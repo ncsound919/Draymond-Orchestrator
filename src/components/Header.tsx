@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
@@ -19,7 +19,7 @@ const modules = [
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
   useEffect(() => {
@@ -28,7 +28,7 @@ export default function Header() {
       setUser(session?.user ?? null);
     });
     return () => subscription.unsubscribe();
-  }, [supabase.auth]);
+  }, [supabase]);
 
   async function handleSignOut() {
     await supabase.auth.signOut();
