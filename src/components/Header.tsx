@@ -13,6 +13,7 @@ const modules = [
   { name: 'Ventures', href: '/modules/ventures' },
   { name: 'Justice', href: '/modules/justice' },
   { name: 'Community', href: '/modules/community' },
+  { name: 'Initiatives', href: '/initiatives' },
 ];
 
 export default function Header() {
@@ -27,7 +28,7 @@ export default function Header() {
       setUser(session?.user ?? null);
     });
     return () => subscription.unsubscribe();
-  }, []);
+  }, [supabase.auth]);
 
   async function handleSignOut() {
     await supabase.auth.signOut();
