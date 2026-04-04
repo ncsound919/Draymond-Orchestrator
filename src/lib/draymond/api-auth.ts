@@ -92,5 +92,6 @@ export function sanitizeError(err: unknown): string {
     return 'Internal database error';
   }
 
-  return raw;
+  // Default: return generic message to avoid leaking internal details
+  return 'An unexpected error occurred';
 }

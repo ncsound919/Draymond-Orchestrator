@@ -5,10 +5,17 @@ import { getPendingActions } from '@/lib/draymond/index';
 import ApprovalsDashboard from './ApprovalsDashboard';
 
 export default async function ApprovalsPage() {
-  const pendingActions = await getPendingActions();
+  let pendingActions: Awaited<ReturnType<typeof getPendingActions>> = [];
+
+  try {
+    pendingActions = await getPendingActions();
+  } catch (err) {
+    console.error('[ApprovalsPage] Failed to load pending actions:', err);
+    // Continue with empty array — dashboard will show empty state
+  }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <div className="min-h-screen text-white">
       {/* Header section */}
       <div className="border-b border-white/10 px-6 py-6">
         <div className="max-w-5xl mx-auto flex items-center justify-between">

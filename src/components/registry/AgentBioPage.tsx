@@ -138,7 +138,7 @@ export default function AgentBioPage({ agent, entity }: { agent: RegisteredAgent
   const accent = agent.theme.accentColor;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <div className="min-h-screen text-white">
       {/* Hero cover */}
       <div
         className="relative h-72 w-full"
@@ -181,7 +181,7 @@ export default function AgentBioPage({ agent, entity }: { agent: RegisteredAgent
                 className="w-full h-full flex items-center justify-center text-5xl font-black"
                 style={{ color: accent }}
               >
-                {agent.name[0]}
+                {(agent.name || '?')[0]}
               </div>
             )}
           </div>

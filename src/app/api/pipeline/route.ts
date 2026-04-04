@@ -31,15 +31,20 @@ import { createClient } from '@/lib/supabase/server'
 import { randomUUID } from 'crypto'
 import { spawn } from 'child_process'
 import path from 'path'
+import { authorizeRequest, parseJsonBody, sanitizeError } from '@/lib/draymond/api-auth'
 
 // Path to the Content-Creation-Engine repo on the same host
 const ENGINE_ROOT = process.env.CCE_ROOT ?? path.join(process.cwd(), '..', 'Content-Creation-Engine-')
 const PYTHON_BIN = process.env.CCE_PYTHON ?? 'python3'
 
 export async function POST(req: NextRequest) {
+  const authError = authorizeRequest(req);
+  if (authError) return authError;
+
   try {
-    const body = await req.json()
-    const { episode_id, topic, characters, dry_run = false } = body
+    const result = await parseJsonBody<{ episode_id?: string; topic?: string; characters?: string[]; dry_run?: boolean }>(req);
+    if (result.error) return result.error;
+    const { episode_id, topic, characters, dry_run = false } = result.data
 
     if (!episode_id || typeof episode_id !== 'string') {
       return NextResponse.json(
@@ -69,7 +74,7 @@ export async function POST(req: NextRequest) {
 
     if (dbError) {
       console.error('[pipeline] Supabase upsert error:', dbError)
-      return NextResponse.json({ error: dbError.message }, { status: 500 })
+      return NextResponse.json({ error: sanitizeError(dbError) }, { status: 500 })
     }
 
     // Launch pipeline as async child process
@@ -79,7 +84,7 @@ export async function POST(req: NextRequest) {
       '--episode', episode_id,
       '--run-id', run_id,
     ]
-    if (topic) args.push('--topic', topic)
+    if (topic) args.push('--topic', topic.replace(/[^a-zA-Z0-9 _\-,.!?]/g, ''))
     if (dry_run) args.push('--dry-run')
     if (characters?.length) args.push('--characters', characters.join(','))
 

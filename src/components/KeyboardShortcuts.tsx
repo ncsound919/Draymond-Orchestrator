@@ -31,7 +31,7 @@ export default function KeyboardShortcuts() {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
       <div className="glass-card w-full max-w-md p-6 mx-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-white">Keyboard Shortcuts</h2>

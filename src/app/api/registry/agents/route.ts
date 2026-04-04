@@ -5,8 +5,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllAgents, upsertAgent } from '@/lib/registry/agent-store';
 import { RegisteredAgent } from '@/lib/registry/types';
+import { authorizeRequest, parseJsonBody } from '@/lib/draymond/api-auth';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authError = authorizeRequest(request);
+  if (authError) return authError;
+
   try {
     const agents = await getAllAgents();
     return NextResponse.json({ agents, total: agents.length });
@@ -19,8 +23,13 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const authError = authorizeRequest(request);
+  if (authError) return authError;
+
   try {
-    const body = await request.json() as Partial<RegisteredAgent>;
+    const bodyResult = await parseJsonBody<Partial<RegisteredAgent>>(request);
+    if (bodyResult.error) return bodyResult.error;
+    const body = bodyResult.data;
     if (!body.id || !body.name || !body.slug) {
       return NextResponse.json(
         { error: 'id, name, and slug are required' },

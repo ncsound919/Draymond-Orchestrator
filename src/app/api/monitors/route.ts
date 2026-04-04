@@ -8,32 +8,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listMonitors, createMonitor } from '@/lib/draymond/monitors';
 import type { MonitorListFilters } from '@/lib/draymond/monitors';
+import { authorizeRequest, parseJsonBody } from '@/lib/draymond/api-auth';
 
 export const dynamic = 'force-dynamic';
 
-// ---------------------------------------------------------------------------
-// Auth helper (mirrors /api/cron pattern)
-// ---------------------------------------------------------------------------
-
-function checkCronAuth(request: NextRequest): NextResponse | null {
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) {
-    console.error('[api/monitors] CRON_SECRET env var is not set');
-    return NextResponse.json(
-      { error: 'Server misconfiguration: CRON_SECRET not set' },
-      { status: 500 },
-    );
-  }
-  const authHeader = request.headers.get('authorization');
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  if (token !== cronSecret) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  return null;
-}
-
 export async function GET(request: NextRequest) {
-  const authError = checkCronAuth(request);
+  const authError = authorizeRequest(request);
   if (authError) return authError;
 
   try {
@@ -52,7 +32,8 @@ export async function GET(request: NextRequest) {
 
     const limitParam = searchParams.get('limit');
     if (limitParam) {
-      filters.limit = parseInt(limitParam, 10);
+      const parsed = parseInt(limitParam, 10);
+      filters.limit = isNaN(parsed) ? 100 : Math.min(Math.max(parsed, 1), 500);
     }
 
     const monitors = await listMonitors(filters);
@@ -71,12 +52,14 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const authError = checkCronAuth(request);
+  const authError = authorizeRequest(request);
   if (authError) return authError;
 
   try {
-    const body = await request.json();
-    const { name, url } = body;
+    const bodyResult = await parseJsonBody<Record<string, unknown>>(request);
+    if (bodyResult.error) return bodyResult.error;
+    const body = bodyResult.data;
+    const { name, url } = body as { name?: string; url?: string };
 
     // Validate required fields
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -106,13 +89,15 @@ export async function POST(request: NextRequest) {
     const monitor = await createMonitor({
       name: name.trim(),
       url,
-      check_interval_seconds: body.check_interval_seconds,
-      expected_status_code: body.expected_status_code,
-      timeout_ms: body.timeout_ms,
-      max_failures_before_alert: body.max_failures_before_alert,
-      notify_on_down: body.notify_on_down,
-      notify_on_recovery: body.notify_on_recovery,
-      metadata: body.metadata,
+      check_interval_seconds: typeof body.check_interval_seconds === 'number' ? body.check_interval_seconds : undefined,
+      expected_status_code: typeof body.expected_status_code === 'number' ? body.expected_status_code : undefined,
+      timeout_ms: typeof body.timeout_ms === 'number' ? body.timeout_ms : undefined,
+      max_failures_before_alert: typeof body.max_failures_before_alert === 'number' ? body.max_failures_before_alert : undefined,
+      notify_on_down: typeof body.notify_on_down === 'boolean' ? body.notify_on_down : undefined,
+      notify_on_recovery: typeof body.notify_on_recovery === 'boolean' ? body.notify_on_recovery : undefined,
+      metadata: (typeof body.metadata === 'object' && body.metadata !== null && !Array.isArray(body.metadata))
+        ? body.metadata as Record<string, unknown>
+        : undefined,
     });
 
     return NextResponse.json({ ok: true, monitor }, { status: 201 });

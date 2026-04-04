@@ -6,6 +6,7 @@ import type { DraymondAgent, DraymondChain, DraymondEntity } from '@/lib/draymon
 import type { ScheduledJob } from '@/lib/draymond/scheduler';
 import type { SiteMonitor } from '@/lib/draymond/monitors';
 import type { NotificationRecord } from '@/lib/draymond/notifications';
+import QuickActionButton from '@/components/QuickActionButton';
 
 export const metadata: Metadata = {
   title: 'Operations Center | Draymond Orchestrator',
@@ -202,8 +203,23 @@ export default async function OperationsPage() {
   //   .from('profiles').select('role').eq('id', user.id).single();
   // if (!profile || profile.role !== 'admin') redirect('/');
 
-  const { agents, entities, chains, jobs, monitors, notifications } =
-      await fetchDashboardData();
+  let data: Awaited<ReturnType<typeof fetchDashboardData>>;
+  try {
+    data = await fetchDashboardData();
+  } catch (err) {
+    console.error('[OperationsPage] Failed to load dashboard data:', err);
+    return (
+      <div className="min-h-screen text-white">
+        <div className="max-w-6xl mx-auto px-4 py-24 text-center">
+          <p className="text-5xl mb-4 opacity-40">&#x26A0;</p>
+          <h1 className="text-xl font-bold mb-2">Failed to load operations data</h1>
+          <p className="text-white/40 text-sm">Could not connect to the database. Check your Supabase configuration and try again.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const { agents, entities, chains, jobs, monitors, notifications } = data;
 
   // Count from both draymond_agents AND draymond_entities for the status banner.
   // Agents (legacy) use status/consecutive_errors; entities use is_active.
@@ -445,11 +461,11 @@ export default async function OperationsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-white/[0.06] bg-gray-900/80 text-gray-400 text-xs uppercase tracking-wider">
-                    <th className="px-4 py-3 text-left font-medium">Name</th>
-                    <th className="px-4 py-3 text-left font-medium">Status</th>
-                    <th className="px-4 py-3 text-left font-medium">Progress</th>
-                    <th className="px-4 py-3 text-left font-medium">Duration</th>
-                    <th className="px-4 py-3 text-left font-medium">Started</th>
+                    <th className="px-4 py-3 text-left font-medium" scope="col">Name</th>
+                    <th className="px-4 py-3 text-left font-medium" scope="col">Status</th>
+                    <th className="px-4 py-3 text-left font-medium" scope="col">Progress</th>
+                    <th className="px-4 py-3 text-left font-medium" scope="col">Duration</th>
+                    <th className="px-4 py-3 text-left font-medium" scope="col">Started</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.04]">
@@ -515,12 +531,12 @@ export default async function OperationsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-white/[0.06] bg-gray-900/80 text-gray-400 text-xs uppercase tracking-wider">
-                    <th className="px-4 py-3 text-left font-medium">Name</th>
-                    <th className="px-4 py-3 text-left font-medium">Cron</th>
-                    <th className="px-4 py-3 text-left font-medium">Next Run</th>
-                    <th className="px-4 py-3 text-left font-medium">Last Status</th>
-                    <th className="px-4 py-3 text-right font-medium">Runs</th>
-                    <th className="px-4 py-3 text-center font-medium">Enabled</th>
+                    <th className="px-4 py-3 text-left font-medium" scope="col">Name</th>
+                    <th className="px-4 py-3 text-left font-medium" scope="col">Cron</th>
+                    <th className="px-4 py-3 text-left font-medium" scope="col">Next Run</th>
+                    <th className="px-4 py-3 text-left font-medium" scope="col">Last Status</th>
+                    <th className="px-4 py-3 text-right font-medium" scope="col">Runs</th>
+                    <th className="px-4 py-3 text-center font-medium" scope="col">Enabled</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.04]">
@@ -656,12 +672,12 @@ export default async function OperationsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-white/[0.06] bg-gray-900/80 text-gray-400 text-xs uppercase tracking-wider">
-                    <th className="px-4 py-3 text-left font-medium">Type</th>
-                    <th className="px-4 py-3 text-left font-medium">Subject</th>
-                    <th className="px-4 py-3 text-left font-medium">Recipient</th>
-                    <th className="px-4 py-3 text-left font-medium">Priority</th>
-                    <th className="px-4 py-3 text-left font-medium">Sent</th>
-                    <th className="px-4 py-3 text-left font-medium">Status</th>
+                    <th scope="col" className="px-4 py-3 text-left font-medium">Type</th>
+                    <th scope="col" className="px-4 py-3 text-left font-medium">Subject</th>
+                    <th scope="col" className="px-4 py-3 text-left font-medium">Recipient</th>
+                    <th scope="col" className="px-4 py-3 text-left font-medium">Priority</th>
+                    <th scope="col" className="px-4 py-3 text-left font-medium">Sent</th>
+                    <th scope="col" className="px-4 py-3 text-left font-medium">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.04]">
@@ -766,42 +782,3 @@ export default async function OperationsPage() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Quick Action Button (server-rendered link styled as button)
-// ---------------------------------------------------------------------------
-
-function QuickActionButton({
-  label,
-  endpoint,
-  method,
-  color,
-}: {
-  label: string;
-  endpoint: string;
-  method: string;
-  color: 'green' | 'blue' | 'purple' | 'yellow';
-}) {
-  const colorStyles = {
-    green:
-      'border-green-500/30 text-green-400 hover:bg-green-500/10 hover:border-green-500/50',
-    blue: 'border-blue-500/30 text-blue-400 hover:bg-blue-500/10 hover:border-blue-500/50',
-    purple:
-      'border-purple-500/30 text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/50',
-    yellow:
-      'border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10 hover:border-yellow-500/50',
-  };
-
-  return (
-    <a
-      href={endpoint}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors ${colorStyles[color]}`}
-    >
-      <span className="font-mono text-[10px] uppercase tracking-wider opacity-60">
-        {method}
-      </span>
-      {label}
-    </a>
-  );
-}

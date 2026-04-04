@@ -9,10 +9,30 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function AgentsPage() {
-  const agents = await getAllAgents();
+  let agents: Awaited<ReturnType<typeof getAllAgents>> = [];
+  let fetchError = false;
+
+  try {
+    agents = await getAllAgents();
+  } catch (err) {
+    console.error('[AgentsPage] Failed to load agents:', err);
+    fetchError = true;
+  }
+
+  if (fetchError) {
+    return (
+      <div className="min-h-screen text-white">
+        <div className="max-w-7xl mx-auto px-6 py-24 text-center">
+          <p className="text-5xl mb-4 opacity-40">&#x26A0;</p>
+          <h1 className="text-xl font-bold mb-2">Failed to load agents</h1>
+          <p className="text-white/40 text-sm">Could not connect to the agent registry. Check your configuration and try again.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <div className="min-h-screen text-white">
       {/* Header */}
       <div className="border-b border-white/10 px-6 py-6">
         <div className="max-w-7xl mx-auto flex items-center justify-between">

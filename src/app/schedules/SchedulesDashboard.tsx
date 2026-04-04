@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { createScheduledJob, toggleJob, removeJob } from './actions';
 
 // ---------------------------------------------------------------------------
@@ -163,6 +163,18 @@ export default function SchedulesDashboard({ initialJobs, chainOptions }: Props)
   const [isPending, startTransition] = useTransition();
   const [pendingJobId, setPendingJobId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [jobs, setJobs] = useState<Job[]>(initialJobs);
+  const [loadedAt, setLoadedAt] = useState('');
+
+  // Hydration-safe timestamp — only runs on client
+  useEffect(() => {
+    setLoadedAt(new Date().toISOString().replace('T', ' ').slice(0, 19));
+  }, []);
+
+  // Keep jobs in sync when server re-renders with fresh initialJobs
+  useEffect(() => {
+    setJobs(initialJobs);
+  }, [initialJobs]);
 
   // Form state
   const [name, setName] = useState('');
@@ -255,7 +267,7 @@ export default function SchedulesDashboard({ initialJobs, chainOptions }: Props)
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Schedules</h1>
           <p className="mt-1 text-sm text-white/40">
-            {initialJobs.length} scheduled job{initialJobs.length !== 1 ? 's' : ''}
+            {jobs.length} scheduled job{jobs.length !== 1 ? 's' : ''}
           </p>
         </div>
         <button
@@ -263,6 +275,7 @@ export default function SchedulesDashboard({ initialJobs, chainOptions }: Props)
             setShowForm((v) => !v);
             if (showForm) resetForm();
           }}
+          aria-expanded={showForm}
           className="rounded-lg px-4 py-2 bg-[#22c55e] hover:bg-[#16a34a] text-black text-sm font-semibold transition-colors"
         >
           {showForm ? 'Cancel' : 'New Job'}
@@ -435,7 +448,7 @@ export default function SchedulesDashboard({ initialJobs, chainOptions }: Props)
           All Jobs
         </h2>
 
-        {initialJobs.length === 0 ? (
+        {jobs.length === 0 ? (
           <div className="rounded-xl bg-white/5 border border-white/10 p-10 text-center">
             <p className="text-white/40 text-sm">No scheduled jobs yet.</p>
             <p className="text-white/20 text-xs mt-1">
@@ -447,19 +460,19 @@ export default function SchedulesDashboard({ initialJobs, chainOptions }: Props)
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/10 text-white/40 text-xs uppercase tracking-wider">
-                  <th className="px-5 py-3 text-left font-medium">Name</th>
-                  <th className="px-5 py-3 text-left font-medium">Schedule</th>
-                  <th className="px-5 py-3 text-left font-medium">Type</th>
-                  <th className="px-5 py-3 text-left font-medium">Status</th>
-                  <th className="px-5 py-3 text-left font-medium">Next Run</th>
-                  <th className="px-5 py-3 text-right font-medium">Runs</th>
-                  <th className="px-5 py-3 text-right font-medium">Fails</th>
-                  <th className="px-5 py-3 text-center font-medium">Enabled</th>
-                  <th className="px-5 py-3 text-right font-medium">Actions</th>
+                  <th className="px-5 py-3 text-left font-medium" scope="col">Name</th>
+                  <th className="px-5 py-3 text-left font-medium" scope="col">Schedule</th>
+                  <th className="px-5 py-3 text-left font-medium" scope="col">Type</th>
+                  <th className="px-5 py-3 text-left font-medium" scope="col">Status</th>
+                  <th className="px-5 py-3 text-left font-medium" scope="col">Next Run</th>
+                  <th className="px-5 py-3 text-right font-medium" scope="col">Runs</th>
+                  <th className="px-5 py-3 text-right font-medium" scope="col">Fails</th>
+                  <th className="px-5 py-3 text-center font-medium" scope="col">Enabled</th>
+                  <th className="px-5 py-3 text-right font-medium" scope="col">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {initialJobs.map((job) => (
+                {jobs.map((job) => (
                   <tr
                     key={job.id}
                     className="hover:bg-white/[0.02] transition-colors"
@@ -577,7 +590,7 @@ export default function SchedulesDashboard({ initialJobs, chainOptions }: Props)
       <div className="border-t border-white/5 pt-6 pb-4">
         <p className="text-xs text-white/20 text-center">
           Draymond Scheduler &mdash; Last loaded:{' '}
-          {new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC
+          {loadedAt || '...'} UTC
         </p>
       </div>
     </div>

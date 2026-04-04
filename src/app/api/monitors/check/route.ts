@@ -6,17 +6,13 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAllSites } from '@/lib/draymond/monitors';
+import { authorizeRequest } from '@/lib/draymond/api-auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  // Authenticate via CRON_SECRET
-  const authHeader = request.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const authError = authorizeRequest(request);
+  if (authError) return authError;
 
   try {
     const results = await checkAllSites();

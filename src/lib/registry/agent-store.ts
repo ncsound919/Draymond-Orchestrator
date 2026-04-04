@@ -26,8 +26,32 @@ async function readStore(): Promise<RegistryStore> {
   await ensureDir();
   try {
     const raw = await fs.readFile(REGISTRY_FILE, 'utf-8');
-    return JSON.parse(raw) as RegistryStore;
-  } catch {
+    const parsed: unknown = JSON.parse(raw);
+
+    // Runtime shape validation — must be an object with expected arrays
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      !Array.isArray((parsed as Record<string, unknown>).agents) ||
+      !Array.isArray((parsed as Record<string, unknown>).workflows) ||
+      !Array.isArray((parsed as Record<string, unknown>).systems)
+    ) {
+      console.error('[agent-store] registry.json has invalid shape, returning empty store');
+      return { agents: [], workflows: [], systems: [], updatedAt: new Date().toISOString() };
+    }
+
+    return parsed as RegistryStore;
+  } catch (err) {
+    // Log non-ENOENT errors (corrupt file, bad JSON, etc.)
+    if (err instanceof SyntaxError) {
+      console.error('[agent-store] registry.json contains invalid JSON:', err.message);
+    } else if (
+      err instanceof Error &&
+      'code' in err &&
+      (err as NodeJS.ErrnoException).code !== 'ENOENT'
+    ) {
+      console.error('[agent-store] Failed to read registry.json:', err.message);
+    }
     return { agents: [], workflows: [], systems: [], updatedAt: new Date().toISOString() };
   }
 }

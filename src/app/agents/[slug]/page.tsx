@@ -7,7 +7,14 @@ export const dynamic = 'force-dynamic';
 
 export default async function AgentPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const agent = await getAgentBySlug(slug);
+
+  let agent: Awaited<ReturnType<typeof getAgentBySlug>>;
+  try {
+    agent = await getAgentBySlug(slug);
+  } catch (err) {
+    console.error('[AgentPage] Failed to load agent:', err);
+    notFound();
+  }
   if (!agent) notFound();
 
   // Try to find a matching Supabase entity for enhanced controls

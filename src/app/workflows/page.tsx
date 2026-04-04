@@ -47,10 +47,30 @@ function formatDate(iso: string): string {
 // ---------------------------------------------------------------------------
 
 export default async function WorkflowsPage() {
-  const chains = await listChains({ is_template: true });
+  let chains: Awaited<ReturnType<typeof listChains>> = [];
+  let fetchError = false;
+
+  try {
+    chains = await listChains({ is_template: true });
+  } catch (err) {
+    console.error('[WorkflowsPage] Failed to load chains:', err);
+    fetchError = true;
+  }
+
+  if (fetchError) {
+    return (
+      <div className="min-h-screen text-white">
+        <div className="max-w-7xl mx-auto px-6 py-24 text-center">
+          <p className="text-5xl mb-4 opacity-40">&#x26A0;</p>
+          <h1 className="text-xl font-bold mb-2">Failed to load workflows</h1>
+          <p className="text-white/40 text-sm">Could not fetch workflow templates. Check your database connection and try again.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <div className="min-h-screen text-white">
       {/* Header */}
       <div className="border-b border-white/10 px-6 py-6">
         <div className="max-w-7xl mx-auto flex items-center justify-between">

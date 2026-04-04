@@ -29,6 +29,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+dev-stderr.log
+dev-stdout.log
 
 # env files (can opt-in for committing if needed)
 .env*.local
@@ -40,6 +42,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Draymond operational data store
+/.draymond/
 
 # Non-project directories
 /downloads/

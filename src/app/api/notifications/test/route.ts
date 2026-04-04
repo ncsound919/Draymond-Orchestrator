@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendNotification } from '@/lib/draymond/notifications';
+import { authorizeRequest, parseJsonBody } from '@/lib/draymond/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,15 +9,13 @@ export const dynamic = 'force-dynamic';
 // ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest) {
-  // Authenticate via CRON_SECRET
-  const authHeader = request.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const authError = authorizeRequest(request);
+  if (authError) return authError;
 
   try {
-    const { recipient } = (await request.json()) as { recipient?: string };
+    const bodyResult = await parseJsonBody<{ recipient?: string }>(request);
+    if (bodyResult.error) return bodyResult.error;
+    const { recipient } = bodyResult.data;
 
     if (!recipient || typeof recipient !== 'string') {
       return NextResponse.json(

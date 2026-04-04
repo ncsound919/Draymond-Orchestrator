@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { appendAuditLog } from '@/lib/audit';
+import { authorizeRequest, parseJsonBody } from '@/lib/draymond/api-auth';
 
 const VALID_AGENTS = new Set([
   'megacode', 'uplift', 'rex', 'maya', 'finn', 'cleo', 'lexa',
@@ -90,8 +91,13 @@ function parseLLMResponse(raw: string): DecomposeResponse {
 }
 
 export async function POST(request: NextRequest) {
+  const authError = authorizeRequest(request);
+  if (authError) return authError;
+
   try {
-    const body = await request.json();
+    const bodyResult = await parseJsonBody(request);
+    if (bodyResult.error) return bodyResult.error;
+    const body = bodyResult.data as Record<string, unknown>;
 
     const goal =
       typeof body?.goal === 'string' ? body.goal.trim() : '';
@@ -115,7 +121,7 @@ export async function POST(request: NextRequest) {
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
     if (!ANTHROPIC_API_KEY)
       return NextResponse.json(
-        { error: 'ANTHROPIC_API_KEY not configured' },
+        { error: 'Internal server error' },
         { status: 500 },
       );
 

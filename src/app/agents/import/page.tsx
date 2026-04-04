@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 export default function ImportPage() {
   const router = useRouter();
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white px-6 py-12">
+    <div className="min-h-screen text-white px-6 py-12">
       <div className="max-w-xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-black tracking-tight">Import Agent Pack</h1>

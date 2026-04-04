@@ -66,12 +66,14 @@ interface EntitySeedDef {
 const ENTITY_DEFS: EntitySeedDef[] = [
   // ── 1. Uplift Agent ─────────────────────────────────────────────────
   // Primary worker agent — Hermes fork with batch_server.py + Draymond bridge
+  // Empowered with: Sub Team tools (5), MegaCode tools (3), 14 superpowers skills,
+  // 179 Claude/CCE skills, and 52+ total registered tools.
   {
     name: 'Uplift Agent',
     slug: 'uplift-agent',
     kind: 'agent',
     description:
-      'General-purpose automation agent (Hermes fork). Handles code execution, web research, file ops, and multi-agent coordination via batch_server.py.',
+      'General-purpose automation agent (Hermes fork). 52+ tools including Sub Team CPU pipeline (5 tools), MegaCode code completion (3 tools), terminal, browser, file ops, web research, delegation, and multi-agent coordination. 193+ skills across superpowers, Claude/CCE, and domain-specific catalogs. Served via batch_server.py.',
     invocation_method: 'api_call',
     invocation_config: {
       url: agentUrl('UPLIFT_BASE_URL', 'http://localhost:8000'),
@@ -90,8 +92,13 @@ const ENTITY_DEFS: EntitySeedDef[] = [
       'web_research',
       'file_operations',
       'multi_agent_coordination',
+      'cpu_rtl_generation',
+      'code_completion',
+      'skill_execution',
+      'sub_team_pipeline',
+      'megacode_bridge',
     ],
-    tags: ['core', 'automation', 'hermes'],
+    tags: ['core', 'automation', 'hermes', 'sub-team', 'megacode', 'skills'],
     category: 'automation',
     health_endpoint: '/health',
   },
@@ -652,6 +659,69 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
         output_key: 'validation',
         step_order: 3,
         depends_on_indices: [1],
+      },
+    ],
+  },
+
+  // ── Chain 5b: CPU RTL Generation Pipeline ──────────────────────────
+  // Uses Uplift Agent's Sub Team tools for end-to-end CPU design
+  {
+    name: 'CPU RTL Generation Pipeline',
+    slug: 'cpu-rtl-generation',
+    description:
+      'End-to-end CPU RTL generation via Uplift Agent Sub Team tools: specification, microarchitecture design, Verilog implementation, and formal verification.',
+    steps: [
+      {
+        name: 'CPU Specification',
+        entitySlug: 'uplift-agent',
+        action: 'batch',
+        input_mapping: {
+          task: 'sub_team_spec',
+          isa: '$.input.isa',
+          pipeline_template: '$.input.pipeline_template',
+          extensions: '$.input.extensions',
+        },
+        output_key: 'formal_spec',
+        step_order: 1,
+        depends_on_indices: [],
+      },
+      {
+        name: 'Microarchitecture Design',
+        entitySlug: 'uplift-agent',
+        action: 'batch',
+        input_mapping: {
+          task: 'sub_team_microarch',
+          spec: '$.steps.formal_spec.output',
+        },
+        output_key: 'microarch_plan',
+        step_order: 2,
+        depends_on_indices: [0],
+      },
+      {
+        name: 'Verilog Implementation',
+        entitySlug: 'uplift-agent',
+        action: 'batch',
+        input_mapping: {
+          task: 'sub_team_implement',
+          spec: '$.steps.formal_spec.output',
+          plan: '$.steps.microarch_plan.output',
+        },
+        output_key: 'rtl_output',
+        step_order: 3,
+        depends_on_indices: [1],
+      },
+      {
+        name: 'Formal Verification',
+        entitySlug: 'uplift-agent',
+        action: 'batch',
+        input_mapping: {
+          task: 'sub_team_verify',
+          spec: '$.steps.formal_spec.output',
+          rtl: '$.steps.rtl_output.output',
+        },
+        output_key: 'verification_report',
+        step_order: 4,
+        depends_on_indices: [2],
       },
     ],
   },

@@ -52,6 +52,11 @@ export default function AgentCard({ agent }: { agent: RegisteredAgent }) {
   const personalityColor = PERSONALITY_COLORS[agent.personality] ?? '#6366f1';
   const clip = FRAME_CLIP[agent.theme.portraitFrame] ?? '';
 
+  /** Sanitize URLs for use in CSS background-image to prevent CSS injection */
+  const safeCoverUrl = agent.coverUrl
+    ? agent.coverUrl.replace(/['"()\\;{}]/g, '')
+    : undefined;
+
   return (
     <Link
       href={`/agents/${agent.slug}`}
@@ -65,8 +70,8 @@ export default function AgentCard({ agent }: { agent: RegisteredAgent }) {
       <div
         className="relative h-36 w-full overflow-hidden"
         style={{
-          background: agent.coverUrl
-            ? `url(${agent.coverUrl}) center/cover`
+          background: safeCoverUrl
+            ? `url(${safeCoverUrl}) center/cover`
             : `linear-gradient(135deg, ${accent}33, ${accent}11)`,
         }}
       >
@@ -106,7 +111,7 @@ export default function AgentCard({ agent }: { agent: RegisteredAgent }) {
               className="w-full h-full flex items-center justify-center text-2xl font-bold"
               style={{ color: accent }}
             >
-              {agent.name[0]}
+              {(agent.name || '?')[0]}
             </div>
           )}
         </div>

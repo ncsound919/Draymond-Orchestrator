@@ -79,15 +79,23 @@ export default async function WorkflowDetailPage({
 }) {
   const { id } = await params;
 
-  const [chain, steps] = await Promise.all([
-    getChain(id),
-    getChainSteps(id),
-  ]);
+  let chain: Awaited<ReturnType<typeof getChain>>;
+  let steps: Awaited<ReturnType<typeof getChainSteps>> = [];
+
+  try {
+    [chain, steps] = await Promise.all([
+      getChain(id),
+      getChainSteps(id),
+    ]);
+  } catch (err) {
+    console.error('[WorkflowDetailPage] Failed to load chain:', err);
+    notFound();
+  }
 
   if (!chain) notFound();
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <div className="min-h-screen text-white">
       {/* Header */}
       <div className="border-b border-white/10 px-6 py-6">
         <div className="max-w-7xl mx-auto">

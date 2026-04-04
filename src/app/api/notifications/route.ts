@@ -5,36 +5,16 @@ import {
   type NotificationType,
   type NotificationPriority,
 } from '@/lib/draymond/notifications';
+import { authorizeRequest, parseJsonBody } from '@/lib/draymond/api-auth';
 
 export const dynamic = 'force-dynamic';
-
-// ---------------------------------------------------------------------------
-// Auth helper (mirrors /api/cron pattern)
-// ---------------------------------------------------------------------------
-
-function checkCronAuth(request: NextRequest): NextResponse | null {
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) {
-    console.error('[api/notifications] CRON_SECRET env var is not set');
-    return NextResponse.json(
-      { error: 'Server misconfiguration: CRON_SECRET not set' },
-      { status: 500 },
-    );
-  }
-  const authHeader = request.headers.get('authorization');
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  if (token !== cronSecret) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  return null;
-}
 
 // ---------------------------------------------------------------------------
 // GET /api/notifications — list notification history
 // ---------------------------------------------------------------------------
 
 export async function GET(request: NextRequest) {
-  const authError = checkCronAuth(request);
+  const authError = authorizeRequest(request);
   if (authError) return authError;
 
   try {
@@ -60,7 +40,7 @@ export async function GET(request: NextRequest) {
       type: type ?? undefined,
       priority: priority ?? undefined,
       since,
-      limit: limit && !isNaN(limit) ? limit : undefined,
+      limit: limit && !isNaN(limit) ? Math.min(Math.max(limit, 1), 500) : undefined,
     });
 
     return NextResponse.json({ notifications: history, count: history.length });
@@ -78,11 +58,13 @@ export async function GET(request: NextRequest) {
 // ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest) {
-  const authError = checkCronAuth(request);
+  const authError = authorizeRequest(request);
   if (authError) return authError;
 
   try {
-    const body = await request.json();
+    const bodyResult = await parseJsonBody<Record<string, unknown>>(request);
+    if (bodyResult.error) return bodyResult.error;
+    const body = bodyResult.data;
 
     const { recipient, subject, body: messageBody, type, priority } = body as {
       recipient?: string;

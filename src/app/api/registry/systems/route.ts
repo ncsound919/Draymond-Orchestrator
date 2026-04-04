@@ -5,15 +5,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllSystems, upsertSystem } from '@/lib/registry/agent-store';
 import { RegisteredSystem } from '@/lib/registry/types';
+import { authorizeRequest, parseJsonBody } from '@/lib/draymond/api-auth';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authError = authorizeRequest(request);
+  if (authError) return authError;
+
   const systems = await getAllSystems();
   return NextResponse.json({ systems, total: systems.length });
 }
 
 export async function POST(request: NextRequest) {
+  const authError = authorizeRequest(request);
+  if (authError) return authError;
+
   try {
-    const body = await request.json() as Partial<RegisteredSystem>;
+    const bodyResult = await parseJsonBody<Partial<RegisteredSystem>>(request);
+    if (bodyResult.error) return bodyResult.error;
+    const body = bodyResult.data;
     if (!body.id || !body.name || !body.type) {
       return NextResponse.json({ error: 'id, name, and type are required' }, { status: 400 });
     }

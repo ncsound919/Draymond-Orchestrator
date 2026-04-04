@@ -421,7 +421,29 @@ async function invokeSubprocess(
     return failResult('invocation_config.command is required for subprocess', Date.now() - start);
   }
 
+  // Validate command against allowlist (matches cli_command handler security)
+  if (!ALLOWED_CLI_COMMANDS.has(command)) {
+    return failResult(
+      `Command "${command}" is not in the allowed command list. ` +
+      `Allowed: ${[...ALLOWED_CLI_COMMANDS].join(', ')}`,
+      Date.now() - start,
+    );
+  }
+
   const args = (config.args ?? []) as string[];
+
+  // Check for blocked argument patterns
+  for (const arg of args) {
+    for (const pattern of BLOCKED_ARG_PATTERNS) {
+      if (pattern.test(arg)) {
+        return failResult(
+          `Blocked argument pattern "${arg}" detected in subprocess args`,
+          Date.now() - start,
+        );
+      }
+    }
+  }
+
   const timeoutMs = resolveTimeoutMs(entity, options);
 
   return new Promise<InvocationResult>((resolve) => {

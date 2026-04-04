@@ -24,6 +24,7 @@
 
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { authorizeRequest } from '@/lib/draymond/api-auth'
 
 const POLL_INTERVAL_MS = 2000
 const MAX_POLL_DURATION_MS = 4 * 60 * 60 * 1000 // 4 hours max
@@ -58,6 +59,9 @@ interface EpisodeRow {
 }
 
 export async function GET(req: NextRequest) {
+  const authError = authorizeRequest(req);
+  if (authError) return authError;
+
   const run_id = req.nextUrl.searchParams.get('id')
 
   if (!run_id) {

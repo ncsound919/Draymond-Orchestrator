@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { appendAuditLog } from '@/lib/audit';
+import { authorizeRequest, parseJsonBody } from '@/lib/draymond/api-auth';
 
 const VALID_AGENTS = new Set([
   'megacode', 'uplift', 'rex', 'maya', 'finn', 'cleo', 'lexa',
@@ -78,8 +79,13 @@ async function dispatchToUplift(
 }
 
 export async function POST(request: NextRequest) {
+  const authError = authorizeRequest(request);
+  if (authError) return authError;
+
   try {
-    const body = await request.json();
+    const bodyResult = await parseJsonBody(request);
+    if (bodyResult.error) return bodyResult.error;
+    const body = bodyResult.data as Record<string, unknown>;
 
     // --- Input validation ---
     const goal =
@@ -104,7 +110,7 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
 
-    const mode = body?.mode;
+    const mode = typeof body?.mode === 'string' ? body.mode : '';
     if (!VALID_MODES.has(mode))
       return NextResponse.json(
         { error: `mode must be one of: ${[...VALID_MODES].join(', ')}` },
@@ -190,12 +196,14 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authError = authorizeRequest(request);
+  if (authError) return authError;
+
   return NextResponse.json({
     status: 'Draymond Swarm Dispatcher ready',
     modes: [...VALID_MODES],
     agents: [...VALID_AGENTS],
     max_tasks: MAX_TASKS,
-    uplift_url: UPLIFT_BASE_URL,
   });
 }

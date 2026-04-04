@@ -5,8 +5,19 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getAgentBySlug, upsertAgent, deleteAgent, getAllAgents } from '@/lib/registry/agent-store';
+import { authorizeRequest, parseJsonBody } from '@/lib/draymond/api-auth';
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+const PATCHABLE_FIELDS = new Set([
+  'name', 'role', 'bio', 'backstory', 'personality', 'codename',
+  'tier', 'specialties', 'capabilities', 'stats', 'tags', 'theme',
+  'runtime', 'permissions', 'workflows', 'memoryEnabled', 'status',
+  'version', 'avatarUrl', 'coverUrl', 'modelPreferences', 'systemPrompt',
+]);
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+  const authError = authorizeRequest(req);
+  if (authError) return authError;
+
   const { slug } = await params;
   const agent = await getAgentBySlug(slug);
   if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
@@ -14,15 +25,28 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+  const authError = authorizeRequest(request);
+  if (authError) return authError;
+
   const { slug } = await params;
   const agent = await getAgentBySlug(slug);
   if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
-  const updates = await request.json();
-  await upsertAgent({ ...agent, ...updates, updatedAt: new Date().toISOString() });
+  const bodyResult = await parseJsonBody<Record<string, unknown>>(request);
+  if (bodyResult.error) return bodyResult.error;
+  const updates = bodyResult.data;
+  // Only allow known fields to be updated
+  const filtered: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(updates)) {
+    if (PATCHABLE_FIELDS.has(key)) filtered[key] = value;
+  }
+  await upsertAgent({ ...agent, ...filtered, updatedAt: new Date().toISOString() });
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+  const authError = authorizeRequest(req);
+  if (authError) return authError;
+
   const { slug } = await params;
   const agents = await getAllAgents();
   const agent = agents.find((a) => a.slug === slug);

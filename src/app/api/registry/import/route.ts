@@ -10,11 +10,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parseAgentPack } from '@/lib/registry/parse-agent-pack';
 import { upsertAgent, upsertWorkflow } from '@/lib/registry/agent-store';
 import { appendAuditLog } from '@/lib/audit';
+import { authorizeRequest, parseJsonBody } from '@/lib/draymond/api-auth';
 
 export async function POST(request: NextRequest) {
+  const authError = authorizeRequest(request);
+  if (authError) return authError;
+
   try {
-    const body = await request.json();
-    const { folderName, files } = body as { folderName: string; files: Record<string, string> };
+    const bodyResult = await parseJsonBody<{ folderName: string; files: Record<string, string> }>(request);
+    if (bodyResult.error) return bodyResult.error;
+    const { folderName, files } = bodyResult.data;
 
     if (!folderName || typeof folderName !== 'string') {
       return NextResponse.json({ error: 'folderName is required' }, { status: 400 });

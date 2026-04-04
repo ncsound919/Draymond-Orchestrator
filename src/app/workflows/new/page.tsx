@@ -6,24 +6,29 @@
  */
 import { searchEntities } from '@/lib/draymond/registry';
 import WorkflowForm from './WorkflowForm';
+import type { EntityKind } from '@/lib/draymond/types';
 
 export const dynamic = 'force-dynamic';
 
 export default async function NewWorkflowPage() {
-  const entities = await searchEntities({ is_active: true });
+  let entityOptions: { id: string; name: string; slug: string; kind: EntityKind; capabilities: string[] }[] = [];
 
-  // Serialize a slim version for the client — avoids passing
-  // large invocation configs / schemas over the wire.
-  const entityOptions = entities.map((e) => ({
-    id: e.id,
-    name: e.name,
-    slug: e.slug,
-    kind: e.kind,
-    capabilities: e.capabilities,
-  }));
+  try {
+    const entities = await searchEntities({ is_active: true });
+    entityOptions = entities.map((e) => ({
+      id: e.id,
+      name: e.name,
+      slug: e.slug,
+      kind: e.kind,
+      capabilities: e.capabilities,
+    }));
+  } catch (err) {
+    console.error('[NewWorkflowPage] Failed to load entities:', err);
+    // Continue with empty list — form will still work, just no entity dropdown
+  }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <div className="min-h-screen text-white">
       {/* Header */}
       <div className="border-b border-white/10 px-6 py-6">
         <div className="max-w-3xl mx-auto">

@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readAuditLog, appendAuditLog, AuditEntry } from '@/lib/audit';
+import { authorizeRequest, parseJsonBody } from '@/lib/draymond/api-auth';
 
 const MIN_LIMIT = 1;
 const MAX_LIMIT = 500;
 const DEFAULT_LIMIT = 100;
 
 export async function GET(request: NextRequest) {
+  const authError = authorizeRequest(request);
+  if (authError) return authError;
+
   try {
     const { searchParams } = new URL(request.url);
 
@@ -60,8 +64,13 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const authError = authorizeRequest(request);
+  if (authError) return authError;
+
   try {
-    const body = await request.json();
+    const bodyResult = await parseJsonBody(request);
+    if (bodyResult.error) return bodyResult.error;
+    const body = bodyResult.data;
     if (!body || typeof body !== 'object' || Array.isArray(body))
       return NextResponse.json(
         { error: 'Request body must be a JSON object' },

@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dispatchTask, UpliftTaskRequest } from '@/lib/uplift';
 import { appendAuditLog } from '@/lib/audit';
+import { authorizeRequest, parseJsonBody } from '@/lib/draymond/api-auth';
 
 export async function POST(request: NextRequest) {
+  const authError = authorizeRequest(request);
+  if (authError) return authError;
+
   try {
-    const body: UpliftTaskRequest = await request.json();
+    const bodyResult = await parseJsonBody<UpliftTaskRequest>(request);
+    if (bodyResult.error) return bodyResult.error;
+    const body = bodyResult.data;
 
     if (!body.description || !body.agent) {
       return NextResponse.json({ error: 'description and agent are required' }, { status: 400 });

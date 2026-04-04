@@ -14,8 +14,12 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { authorizeRequest } from '@/lib/draymond/api-auth'
 
 export async function GET(req: NextRequest) {
+  const authError = authorizeRequest(req);
+  if (authError) return authError;
+
   const { searchParams } = req.nextUrl
   const limit  = Math.min(parseInt(searchParams.get('limit')  ?? '20', 10), 100)
   const offset = parseInt(searchParams.get('offset') ?? '0',  10)

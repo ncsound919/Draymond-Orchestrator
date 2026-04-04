@@ -363,6 +363,7 @@ export default function WorkflowForm({ entities }: { entities: EntityOption[] })
           <button
             type="button"
             onClick={() => setShowAddStep(true)}
+            aria-expanded={showAddStep}
             className="rounded-lg px-4 py-2 text-sm font-semibold transition-colors bg-white/10 hover:bg-white/20 text-white"
           >
             + Add Step

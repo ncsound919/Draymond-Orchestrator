@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { approveAction, rejectAction } from './actions';
 import type { DraymondAction } from '@/lib/draymond/types';
 
@@ -28,6 +29,7 @@ export default function ApprovalsDashboard({
 }: {
   initialActions: DraymondAction[];
 }) {
+  const router = useRouter();
   const [actions, setActions] = useState(initialActions);
   const [isPending, startTransition] = useTransition();
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -35,14 +37,13 @@ export default function ApprovalsDashboard({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null); // item 37
 
-  // Auto-refresh via page reload (item 39)
+  // Auto-refresh via router.refresh() — re-fetches server data without full page reload
   useEffect(() => {
     const timer = setInterval(() => {
-      // Use router.refresh() pattern — simplest way to get fresh server data
-      window.location.reload();
+      router.refresh();
     }, REFRESH_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, []);
+  }, [router]);
 
   // Clear error message after 5 seconds
   useEffect(() => {
@@ -128,11 +129,11 @@ export default function ApprovalsDashboard({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-white/[0.06] bg-gray-900/80 text-gray-400 text-xs uppercase tracking-wider">
-              <th className="px-4 py-3 text-left font-medium">Action</th>
-              <th className="px-4 py-3 text-left font-medium">Risk</th>
-              <th className="px-4 py-3 text-left font-medium">Confidence</th>
-              <th className="px-4 py-3 text-left font-medium">Submitted</th>
-              <th className="px-4 py-3 text-right font-medium">Review</th>
+              <th className="px-4 py-3 text-left font-medium" scope="col">Action</th>
+              <th className="px-4 py-3 text-left font-medium" scope="col">Risk</th>
+              <th className="px-4 py-3 text-left font-medium" scope="col">Confidence</th>
+              <th className="px-4 py-3 text-left font-medium" scope="col">Submitted</th>
+              <th className="px-4 py-3 text-right font-medium" scope="col">Review</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/[0.04]">

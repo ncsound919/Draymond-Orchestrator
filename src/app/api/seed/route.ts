@@ -13,32 +13,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { seedBusinessAutomation } from '@/lib/draymond/business-chains';
 import { seedAgentMonitors } from '@/lib/draymond/monitors';
+import { authorizeRequest } from '@/lib/draymond/api-auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  const authError = authorizeRequest(request);
+  if (authError) return authError;
+
   const startTime = Date.now();
-
-  // ── Auth check ──────────────────────────────────────────────────────
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (!cronSecret) {
-    console.error('[Seed] CRON_SECRET env var is not set');
-    return NextResponse.json(
-      { error: 'Server misconfiguration: CRON_SECRET not set' },
-      { status: 500 }
-    );
-  }
-
-  const authHeader = request.headers.get('authorization');
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
-
-  if (token !== cronSecret) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    );
-  }
 
   // ── Run seed ────────────────────────────────────────────────────────
   try {
