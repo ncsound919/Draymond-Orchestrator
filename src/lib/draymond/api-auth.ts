@@ -9,13 +9,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
 
+/** Maximum request body size (1 MB). */
+const MAX_BODY_BYTES = 1_048_576;
+
 /**
  * Timing-safe string comparison.
- * Returns false if lengths differ (without leaking which bytes differ).
+ * Always runs timingSafeEqual regardless of length mismatch to avoid
+ * leaking length information through timing side-channels.
  */
 function safeCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  // Pad the shorter buffer so timingSafeEqual always executes over the same length
+  const maxLen = Math.max(bufA.length, bufB.length);
+  const paddedA = Buffer.alloc(maxLen);
+  const paddedB = Buffer.alloc(maxLen);
+  bufA.copy(paddedA);
+  bufB.copy(paddedB);
+  // Both the constant-time compare AND the length check must pass
+  return timingSafeEqual(paddedA, paddedB) && bufA.length === bufB.length;
 }
 
 /**
@@ -30,7 +42,7 @@ function safeCompare(a: string, b: string): boolean {
  * if (authError) return authError;
  * ```
  */
-export function authorizeRequest(request: NextRequest): NextResponse | null {
+export function authorizeRequest(request: NextRequest | Request): NextResponse | null {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
     // Log the real issue server-side, but return a generic error to the caller
@@ -53,18 +65,41 @@ export function authorizeRequest(request: NextRequest): NextResponse | null {
 
 /**
  * Safely parse JSON from a request body.
+ * Enforces a maximum body size to prevent memory exhaustion.
  * Returns `{ data }` on success or `{ error: NextResponse }` on failure.
  */
 export async function parseJsonBody<T = unknown>(
   request: NextRequest,
 ): Promise<{ data: T; error?: never } | { data?: never; error: NextResponse }> {
   try {
-    const data = (await request.json()) as T;
+    // Check Content-Length if provided (fast reject for obviously oversized bodies)
+    const contentLength = parseInt(request.headers.get('content-length') ?? '', 10);
+    if (contentLength > MAX_BODY_BYTES) {
+      return {
+        error: NextResponse.json(
+          { error: 'Request body too large' },
+          { status: 413 },
+        ),
+      };
+    }
+
+    // Read the body as text first so we can enforce size limits
+    const text = await request.text();
+    if (text.length > MAX_BODY_BYTES) {
+      return {
+        error: NextResponse.json(
+          { error: 'Request body too large' },
+          { status: 413 },
+        ),
+      };
+    }
+
+    const data = JSON.parse(text) as T;
     return { data };
   } catch {
     return {
       error: NextResponse.json(
-        { ok: false, error: 'Invalid JSON body' },
+        { error: 'Invalid JSON body' },
         { status: 400 },
       ),
     };

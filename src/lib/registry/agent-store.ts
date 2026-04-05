@@ -18,6 +18,23 @@ interface RegistryStore {
   updatedAt: string;
 }
 
+/**
+ * Write-mutex: serialises all read-modify-write operations so concurrent
+ * calls (e.g. two heartbeat updates arriving at the same time) never
+ * clobber each other.
+ */
+let _lock: Promise<void> = Promise.resolve();
+
+function withLock<T>(fn: () => Promise<T>): Promise<T> {
+  let resolve!: (v: T) => void;
+  let reject!: (e: unknown) => void;
+  const result = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+  _lock = _lock
+    .then(() => fn().then(resolve, reject))
+    .catch(() => undefined); // never break the chain
+  return result;
+}
+
 async function ensureDir(): Promise<void> {
   await fs.mkdir(REGISTRY_DIR, { recursive: true });
 }
@@ -74,35 +91,41 @@ export async function getAgentBySlug(slug: string): Promise<RegisteredAgent | nu
 }
 
 export async function upsertAgent(agent: RegisteredAgent): Promise<void> {
-  const store = await readStore();
-  const idx = store.agents.findIndex((a) => a.id === agent.id);
-  if (idx >= 0) {
-    store.agents[idx] = { ...agent, updatedAt: new Date().toISOString() };
-  } else {
-    store.agents.push(agent);
-  }
-  await writeStore(store);
+  return withLock(async () => {
+    const store = await readStore();
+    const idx = store.agents.findIndex((a) => a.id === agent.id);
+    if (idx >= 0) {
+      store.agents[idx] = { ...agent, updatedAt: new Date().toISOString() };
+    } else {
+      store.agents.push(agent);
+    }
+    await writeStore(store);
+  });
 }
 
 export async function deleteAgent(id: string): Promise<boolean> {
-  const store = await readStore();
-  const before = store.agents.length;
-  store.agents = store.agents.filter((a) => a.id !== id);
-  await writeStore(store);
-  return store.agents.length < before;
+  return withLock(async () => {
+    const store = await readStore();
+    const before = store.agents.length;
+    store.agents = store.agents.filter((a) => a.id !== id);
+    await writeStore(store);
+    return store.agents.length < before;
+  });
 }
 
 export async function updateAgentStatus(
   id: string,
   status: RegisteredAgent['status'],
 ): Promise<void> {
-  const store = await readStore();
-  const agent = store.agents.find((a) => a.id === id);
-  if (agent) {
-    agent.status = status;
-    agent.updatedAt = new Date().toISOString();
-    await writeStore(store);
-  }
+  return withLock(async () => {
+    const store = await readStore();
+    const agent = store.agents.find((a) => a.id === id);
+    if (agent) {
+      agent.status = status;
+      agent.updatedAt = new Date().toISOString();
+      await writeStore(store);
+    }
+  });
 }
 
 // ── Workflows ─────────────────────────────────────────────────────────────────
@@ -112,19 +135,23 @@ export async function getAllWorkflows(): Promise<RegisteredWorkflow[]> {
 }
 
 export async function upsertWorkflow(wf: RegisteredWorkflow): Promise<void> {
-  const store = await readStore();
-  const idx = store.workflows.findIndex((w) => w.id === wf.id);
-  if (idx >= 0) store.workflows[idx] = wf;
-  else store.workflows.push(wf);
-  await writeStore(store);
+  return withLock(async () => {
+    const store = await readStore();
+    const idx = store.workflows.findIndex((w) => w.id === wf.id);
+    if (idx >= 0) store.workflows[idx] = wf;
+    else store.workflows.push(wf);
+    await writeStore(store);
+  });
 }
 
 export async function deleteWorkflow(id: string): Promise<boolean> {
-  const store = await readStore();
-  const before = store.workflows.length;
-  store.workflows = store.workflows.filter((w) => w.id !== id);
-  await writeStore(store);
-  return store.workflows.length < before;
+  return withLock(async () => {
+    const store = await readStore();
+    const before = store.workflows.length;
+    store.workflows = store.workflows.filter((w) => w.id !== id);
+    await writeStore(store);
+    return store.workflows.length < before;
+  });
 }
 
 // ── Systems ───────────────────────────────────────────────────────────────────
@@ -134,19 +161,23 @@ export async function getAllSystems(): Promise<RegisteredSystem[]> {
 }
 
 export async function upsertSystem(sys: RegisteredSystem): Promise<void> {
-  const store = await readStore();
-  const idx = store.systems.findIndex((s) => s.id === sys.id);
-  if (idx >= 0) store.systems[idx] = sys;
-  else store.systems.push(sys);
-  await writeStore(store);
+  return withLock(async () => {
+    const store = await readStore();
+    const idx = store.systems.findIndex((s) => s.id === sys.id);
+    if (idx >= 0) store.systems[idx] = sys;
+    else store.systems.push(sys);
+    await writeStore(store);
+  });
 }
 
 export async function deleteSystem(id: string): Promise<boolean> {
-  const store = await readStore();
-  const before = store.systems.length;
-  store.systems = store.systems.filter((s) => s.id !== id);
-  await writeStore(store);
-  return store.systems.length < before;
+  return withLock(async () => {
+    const store = await readStore();
+    const before = store.systems.length;
+    store.systems = store.systems.filter((s) => s.id !== id);
+    await writeStore(store);
+    return store.systems.length < before;
+  });
 }
 
 export async function getFullRegistry(): Promise<RegistryStore> {

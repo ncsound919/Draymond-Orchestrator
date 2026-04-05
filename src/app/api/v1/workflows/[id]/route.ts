@@ -2,13 +2,6 @@
  * GET  /api/v1/workflows/[id]  — get workflow status
  * DELETE /api/v1/workflows/[id] — cancel a workflow
  *
- * Open-Chat's DraymondOrchestratorClient polls this endpoint to track
- * multi-agent workflow progress and cancels workflows on user abort.
- *
- * Because orchestrations are dispatched to Uplift (which manages its own
- * state), this route queries Uplift for the task status and normalises
- * the response to the shape Open-Chat expects.
- *
  * Auth: Bearer token checked against CRON_SECRET env var.
  */
 import { NextRequest, NextResponse } from 'next/server';
@@ -17,6 +10,9 @@ import { getTaskStatus } from '@/lib/uplift';
 
 export const dynamic = 'force-dynamic';
 
+/** Workflow IDs must be alphanumeric, hyphens, underscores (max 128 chars). */
+const WORKFLOW_ID_RE = /^[a-zA-Z0-9_-]{1,128}$/;
+
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(request: NextRequest, context: RouteContext) {
@@ -24,8 +20,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
   if (authError) return authError;
 
   const { id } = await context.params;
-  if (!id) {
-    return NextResponse.json({ error: 'Workflow ID is required' }, { status: 400 });
+  if (!id || !WORKFLOW_ID_RE.test(id)) {
+    return NextResponse.json({ error: 'Invalid or missing workflow ID' }, { status: 400 });
   }
 
   try {
@@ -40,15 +36,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
       started_at: (raw?.started_at as string) ?? null,
       completed_at: (raw?.completed_at as string) ?? null,
     });
-  } catch (err) {
+  } catch {
     // Uplift may not know about this workflow (e.g. it was completed already)
-    // Return a safe default rather than a 500 so Open-Chat stops polling.
+    // Return 'unknown' rather than 'completed' to avoid misleading the client.
     return NextResponse.json({
       id,
-      status: 'completed',
+      status: 'unknown',
       current_phase: null,
       recent_executions: [],
-      error: err instanceof Error ? err.message : 'Status unavailable',
     });
   }
 }
@@ -58,16 +53,20 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   if (authError) return authError;
 
   const { id } = await context.params;
-  if (!id) {
-    return NextResponse.json({ error: 'Workflow ID is required' }, { status: 400 });
+  if (!id || !WORKFLOW_ID_RE.test(id)) {
+    return NextResponse.json({ error: 'Invalid or missing workflow ID' }, { status: 400 });
   }
 
   // Best-effort cancel — Uplift may have already completed the task.
-  // We always return 200 so Open-Chat marks the workflow as cancelled locally.
   try {
     const UPLIFT_BASE_URL = process.env.UPLIFT_BASE_URL ?? 'http://localhost:8000';
-    const res = await fetch(`${UPLIFT_BASE_URL}/task/${id}/cancel`, {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const apiKey = process.env.UPLIFT_API_KEY;
+    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
+    const res = await fetch(`${UPLIFT_BASE_URL}/task/${encodeURIComponent(id)}/cancel`, {
       method: 'POST',
+      headers,
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok && res.status !== 404) {

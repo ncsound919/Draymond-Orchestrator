@@ -2,21 +2,6 @@
  * GET /api/v1/events
  * Open-Chat companion real-time SSE event stream.
  *
- * Streams Draymond orchestrator lifecycle events to the Open-Chat phone app
- * so it can update agent status, workflow progress, and tool execution state
- * in real time without polling.
- *
- * The stream sends:
- *   - A heartbeat ping every 15 s to keep the connection alive through proxies
- *   - agent.registered / agent.updated events when the agent list changes
- *   - workflow.started / workflow.completed / workflow.failed when tasks run
- *   - tool.executed when an agent runs a tool
- *
- * Because Next.js App Router runs in an Edge-compatible environment the event
- * bus is implemented as a simple in-process pub/sub using a shared Set of
- * WritableStream writers. In a multi-replica deployment you would replace this
- * with Redis Pub/Sub, Supabase Realtime, or similar.
- *
  * Auth: Bearer token checked against CRON_SECRET env var.
  * The token may alternatively be passed as ?token=... for SSE clients that
  * cannot set headers (EventSource browsers), but Bearer header is preferred.
@@ -28,7 +13,6 @@ export const dynamic = 'force-dynamic';
 
 // ---------------------------------------------------------------------------
 // In-process event bus
-// Exported so orchestrate / other routes can publish events.
 // ---------------------------------------------------------------------------
 
 type OrchestratorEvent = {
@@ -42,8 +26,14 @@ type EventWriter = {
   close: () => void;
 };
 
+/** Maximum concurrent SSE connections to prevent resource exhaustion. */
+const MAX_CLIENTS = 50;
+
 /** All currently connected SSE clients */
 const clients = new Set<EventWriter>();
+
+/** Module-level encoder — reused across all publishEvent calls. */
+const sharedEncoder = new TextEncoder();
 
 /**
  * Publish an event to all connected Open-Chat clients.
@@ -52,16 +42,22 @@ const clients = new Set<EventWriter>();
 export function publishEvent(event: OrchestratorEvent): void {
   if (clients.size === 0) return;
 
-  const encoder = new TextEncoder();
   const line = `data: ${JSON.stringify(event)}\n\n`;
-  const chunk = encoder.encode(line);
+  const chunk = sharedEncoder.encode(line);
+
+  // Collect dead clients instead of mutating the Set during iteration
+  const dead: EventWriter[] = [];
 
   for (const client of clients) {
     client.write(chunk).catch(() => {
-      // Client disconnected — remove it
-      clients.delete(client);
-      client.close();
+      dead.push(client);
     });
+  }
+
+  // Clean up disconnected clients after the iteration completes
+  for (const client of dead) {
+    clients.delete(client);
+    client.close();
   }
 }
 
@@ -72,12 +68,20 @@ export function publishEvent(event: OrchestratorEvent): void {
 const HEARTBEAT_INTERVAL_MS = 15_000;
 
 export async function GET(request: NextRequest) {
+  // Enforce connection limit
+  if (clients.size >= MAX_CLIENTS) {
+    return new Response(JSON.stringify({ error: 'Too many connections' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   // Support ?token=... for EventSource clients that can't set headers
   const urlToken = new URL(request.url).searchParams.get('token');
   let authorised: boolean;
 
   if (urlToken) {
-    // Re-use the authorizeRequest helper by building a synthetic header
+    console.warn('[events] Token passed via query string — prefer Authorization header');
     const syntheticRequest = new Request(request.url, {
       headers: { Authorization: `Bearer ${urlToken}` },
     });
@@ -93,7 +97,6 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const encoder = new TextEncoder();
   const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
   const writer = writable.getWriter();
 
@@ -110,15 +113,16 @@ export async function GET(request: NextRequest) {
     data: { message: 'Open-Chat event stream connected', client_count: clients.size },
     ts: new Date().toISOString(),
   };
-  await writer.write(encoder.encode(`data: ${JSON.stringify(connectedEvent)}\n\n`));
+  await writer.write(sharedEncoder.encode(`data: ${JSON.stringify(connectedEvent)}\n\n`));
 
   // Heartbeat to keep proxies from closing the idle connection
   const heartbeat = setInterval(async () => {
     try {
-      await writer.write(encoder.encode(': heartbeat\n\n'));
+      await writer.write(sharedEncoder.encode(': heartbeat\n\n'));
     } catch {
       clearInterval(heartbeat);
       clients.delete(eventWriter);
+      eventWriter.close();
     }
   }, HEARTBEAT_INTERVAL_MS);
 
@@ -126,14 +130,13 @@ export async function GET(request: NextRequest) {
   request.signal.addEventListener('abort', () => {
     clearInterval(heartbeat);
     clients.delete(eventWriter);
-    writer.close().catch(() => undefined);
+    eventWriter.close();
   }, { once: true });
 
   return new Response(readable, {
     headers: {
       'Content-Type': 'text/event-stream; charset=utf-8',
       'Cache-Control': 'no-cache, no-transform',
-      Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
     },
   });

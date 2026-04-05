@@ -15,6 +15,12 @@ export interface AuditEntry {
   [key: string]: unknown;
 }
 
+/** Maximum audit log size before rotation (5 MB). */
+const MAX_LOG_BYTES = 5 * 1024 * 1024;
+
+/** Number of rotated log files to keep. */
+const MAX_ROTATED_FILES = 3;
+
 /** Prevent path traversal: AUDIT_LOG_PATH must be inside cwd or HOME */
 function safeAuditPath(): string {
   const raw = process.env.AUDIT_LOG_PATH
@@ -43,10 +49,38 @@ async function ensureAuditDir(): Promise<void> {
   await fs.mkdir(path.dirname(AUDIT_LOG_PATH), { recursive: true });
 }
 
+/**
+ * Rotate the audit log if it exceeds MAX_LOG_BYTES.
+ * Keeps up to MAX_ROTATED_FILES old copies (audit.jsonl.1, .2, .3).
+ */
+async function rotateIfNeeded(): Promise<void> {
+  try {
+    const stat = await fs.stat(AUDIT_LOG_PATH);
+    if (stat.size < MAX_LOG_BYTES) return;
+  } catch {
+    return; // File doesn't exist yet — nothing to rotate
+  }
+
+  // Shift existing rotated files: .2 → .3, .1 → .2
+  for (let i = MAX_ROTATED_FILES; i >= 1; i--) {
+    const from = i === 1 ? AUDIT_LOG_PATH : `${AUDIT_LOG_PATH}.${i - 1}`;
+    const to = `${AUDIT_LOG_PATH}.${i}`;
+    try {
+      await fs.rename(from, to);
+    } catch {
+      // Source file may not exist — that's fine
+    }
+  }
+
+  // The main log was renamed to .1 above; create a fresh empty log
+  await fs.writeFile(AUDIT_LOG_PATH, '', 'utf-8');
+}
+
 export async function appendAuditLog(entry: Partial<AuditEntry>): Promise<void> {
   // Chain onto the existing lock — never reject the chain itself
   _writeLock = _writeLock.then(async () => {
     await ensureAuditDir();
+    await rotateIfNeeded();
     const line =
       JSON.stringify({ timestamp: new Date().toISOString(), ...entry }) + '\n';
     await fs.appendFile(AUDIT_LOG_PATH, line, 'utf-8');

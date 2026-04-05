@@ -36,6 +36,16 @@ export default function DownloadButtons({ productId, price }: Props) {
         throw new Error(data.error || 'Failed to get download link');
       }
 
+      // Validate the URL scheme before using it
+      try {
+        const downloadUrl = new URL(data.url);
+        if (downloadUrl.protocol !== 'https:') {
+          throw new Error('Invalid download URL');
+        }
+      } catch {
+        throw new Error('Invalid download URL received');
+      }
+
       // Trigger download via temporary anchor
       const a = document.createElement('a');
       a.href = data.url;

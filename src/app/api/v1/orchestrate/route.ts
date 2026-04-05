@@ -15,6 +15,7 @@
  *
  * Auth: Bearer token checked against CRON_SECRET env var.
  */
+import { randomUUID } from 'crypto';
 import { NextRequest } from 'next/server';
 import { authorizeRequest, parseJsonBody } from '@/lib/draymond/api-auth';
 import { appendAuditLog } from '@/lib/audit';
@@ -24,6 +25,9 @@ export const dynamic = 'force-dynamic';
 
 /** Max milliseconds to wait for Uplift to respond before timing out. */
 const UPLIFT_TIMEOUT_MS = 60_000;
+
+/** Workflow ID must be alphanumeric, hyphens, underscores (max 128 chars). */
+const WORKFLOW_ID_RE = /^[a-zA-Z0-9_-]{1,128}$/;
 
 function sseChunk(content: string): string {
   const payload = JSON.stringify({
@@ -65,10 +69,26 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const workflowId =
-    typeof body.workflow_id === 'string' && body.workflow_id.trim()
-      ? body.workflow_id.trim()
-      : `wf-${Date.now()}`;
+  // Validate or generate workflow ID
+  let workflowId: string;
+  if (typeof body.workflow_id === 'string' && body.workflow_id.trim()) {
+    const trimmed = body.workflow_id.trim();
+    if (!WORKFLOW_ID_RE.test(trimmed)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid workflow_id format' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+    workflowId = trimmed;
+  } else {
+    workflowId = `wf-${randomUUID()}`;
+  }
+
+  // Validate metadata is a plain object (not an array or primitive)
+  const metadata: Record<string, unknown> =
+    body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata)
+      ? body.metadata
+      : {};
 
   await appendAuditLog({
     event: 'open_chat_orchestrate_start',
@@ -92,19 +112,22 @@ export async function POST(request: NextRequest) {
       // Announce workflow start
       await write(sseWorkflow(workflowId, { status: 'in_progress', startTime: Date.now() }));
 
-      // Dispatch to Uplift with a timeout
+      // Dispatch to Uplift with a timeout — pass the abort signal through
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), UPLIFT_TIMEOUT_MS);
 
       let resultText = '';
       try {
-        const result = await dispatchTask({
-          task_id: workflowId,
-          description: task,
-          agent: 'uplift',
-          context: (body.metadata as Record<string, unknown>) ?? {},
-          session_id: `openchat-${Date.now()}`,
-        });
+        const result = await dispatchTask(
+          {
+            task_id: workflowId,
+            description: task,
+            agent: 'uplift',
+            context: metadata,
+            session_id: `openchat-${randomUUID()}`,
+          },
+          controller.signal,
+        );
 
         clearTimeout(timer);
 
@@ -118,15 +141,16 @@ export async function POST(request: NextRequest) {
           JSON.stringify(result);
       } catch (upliftErr) {
         clearTimeout(timer);
-        // Uplift unavailable — return a graceful degraded response
-        const errMsg =
-          upliftErr instanceof Error ? upliftErr.message : String(upliftErr);
-        resultText = `[Draymond] Task received: "${task}"\n\nUplift agent is currently unavailable (${errMsg}). The task has been logged and will be retried when the agent is back online.`;
+        // Sanitise error — never leak internal Uplift details to the client
+        const isTimeout = upliftErr instanceof DOMException && upliftErr.name === 'AbortError';
+        resultText = isTimeout
+          ? `[Draymond] Task received: "${task}"\n\nThe request timed out. The task has been logged and will be retried.`
+          : `[Draymond] Task received: "${task}"\n\nUplift agent is currently unavailable. The task has been logged and will be retried when the agent is back online.`;
 
         await appendAuditLog({
           event: 'open_chat_orchestrate_uplift_error',
           workflow_id: workflowId,
-          error: errMsg,
+          error: upliftErr instanceof Error ? upliftErr.message : String(upliftErr),
           agent: 'draymond',
         });
       }
@@ -149,8 +173,9 @@ export async function POST(request: NextRequest) {
         agent: 'draymond',
       });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Orchestration failed';
-      await write(sseChunk(`\n\n⚠ ${msg}`));
+      // Generic error — never leak internals
+      console.error('[orchestrate] stream error:', err);
+      await write(sseChunk('\n\nAn unexpected error occurred during orchestration.'));
       await write(sseDone());
     } finally {
       await writer.close();
@@ -161,7 +186,6 @@ export async function POST(request: NextRequest) {
     headers: {
       'Content-Type': 'text/event-stream; charset=utf-8',
       'Cache-Control': 'no-cache, no-transform',
-      Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
     },
   });

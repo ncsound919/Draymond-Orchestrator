@@ -37,8 +37,8 @@ export async function POST(request: NextRequest) {
     //   a) Bearer token in Authorization header (Supabase Auth JWT)
     //   b) stripe_session_id in the request body (from checkout success redirect)
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceRoleKey) {
       console.error('Missing SUPABASE env vars');
@@ -57,9 +57,14 @@ export async function POST(request: NextRequest) {
 
     if (authHeader.startsWith('Bearer ')) {
       // Verify Supabase JWT and look up by user_id
+      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (!anonKey) {
+        console.error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY env var');
+        return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+      }
       const anonClient = createClient(
         supabaseUrl,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        anonKey,
         { auth: { persistSession: false } },
       );
       const { data: { user }, error: userErr } = await anonClient.auth.getUser(
@@ -75,7 +80,7 @@ export async function POST(request: NextRequest) {
           .maybeSingle();
         hasPurchase = !!purchase;
       }
-    } else if (stripeSessionId) {
+    } else if (stripeSessionId && typeof stripeSessionId === 'string' && stripeSessionId.startsWith('cs_')) {
       // Fall back to stripe_session_id (set by checkout success redirect)
       const { data: purchase } = await adminClient
         .from('purchases')
@@ -111,7 +116,7 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error('signed-url route error:', err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 },
     );
   }

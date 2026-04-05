@@ -11,7 +11,6 @@ export async function GET() {
   return NextResponse.json({
     status: 'ok',
     service: 'draymond-orchestrator',
-    version: process.env.npm_package_version ?? '1.0.0',
     checked_at: new Date().toISOString(),
   });
 }

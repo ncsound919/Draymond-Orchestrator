@@ -9,7 +9,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllAgents } from '@/lib/registry/agent-store';
-import { authorizeRequest } from '@/lib/draymond/api-auth';
+import { authorizeRequest, sanitizeError } from '@/lib/draymond/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     console.error('[api/v1/agents] GET error:', err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Failed to load agents' },
+      { error: sanitizeError(err) },
       { status: 500 },
     );
   }
