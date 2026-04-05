@@ -1,47 +1,14 @@
-# The Uplift Lab + Draymond Orchestrator
-
-This repository serves a dual purpose: it is the codebase for **The Uplift Lab** (public-facing community platform) and **Draymond Orchestrator** (the central AI agent management system for the Uplift Ecosystem). Both share a single Next.js application.
-
----
-
-## The Uplift Lab
-
-**The Operating System for Black Community Empowerment**
-
-The Uplift Lab is a modular, community-owned digital platform engineered to directly address systemic barriers facing the Black community across six critical domains: education, health, finance, entrepreneurship, justice, and community support. Built by and with the community — never extracting, always uplifting.
-
-### Membership
-
-**Membership at The Uplift Lab is, and always will be, $0.**
-
-We believe that access to empowerment tools should not be behind a paywall. Every module, from financial literacy to life skills training, is accessible for free to all community members.
-
-- **Easy Access:** Simple signup process with no credit card required.
-- **Always Free:** No hidden fees, no "pro" tiers, no catch.
-- **Community Owned:** Data sovereignty and community governance at the core.
-
-### Modules
-
-| Module | Domain | Status |
-|---|---|---|
-| **Uplift Learn** | Education & Digital Literacy | **Active** (Life Skills & Mentorship) |
-| Uplift Health | Health & Wellness | Coming Soon |
-| **Uplift Wealth** | Financial Empowerment | **Active** (Financial Literacy) |
-| Uplift Ventures | Entrepreneurship | Coming Soon |
-| Uplift Justice | Legal Aid & Criminal Justice | Coming Soon |
-| Uplift Community | Community Support & Mutual Aid | Phase 0 |
-
----
-
-## Draymond Orchestrator
+# Draymond Orchestrator
 
 **The central nervous system for the Uplift Ecosystem's AI agents.**
 
 Draymond is not a DevOps control panel. It is a **Marvel-style character roster dashboard** where every AI agent, tool, skill, and service in the ecosystem gets a character bio card with capabilities, status indicators, and invocation controls. Think S.H.I.E.L.D. agent roster, not Kubernetes dashboard.
 
-### Core Capabilities
+---
 
-#### Entity Registry (`seed.ts`)
+## Core Capabilities
+
+### Entity Registry (`seed.ts`)
 
 50+ registered entities across seven kinds:
 
@@ -55,7 +22,7 @@ Draymond is not a DevOps control panel. It is a **Marvel-style character roster 
 | `service` | Infrastructure services | API gateways, databases, auth providers |
 | `pipeline` | Multi-step processing chains | Batch runners, data pipelines |
 
-#### Business Chains (`business-chains.ts`)
+### Business Chains (`business-chains.ts`)
 
 9 chain templates for multi-agent workflows:
 
@@ -71,22 +38,24 @@ Draymond is not a DevOps control panel. It is a **Marvel-style character roster 
 | Overlay Chain Pipeline | Overlay Chain | Cross-chain blockchain operations |
 | Full Ecosystem Pipeline | All agents | End-to-end orchestration across all agents |
 
-#### Scheduled Jobs
+### Scheduled Jobs
 
-11 automated jobs managed by Draymond for health checks, data syncs, report generation, and maintenance tasks across all registered entities.
+11 automated jobs for health checks, data syncs, report generation, and maintenance tasks across all registered entities.
 
-#### Invocation System
+### Invocation System
 
 Draymond invokes registered entities through three mechanisms:
 - **REST API** — HTTP endpoints for request/response workflows
 - **Subprocess** — Direct process spawning for local agents
 - **SDK calls** — Programmatic integration for tightly-coupled services
 
-#### Health Monitoring
+### Health Monitoring
 
 Continuous health checking for all registered agents. The dashboard displays real-time status (online, degraded, offline) on each character bio card.
 
-### Registered Agents
+---
+
+## Registered Agents
 
 | Agent | Slug | Kind | Description |
 |-------|------|------|-------------|
@@ -124,7 +93,7 @@ The dashboard renders each registered entity as a character card. Clicking a car
 - **Styling:** [Tailwind CSS v4](https://tailwindcss.com/)
 - **Fonts:** Inter (body), Space Grotesk (headings)
 - **Backend:** [Supabase](https://supabase.com/) (PostgreSQL + Auth)
-- **Architecture:** Static site generation (SSG) for public pages, server components for dashboard
+- **Architecture:** Server components for dashboard, SSG for public pages
 
 ### Brand Colors
 
@@ -162,18 +131,27 @@ Open [http://localhost:3000](http://localhost:3000).
 ```
 ├── src/
 │   ├── app/                     # Next.js App Router pages
-│   │   ├── page.tsx             # Uplift Lab landing page
-│   │   ├── dashboard/           # Draymond Orchestrator dashboard
+│   │   ├── page.tsx             # Dashboard home
+│   │   ├── agents/              # Agent roster and detail pages
+│   │   ├── workflows/           # Workflow builder and runner
+│   │   ├── operations/          # Operations monitoring
+│   │   ├── schedules/           # Scheduled jobs management
+│   │   ├── approvals/           # Approval queue
+│   │   ├── pipeline/            # Pipeline status
 │   │   └── api/                 # API routes for invocation
 │   ├── components/
-│   │   ├── MembershipBanner.tsx # Uplift Lab CTA
-│   │   ├── HistoryHeroes.tsx    # Interactive Black history component
-│   │   ├── CharacterRoster.tsx  # Marvel-style agent bio cards
-│   │   └── ChainBuilder.tsx     # Business chain workflow UI
+│   │   ├── Header.tsx           # Dashboard navigation
+│   │   ├── registry/            # Agent bio card components
+│   │   └── QuickActionButton.tsx
 │   └── lib/
-│       ├── seed.ts              # Entity registry (50+ entities)
-│       ├── business-chains.ts   # 9 chain templates
-│       └── scheduler.ts        # 11 scheduled jobs
+│       ├── draymond/            # Core orchestration logic
+│       │   ├── seed.ts          # Entity registry (50+ entities)
+│       │   ├── business-chains.ts # 9 chain templates
+│       │   ├── scheduler.ts     # 11 scheduled jobs
+│       │   ├── invoker.ts       # REST / subprocess / SDK dispatch
+│       │   ├── monitors.ts      # Health monitoring
+│       │   └── registry.ts      # Entity registry operations
+│       └── supabase/            # Database client and types
 ├── supabase/
 │   └── migrations/              # Database schema and RLS policies
 ├── Scaffold                     # Full platform architecture blueprint
@@ -184,10 +162,10 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Key Files
 
-- `src/lib/seed.ts` — Entity registry defining all agents, tools, skills, services, and pipelines with slugs, kinds, and capabilities
-- `src/lib/business-chains.ts` — Multi-agent chain templates connecting entities into workflows
-- `src/components/MembershipBanner.tsx` — Call-to-action for free membership
-- `src/components/HistoryHeroes.tsx` — Interactive Black history component
+- `src/lib/draymond/seed.ts` — Entity registry defining all agents, tools, skills, services, and pipelines
+- `src/lib/draymond/business-chains.ts` — Multi-agent chain templates connecting entities into workflows
+- `src/lib/draymond/invoker.ts` — Invocation layer for REST, subprocess, and SDK calls
+- `src/lib/draymond/monitors.ts` — Health monitoring for all registered entities
 - `Scaffold` — Full platform architecture and development blueprint
 - `supabase/migrations/` — Database schema and security policies
 
@@ -199,12 +177,13 @@ Draymond Orchestrator manages the following ecosystem:
 
 - **Uplift Agent** — Advanced AI coding agent (Hermes fork) with 52 tools and 244 skills
 - **Sports Steve** — Sports analytics and prediction agent
-- **Sub Team** — Deterministic CPU design pipeline
+- **Sub Team** — Deterministic CPU design pipeline ([github.com/ncsound919/Sub-Team](https://github.com/ncsound919/Sub-Team))
 - **Megacode** — Multi-LLM provider-agnostic coding assistant
 - **OmniResearch Pro** — Deep research and synthesis agent
 - **Social Media Dashboard** — Social media management and analytics
 - **Indy Music Platform** — Independent music discovery and promotion
 - **TradingAgents** — Market analysis and trading strategy agent
 - **Overlay Chain** — Cross-chain blockchain infrastructure
+- **The Uplift Lab** — Community empowerment platform ([github.com/ncsound919/The-Uplift-Lab](https://github.com/ncsound919/The-Uplift-Lab))
 
 Each tool works standalone. Draymond adds centralized monitoring, multi-agent chain workflows, and scheduled job management — but connection is always optional.
