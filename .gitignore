@@ -31,6 +31,7 @@ yarn-error.log*
 .pnpm-debug.log*
 dev-stderr.log
 dev-stdout.log
+build_error.log
 
 # env files (can opt-in for committing if needed)
 .env

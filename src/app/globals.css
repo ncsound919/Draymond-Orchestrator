@@ -15,14 +15,6 @@
   --color-green-light: #4ade80;
   --color-green-dark: #16a34a;
 
-  /* Legacy Module Accent Colors */
-  --color-learn-blue: #3b82f6;
-  --color-health-teal: #14b8a6;
-  --color-wealth-amber: #f59e0b;
-  --color-ventures-coral: #ef4444;
-  --color-justice-indigo: #8b5cf6;
-  --color-community-violet: #a855f7;
-
   --background: var(--color-black);
   --foreground: #e5e7eb;
 
