@@ -7,6 +7,7 @@ import type { ScheduledJob } from '@/lib/draymond/scheduler';
 import type { SiteMonitor } from '@/lib/draymond/monitors';
 import type { NotificationRecord } from '@/lib/draymond/notifications';
 import QuickActionButton from '@/components/QuickActionButton';
+import DataExportButton from '@/components/DataExportButton';
 
 export const metadata: Metadata = {
   title: 'Operations Center | Draymond Orchestrator',
@@ -142,12 +143,12 @@ async function fetchDashboardData() {
   const supabase = createDraymondAdminClient();
 
   const [
-    { data: agents },
-    { data: entities },
-    { data: chains },
-    { data: jobs },
-    { data: monitors },
-    { data: notifications },
+    { data: agents, error: agentsError },
+    { data: entities, error: entitiesError },
+    { data: chains, error: chainsError },
+    { data: jobs, error: jobsError },
+    { data: monitors, error: monitorsError },
+    { data: notifications, error: notificationsError },
   ] = await Promise.all([
     supabase
       .from('draymond_agents')
@@ -179,6 +180,14 @@ async function fetchDashboardData() {
       .limit(20),
   ]);
 
+  // Log errors from each query so failures don't silently produce empty data.
+  if (agentsError) console.error('[fetchDashboardData] agents error:', agentsError);
+  if (entitiesError) console.error('[fetchDashboardData] entities error:', entitiesError);
+  if (chainsError) console.error('[fetchDashboardData] chains error:', chainsError);
+  if (jobsError) console.error('[fetchDashboardData] jobs error:', jobsError);
+  if (monitorsError) console.error('[fetchDashboardData] monitors error:', monitorsError);
+  if (notificationsError) console.error('[fetchDashboardData] notifications error:', notificationsError);
+
   return {
     agents: (agents ?? []) as DraymondAgent[],
     entities: (entities ?? []) as DraymondEntity[],
@@ -194,8 +203,10 @@ async function fetchDashboardData() {
 // ---------------------------------------------------------------------------
 
 export default async function OperationsPage() {
-  // ── Auth gate disabled for local dev (no login pages in dashboard) ──
-  // TODO: Re-enable auth when dashboard auth flow is built
+  // SECURITY TODO: Auth gate is currently disabled for local development.
+  // BEFORE DEPLOYING TO PRODUCTION, re-enable the admin role check below.
+  // Access to this page is controlled by middleware.ts (purchase verification),
+  // but row-level admin verification is also required to prevent privilege escalation.
   // const supabase = await createClient();
   // const { data: { user } } = await supabase.auth.getUser();
   // if (!user) redirect('/auth/login');
@@ -222,22 +233,22 @@ export default async function OperationsPage() {
   const { agents, entities, chains, jobs, monitors, notifications } = data;
 
   // Count from both draymond_agents AND draymond_entities for the status banner.
-  // Agents (legacy) use status/consecutive_errors; entities use is_active.
+  // Agents (legacy) use status/consecutive_errors; entities use is_active + health_status.
   const agentHealthyCount = agents.filter(
     (a) => a.status === 'active' && a.consecutive_errors === 0,
   ).length;
   const agentDegradedCount = agents.filter(
     (a) => a.status === 'degraded' || a.consecutive_errors > 0,
   ).length;
-  const entityActiveCount = entities.filter(
-    (e: any) => e.is_active !== false,
-  ).length;
-  const entityInactiveCount = entities.filter(
-    (e: any) => e.is_active === false,
+  // DB query already filters is_active=true, so all returned entities are active.
+  const entityActiveCount = entities.length;
+  // Entities with unhealthy/degraded health_status count toward degraded total.
+  const entityDegradedCount = entities.filter(
+    (e: DraymondEntity) => e.health_status === 'unhealthy' || e.health_status === 'degraded',
   ).length;
 
-  const healthyCount = agentHealthyCount + entityActiveCount;
-  const degradedCount = agentDegradedCount + entityInactiveCount;
+  const healthyCount = agentHealthyCount + (entityActiveCount - entityDegradedCount);
+  const degradedCount = agentDegradedCount + entityDegradedCount;
   const totalAgents = agents.length + entities.length;
 
   const systemHealth: 'green' | 'yellow' | 'red' =
@@ -318,9 +329,17 @@ export default async function OperationsPage() {
 
         {/* ── Section 2: Agent Fleet Status ──────────────────────────── */}
         <section>
-          <h2 className="text-xl font-semibold text-white mb-4">
-            Agent Fleet Status
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-white">
+              Agent Fleet Status
+            </h2>
+            <DataExportButton
+              label="Agents"
+              data={agents.map(({ id, name, status, last_heartbeat, consecutive_errors }) => ({
+                id, name, status, last_heartbeat, consecutive_errors,
+              }))}
+            />
+          </div>
           {agents.length === 0 ? (
             <p className="text-sm text-gray-500">No agents registered.</p>
           ) : (
@@ -370,9 +389,19 @@ export default async function OperationsPage() {
 
         {/* ── Section 2b: Entity Registry (Full Fleet) ───────────────── */}
         <section>
-          <h2 className="text-xl font-semibold text-white mb-1">
-            Entity Registry
-          </h2>
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-xl font-semibold text-white">
+              Entity Registry
+            </h2>
+            <DataExportButton
+              label="Entities"
+              data={entities.map(({ id, name, category, kind, health_status, invocation_method, last_invoked_at, description, capabilities }) => ({
+                id, name, category, kind, health_status, invocation_method, last_invoked_at, description,
+                // capabilities may be null in the DB despite the TypeScript type saying string[] — guard defensively.
+                capabilities: (capabilities ?? []).join(', '),
+              }))}
+            />
+          </div>
           <p className="text-xs text-gray-500 mb-4">
             {entities.length} registered entities across the Uplift Ecosystem
           </p>
@@ -426,9 +455,10 @@ export default async function OperationsPage() {
                       </span>
                     </div>
                   </div>
-                  {entity.capabilities.length > 0 && (
+                  {/* capabilities may be null from DB even though the type says string[] */}
+                  {(entity.capabilities ?? []).length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
-                      {entity.capabilities.slice(0, 3).map((cap) => (
+                      {(entity.capabilities ?? []).slice(0, 3).map((cap) => (
                         <span
                           key={cap}
                           className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-400"
@@ -436,9 +466,9 @@ export default async function OperationsPage() {
                           {cap}
                         </span>
                       ))}
-                      {entity.capabilities.length > 3 && (
+                      {(entity.capabilities ?? []).length > 3 && (
                         <span className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-500">
-                          +{entity.capabilities.length - 3}
+                          +{(entity.capabilities ?? []).length - 3}
                         </span>
                       )}
                     </div>
@@ -451,9 +481,17 @@ export default async function OperationsPage() {
 
         {/* ── Section 3: Active Chains ───────────────────────────────── */}
         <section>
-          <h2 className="text-xl font-semibold text-white mb-4">
-            Active Chains
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-white">
+              Active Chains
+            </h2>
+            <DataExportButton
+              label="Chains"
+              data={chains.map(({ id, name, status, completed_steps, total_steps, total_duration_ms, started_at }) => ({
+                id, name, status, completed_steps, total_steps, total_duration_ms, started_at,
+              }))}
+            />
+          </div>
           {chains.length === 0 ? (
             <p className="text-sm text-gray-500">No recent chains.</p>
           ) : (
@@ -521,9 +559,18 @@ export default async function OperationsPage() {
 
         {/* ── Section 4: Scheduled Jobs ──────────────────────────────── */}
         <section>
-          <h2 className="text-xl font-semibold text-white mb-4">
-            Scheduled Jobs
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-white">
+              Scheduled Jobs
+            </h2>
+            <DataExportButton
+              label="Scheduled Jobs"
+              filenamePrefix="scheduled-jobs"
+              data={jobs.map(({ id, name, cron_expression, next_run_at, last_run_status, run_count, is_enabled }) => ({
+                id, name, cron_expression, next_run_at, last_run_status, run_count, is_enabled,
+              }))}
+            />
+          </div>
           {jobs.length === 0 ? (
             <p className="text-sm text-gray-500">No scheduled jobs.</p>
           ) : (
@@ -584,9 +631,18 @@ export default async function OperationsPage() {
 
         {/* ── Section 5: Site Monitors ───────────────────────────────── */}
         <section>
-          <h2 className="text-xl font-semibold text-white mb-4">
-            Site Monitors
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-white">
+              Site Monitors
+            </h2>
+            <DataExportButton
+              label="Site Monitors"
+              filenamePrefix="site-monitors"
+              data={monitors.map(({ id, name, url, current_status, last_response_time_ms, last_check_at, consecutive_failures }) => ({
+                id, name, url, current_status, last_response_time_ms, last_check_at, consecutive_failures,
+              }))}
+            />
+          </div>
           {monitors.length === 0 ? (
             <p className="text-sm text-gray-500">No site monitors configured.</p>
           ) : (
@@ -662,9 +718,17 @@ export default async function OperationsPage() {
 
         {/* ── Section 6: Recent Notifications ────────────────────────── */}
         <section>
-          <h2 className="text-xl font-semibold text-white mb-4">
-            Recent Notifications
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-white">
+              Recent Notifications
+            </h2>
+            <DataExportButton
+              label="Notifications"
+              data={notifications.map(({ id, type, subject, recipient, priority, sent_at, error_message }) => ({
+                id, type, subject, recipient, priority, sent_at, status: sent_at ? 'sent' : error_message ? 'failed' : 'pending',
+              }))}
+            />
+          </div>
           {notifications.length === 0 ? (
             <p className="text-sm text-gray-500">No notifications yet.</p>
           ) : (
@@ -743,6 +807,10 @@ export default async function OperationsPage() {
           <h2 className="text-xl font-semibold text-white mb-4">
             Quick Actions
           </h2>
+          {/* NOTE: These actions invoke server-side API routes that can mutate state
+              (health checks, site monitors, notifications, data seeding). Access is
+              gated by middleware.ts purchase verification. Re-enable the admin role
+              check in this page component before exposing to untrusted users. */}
           <div className="flex flex-wrap gap-3">
             <QuickActionButton
               label="Run Health Check"
