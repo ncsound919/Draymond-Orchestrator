@@ -33,6 +33,7 @@ dev-stderr.log
 dev-stdout.log
 
 # env files (can opt-in for committing if needed)
+.env
 .env*.local
 .env.local
 
@@ -57,3 +58,11 @@ next-env.d.ts
 /nul
 /connect-browser.js
 /connect-supabase.js
+__pycache__/
+*.pyc
+*.db
+*.sqlite
+.vscode/
+.idea/
+Thumbs.db
+sessions/
