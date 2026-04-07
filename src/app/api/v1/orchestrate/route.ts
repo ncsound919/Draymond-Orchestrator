@@ -4,10 +4,19 @@
  *
  * Accepts a task from Open-Chat's DraymondOrchestratorClient and streams
  * back an OpenAI-compatible SSE response while dispatching the task to
- * Draymond's Uplift agent backend.
+ * Draymond's Uplift agent backend, a registered entity, or a chain.
  *
  * Request body (JSON):
- *   { workflow_id: string, task: string, stream?: boolean, metadata?: object }
+ *   { workflow_id: string, task: string, stream?: boolean, metadata?: object,
+ *     entity_slug?: string, chain_slug?: string, auto_route?: boolean,
+ *     build_chain?: boolean }
+ *
+ * Routing (upgraded with Intelligent Task Router):
+ *   - entity_slug provided → invoke the matching Draymond entity
+ *   - chain_slug provided  → instantiate and execute the chain
+ *   - build_chain: true    → use Dynamic Chain Builder to create & run a chain
+ *   - auto_route: true     → use Intelligent Router to classify & dispatch
+ *   - neither              → dispatch to Uplift (default fallback)
  *
  * Response: text/event-stream (SSE)
  *   data: { choices: [{ delta: { content: "..." } }] }
@@ -20,6 +29,14 @@ import { NextRequest } from 'next/server';
 import { authorizeRequest, parseJsonBody } from '@/lib/draymond/api-auth';
 import { appendAuditLog } from '@/lib/audit';
 import { dispatchTask } from '@/lib/uplift';
+import { getEntity } from '@/lib/draymond/registry';
+import { invokeEntity } from '@/lib/draymond/invoker';
+import { instantiateChain, executeChain } from '@/lib/draymond/chains';
+import { routeAndClassify } from '@/lib/draymond/router';
+import { logExecution } from '@/lib/draymond/confidence';
+import { processEvent } from '@/lib/draymond/reactive';
+import { buildAndExecuteChain } from '@/lib/draymond/chain-builder';
+import { getDashboardSummary } from '@/lib/draymond/index';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +65,134 @@ function sseWorkflow(workflowId: string, update: Record<string, unknown>): strin
   return `data: ${payload}\n\n`;
 }
 
+// ── Extracted handler functions ──────────────────────────────────────────────
+
+async function handleEntityInvocation(
+  slug: string,
+  metadata: Record<string, unknown>,
+  write: (chunk: string) => Promise<void>
+): Promise<string> {
+  const entity = await getEntity(slug);
+  if (!entity) {
+    await write(sseChunk(`[Draymond] Entity "${slug}" not found.`));
+    return `[Draymond] Entity "${slug}" not found.`;
+  }
+
+  const action = (metadata.action as string) ?? 'default';
+  const input = (metadata.input as Record<string, unknown>) ?? {};
+  const startMs = Date.now();
+
+  try {
+    const result = await invokeEntity(
+      {
+        id: entity.id,
+        slug: entity.slug,
+        name: entity.name,
+        kind: entity.kind,
+        invocation_method: entity.invocation_method,
+        invocation_config: (entity.invocation_config as Record<string, unknown>) ?? {},
+        timeout_seconds: entity.timeout_seconds ?? 30,
+      },
+      action,
+      input,
+    );
+
+    const durationMs = Date.now() - startMs;
+
+    // Log execution for adaptive confidence scoring
+    logExecution({
+      entity_id: entity.id,
+      entity_slug: entity.slug,
+      action,
+      success: result.success,
+      duration_ms: durationMs,
+      input_summary: JSON.stringify(input).slice(0, 500),
+      output_summary: result.success ? JSON.stringify(result.output).slice(0, 500) : '',
+      error_message: result.success ? undefined : result.error,
+    }).catch(() => {});
+
+    return result.success
+      ? JSON.stringify(result.output)
+      : `[Draymond] Entity invocation failed: ${result.error}`;
+  } catch (entityErr) {
+    const durationMs = Date.now() - startMs;
+
+    logExecution({
+      entity_id: entity.id,
+      entity_slug: entity.slug,
+      action,
+      success: false,
+      duration_ms: durationMs,
+      error_message: entityErr instanceof Error ? entityErr.message : String(entityErr),
+    }).catch(() => {});
+
+    return `[Draymond] Entity invocation error: ${entityErr instanceof Error ? entityErr.message : String(entityErr)}`;
+  }
+}
+
+async function handleChainExecution(
+  slug: string,
+  metadata: Record<string, unknown>
+): Promise<string> {
+  try {
+    const chainInput = (metadata.input as Record<string, unknown>) ?? {};
+    const agentId = metadata.agent_id as string | undefined;
+    const instance = await instantiateChain(slug, chainInput, undefined, agentId);
+    const ctx = await executeChain(instance.id, agentId);
+    return JSON.stringify({ chain_id: instance.id, context: ctx.context, steps: ctx.steps });
+  } catch (chainErr) {
+    return `[Draymond] Chain execution error: ${chainErr instanceof Error ? chainErr.message : String(chainErr)}`;
+  }
+}
+
+async function handleUpliftDispatch(
+  workflowId: string,
+  task: string,
+  metadata: Record<string, unknown>,
+  write: (chunk: string) => Promise<void>
+): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), UPLIFT_TIMEOUT_MS);
+
+  try {
+    const result = await dispatchTask(
+      {
+        task_id: workflowId,
+        description: task,
+        agent: 'uplift',
+        context: metadata,
+        session_id: `openchat-${randomUUID()}`,
+      },
+      controller.signal,
+    );
+
+    clearTimeout(timer);
+
+    const r = result as Record<string, unknown>;
+    return (
+      (typeof r?.content === 'string' ? r.content : null) ??
+      (typeof r?.output === 'string' ? r.output : null) ??
+      (typeof r?.result === 'string' ? r.result : null) ??
+      (typeof r?.message === 'string' ? r.message : null) ??
+      JSON.stringify(result)
+    );
+  } catch (upliftErr) {
+    clearTimeout(timer);
+    const isTimeout = upliftErr instanceof DOMException && upliftErr.name === 'AbortError';
+
+    await appendAuditLog({
+      event: 'open_chat_orchestrate_uplift_error',
+      workflow_id: workflowId,
+      error: upliftErr instanceof Error ? upliftErr.message : String(upliftErr),
+      agent: 'draymond',
+    });
+
+    return isTimeout
+      ? `[Draymond] Task received: "${task}"\n\nThe request timed out. The task has been logged and will be retried.`
+      : `[Draymond] Task received: "${task}"\n\nUplift agent is currently unavailable. The task has been logged and will be retried when the agent is back online.`;
+  }
+}
+
 export async function POST(request: NextRequest) {
   const authError = authorizeRequest(request);
   if (authError) return authError;
@@ -57,6 +202,10 @@ export async function POST(request: NextRequest) {
     task?: string;
     stream?: boolean;
     metadata?: Record<string, unknown>;
+    entity_slug?: string;
+    chain_slug?: string;
+    auto_route?: boolean;
+    build_chain?: boolean;
   }>(request);
   if (bodyResult.error) return bodyResult.error;
 
@@ -90,6 +239,11 @@ export async function POST(request: NextRequest) {
       ? body.metadata
       : {};
 
+  const entity_slug = typeof body.entity_slug === 'string' ? body.entity_slug.trim() || undefined : undefined;
+  const chain_slug = typeof body.chain_slug === 'string' ? body.chain_slug.trim() || undefined : undefined;
+  const auto_route = body.auto_route === true;
+  const build_chain = body.build_chain === true;
+
   await appendAuditLog({
     event: 'open_chat_orchestrate_start',
     workflow_id: workflowId,
@@ -112,48 +266,105 @@ export async function POST(request: NextRequest) {
       // Announce workflow start
       await write(sseWorkflow(workflowId, { status: 'in_progress', startTime: Date.now() }));
 
-      // Dispatch to Uplift with a timeout — pass the abort signal through
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), UPLIFT_TIMEOUT_MS);
-
       let resultText = '';
-      try {
-        const result = await dispatchTask(
-          {
-            task_id: workflowId,
-            description: task,
-            agent: 'uplift',
-            context: metadata,
-            session_id: `openchat-${randomUUID()}`,
-          },
-          controller.signal,
-        );
 
-        clearTimeout(timer);
+      if (entity_slug) {
+        // ── Entity invocation path (explicit slug) ─────────────────
+        resultText = await handleEntityInvocation(entity_slug, metadata, write);
+      } else if (chain_slug) {
+        // ── Chain execution path (explicit slug) ───────────────────
+        resultText = await handleChainExecution(chain_slug, metadata);
+      } else if (build_chain) {
+        // ── Dynamic Chain Builder path ─────────────────────────────
+        await write(sseChunk('[Draymond] Building chain from description...\n'));
+        try {
+          const buildResult = await buildAndExecuteChain({ description: task, context: metadata });
+          if (buildResult.executed) {
+            resultText = JSON.stringify({
+              status: 'chain_built_and_executed',
+              chain_id: buildResult.build.chain_id,
+              blueprint: buildResult.build.blueprint.name,
+              steps: buildResult.build.blueprint.steps.length,
+              confidence: buildResult.build.blueprint.confidence,
+            });
+          } else {
+            resultText = JSON.stringify({
+              status: 'chain_built_not_executed',
+              blueprint: buildResult.build.blueprint,
+              validation: buildResult.build.validation,
+              error: buildResult.execution_error,
+            });
+          }
+        } catch (buildErr) {
+          resultText = `[Draymond] Chain builder error: ${buildErr instanceof Error ? buildErr.message : String(buildErr)}`;
+        }
+      } else if (auto_route) {
+        // ── Intelligent Task Router path ───────────────────────────
+        await write(sseChunk('[Draymond] Routing task...\n'));
+        try {
+          const routeResult = await routeAndClassify(task, metadata);
+          const route = routeResult.route;
 
-        // Extract text from various possible Uplift response shapes
-        const r = result as Record<string, unknown>;
-        resultText =
-          (typeof r?.content === 'string' ? r.content : null) ??
-          (typeof r?.output === 'string' ? r.output : null) ??
-          (typeof r?.result === 'string' ? r.result : null) ??
-          (typeof r?.message === 'string' ? r.message : null) ??
-          JSON.stringify(result);
-      } catch (upliftErr) {
-        clearTimeout(timer);
-        // Sanitise error — never leak internal Uplift details to the client
-        const isTimeout = upliftErr instanceof DOMException && upliftErr.name === 'AbortError';
-        resultText = isTimeout
-          ? `[Draymond] Task received: "${task}"\n\nThe request timed out. The task has been logged and will be retried.`
-          : `[Draymond] Task received: "${task}"\n\nUplift agent is currently unavailable. The task has been logged and will be retried when the agent is back online.`;
+          await write(
+            sseChunk(
+              `[Route] ${route.intent} → ${route.entity_slug ?? route.chain_slug ?? 'default'} (confidence: ${route.confidence.toFixed(2)})\n`,
+            ),
+          );
 
-        await appendAuditLog({
-          event: 'open_chat_orchestrate_uplift_error',
-          workflow_id: workflowId,
-          error: upliftErr instanceof Error ? upliftErr.message : String(upliftErr),
-          agent: 'draymond',
-        });
+          if (routeResult.should_auto_execute && route.intent === 'invoke_entity' && route.entity_slug) {
+            resultText = await handleEntityInvocation(route.entity_slug, {
+              ...metadata,
+              action: route.action,
+              input: route.input,
+            }, write);
+          } else if (routeResult.should_auto_execute && route.intent === 'execute_chain' && route.chain_slug) {
+            resultText = await handleChainExecution(route.chain_slug, {
+              ...metadata,
+              input: route.input,
+            });
+          } else if (route.intent === 'query_status') {
+            const summary = await getDashboardSummary();
+            resultText = JSON.stringify(summary);
+          } else if (route.intent === 'decompose_goal' || routeResult.needs_decomposition) {
+            // Fall through to Uplift for complex decomposition
+            resultText = await handleUpliftDispatch(workflowId, task, metadata, write);
+          } else if (routeResult.needs_confirmation) {
+            // Confidence not high enough — return routing info for user confirmation
+            resultText = JSON.stringify({
+              status: 'needs_confirmation',
+              route: {
+                intent: route.intent,
+                entity_slug: route.entity_slug,
+                chain_slug: route.chain_slug,
+                confidence: route.confidence,
+                reasoning: route.reasoning,
+                alternatives: route.alternatives,
+              },
+              message: `I'm ${(route.confidence * 100).toFixed(0)}% confident this should go to "${route.entity_slug ?? route.chain_slug ?? 'unknown'}". Please confirm or provide more details.`,
+            });
+          } else {
+            // Low confidence or unknown — fall back to Uplift
+            resultText = await handleUpliftDispatch(workflowId, task, metadata, write);
+          }
+        } catch (routeErr) {
+          // Router failed — fall back to Uplift
+          console.error('[orchestrate] Router error, falling back to Uplift:', routeErr);
+          resultText = await handleUpliftDispatch(workflowId, task, metadata, write);
+        }
+      } else {
+        // ── Uplift dispatch path (default fallback) ────────────────
+        resultText = await handleUpliftDispatch(workflowId, task, metadata, write);
       }
+
+      // Fire reactive event for orchestration completion
+      processEvent('orchestrate.completed', 'orchestrate-route', {
+        workflow_id: workflowId,
+        task: task.slice(0, 200),
+        entity_slug,
+        chain_slug,
+        auto_route,
+        build_chain,
+      }).catch(() => {});
 
       // Stream the result in chunks so Open-Chat sees a streaming response
       const CHUNK_SIZE = 20;

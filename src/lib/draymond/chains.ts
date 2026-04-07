@@ -10,6 +10,15 @@ import { createDraymondAdminClient } from './client';
 import { logEvent, evaluateConfidence, submitAction } from './index';
 import { getEntity, recordInvocation } from './registry';
 import { invokeEntity } from './invoker';
+import {
+  emitChainStarted,
+  emitChainStepCompleted,
+  emitChainStepFailed,
+  emitChainCompleted,
+  emitChainFailed,
+  emitAgentInvoked,
+  emitAgentResult,
+} from '@/lib/draymond/event-bridge';
 import type {
   DraymondChain,
   DraymondChainInsert,
@@ -732,8 +741,34 @@ async function executeStep(
 
       // Confidence gate check (if threshold is set)
       if (step.confidence_threshold && agentId) {
-        // TODO: When entity execution returns confidence scores, use the real score here
-        const confidenceScore = DEFAULT_ENTITY_CONFIDENCE_SCORE;
+        // Compute adaptive confidence score from execution history, entity health, and chain context
+        let confidenceScore = DEFAULT_ENTITY_CONFIDENCE_SCORE;
+        try {
+          const { computeConfidence } = await import('./confidence');
+
+          // Derive chain context from ctx.steps (a Record<string, StepState>)
+          const stepEntries = Object.values(ctx.steps);
+          const completedSteps = stepEntries.filter((s) => s.status === 'completed' || s.status === 'failed');
+          const failedCount = stepEntries.filter((s) => s.status === 'failed').length;
+          const lastCompleted = completedSteps[completedSteps.length - 1];
+
+          const confidenceResult = await computeConfidence(
+            entity.id,
+            entity.slug,
+            {
+              step_index: completedSteps.length,
+              total_steps: Object.keys(ctx.steps).length,
+              previous_step_succeeded: lastCompleted ? lastCompleted.status === 'completed' : true,
+              chain_failure_count: failedCount,
+            }
+          );
+          confidenceScore = confidenceResult.final_score;
+        } catch (confErr) {
+          // Non-fatal: fall back to default if confidence computation fails
+          console.warn(
+            `[Draymond Chains] Confidence computation failed for ${entity.slug}, using default: ${confErr instanceof Error ? confErr.message : confErr}`
+          );
+        }
         const decision = evaluateConfidence(
           confidenceScore,
           (step.risk_level || 'low') as ActionRiskLevel,
@@ -781,6 +816,7 @@ async function executeStep(
       }
 
       // Execute the entity via the invocation bridge
+      emitAgentInvoked(entity.id, entity.name, step.action, entity.invocation_method);
       const invocationResult = await invokeEntity(
         {
           id: entity.id,
@@ -809,6 +845,8 @@ async function executeStep(
 
       // Record the invocation
       await recordInvocation(entity.id, agentId, undefined, undefined);
+
+      emitAgentResult(entity.id, entity.name, invocationResult.success, invocationResult.duration_ms ?? (Date.now() - startTime), invocationResult.error);
 
       if (!invocationResult.success) {
         throw new Error(
@@ -844,6 +882,8 @@ async function executeStep(
           },
         });
       }
+
+      emitChainStepCompleted(ctx.chain_id, step.name, step.step_order, 0, duration_ms);
 
       return { success: true, output, duration_ms };
     } catch (err) {
@@ -896,6 +936,12 @@ async function executeStep(
         } catch (logErr) {
           console.error('[Draymond Chains] Failed to log step failure event:', logErr);
         }
+      }
+
+      try {
+        emitChainStepFailed(ctx.chain_id, step.name, step.step_order, errorMessage);
+      } catch (_emitErr) {
+        // Non-fatal: best-effort event emission
       }
 
       return { success: false, output: {}, error: errorMessage, duration_ms };
@@ -974,6 +1020,8 @@ export async function executeChain(
     });
   }
 
+  emitChainStarted(chainId, chain.name, steps.length, agentId);
+
   const completedStepIds = new Set<string>();
 
   // Delegate to the shared step-group execution loop
@@ -1025,6 +1073,12 @@ export async function executeChain(
         total_duration_ms: totalDuration,
       },
     });
+  }
+
+  if (failedSteps > 0) {
+    emitChainFailed(chainId, chain.name, completedSteps, failedSteps, totalDuration, `${failedSteps} of ${steps.length} steps failed`);
+  } else {
+    emitChainCompleted(chainId, chain.name, completedSteps, failedSteps, totalDuration);
   }
 
   return ctx;

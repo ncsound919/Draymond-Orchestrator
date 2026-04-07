@@ -1,0 +1,509 @@
+// ============================================================================
+// DRAYMOND ORCHESTRATION SYSTEM — Intelligent Task Router
+// ============================================================================
+// LLM-powered intent classification and entity resolution from natural language.
+// Replaces the dumb dispatcher that required explicit entity/chain slugs.
+//
+// The router:
+// 1. Takes a natural language task description
+// 2. Classifies intent (invoke entity, run chain, query status, etc.)
+// 3. Resolves the best entity/chain from the registry
+// 4. Returns a RouteResult with confidence and alternatives
+// ============================================================================
+
+import { createDraymondClient } from './client';
+import { logEvent } from './index';
+import type {
+  RouterIntent,
+  RouteResult,
+  RouterConfig,
+  DraymondEntity,
+  DraymondChain,
+} from './types';
+
+// ── Default configuration ────────────────────────────────────────────────────
+
+const DEFAULT_CONFIG: RouterConfig = {
+  model: 'claude-sonnet-4-5',
+  provider: 'anthropic',
+  temperature: 0.1,
+  auto_route_threshold: 0.85,
+  fallback_threshold: 0.4,
+  max_tokens: 1024,
+  timeout_ms: 15_000,
+};
+
+let _config: RouterConfig = { ...DEFAULT_CONFIG };
+
+export function configureRouter(overrides: Partial<RouterConfig>): void {
+  _config = { ...DEFAULT_CONFIG, ...overrides };
+}
+
+export function getRouterConfig(): RouterConfig {
+  return { ..._config };
+}
+
+// ── API key resolver ─────────────────────────────────────────────────────────
+
+function getApiKey(provider: RouterConfig['provider']): string {
+  const keys: Record<string, string | undefined> = {
+    anthropic: process.env.ANTHROPIC_API_KEY,
+    openai: process.env.OPENAI_API_KEY,
+    qwen: process.env.QWEN_API_KEY,
+  };
+  const key = keys[provider];
+  if (!key) throw new Error(`Missing API key for provider "${provider}"`);
+  return key;
+}
+
+function getApiUrl(provider: RouterConfig['provider']): string {
+  const urls: Record<string, string> = {
+    anthropic: 'https://api.anthropic.com/v1/messages',
+    openai: 'https://api.openai.com/v1/chat/completions',
+    qwen: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions',
+  };
+  return urls[provider];
+}
+
+// ── Registry snapshot (cached for routing) ───────────────────────────────────
+
+type RegistrySnapshot = {
+  entities: Array<{
+    slug: string;
+    name: string;
+    kind: string;
+    description: string | null;
+    capabilities: string[];
+    category: string | null;
+    tags: string[];
+    is_active: boolean;
+  }>;
+  chains: Array<{
+    slug: string;
+    name: string;
+    description: string | null;
+    trigger_type: string;
+  }>;
+};
+
+let _snapshotCache: { data: RegistrySnapshot; expires: number } | null = null;
+const CACHE_TTL_MS = 60_000; // 1 minute
+
+async function getRegistrySnapshot(): Promise<RegistrySnapshot> {
+  if (_snapshotCache && Date.now() < _snapshotCache.expires) {
+    return _snapshotCache.data;
+  }
+
+  const supabase = await createDraymondClient();
+
+  const [entitiesResult, chainsResult] = await Promise.all([
+    supabase
+      .from('draymond_entities')
+      .select('slug, name, kind, description, capabilities, category, tags, is_active')
+      .eq('is_active', true)
+      .order('name'),
+    supabase
+      .from('draymond_chains')
+      .select('slug, name, description, trigger_type')
+      .eq('is_template', true)
+      .eq('status', 'active')
+      .order('name'),
+  ]);
+
+  if (entitiesResult.error) {
+    throw new Error(`Failed to fetch entities for routing: ${entitiesResult.error.message}`);
+  }
+  if (chainsResult.error) {
+    throw new Error(`Failed to fetch chains for routing: ${chainsResult.error.message}`);
+  }
+
+  const snapshot: RegistrySnapshot = {
+    entities: (entitiesResult.data || []) as RegistrySnapshot['entities'],
+    chains: (chainsResult.data || []) as RegistrySnapshot['chains'],
+  };
+
+  _snapshotCache = { data: snapshot, expires: Date.now() + CACHE_TTL_MS };
+  return snapshot;
+}
+
+/** Force-clear the snapshot cache (e.g., after entity registration). */
+export function invalidateRouterCache(): void {
+  _snapshotCache = null;
+}
+
+// ── LLM call ─────────────────────────────────────────────────────────────────
+
+function buildSystemPrompt(snapshot: RegistrySnapshot): string {
+  const entityList = snapshot.entities
+    .map(
+      (e) =>
+        `  - slug: "${e.slug}", name: "${e.name}", kind: ${e.kind}, ` +
+        `capabilities: [${e.capabilities.join(', ')}], ` +
+        `category: ${e.category ?? 'none'}, ` +
+        `description: ${e.description ?? 'none'}`
+    )
+    .join('\n');
+
+  const chainList = snapshot.chains
+    .map(
+      (c) =>
+        `  - slug: "${c.slug}", name: "${c.name}", ` +
+        `trigger: ${c.trigger_type}, ` +
+        `description: ${c.description ?? 'none'}`
+    )
+    .join('\n');
+
+  return [
+    'You are Draymond\'s intelligent task router. Your job is to classify user intent and resolve the best entity or chain to handle it.',
+    '',
+    'Available entities:',
+    entityList || '  (none registered)',
+    '',
+    'Available chain templates:',
+    chainList || '  (none registered)',
+    '',
+    'Classify the intent as one of:',
+    '  - invoke_entity: the task should be handled by a specific entity',
+    '  - execute_chain: the task requires a multi-step chain',
+    '  - query_status: the user wants system status, health, or analytics info',
+    '  - manage_memory: the user wants to store, retrieve, or manage memory',
+    '  - decompose_goal: the task is complex and needs to be broken into subtasks',
+    '  - unknown: you cannot determine the intent',
+    '',
+    'Respond ONLY with valid JSON (no markdown fences):',
+    '{',
+    '  "intent": "invoke_entity|execute_chain|query_status|manage_memory|decompose_goal|unknown",',
+    '  "confidence": 0.0-1.0,',
+    '  "entity_slug": "slug or null",',
+    '  "chain_slug": "slug or null",',
+    '  "action": "the action to invoke or null",',
+    '  "input": { "extracted input parameters" },',
+    '  "reasoning": "brief explanation of your routing decision",',
+    '  "alternatives": [{ "intent": "...", "entity_slug": "...", "chain_slug": "...", "confidence": 0.0-1.0 }]',
+    '}',
+  ].join('\n');
+}
+
+async function callLLM(
+  systemPrompt: string,
+  userMessage: string
+): Promise<string> {
+  const apiKey = getApiKey(_config.provider);
+  const apiUrl = getApiUrl(_config.provider);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), _config.timeout_ms);
+
+  try {
+    let response: Response;
+
+    if (_config.provider === 'anthropic') {
+      response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: _config.model,
+          max_tokens: _config.max_tokens,
+          temperature: _config.temperature,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userMessage }],
+        }),
+        signal: controller.signal,
+      });
+    } else {
+      // OpenAI-compatible format (works for OpenAI and Qwen)
+      response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: _config.model,
+          max_tokens: _config.max_tokens,
+          temperature: _config.temperature,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMessage },
+          ],
+        }),
+        signal: controller.signal,
+      });
+    }
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      throw new Error(`Router LLM API error ${response.status}: ${errText.slice(0, 200)}`);
+    }
+
+    const data = (await response.json()) as Record<string, unknown>;
+
+    if (_config.provider === 'anthropic') {
+      const content = (data.content as Array<{ text?: string }>)?.[0]?.text ?? '';
+      if (!content) throw new Error('Empty response from Anthropic');
+      return content;
+    } else {
+      const choices = data.choices as Array<{ message?: { content?: string } }>;
+      const content = choices?.[0]?.message?.content ?? '';
+      if (!content) throw new Error('Empty response from LLM');
+      return content;
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ── Response parsing ─────────────────────────────────────────────────────────
+
+const VALID_INTENTS: Set<RouterIntent> = new Set([
+  'invoke_entity',
+  'execute_chain',
+  'query_status',
+  'manage_memory',
+  'decompose_goal',
+  'unknown',
+]);
+
+function parseRouterResponse(raw: string, snapshot: RegistrySnapshot, latencyMs: number): RouteResult {
+  // Strip markdown code fences if present
+  const stripped = raw
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/, '')
+    .trim();
+
+  let obj: Record<string, unknown>;
+  try {
+    obj = JSON.parse(stripped) as Record<string, unknown>;
+  } catch {
+    return {
+      intent: 'unknown',
+      confidence: 0,
+      reasoning: `Failed to parse LLM response as JSON: ${stripped.slice(0, 100)}`,
+      alternatives: [],
+      resolved_at: new Date().toISOString(),
+      latency_ms: latencyMs,
+    };
+  }
+
+  const rawIntent = typeof obj.intent === 'string' ? obj.intent : 'unknown';
+  const intent: RouterIntent = VALID_INTENTS.has(rawIntent as RouterIntent)
+    ? (rawIntent as RouterIntent)
+    : 'unknown';
+
+  const confidence = typeof obj.confidence === 'number'
+    ? Math.max(0, Math.min(1, obj.confidence))
+    : 0;
+
+  // Validate entity_slug actually exists
+  let entitySlug = typeof obj.entity_slug === 'string' ? obj.entity_slug : undefined;
+  if (entitySlug && !snapshot.entities.some((e) => e.slug === entitySlug)) {
+    entitySlug = undefined; // LLM hallucinated a slug — drop it
+  }
+
+  // Validate chain_slug actually exists
+  let chainSlug = typeof obj.chain_slug === 'string' ? obj.chain_slug : undefined;
+  if (chainSlug && !snapshot.chains.some((c) => c.slug === chainSlug)) {
+    chainSlug = undefined;
+  }
+
+  const action = typeof obj.action === 'string' ? obj.action : undefined;
+  const input =
+    obj.input && typeof obj.input === 'object' && !Array.isArray(obj.input)
+      ? (obj.input as Record<string, unknown>)
+      : undefined;
+
+  const reasoning = typeof obj.reasoning === 'string' ? obj.reasoning : '';
+
+  const alternatives = Array.isArray(obj.alternatives)
+    ? (obj.alternatives as Array<Record<string, unknown>>)
+        .slice(0, 3)
+        .map((alt) => ({
+          intent: (VALID_INTENTS.has(alt.intent as RouterIntent)
+            ? alt.intent
+            : 'unknown') as RouterIntent,
+          entity_slug: typeof alt.entity_slug === 'string' ? alt.entity_slug : undefined,
+          chain_slug: typeof alt.chain_slug === 'string' ? alt.chain_slug : undefined,
+          confidence: typeof alt.confidence === 'number'
+            ? Math.max(0, Math.min(1, alt.confidence))
+            : 0,
+        }))
+    : [];
+
+  return {
+    intent,
+    confidence,
+    entity_slug: entitySlug,
+    chain_slug: chainSlug,
+    action,
+    input,
+    reasoning,
+    alternatives,
+    resolved_at: new Date().toISOString(),
+    latency_ms: latencyMs,
+  };
+}
+
+// ── Public API ───────────────────────────────────────────────────────────────
+
+/**
+ * Route a natural language task to the best entity or chain.
+ *
+ * Returns a RouteResult with intent classification, resolved entity/chain,
+ * confidence score, and alternatives.
+ */
+export async function routeTask(
+  task: string,
+  context?: Record<string, unknown>
+): Promise<RouteResult> {
+  const startMs = Date.now();
+
+  // Quick-match: if the task looks like a direct slug reference, skip LLM
+  const snapshot = await getRegistrySnapshot();
+  const directMatch = tryDirectMatch(task, snapshot);
+  if (directMatch) {
+    return directMatch;
+  }
+
+  const systemPrompt = buildSystemPrompt(snapshot);
+
+  const userMessage = context
+    ? `<user_task>${task}</user_task>\n<context>${JSON.stringify(context)}</context>`
+    : `<user_task>${task}</user_task>`;
+
+  try {
+    const raw = await callLLM(systemPrompt, userMessage);
+    const latencyMs = Date.now() - startMs;
+    const result = parseRouterResponse(raw, snapshot, latencyMs);
+
+    // Log routing decision for observability
+    await logEvent({
+      agent_id: 'draymond-router',
+      category: 'decision',
+      severity: 'info',
+      event_type: 'task_routed',
+      message: `Routed "${task.slice(0, 100)}" → ${result.intent} (${result.entity_slug ?? result.chain_slug ?? 'none'})`,
+      metadata: {
+        intent: result.intent,
+        confidence: result.confidence,
+        entity_slug: result.entity_slug,
+        chain_slug: result.chain_slug,
+        latency_ms: result.latency_ms,
+        alternatives_count: result.alternatives.length,
+      },
+      reasoning: result.reasoning,
+    }).catch(() => {});
+
+    return result;
+  } catch (err) {
+    const latencyMs = Date.now() - startMs;
+
+    await logEvent({
+      agent_id: 'draymond-router',
+      category: 'decision',
+      severity: 'error',
+      event_type: 'routing_failed',
+      message: `Router failed for "${task.slice(0, 100)}": ${err instanceof Error ? err.message : String(err)}`,
+      metadata: { latency_ms: latencyMs },
+    }).catch(() => {});
+
+    return {
+      intent: 'unknown',
+      confidence: 0,
+      reasoning: `Router error: ${err instanceof Error ? err.message : String(err)}`,
+      alternatives: [],
+      resolved_at: new Date().toISOString(),
+      latency_ms: latencyMs,
+    };
+  }
+}
+
+/**
+ * Route and execute in one call — auto-routes if confidence is high enough,
+ * otherwise returns the route result for the caller to decide.
+ */
+export async function routeAndClassify(
+  task: string,
+  context?: Record<string, unknown>
+): Promise<{
+  route: RouteResult;
+  should_auto_execute: boolean;
+  needs_confirmation: boolean;
+  needs_decomposition: boolean;
+}> {
+  const route = await routeTask(task, context);
+
+  return {
+    route,
+    should_auto_execute: route.confidence >= _config.auto_route_threshold,
+    needs_confirmation:
+      route.confidence >= _config.fallback_threshold &&
+      route.confidence < _config.auto_route_threshold,
+    needs_decomposition: route.intent === 'decompose_goal',
+  };
+}
+
+// ── Direct matching (skip LLM for obvious patterns) ──────────────────────────
+
+const ENTITY_PREFIX_RE = /^(?:run|invoke|execute|use|call)\s+(?:entity\s+)?['""]?([a-z0-9_-]+)['""]?/i;
+const CHAIN_PREFIX_RE = /^(?:run|execute|start)\s+(?:chain\s+)?['""]?([a-z0-9_-]+)['""]?\s*chain/i;
+const STATUS_RE = /^(?:show|get|what(?:'s| is))\s+(?:the\s+)?(?:status|health|dashboard)/i;
+
+function tryDirectMatch(task: string, snapshot: RegistrySnapshot): RouteResult | null {
+  const trimmed = task.trim();
+
+  // Check for entity invocation pattern
+  const entityMatch = ENTITY_PREFIX_RE.exec(trimmed);
+  if (entityMatch) {
+    const slug = entityMatch[1].toLowerCase();
+    // Validate that the entity actually exists in the registry
+    if (!snapshot.entities.some((e) => e.slug === slug)) {
+      return null; // Slug not in registry — fall through to LLM routing
+    }
+    return {
+      intent: 'invoke_entity',
+      confidence: 0.95,
+      entity_slug: slug,
+      reasoning: 'Direct entity slug pattern detected and validated against registry — skipped LLM routing',
+      alternatives: [],
+      resolved_at: new Date().toISOString(),
+      latency_ms: 0,
+    };
+  }
+
+  // Check for chain execution pattern
+  const chainMatch = CHAIN_PREFIX_RE.exec(trimmed);
+  if (chainMatch) {
+    const slug = chainMatch[1].toLowerCase();
+    // Validate that the chain actually exists in the registry
+    if (!snapshot.chains.some((c) => c.slug === slug)) {
+      return null; // Slug not in registry — fall through to LLM routing
+    }
+    return {
+      intent: 'execute_chain',
+      confidence: 0.95,
+      chain_slug: slug,
+      reasoning: 'Direct chain slug pattern detected and validated against registry — skipped LLM routing',
+      alternatives: [],
+      resolved_at: new Date().toISOString(),
+      latency_ms: 0,
+    };
+  }
+
+  // Check for status query
+  if (STATUS_RE.test(trimmed)) {
+    return {
+      intent: 'query_status',
+      confidence: 0.9,
+      reasoning: 'Status query pattern detected — skipped LLM routing',
+      alternatives: [],
+      resolved_at: new Date().toISOString(),
+      latency_ms: 0,
+    };
+  }
+
+  return null;
+}

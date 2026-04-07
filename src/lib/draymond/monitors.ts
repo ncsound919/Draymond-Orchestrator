@@ -10,6 +10,7 @@
 
 import { createDraymondAdminClient } from './client';
 import { sendNotification } from './notifications';
+import { emitSiteDown, emitSiteRecovered, emitHealthCheckComplete } from '@/lib/draymond/event-bridge';
 
 // ============================================================================
 // TYPES
@@ -351,6 +352,8 @@ export async function checkSite(monitorId: string): Promise<SiteCheckResult> {
           );
         }
       }
+
+      emitSiteDown(monitor.id, monitor.name, monitor.url, statusCode, responseTimeMs, newConsecutiveFailures);
     }
   } else {
     // Site is up
@@ -390,6 +393,8 @@ export async function checkSite(monitorId: string): Promise<SiteCheckResult> {
           );
         }
       }
+
+      emitSiteRecovered(monitor.id, monitor.name, monitor.url, statusCode, responseTimeMs);
     } else {
       // Was already up (or unknown) — just mark as up
       newStatus = 'up';
@@ -462,6 +467,8 @@ export async function checkAllSites(): Promise<CheckAllSitesResult> {
   const upCount = results.filter((r) => r.is_up).length;
   const downCount = results.filter((r) => !r.is_up).length;
   const errorCount = results.filter((r) => !!r.error).length;
+
+  emitHealthCheckComplete(results.length, upCount, downCount);
 
   return {
     checked_at: new Date().toISOString(),

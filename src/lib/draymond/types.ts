@@ -623,3 +623,353 @@ export type ChainExecutionContext = {
     duration_ms?: number;
   }>;
 };
+
+// ============================================================================
+// INTELLIGENT TASK ROUTER — Types
+// LLM-powered intent classification and entity resolution from natural language
+// ============================================================================
+
+export type RouterIntent =
+  | 'invoke_entity'
+  | 'execute_chain'
+  | 'query_status'
+  | 'manage_memory'
+  | 'decompose_goal'
+  | 'unknown';
+
+export type RouteResult = {
+  intent: RouterIntent;
+  confidence: number;
+  entity_slug?: string;
+  chain_slug?: string;
+  action?: string;
+  input?: Record<string, unknown>;
+  reasoning: string;
+  alternatives: Array<{
+    intent: RouterIntent;
+    entity_slug?: string;
+    chain_slug?: string;
+    confidence: number;
+  }>;
+  resolved_at: string;
+  latency_ms: number;
+};
+
+export type RouterConfig = {
+  /** Model to use for intent classification */
+  model: string;
+  /** Provider for the model */
+  provider: 'anthropic' | 'openai' | 'qwen';
+  /** Temperature for LLM calls (lower = more deterministic) */
+  temperature: number;
+  /** Minimum confidence to auto-route without confirmation */
+  auto_route_threshold: number;
+  /** Below this confidence, fall back to asking the user */
+  fallback_threshold: number;
+  /** Maximum tokens for classification response */
+  max_tokens: number;
+  /** Timeout in ms */
+  timeout_ms: number;
+};
+
+// ============================================================================
+// ADAPTIVE CONFIDENCE SCORING — Types
+// Real scores from execution results, historical success rates, self-tuning
+// ============================================================================
+
+export type ConfidenceSignal = {
+  source: 'execution_result' | 'historical_rate' | 'entity_health' | 'chain_context' | 'llm_assessment' | 'recent_trend';
+  weight: number;
+  score: number;
+  reasoning: string;
+};
+
+export type AdaptiveConfidenceResult = {
+  final_score: number;
+  signals: ConfidenceSignal[];
+  entity_id: string;
+  entity_slug: string;
+  historical_success_rate: number | null;
+  recent_executions: number;
+  threshold_recommendation: number;
+  computed_at: string;
+};
+
+export type EntityPerformanceRecord = {
+  entity_id: string;
+  entity_slug: string;
+  total_executions: number;
+  successful_executions: number;
+  failed_executions: number;
+  avg_duration_ms: number;
+  p50_duration_ms: number;
+  p95_duration_ms: number;
+  p99_duration_ms: number;
+  success_rate: number;
+  last_success_at: string | null;
+  last_failure_at: string | null;
+  current_streak: number;
+  streak_type: 'success' | 'failure';
+  computed_at: string;
+};
+
+// ============================================================================
+// REACTIVE EVENT SYSTEM — Types
+// Event subscriptions, cross-chain triggers, conditional chain spawning
+// ============================================================================
+
+export type EventPattern = {
+  event_type: string;
+  /** JSONPath-like conditions on the event data */
+  conditions?: Record<string, unknown>;
+  /** Debounce window in ms — prevents rapid re-triggering */
+  debounce_ms?: number;
+};
+
+export type EventSubscription = {
+  id: string;
+  name: string;
+  description: string | null;
+  pattern: EventPattern;
+  action_type: 'invoke_entity' | 'execute_chain' | 'emit_event' | 'webhook';
+  action_config: {
+    entity_slug?: string;
+    chain_slug?: string;
+    event_type?: string;
+    webhook_url?: string;
+    input_mapping?: Record<string, string>;
+  };
+  is_active: boolean;
+  last_triggered_at: string | null;
+  trigger_count: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EventSubscriptionInsert = {
+  name: string;
+  description?: string;
+  pattern: EventPattern;
+  action_type: EventSubscription['action_type'];
+  action_config: EventSubscription['action_config'];
+  is_active?: boolean;
+  created_by?: string;
+};
+
+export type ReactiveEvent = {
+  id: string;
+  event_type: string;
+  source: string;
+  data: Record<string, unknown>;
+  matched_subscriptions: string[];
+  processed_at: string | null;
+  created_at: string;
+};
+
+// ============================================================================
+// MEMORY INTELLIGENCE — Types
+// Semantic search, auto-decay, cross-agent sharing, memory-informed decisions
+// ============================================================================
+
+export type MemorySearchResult = {
+  memory: DraymondMemory;
+  relevance_score: number;
+  match_type: 'exact_key' | 'semantic' | 'tag' | 'summary';
+};
+
+export type MemorySharePermission = 'read' | 'read_write' | 'full';
+
+export type MemoryShareGrant = {
+  id: string;
+  memory_id: string;
+  owner_agent_id: string;
+  granted_agent_id: string;
+  permission: MemorySharePermission;
+  granted_at: string;
+  expires_at: string | null;
+  is_active: boolean;
+};
+
+export type MemoryShareGrantInsert = {
+  memory_id: string;
+  owner_agent_id: string;
+  granted_agent_id: string;
+  permission: MemorySharePermission;
+  expires_at?: string;
+};
+
+export type MemoryDecayResult = {
+  total_scanned: number;
+  decayed: number;
+  expired: number;
+  boosted: number;
+  sweep_duration_ms: number;
+  swept_at: string;
+};
+
+export type MemoryInsight = {
+  agent_id: string;
+  total_memories: number;
+  active_memories: number;
+  expired_memories: number;
+  by_tier: Record<MemoryTier, number>;
+  avg_importance: number;
+  oldest_memory_at: string | null;
+  newest_memory_at: string | null;
+  most_accessed_keys: Array<{ key: string; access_count: number }>;
+};
+
+// ============================================================================
+// OBSERVABILITY & ANALYTICS — Types
+// Performance leaderboard, execution heatmaps, cost tracking, latency percentiles
+// ============================================================================
+
+export type EntityLeaderboardEntry = {
+  entity_id: string;
+  entity_slug: string;
+  entity_name: string;
+  entity_kind: EntityKind;
+  total_executions: number;
+  success_rate: number;
+  avg_duration_ms: number;
+  p95_duration_ms: number;
+  total_cost_cents: number;
+  score: number;
+  rank: number;
+};
+
+export type ExecutionHeatmapPoint = {
+  hour: number;       // 0-23
+  day_of_week: number; // 0-6 (Sun-Sat)
+  execution_count: number;
+  avg_duration_ms: number;
+  failure_rate: number;
+};
+
+export type CostRecord = {
+  id: string;
+  entity_id: string;
+  chain_id: string | null;
+  step_id: string | null;
+  cost_type: 'llm_tokens' | 'api_call' | 'compute' | 'storage' | 'external';
+  amount_cents: number;
+  unit_count: number;
+  unit_label: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
+export type CostRecordInsert = {
+  entity_id: string;
+  chain_id?: string;
+  step_id?: string;
+  cost_type: CostRecord['cost_type'];
+  amount_cents: number;
+  unit_count?: number;
+  unit_label?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type AnalyticsSummary = {
+  period: 'hour' | 'day' | 'week' | 'month';
+  total_executions: number;
+  successful_executions: number;
+  failed_executions: number;
+  total_chains_run: number;
+  total_cost_cents: number;
+  avg_latency_ms: number;
+  p50_latency_ms: number;
+  p95_latency_ms: number;
+  p99_latency_ms: number;
+  busiest_hour: number;
+  top_entities: EntityLeaderboardEntry[];
+  heatmap: ExecutionHeatmapPoint[];
+  computed_at: string;
+};
+
+export type ExecutionLog = {
+  id: string;
+  entity_id: string;
+  entity_slug: string;
+  chain_id: string | null;
+  step_id: string | null;
+  action: string;
+  success: boolean;
+  duration_ms: number;
+  input_summary: string;
+  output_summary: string;
+  error_message: string | null;
+  cost_cents: number;
+  created_at: string;
+};
+
+export type ExecutionLogInsert = {
+  entity_id: string;
+  entity_slug: string;
+  chain_id?: string;
+  step_id?: string;
+  action: string;
+  success: boolean;
+  duration_ms: number;
+  input_summary?: string;
+  output_summary?: string;
+  error_message?: string;
+  cost_cents?: number;
+};
+
+// ============================================================================
+// DYNAMIC CHAIN BUILDER — Types
+// Natural language to entity chain conversion
+// ============================================================================
+
+export type ChainBlueprintStep = {
+  name: string;
+  description: string;
+  entity_slug: string;
+  action: string;
+  input_mapping: Record<string, string>;
+  output_key: string;
+  depends_on: string[];
+  parallel_group?: string;
+  confidence_threshold?: number;
+  risk_level?: string;
+};
+
+export type ChainBlueprint = {
+  name: string;
+  slug: string;
+  description: string;
+  steps: ChainBlueprintStep[];
+  estimated_duration_ms: number;
+  estimated_cost_cents: number;
+  confidence: number;
+  reasoning: string;
+  warnings: string[];
+  generated_at: string;
+};
+
+export type ChainBuildRequest = {
+  description: string;
+  constraints?: {
+    max_steps?: number;
+    max_duration_ms?: number;
+    max_cost_cents?: number;
+    required_entities?: string[];
+    excluded_entities?: string[];
+    parallel_allowed?: boolean;
+  };
+  context?: Record<string, unknown>;
+};
+
+export type ChainBuildResult = {
+  blueprint: ChainBlueprint;
+  chain_id?: string;
+  auto_created: boolean;
+  validation: {
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+    missing_entities: string[];
+  };
+};

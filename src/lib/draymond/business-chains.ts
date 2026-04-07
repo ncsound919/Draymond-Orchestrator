@@ -377,30 +377,63 @@ const ENTITY_DEFS: EntitySeedDef[] = [
   },
 
   // ── 10. Sub Team ────────────────────────────────────────────────────
-  // Pure Python — deterministic CPU RTL generation + cross-disciplinary analysis
-  // No HTTP server. Invoked via subprocess.
+  // Full-spectrum agentic workforce (8 CrewAI agents) + deterministic
+  // CPU RTL generation + cross-disciplinary/business analysis.
+  // HTTP server (FastAPI) — also supports subprocess fallback.
   {
     name: 'Sub Team',
     slug: 'sub-team',
     kind: 'agent',
     description:
-      'Deterministic CPU RTL (Verilog) generation and cross-disciplinary analysis agent. Pure Python, no HTTP server. Invoked via subprocess.',
-    invocation_method: 'subprocess',
+      'Full-spectrum agentic workforce with 8 specialized CrewAI agents (research, coding, data science, business strategy, creative, security, architecture, hardware). Retains deterministic CPU RTL pipeline and cross-disciplinary/business analysis.',
+    invocation_method: 'http_api',
     invocation_config: {
-      command: process.env.SUB_TEAM_PYTHON || 'python',
-      args: ['main.py'],
-      working_dir:
-        process.env.SUB_TEAM_DIR ||
-        // Fallback for local dev on Windows — override via env var in production
-        (process.platform === 'win32'
-          ? 'C:\\Users\\User\\Desktop\\Uplift Ecosystem\\agents and systems\\Sub-Team-main'
-          : './agents/Sub-Team-main'),
-      env: {
-        DRAYMOND_TOTAL_BUDGET: '10000',
+      base_url:
+        process.env.SUB_TEAM_URL || 'http://localhost:8050',
+      health_endpoint: '/health',
+      timeout_ms: 120_000,
+      headers: {
+        Authorization: `Bearer ${process.env.SUB_TEAM_AUTH_TOKEN || process.env.CRON_SECRET || ''}`,
+        'Content-Type': 'application/json',
+      },
+      endpoints: {
+        execute: { method: 'POST', path: '/execute' },
+        capabilities: { method: 'GET', path: '/capabilities' },
+        cpu_pipeline: { method: 'POST', path: '/pipeline/cpu' },
+        analyze: { method: 'POST', path: '/pipeline/analyze' },
+        business: { method: 'POST', path: '/pipeline/business' },
+        memory_store: { method: 'POST', path: '/memory' },
+        memory_search: { method: 'POST', path: '/memory/search' },
+      },
+      // Subprocess fallback if HTTP server is not running
+      fallback: {
+        command: process.env.SUB_TEAM_PYTHON || 'python',
+        args: ['main.py'],
+        working_dir:
+          process.env.SUB_TEAM_DIR ||
+          (process.platform === 'win32'
+            ? 'C:\\Users\\User\\Desktop\\Uplift Lab Revised\\uplift-lab-v2\\Sub-Team'
+            : './agents/Sub-Team'),
+        env: {
+          DRAYMOND_TOTAL_BUDGET: '10000',
+        },
       },
     },
-    capabilities: ['cpu_rtl_generation', 'cross_disciplinary_analysis'],
-    tags: ['hardware', 'verilog', 'python', 'rtl'],
+    capabilities: [
+      'agentic_workforce',
+      'research',
+      'code_generation',
+      'data_science',
+      'business_strategy',
+      'creative_content',
+      'security_analysis',
+      'systems_architecture',
+      'cpu_rtl_generation',
+      'cross_disciplinary_analysis',
+      'business_intelligence',
+      'agent_memory',
+    ],
+    tags: ['agentic', 'crewai', 'workforce', 'hardware', 'verilog', 'python', 'rtl', 'research', 'security'],
     category: 'engineering',
   },
 ];
@@ -925,7 +958,7 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
 interface JobSeedDef {
   name: string;
   cron_expression: string;
-  job_type: 'chain' | 'health_check' | 'notification' | 'custom';
+  job_type: 'chain' | 'health_check' | 'notification' | 'decay_sweep' | 'custom';
   job_config: Record<string, unknown>;
   notify_on_failure?: boolean;
 }
@@ -954,6 +987,15 @@ const JOB_DEFS: JobSeedDef[] = [
     job_config: {
       type: 'health_summary',
     },
+    notify_on_failure: true,
+  },
+
+  // ── Memory Decay Sweep (every hour) ─────────────────────────────────
+  {
+    name: 'Memory Decay Sweep',
+    cron_expression: '0 * * * *',
+    job_type: 'decay_sweep',
+    job_config: {},
     notify_on_failure: true,
   },
 

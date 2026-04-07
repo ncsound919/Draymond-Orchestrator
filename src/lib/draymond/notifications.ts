@@ -12,6 +12,7 @@ import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import { createDraymondAdminClient } from './client';
 import type { DraymondDashboardSummary } from './types';
+import { emitNotificationSent, emitNotificationFailed } from '@/lib/draymond/event-bridge';
 
 // ============================================================================
 // TYPES
@@ -475,6 +476,8 @@ export async function sendNotification(
       );
     }
 
+    emitNotificationSent(notificationId, payload.type, payload.subject, priority, payload.recipient);
+
     return (updated ?? record) as NotificationRecord;
   } catch (err) {
     // 3b. Record the sending error
@@ -496,6 +499,8 @@ export async function sendNotification(
       `[Draymond Notifications] Email send failed for ${notificationId}:`,
       errorMessage
     );
+
+    emitNotificationFailed(notificationId, payload.type, payload.subject, errorMessage);
 
     return { ...(record as NotificationRecord), status: 'failed' as const, error_message: errorMessage };
   }

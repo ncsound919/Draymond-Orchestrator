@@ -130,3 +130,47 @@ export function sanitizeError(err: unknown): string {
   // Default: return generic message to avoid leaking internal details
   return 'An unexpected error occurred';
 }
+
+// ── ID validation ────────────────────────────────────────────────────────────
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Returns true if `id` is a valid UUID v4 format. */
+export function isValidUuid(id: string): boolean {
+  return UUID_RE.test(id);
+}
+
+/**
+ * Validate that a string looks like a safe identifier (UUID, slug, or short alphanum).
+ * Blocks injection attempts — only allows alphanumeric, hyphens, underscores, dots.
+ */
+const SAFE_ID_RE = /^[a-zA-Z0-9_.-]{1,128}$/;
+
+export function isValidId(id: string): boolean {
+  return SAFE_ID_RE.test(id);
+}
+
+/**
+ * Returns a 400 NextResponse if any of the given IDs fail the UUID format check.
+ * Returns `null` if all IDs are valid (or undefined/empty — those are skipped).
+ *
+ * Usage:
+ * ```ts
+ * const badId = requireValidIds({ entity_id: entityId, agent_id: agentId });
+ * if (badId) return badId;
+ * ```
+ */
+export function requireValidIds(
+  ids: Record<string, string | null | undefined>,
+): NextResponse | null {
+  for (const [name, value] of Object.entries(ids)) {
+    if (value == null || value === '') continue;
+    if (!isValidId(value)) {
+      return NextResponse.json(
+        { error: `Invalid ${name} format` },
+        { status: 400 },
+      );
+    }
+  }
+  return null;
+}

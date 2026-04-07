@@ -10,12 +10,13 @@ import { createDraymondAdminClient } from './client';
 import { instantiateChain, executeChain } from './chains';
 import { checkAllAgentHealth } from './index';
 import { sendNotification, sendAlertEmail } from './notifications';
+import { emitJobStarted, emitJobCompleted, emitJobFailed } from '@/lib/draymond/event-bridge';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-export type JobType = 'chain' | 'health_check' | 'notification' | 'custom';
+export type JobType = 'chain' | 'health_check' | 'notification' | 'decay_sweep' | 'custom';
 
 export type JobRunStatus = 'never' | 'running' | 'success' | 'failed' | 'skipped';
 
@@ -411,6 +412,18 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
       return { notification_id: result.id, sent_at: result.sent_at };
     }
 
+    case 'decay_sweep': {
+      // Lazy import to avoid circular dependencies
+      const { runDecaySweep } = await import('./memory-intelligence');
+      const sweepResult = await runDecaySweep();
+      console.log(
+        `[Draymond Scheduler] Memory decay sweep: ${sweepResult.decayed} decayed, ` +
+        `${sweepResult.expired} expired out of ${sweepResult.total_scanned} scanned ` +
+        `(${sweepResult.sweep_duration_ms}ms).`
+      );
+      return sweepResult;
+    }
+
     case 'custom': {
       const handler = config.handler as string | undefined;
       console.log(
@@ -491,6 +504,7 @@ export async function runDueJobs(): Promise<JobRunResult[]> {
     }
 
     const startTime = Date.now();
+    emitJobStarted(job.id, job.name, job.job_type);
 
     try {
       // Execute the job
@@ -515,6 +529,8 @@ export async function runDueJobs(): Promise<JobRunResult[]> {
           next_run_at: nextRunAt,
         })
         .eq('id', job.id);
+
+      emitJobCompleted(job.id, job.name, job.job_type, durationMs);
 
       results.push({
         job_id: job.id,
@@ -559,6 +575,8 @@ export async function runDueJobs(): Promise<JobRunResult[]> {
           next_run_at: nextRunAt,
         })
         .eq('id', job.id);
+
+      emitJobFailed(job.id, job.name, job.job_type, errorMessage);
 
       results.push({
         job_id: job.id,

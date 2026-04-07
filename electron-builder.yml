@@ -1,0 +1,21 @@
+appId: com.upliftlab.draymond-orchestrator
+productName: Draymond Orchestrator
+directories:
+  buildResources: public
+  output: release
+files:
+  - .next/**/*
+  - electron/**/*
+  - public/**/*
+  - package.json
+  - next.config.ts
+  - node_modules/**/*
+win:
+  target: nsis
+nsis:
+  oneClick: true
+  perMachine: false
+mac:
+  target: dmg
+linux:
+  target: AppImage
