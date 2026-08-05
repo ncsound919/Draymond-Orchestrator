@@ -11,6 +11,7 @@
 // ============================================================================
 
 import type { ActionRiskLevel } from './types';
+import { publishResultNotification } from './ntfy';
 
 export type AetherDeskOperationDef = {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -174,4 +175,79 @@ export async function executeAetherDeskOperation(
       error: isTimeout ? `Request timed out after ${timeoutMs}ms` : message,
     };
   }
+}
+
+/**
+ * Resolve the id of the AetherDesk control agent from draymond_agents.
+ * Dynamic import of ./client keeps this module testable without Supabase.
+ */
+export async function resolveAetherDeskAgentId(): Promise<string | null> {
+  const { createDraymondClient } = await import('./client');
+  const supabase = await createDraymondClient();
+  const { data, error } = await supabase
+    .from('draymond_agents')
+    .select('id')
+    .eq('slug', 'aetherdesk')
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return data.id as string;
+}
+
+/**
+ * Execute a previously approved AetherDesk action, then record the result and
+ * publish it to the results ntfy topic. Fire-and-forget — invoked post-response
+ * so the ntfy Approve button callback stays fast. Idempotent: skips if the
+ * action is no longer `approved` or was already executed.
+ */
+export async function executeApprovedAetherDeskAction(actionId: string): Promise<void> {
+  const { createDraymondClient } = await import('./client');
+  const supabase = await createDraymondClient();
+
+  const { data: action, error } = await supabase
+    .from('draymond_actions')
+    .select('*')
+    .eq('id', actionId)
+    .maybeSingle();
+
+  if (error || !action) return;
+  if (action.status !== 'approved') return;
+  if (action.executed_at) return; // already executed — idempotent
+
+  const payload = (action.payload ?? {}) as Record<string, unknown>;
+  const operation = typeof payload.aetherdesk_operation === 'string' ? payload.aetherdesk_operation : '';
+  const input = (payload.aetherdesk_input as Record<string, unknown>) ?? {};
+  const tenantId = typeof payload.tenant_id === 'string' ? payload.tenant_id : 'TENANT-001';
+
+  const result = await executeAetherDeskOperation(operation, input, { tenantId });
+  const executedAt = new Date().toISOString();
+
+  if (result.success) {
+    await supabase
+      .from('draymond_actions')
+      .update({
+        status: 'completed',
+        executed_at: executedAt,
+        result: { ok: true, operation, output: result.output, status_code: result.status_code },
+        error_message: null,
+      })
+      .eq('id', actionId);
+  } else {
+    await supabase
+      .from('draymond_actions')
+      .update({
+        status: 'failed',
+        executed_at: executedAt,
+        result: { ok: false, operation, error: result.error },
+        error_message: result.error ?? 'AetherDesk execution failed',
+      })
+      .eq('id', actionId);
+  }
+
+  await publishResultNotification({
+    operation,
+    success: result.success,
+    error: result.error,
+    status_code: result.status_code,
+  }).catch(() => {});
 }
