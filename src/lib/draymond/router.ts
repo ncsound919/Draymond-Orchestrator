@@ -24,8 +24,8 @@ import type {
 // ── Default configuration ────────────────────────────────────────────────────
 
 const DEFAULT_CONFIG: RouterConfig = {
-  model: 'claude-sonnet-4-5',
-  provider: 'anthropic',
+  model: 'deepseek-v4-flash',
+  provider: 'deepseek',
   temperature: 0.1,
   auto_route_threshold: 0.85,
   fallback_threshold: 0.4,
@@ -50,6 +50,7 @@ function getApiKey(provider: RouterConfig['provider']): string {
     anthropic: process.env.ANTHROPIC_API_KEY,
     openai: process.env.OPENAI_API_KEY,
     qwen: process.env.QWEN_API_KEY,
+    deepseek: process.env.DEEPSEEK_API_KEY,
   };
   const key = keys[provider];
   if (!key) throw new Error(`Missing API key for provider "${provider}"`);
@@ -61,6 +62,7 @@ function getApiUrl(provider: RouterConfig['provider']): string {
     anthropic: 'https://api.anthropic.com/v1/messages',
     openai: 'https://api.openai.com/v1/chat/completions',
     qwen: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions',
+    deepseek: 'https://api.deepseek.com/v1/chat/completions',
   };
   return urls[provider];
 }
