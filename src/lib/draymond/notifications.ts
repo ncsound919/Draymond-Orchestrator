@@ -26,6 +26,7 @@ export type NotificationType =
   | 'site_down'
   | 'site_recovered'
   | 'health_summary'
+  | 'memo'
   | 'custom';
 
 export type NotificationChannel = 'email';
@@ -87,6 +88,7 @@ const TEMPLATE_CONFIG: Record<
   site_down:       { prefix: 'SITE DOWN',        icon: '\u{1F534}', color: '#dc2626' },
   site_recovered:  { prefix: 'Site Recovered',   icon: '\u{1F7E2}', color: '#16a34a' },
   health_summary:  { prefix: 'Health Digest',    icon: '\u{1F4CA}', color: '#7c3aed' },
+  memo:            { prefix: 'Memo',             icon: '\u{1F4DD}', color: '#0891b2' },
   custom:          { prefix: 'Notification',     icon: '\u{1F514}', color: '#6b7280' },
 };
 
@@ -546,6 +548,47 @@ export async function sendAlertEmail(
     related_agent_id: options?.related_agent_id,
     related_chain_id: options?.related_chain_id,
     metadata: options?.metadata,
+  });
+}
+
+// ============================================================================
+// CONVENIENCE: sendMemo
+// ============================================================================
+
+/**
+ * Send a low-urgency memo/update email (type `memo`).
+ *
+ * Intended for non-urgent informational updates (progress notes, status
+ * memos, daily summaries) where a normal alert is overkill. Sends to the
+ * given recipient (or DRAYMOND_ALERT_EMAIL if omitted) at low priority.
+ *
+ * @param subject  Memo subject line.
+ * @param body     Memo body text (plain text; rendered as HTML by the service).
+ * @param recipient  Optional recipient — defaults to DRAYMOND_ALERT_EMAIL,
+ *                   then GMAIL_USER.
+ */
+export async function sendMemo(
+  subject: string,
+  body: string,
+  recipient?: string
+): Promise<NotificationRecord> {
+  const to =
+    recipient ??
+    process.env.DRAYMOND_ALERT_EMAIL ??
+    process.env.GMAIL_USER ??
+    '';
+  if (!to) {
+    throw new Error(
+      '[Draymond Notifications] sendMemo requires a recipient, DRAYMOND_ALERT_EMAIL, or GMAIL_USER'
+    );
+  }
+  return sendNotification({
+    channel: 'email',
+    recipient: to,
+    subject,
+    body,
+    type: 'memo',
+    priority: 'low',
   });
 }
 
