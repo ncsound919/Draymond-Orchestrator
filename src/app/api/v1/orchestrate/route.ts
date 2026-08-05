@@ -36,7 +36,13 @@ import { routeAndClassify } from '@/lib/draymond/router';
 import { logExecution } from '@/lib/draymond/confidence';
 import { processEvent } from '@/lib/draymond/reactive';
 import { buildAndExecuteChain } from '@/lib/draymond/chain-builder';
-import { getDashboardSummary } from '@/lib/draymond/index';
+import { getDashboardSummary, submitAction } from '@/lib/draymond/index';
+import {
+  AETHERDESK_OPERATIONS,
+  executeAetherDeskOperation,
+  getOperationRisk,
+  resolveAetherDeskAgentId,
+} from '@/lib/draymond/aetherdesk';
 
 export const dynamic = 'force-dynamic';
 
@@ -128,6 +134,64 @@ async function handleEntityInvocation(
 
     return `[Draymond] Entity invocation error: ${entityErr instanceof Error ? entityErr.message : String(entityErr)}`;
   }
+}
+
+/**
+ * AetherDesk invocation special-case.
+ * Low/medium-risk operations execute immediately. High/critical operations
+ * are submitted through the confidence gate (clamped to 0.8, which always
+ * yields queue_for_review) and then executed asynchronously after the user
+ * approves the ntfy notification.
+ */
+async function handleAetherDeskInvocation(
+  slug: string,
+  metadata: Record<string, unknown>,
+  write: (chunk: string) => Promise<void>
+): Promise<string> {
+  const action = typeof metadata.action === 'string' ? metadata.action : '';
+  const input = (metadata.input as Record<string, unknown>) ?? {};
+  const risk = getOperationRisk(action);
+
+  if (!risk) {
+    const supported = Object.keys(AETHERDESK_OPERATIONS).join(', ');
+    const msg = `[Draymond] Unknown AetherDesk operation "${action}". Supported: ${supported}`;
+    await write(sseChunk(`${msg}\n`));
+    return msg;
+  }
+
+  if (risk === 'low' || risk === 'medium') {
+    const result = await executeAetherDeskOperation(action, input);
+    return result.success
+      ? JSON.stringify(result.output)
+      : `[Draymond] AetherDesk operation failed: ${result.error}`;
+  }
+
+  // high/critical → human approval via ntfy
+  const agentId = await resolveAetherDeskAgentId();
+  if (!agentId) {
+    const msg = '[Draymond] AetherDesk control agent is not registered — apply migration 009.';
+    await write(sseChunk(`${msg}\n`));
+    return msg;
+  }
+
+  const tenantId = typeof input.tenant_id === 'string' ? input.tenant_id : 'TENANT-001';
+
+  const { action: submitted } = await submitAction({
+    agent_id: agentId,
+    action_type: `aetherdesk:${action}`,
+    description: `AetherDesk ${action}: ${JSON.stringify(input).slice(0, 200)}`,
+    payload: {
+      aetherdesk_operation: action,
+      aetherdesk_input: input,
+      tenant_id: tenantId,
+    },
+    confidence_score: 0.8,
+    risk_level: risk,
+  });
+
+  const msg = '[Draymond] High-risk AetherDesk order queued for approval — check your phone.';
+  await write(sseChunk(`${msg}\n`));
+  return `${msg} (action ${submitted.id})`;
 }
 
 async function handleChainExecution(
@@ -270,7 +334,9 @@ export async function POST(request: NextRequest) {
 
       if (entity_slug) {
         // ── Entity invocation path (explicit slug) ─────────────────
-        resultText = await handleEntityInvocation(entity_slug, metadata, write);
+        resultText = entity_slug === 'aetherdesk'
+          ? await handleAetherDeskInvocation(entity_slug, metadata, write)
+          : await handleEntityInvocation(entity_slug, metadata, write);
       } else if (chain_slug) {
         // ── Chain execution path (explicit slug) ───────────────────
         resultText = await handleChainExecution(chain_slug, metadata);
@@ -312,11 +378,14 @@ export async function POST(request: NextRequest) {
           );
 
           if (routeResult.should_auto_execute && route.intent === 'invoke_entity' && route.entity_slug) {
-            resultText = await handleEntityInvocation(route.entity_slug, {
+            const merged = {
               ...metadata,
               action: route.action,
               input: route.input,
-            }, write);
+            };
+            resultText = route.entity_slug === 'aetherdesk'
+              ? await handleAetherDeskInvocation(route.entity_slug, merged, write)
+              : await handleEntityInvocation(route.entity_slug, merged, write);
           } else if (routeResult.should_auto_execute && route.intent === 'execute_chain' && route.chain_slug) {
             resultText = await handleChainExecution(route.chain_slug, {
               ...metadata,
