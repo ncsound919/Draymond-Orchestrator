@@ -53,22 +53,22 @@ import {
   routeTask,
 } from '../src/lib/draymond/router';
 
-describe('router deepseek provider', () => {
+describe('router opencode-free provider', () => {
   const fetchMock = vi.fn();
 
   afterEach(() => {
     vi.unstubAllGlobals();
-    delete process.env.DEEPSEEK_API_KEY;
+    delete process.env.OPENCODE_API_KEY;
     fetchMock.mockReset();
   });
 
-  it('defaults to deepseek-v4-flash', () => {
-    expect(getRouterConfig().provider).toBe('deepseek');
-    expect(getRouterConfig().model).toBe('deepseek-v4-flash');
+  it('defaults to opencode-free deepseek-v4-flash-free', () => {
+    expect(getRouterConfig().provider).toBe('opencode-free');
+    expect(getRouterConfig().model).toBe('deepseek-v4-flash-free');
   });
 
-  it('calls the DeepSeek chat completions endpoint with Bearer auth', async () => {
-    process.env.DEEPSEEK_API_KEY = 'test-key';
+  it('calls the OpenCode Zen free endpoint with Bearer auth', async () => {
+    process.env.OPENCODE_API_KEY = 'test-key';
     fetchMock.mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -99,14 +99,14 @@ describe('router deepseek provider', () => {
     expect(result.action).toBe('list_agents');
 
     const [url, init] = fetchMock.mock.calls[0];
-    expect(String(url)).toBe('https://api.deepseek.com/v1/chat/completions');
+    expect(String(url)).toBe('https://opencode.ai/zen/v1/chat/completions');
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer test-key');
     const body = JSON.parse(init.body as string);
-    expect(body.model).toBe('deepseek-v4-flash');
+    expect(body.model).toBe('deepseek-v4-flash-free');
   });
 
   it('falls back to intent unknown on non-JSON response (tolerant parser)', async () => {
-    process.env.DEEPSEEK_API_KEY = 'test-key';
+    process.env.OPENCODE_API_KEY = 'test-key';
     fetchMock.mockResolvedValue(
       new Response(
         JSON.stringify({ choices: [{ message: { content: 'not json at all' } }] }),

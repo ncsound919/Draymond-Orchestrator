@@ -10,5 +10,24 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      include: ['src/lib/draymond/**/*.ts'],
+      exclude: [
+        'src/lib/draymond/index.ts',
+        'src/lib/draymond/types.ts',
+        'src/lib/draymond/api-auth.ts',
+        'src/lib/draymond/seed.ts',
+        'src/lib/draymond/business-chains.ts',
+        'src/lib/draymond/chains-seed.ts',
+      ],
+      thresholds: {
+        lines: 75,
+        statements: 70,
+        functions: 75,
+        branches: 55,
+      },
+    },
   },
 });
