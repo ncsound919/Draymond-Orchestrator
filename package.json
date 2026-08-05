@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint . --ext .ts,.tsx",
     "type-check": "tsc --noEmit",
+    "test": "vitest run",
     "electron:dev": "next build && electron .",
     "electron:build": "next build && electron-builder --win --mac --linux"
   },
@@ -37,6 +38,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }
