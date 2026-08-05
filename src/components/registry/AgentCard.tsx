@@ -6,6 +6,7 @@
  */
 import { RegisteredAgent } from '@/lib/registry/types';
 import Link from 'next/link';
+import Image from 'next/image';
 
 const PERSONALITY_COLORS: Record<string, string> = {
   analytical: '#60a5fa',
@@ -105,7 +106,7 @@ export default function AgentCard({ agent }: { agent: RegisteredAgent }) {
           }}
         >
           {agent.avatarUrl ? (
-            <img src={agent.avatarUrl} alt={agent.name} className="w-full h-full object-cover" />
+            <Image src={agent.avatarUrl} alt={agent.name} width={64} height={64} unoptimized className="w-full h-full object-cover" />
           ) : (
             <div
               className="w-full h-full flex items-center justify-center text-2xl font-bold"

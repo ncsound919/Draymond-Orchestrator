@@ -21,7 +21,6 @@ import type {
   EventPattern,
   EventSubscription,
   EventSubscriptionInsert,
-  ReactiveEvent,
 } from './types';
 
 // ── In-memory subscription cache ─────────────────────────────────────────────
@@ -296,7 +295,7 @@ export async function processEvent(
     .single();
 
   // Execute actions for matched subscriptions (in parallel)
-  const results = await Promise.allSettled(
+  await Promise.allSettled(
     matched.map(async (sub) => {
       // Check debounce
       if (shouldDebounce(sub.id, sub.pattern.debounce_ms)) {

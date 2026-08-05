@@ -14,7 +14,6 @@ import { createDraymondClient } from './client';
 import type {
   EntityLeaderboardEntry,
   ExecutionHeatmapPoint,
-  CostRecord,
   CostRecordInsert,
   AnalyticsSummary,
   ExecutionLog,

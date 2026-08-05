@@ -6,7 +6,6 @@
  */
 import Link from 'next/link';
 import { listChains } from '@/lib/draymond/chains';
-import type { ChainStatus } from '@/lib/draymond/types';
 
 export const dynamic = 'force-dynamic';
 

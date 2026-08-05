@@ -102,7 +102,6 @@ export async function GET(req: NextRequest) {
         for (const step of PIPELINE_STEPS) {
           const state = row.steps?.[step]
           if (!state) continue
-          const key = `${step}:${state.status}`
           if (seen[step] === state.status) continue
           seen[step] = state.status
 

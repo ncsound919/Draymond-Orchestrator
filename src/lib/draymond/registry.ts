@@ -6,7 +6,7 @@
 // in the Uplift Lab ecosystem.
 // ============================================================================
 
-import { createDraymondClient } from './client';
+import { createDraymondAdminClient, createDraymondClient } from './client';
 import { logEvent } from './index';
 import type {
   DraymondEntity,
@@ -117,7 +117,10 @@ export async function registerEntities(
 export async function getEntity(
   slugOrId: string
 ): Promise<DraymondEntity | null> {
-  const supabase = await createDraymondClient();
+  // Admin client so server-side automation (orchestrate, chain executor) can
+  // resolve entities without a Supabase user session — the draymond_entities
+  // RLS policy only allows reads for authenticated users.
+  const supabase = createDraymondAdminClient();
 
   // Try by slug first, then by ID
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId);

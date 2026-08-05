@@ -12,6 +12,7 @@
 import { useState, useTransition } from 'react';
 import { RegisteredAgent } from '@/lib/registry/types';
 import { invokeAgent, recoverAgent } from '@/app/agents/actions';
+import Image from 'next/image';
 
 /** Shape of the optional Supabase entity passed from the server page. */
 type EntitySnapshot = {
@@ -175,7 +176,7 @@ export default function AgentBioPage({ agent, entity }: { agent: RegisteredAgent
             style={{ borderColor: accent, background: '#1a1a2e' }}
           >
             {agent.avatarUrl ? (
-              <img src={agent.avatarUrl} alt={agent.name} className="w-full h-full object-cover" />
+              <Image src={agent.avatarUrl} alt={agent.name} width={144} height={144} unoptimized className="w-full h-full object-cover" />
             ) : (
               <div
                 className="w-full h-full flex items-center justify-center text-5xl font-black"

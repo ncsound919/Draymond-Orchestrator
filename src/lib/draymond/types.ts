@@ -661,7 +661,7 @@ export type RouterConfig = {
   /** Model to use for intent classification */
   model: string;
   /** Provider for the model */
-  provider: 'anthropic' | 'openai' | 'qwen' | 'deepseek';
+  provider: 'opencode-free' | 'opencode' | 'deepseek' | 'gemini' | 'openai' | 'anthropic' | 'qwen';
   /** Temperature for LLM calls (lower = more deterministic) */
   temperature: number;
   /** Minimum confidence to auto-route without confirmation */

@@ -14,21 +14,21 @@
 //   → chain: [omniresearch → email-sender]
 // ============================================================================
 
-import { createDraymondClient } from './client';
+import { createDraymondAdminClient, createDraymondClient } from './client';
 import { logEvent } from './index';
-import { instantiateChain, executeChain } from './chains';
+import { callLLM } from './llm';
+import { executeChain } from './chains';
 import type {
   ChainBlueprintStep,
   ChainBlueprint,
   ChainBuildRequest,
   ChainBuildResult,
-  DraymondEntity,
   DraymondChainStepInsert,
 } from './types';
 
 // ── Configuration ────────────────────────────────────────────────────────────
 
-const BUILDER_MODEL = 'claude-sonnet-4-5';
+const BUILDER_MODEL = 'deepseek-v4-flash-free';
 const BUILDER_TIMEOUT_MS = 20_000;
 const MAX_STEPS = 10;
 
@@ -45,8 +45,24 @@ type BuilderEntityInfo = {
   output_schema: Record<string, unknown>;
 };
 
+// Entity catalog cache (1 minute TTL) so repeated chain builds don't re-fetch
+// and re-serialize the full catalog on every request.
+let _catalogCache: { data: BuilderEntityInfo[]; expires: number } | null = null;
+const CATALOG_TTL_MS = 60_000;
+
+/** Force-clear the catalog cache (e.g., after entity registration). */
+export function invalidateChainBuilderCache(): void {
+  _catalogCache = null;
+}
+
 async function getEntityCatalog(): Promise<BuilderEntityInfo[]> {
-  const supabase = await createDraymondClient();
+  if (_catalogCache && Date.now() < _catalogCache.expires) {
+    return _catalogCache.data;
+  }
+
+  // Admin client so chain building works from server-side automation without
+  // a Supabase user session (RLS on draymond_entities allows authenticated reads).
+  const supabase = createDraymondAdminClient();
 
   const { data, error } = await supabase
     .from('draymond_entities')
@@ -57,7 +73,10 @@ async function getEntityCatalog(): Promise<BuilderEntityInfo[]> {
     .order('name');
 
   if (error) throw new Error(`Failed to fetch entity catalog: ${error.message}`);
-  return (data || []) as BuilderEntityInfo[];
+
+  const catalog = (data || []) as BuilderEntityInfo[];
+  _catalogCache = { data: catalog, expires: Date.now() + CATALOG_TTL_MS };
+  return catalog;
 }
 
 // ── LLM-based chain generation ───────────────────────────────────────────────
@@ -69,9 +88,9 @@ function buildChainBuilderPrompt(catalog: BuilderEntityInfo[]): string {
         `  - slug: "${e.slug}", name: "${e.name}", kind: ${e.kind}, ` +
         `capabilities: [${e.capabilities.join(', ')}], ` +
         `category: ${e.category ?? 'none'}, ` +
-        `description: ${e.description ?? 'none'}, ` +
-        `input_schema: ${JSON.stringify(e.input_schema).slice(0, 200)}, ` +
-        `output_schema: ${JSON.stringify(e.output_schema).slice(0, 200)}`
+        `description: ${(e.description ?? 'none').slice(0, 120)}, ` +
+        `input_schema: ${JSON.stringify(e.input_schema).slice(0, 120)}, ` +
+        `output_schema: ${JSON.stringify(e.output_schema).slice(0, 120)}`
     )
     .join('\n');
 
@@ -120,9 +139,6 @@ async function generateBlueprint(
   request: ChainBuildRequest,
   catalog: BuilderEntityInfo[]
 ): Promise<ChainBlueprint> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
-
   const systemPrompt = buildChainBuilderPrompt(catalog);
 
   let userMessage = `Build a chain for the following user request:\n<user_request>${request.description}</user_request>`;
@@ -141,41 +157,17 @@ async function generateBlueprint(
     userMessage += `\n<context>${JSON.stringify(request.context)}</context>`;
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), BUILDER_TIMEOUT_MS);
+  const content = await callLLM({
+    provider: 'opencode-free',
+    model: BUILDER_MODEL,
+    system: systemPrompt,
+    userMessage,
+    maxTokens: 1500,
+    temperature: 0.2,
+    timeoutMs: BUILDER_TIMEOUT_MS,
+  });
 
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: BUILDER_MODEL,
-        max_tokens: 2048,
-        temperature: 0.2,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userMessage }],
-      }),
-      signal: controller.signal,
-    });
-
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      throw new Error(`Chain builder LLM error ${res.status}: ${errText.slice(0, 200)}`);
-    }
-
-    const data = (await res.json()) as Record<string, unknown>;
-    const content = (data.content as Array<{ text?: string }>)?.[0]?.text ?? '';
-
-    if (!content) throw new Error('Empty response from chain builder LLM');
-
-    return parseBlueprintResponse(content, catalog);
-  } finally {
-    clearTimeout(timer);
-  }
+  return parseBlueprintResponse(content, catalog);
 }
 
 function parseBlueprintResponse(
@@ -368,7 +360,7 @@ export async function buildChain(
   let chainId: string | undefined;
 
   if (autoCreate && validation.valid) {
-    chainId = await createChainFromBlueprint(blueprint, catalog);
+    chainId = await createChainFromBlueprint(blueprint);
   }
 
   // Log the build
@@ -430,7 +422,6 @@ export async function buildAndExecuteChain(
   // Chain was created — execute it
   try {
     await executeChain(result.chain_id);
-    await executeChain(result.chain_id);
     return { build: result, executed: true };
   } catch (err) {
     return {
@@ -445,7 +436,6 @@ export async function buildAndExecuteChain(
 
 async function createChainFromBlueprint(
   blueprint: ChainBlueprint,
-  catalog: BuilderEntityInfo[]
 ): Promise<string> {
   const supabase = await createDraymondClient();
 

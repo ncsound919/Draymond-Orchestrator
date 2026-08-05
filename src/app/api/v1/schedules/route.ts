@@ -5,7 +5,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeRequest, parseJsonBody, sanitizeError } from '@/lib/draymond/api-auth';
-import { listJobs, enableJob, disableJob, getJob } from '@/lib/draymond/scheduler';
+import { listJobs, enableJob, disableJob } from '@/lib/draymond/scheduler';
 
 export const dynamic = 'force-dynamic';
 

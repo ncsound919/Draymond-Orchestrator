@@ -952,7 +952,7 @@ async function executeStep(
 
       try {
         emitChainStepFailed(ctx.chain_id, step.name, step.step_order, errorMessage);
-      } catch (_emitErr) {
+      } catch {
         // Non-fatal: best-effort event emission
       }
 

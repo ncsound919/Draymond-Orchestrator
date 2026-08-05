@@ -13,23 +13,22 @@
 
 import { createDraymondAdminClient } from './client';
 import { logEvent } from './index';
+import { callLLM } from './llm';
 import type {
   RouterIntent,
   RouteResult,
   RouterConfig,
-  DraymondEntity,
-  DraymondChain,
 } from './types';
 
 // ── Default configuration ────────────────────────────────────────────────────
 
 const DEFAULT_CONFIG: RouterConfig = {
-  model: 'deepseek-v4-flash',
-  provider: 'deepseek',
+  model: 'deepseek-v4-flash-free',
+  provider: 'opencode-free',
   temperature: 0.1,
   auto_route_threshold: 0.85,
   fallback_threshold: 0.4,
-  max_tokens: 1024,
+  max_tokens: 512,
   timeout_ms: 15_000,
 };
 
@@ -41,30 +40,6 @@ export function configureRouter(overrides: Partial<RouterConfig>): void {
 
 export function getRouterConfig(): RouterConfig {
   return { ..._config };
-}
-
-// ── API key resolver ─────────────────────────────────────────────────────────
-
-function getApiKey(provider: RouterConfig['provider']): string {
-  const keys: Record<string, string | undefined> = {
-    anthropic: process.env.ANTHROPIC_API_KEY,
-    openai: process.env.OPENAI_API_KEY,
-    qwen: process.env.QWEN_API_KEY,
-    deepseek: process.env.DEEPSEEK_API_KEY,
-  };
-  const key = keys[provider];
-  if (!key) throw new Error(`Missing API key for provider "${provider}"`);
-  return key;
-}
-
-function getApiUrl(provider: RouterConfig['provider']): string {
-  const urls: Record<string, string> = {
-    anthropic: 'https://api.anthropic.com/v1/messages',
-    openai: 'https://api.openai.com/v1/chat/completions',
-    qwen: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions',
-    deepseek: 'https://api.deepseek.com/v1/chat/completions',
-  };
-  return urls[provider];
 }
 
 // ── Registry snapshot (cached for routing) ───────────────────────────────────
@@ -88,7 +63,7 @@ type RegistrySnapshot = {
   }>;
 };
 
-let _snapshotCache: { data: RegistrySnapshot; expires: number } | null = null;
+let _snapshotCache: { data: RegistrySnapshot; prompt: string; expires: number } | null = null;
 const CACHE_TTL_MS = 60_000; // 1 minute
 
 async function getRegistrySnapshot(): Promise<RegistrySnapshot> {
@@ -124,8 +99,19 @@ async function getRegistrySnapshot(): Promise<RegistrySnapshot> {
     chains: (chainsResult.data || []) as RegistrySnapshot['chains'],
   };
 
-  _snapshotCache = { data: snapshot, expires: Date.now() + CACHE_TTL_MS };
+  // Build the system prompt once per snapshot so cached routing calls don't
+  // re-serialize the whole registry on every task.
+  _snapshotCache = {
+    data: snapshot,
+    prompt: buildSystemPrompt(snapshot),
+    expires: Date.now() + CACHE_TTL_MS,
+  };
   return snapshot;
+}
+
+/** Return the cached system prompt (empty if the snapshot hasn't loaded yet). */
+function getCachedPrompt(): string {
+  return _snapshotCache?.prompt ?? '';
 }
 
 /** Force-clear the snapshot cache (e.g., after entity registration). */
@@ -142,7 +128,7 @@ function buildSystemPrompt(snapshot: RegistrySnapshot): string {
         `  - slug: "${e.slug}", name: "${e.name}", kind: ${e.kind}, ` +
         `capabilities: [${e.capabilities.join(', ')}], ` +
         `category: ${e.category ?? 'none'}, ` +
-        `description: ${e.description ?? 'none'}`
+        `description: ${(e.description ?? 'none').slice(0, 120)}`
     )
     .join('\n');
 
@@ -151,7 +137,7 @@ function buildSystemPrompt(snapshot: RegistrySnapshot): string {
       (c) =>
         `  - slug: "${c.slug}", name: "${c.name}", ` +
         `trigger: ${c.trigger_type}, ` +
-        `description: ${c.description ?? 'none'}`
+        `description: ${(c.description ?? 'none').slice(0, 120)}`
     )
     .join('\n');
 
@@ -184,79 +170,6 @@ function buildSystemPrompt(snapshot: RegistrySnapshot): string {
     '  "alternatives": [{ "intent": "...", "entity_slug": "...", "chain_slug": "...", "confidence": 0.0-1.0 }]',
     '}',
   ].join('\n');
-}
-
-async function callLLM(
-  systemPrompt: string,
-  userMessage: string
-): Promise<string> {
-  const apiKey = getApiKey(_config.provider);
-  const apiUrl = getApiUrl(_config.provider);
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), _config.timeout_ms);
-
-  try {
-    let response: Response;
-
-    if (_config.provider === 'anthropic') {
-      response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: _config.model,
-          max_tokens: _config.max_tokens,
-          temperature: _config.temperature,
-          system: systemPrompt,
-          messages: [{ role: 'user', content: userMessage }],
-        }),
-        signal: controller.signal,
-      });
-    } else {
-      // OpenAI-compatible format (works for OpenAI and Qwen)
-      response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: _config.model,
-          max_tokens: _config.max_tokens,
-          temperature: _config.temperature,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userMessage },
-          ],
-        }),
-        signal: controller.signal,
-      });
-    }
-
-    if (!response.ok) {
-      const errText = await response.text().catch(() => '');
-      throw new Error(`Router LLM API error ${response.status}: ${errText.slice(0, 200)}`);
-    }
-
-    const data = (await response.json()) as Record<string, unknown>;
-
-    if (_config.provider === 'anthropic') {
-      const content = (data.content as Array<{ text?: string }>)?.[0]?.text ?? '';
-      if (!content) throw new Error('Empty response from Anthropic');
-      return content;
-    } else {
-      const choices = data.choices as Array<{ message?: { content?: string } }>;
-      const content = choices?.[0]?.message?.content ?? '';
-      if (!content) throw new Error('Empty response from LLM');
-      return content;
-    }
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 // ── Response parsing ─────────────────────────────────────────────────────────
@@ -370,14 +283,22 @@ export async function routeTask(
     return directMatch;
   }
 
-  const systemPrompt = buildSystemPrompt(snapshot);
+  const systemPrompt = getCachedPrompt() || buildSystemPrompt(snapshot);
 
   const userMessage = context
     ? `<user_task>${task}</user_task>\n<context>${JSON.stringify(context)}</context>`
     : `<user_task>${task}</user_task>`;
 
   try {
-    const raw = await callLLM(systemPrompt, userMessage);
+    const raw = await callLLM({
+      provider: _config.provider,
+      model: _config.model,
+      system: systemPrompt,
+      userMessage,
+      maxTokens: _config.max_tokens,
+      temperature: _config.temperature,
+      timeoutMs: _config.timeout_ms,
+    });
     const latencyMs = Date.now() - startMs;
     const result = parseRouterResponse(raw, snapshot, latencyMs);
 

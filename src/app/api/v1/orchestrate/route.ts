@@ -213,7 +213,6 @@ async function handleUpliftDispatch(
   workflowId: string,
   task: string,
   metadata: Record<string, unknown>,
-  write: (chunk: string) => Promise<void>
 ): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), UPLIFT_TIMEOUT_MS);
@@ -396,7 +395,7 @@ export async function POST(request: NextRequest) {
             resultText = JSON.stringify(summary);
           } else if (route.intent === 'decompose_goal' || routeResult.needs_decomposition) {
             // Fall through to Uplift for complex decomposition
-            resultText = await handleUpliftDispatch(workflowId, task, metadata, write);
+            resultText = await handleUpliftDispatch(workflowId, task, metadata);
           } else if (routeResult.needs_confirmation) {
             // Confidence not high enough — return routing info for user confirmation
             resultText = JSON.stringify({
@@ -413,16 +412,16 @@ export async function POST(request: NextRequest) {
             });
           } else {
             // Low confidence or unknown — fall back to Uplift
-            resultText = await handleUpliftDispatch(workflowId, task, metadata, write);
+            resultText = await handleUpliftDispatch(workflowId, task, metadata);
           }
         } catch (routeErr) {
           // Router failed — fall back to Uplift
           console.error('[orchestrate] Router error, falling back to Uplift:', routeErr);
-          resultText = await handleUpliftDispatch(workflowId, task, metadata, write);
+          resultText = await handleUpliftDispatch(workflowId, task, metadata);
         }
       } else {
         // ── Uplift dispatch path (default fallback) ────────────────
-        resultText = await handleUpliftDispatch(workflowId, task, metadata, write);
+        resultText = await handleUpliftDispatch(workflowId, task, metadata);
       }
 
       // Fire reactive event for orchestration completion

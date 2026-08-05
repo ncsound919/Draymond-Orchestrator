@@ -1,0 +1,263 @@
+// ============================================================================
+// DRAYMOND — Shared LLM Call Helper (provider chain with fallback)
+// ============================================================================
+// Provider-agnostic LLM calls. Primary is DeepSeek V4 Flash (0731) served by
+// OpenCode's free tier; if it fails (rate limit, outage, balance), the chain
+// falls back to OpenCode Go (paid), then DeepSeek direct, then Gemini.
+// All OpenAI-compatible providers share one request shape; Anthropic uses the
+// Messages API; Gemini uses the Google Generative Language format.
+// ============================================================================
+
+export type LLMProvider =
+  | 'opencode-free'
+  | 'opencode'
+  | 'deepseek'
+  | 'gemini'
+  | 'openai'
+  | 'anthropic'
+  | 'qwen';
+
+export interface LLMCallOptions {
+  /** Preferred provider. Falls back through the chain when it fails. */
+  provider?: LLMProvider;
+  /** Model name. Provider-specific defaults apply when omitted. */
+  model?: string;
+  system: string;
+  userMessage: string;
+  maxTokens?: number;
+  temperature?: number;
+  timeoutMs?: number;
+}
+
+const PROVIDER_URLS: Record<LLMProvider, string> = {
+  'opencode-free': 'https://opencode.ai/zen/v1/chat/completions',
+  opencode: 'https://opencode.ai/zen/go/v1/chat/completions',
+  deepseek: 'https://api.deepseek.com/v1/chat/completions',
+  gemini: 'https://generativelanguage.googleapis.com/v1beta/models',
+  openai: 'https://api.openai.com/v1/chat/completions',
+  anthropic: 'https://api.anthropic.com/v1/messages',
+  qwen: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions',
+};
+
+const PROVIDER_ENV: Record<LLMProvider, string> = {
+  'opencode-free': 'OPENCODE_API_KEY',
+  opencode: 'OPENCODE_API_KEY',
+  deepseek: 'DEEPSEEK_API_KEY',
+  gemini: 'GEMINI_API_KEY',
+  openai: 'OPENAI_API_KEY',
+  anthropic: 'ANTHROPIC_API_KEY',
+  qwen: 'QWEN_API_KEY',
+};
+
+const DEFAULT_MODELS: Record<LLMProvider, string> = {
+  'opencode-free': 'deepseek-v4-flash-free',
+  opencode: 'deepseek-v4-flash',
+  deepseek: 'deepseek-v4-flash',
+  gemini: 'gemini-3.5-flash',
+  openai: 'gpt-4o-mini',
+  anthropic: 'claude-sonnet-4-5',
+  qwen: 'qwen-plus',
+};
+
+/** Resolution order when no explicit provider is requested. */
+const FALLBACK_ORDER: LLMProvider[] = [
+  'opencode-free',
+  'opencode',
+  'deepseek',
+  'gemini',
+  'openai',
+  'anthropic',
+  'qwen',
+];
+
+export function hasKey(provider: LLMProvider): boolean {
+  return !!process.env[PROVIDER_ENV[provider]];
+}
+
+/**
+ * Build the provider order for a call: the preferred provider first (if its
+ * key is configured), then every configured provider in fallback order.
+ */
+export function buildProviderOrder(preferred?: LLMProvider): LLMProvider[] {
+  const order: LLMProvider[] = [];
+  const add = (p: LLMProvider) => {
+    if (!order.includes(p) && hasKey(p)) order.push(p);
+  };
+  if (preferred) add(preferred);
+  for (const p of FALLBACK_ORDER) add(p);
+  return order;
+}
+
+/** Resolve the single best provider when callers need one up front. */
+export function resolveLLMProvider(preferred?: LLMProvider): LLMProvider {
+  const order = buildProviderOrder(preferred);
+  if (order.length === 0) {
+    throw new Error(
+      'No LLM API key configured. Set OPENCODE_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, or QWEN_API_KEY.'
+    );
+  }
+  return order[0];
+}
+
+function getApiKey(provider: LLMProvider): string {
+  const key = process.env[PROVIDER_ENV[provider]];
+  if (!key) throw new Error(`Missing API key for provider "${provider}"`);
+  return key;
+}
+
+async function callGemini(options: LLMCallOptions): Promise<string> {
+  const apiKey = getApiKey('gemini');
+  const model = options.model ?? DEFAULT_MODELS.gemini;
+  const maxTokens = options.maxTokens ?? 1024;
+  const temperature = options.temperature ?? 0.2;
+  const timeoutMs = options.timeoutMs ?? 15_000;
+
+  const contents = [{ role: 'user', parts: [{ text: options.userMessage }] }];
+  const body: Record<string, unknown> = {
+    contents,
+    generationConfig: { maxOutputTokens: maxTokens, temperature },
+  };
+  if (options.system) body.systemInstruction = { parts: [{ text: options.system }] };
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const url = `${PROVIDER_URLS.gemini}/${model}:generateContent`;
+
+    // `AQ.` keys are Google's new auth-key format. Official docs send them via
+    // x-goog-api-key, but some accounts need the OAuth Bearer header — try both.
+    const attempts: Array<Record<string, string>> = [
+      { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    ];
+
+    let lastErr: unknown;
+    for (const headers of attempts) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          const errText = await res.text().catch(() => '');
+          throw new Error(`Gemini API error ${res.status}: ${errText.slice(0, 200)}`);
+        }
+        const data = (await res.json()) as Record<string, unknown>;
+        const text = (data.candidates as Array<{ content?: { parts?: Array<{ text?: string }> } }>)?.[0]
+          ?.content?.parts?.[0]?.text ?? '';
+        if (!text) throw new Error('Empty response from Gemini');
+        return text;
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    throw lastErr ?? new Error('Gemini auth failed');
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Single-provider request. Throws on any non-success so the chain can retry. */
+async function callProvider(provider: LLMProvider, options: LLMCallOptions): Promise<string> {
+  if (provider === 'gemini') return callGemini(options);
+
+  const apiKey = getApiKey(provider);
+  const apiUrl = PROVIDER_URLS[provider];
+  const model = options.model ?? DEFAULT_MODELS[provider];
+  const maxTokens = options.maxTokens ?? 1024;
+  const temperature = options.temperature ?? 0.2;
+  const timeoutMs = options.timeoutMs ?? 15_000;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    let response: Response;
+
+    if (provider === 'anthropic') {
+      response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: maxTokens,
+          temperature,
+          system: options.system,
+          messages: [{ role: 'user', content: options.userMessage }],
+        }),
+        signal: controller.signal,
+      });
+    } else {
+      response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: maxTokens,
+          temperature,
+          messages: [
+            { role: 'system', content: options.system },
+            { role: 'user', content: options.userMessage },
+          ],
+        }),
+        signal: controller.signal,
+      });
+    }
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      throw new Error(`LLM API error ${response.status}: ${errText.slice(0, 200)}`);
+    }
+
+    const data = (await response.json()) as Record<string, unknown>;
+
+    if (provider === 'anthropic') {
+      const content = (data.content as Array<{ text?: string }>)?.[0]?.text ?? '';
+      if (!content) throw new Error('Empty response from LLM');
+      return content;
+    }
+
+    const choices = data.choices as Array<{ message?: { content?: string } }>;
+    const content = choices?.[0]?.message?.content ?? '';
+    if (!content) throw new Error('Empty response from LLM');
+    return content;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Call the LLM across the provider chain and return the text content.
+ * Tries the preferred provider first, then every configured provider in
+ * fallback order. Throws only when all providers fail.
+ */
+export async function callLLM(options: LLMCallOptions): Promise<string> {
+  const order = buildProviderOrder(options.provider);
+  if (order.length === 0) {
+    throw new Error(
+      'No LLM API key configured. Set OPENCODE_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, or QWEN_API_KEY.'
+    );
+  }
+
+  let lastErr: unknown;
+  for (const provider of order) {
+    try {
+      return await callProvider(provider, options);
+    } catch (err) {
+      lastErr = err;
+      console.warn(
+        `[llm] provider "${provider}" failed: ${err instanceof Error ? err.message : String(err)}. Trying next.`
+      );
+    }
+  }
+  throw lastErr ?? new Error('All LLM providers failed');
+}

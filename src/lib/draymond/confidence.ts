@@ -14,12 +14,10 @@
 // ============================================================================
 
 import { createDraymondClient } from './client';
-import { logEvent } from './index';
 import type {
   ConfidenceSignal,
   AdaptiveConfidenceResult,
   EntityPerformanceRecord,
-  DraymondEntity,
   ExecutionLogInsert,
 } from './types';
 
@@ -27,9 +25,6 @@ import type {
 
 /** Fallback score when we have zero history for an entity. */
 const BASELINE_CONFIDENCE = 0.75;
-
-/** Number of recent executions to consider for trend analysis. */
-const RECENT_WINDOW = 20;
 
 /** Minimum executions needed before historical rate is trusted. */
 const MIN_EXECUTIONS_FOR_HISTORY = 5;

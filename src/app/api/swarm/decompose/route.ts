@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { appendAuditLog } from '@/lib/audit';
 import { authorizeRequest, parseJsonBody } from '@/lib/draymond/api-auth';
+import { callLLM } from '@/lib/draymond/llm';
 
 const VALID_AGENTS = new Set([
   'megacode', 'uplift', 'rex', 'maya', 'finn', 'cleo', 'lexa',
+  'riggs', 'moss', 'scribe', 'echo', 'hype',
 ]);
 const MAX_GOAL_LEN = 500;
 const MAX_CONTEXT_KEYS = 20;
-const ANTHROPIC_TIMEOUT_MS = 25_000;
+const LLM_TIMEOUT_MS = 25_000;
 
 const AGENT_ROLES: Record<string, string> = {
   megacode: 'web and software development, code generation, file I/O, git operations',
@@ -17,6 +19,11 @@ const AGENT_ROLES: Record<string, string> = {
   cleo: 'project management, scheduling, SOPs, task tracking',
   lexa: 'client onboarding, check-ins, satisfaction tracking, communication',
   uplift: 'general research, web browsing, complex multi-step reasoning, coordination',
+  riggs: 'software engineering, debugging, code review, API research',
+  moss: 'research and OSINT, lead enrichment, competitive intelligence, source verification',
+  scribe: 'communications, email drafting and sending, calendar scheduling, document management',
+  echo: 'call center operations, lead triage, outbound campaigns, agent monitoring',
+  hype: 'media and creative, promo videos, scriptwriting, marketing copy',
 };
 
 interface ValidatedTask {
@@ -118,12 +125,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-    if (!ANTHROPIC_API_KEY)
-      return NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 },
-      );
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
 
     const systemPrompt = [
       'You are Draymond, the orchestrator for a solopreneur OS.',
@@ -140,46 +143,26 @@ export async function POST(request: NextRequest) {
       '}',
     ].join('\n');
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), ANTHROPIC_TIMEOUT_MS);
-
-    let apiData: Record<string, unknown>;
+    let content: string;
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-5',
-          max_tokens: 1024,
-          system: systemPrompt,
-          messages: [{
-            role: 'user',
-            content: `Goal: ${goal}\nContext: ${JSON.stringify(context)}`,
-          }],
-        }),
-        signal: controller.signal,
+      content = await callLLM({
+        provider: 'opencode-free',
+        system: systemPrompt,
+        userMessage: `Goal: ${goal}\nContext: ${JSON.stringify(context)}`,
+        maxTokens: 800,
+        temperature: 0.2,
+        timeoutMs: LLM_TIMEOUT_MS,
       });
-      if (!res.ok) {
-        const errText = await res.text().catch(() => '');
-        throw new Error(`Anthropic API error ${res.status}: ${errText.slice(0, 200)}`);
-      }
-      apiData = await res.json() as Record<string, unknown>;
     } catch (err) {
       if ((err as Error)?.name === 'AbortError')
-        throw new Error('Anthropic API timed out — try again');
+        throw new Error('LLM timed out — try again');
       throw err;
     } finally {
       clearTimeout(timer);
     }
 
-    const content =
-      (apiData?.content as Array<{ text?: string }>)?.[0]?.text ?? '';
     if (!content)
-      throw new Error('Empty response from Anthropic API');
+      throw new Error('Empty response from LLM');
 
     const parsed = parseLLMResponse(content);
 
