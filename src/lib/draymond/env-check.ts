@@ -50,6 +50,10 @@ const OPTIONAL_VARS: EnvVar[] = [
   { name: 'SUB_TEAM_DIR', required: false, description: 'Sub Team project directory' },
   { name: 'DRAYMOND_REGISTRY_DIR', required: false, description: 'File-based registry directory' },
   { name: 'AUDIT_LOG_PATH', required: false, description: 'Audit log file path' },
+  { name: 'DEEPSEEK_API_KEY', required: false, description: 'DeepSeek API key for the task router' },
+  { name: 'AETHERDESK_BASE_URL', required: false, description: 'AetherDesk API base URL (e.g. http://127.0.0.1:8000/api/v1)' },
+  { name: 'AETHERDESK_API_KEY', required: false, description: 'AetherDesk INTERNAL_API_KEY for x-api-key auth' },
+  { name: 'NTFY_TOPIC_RESULTS', required: false, description: 'ntfy topic for execution result notifications (separate from approvals)' },
 ];
 
 /**
