@@ -7,7 +7,7 @@
 // ============================================================================
 
 import { createDraymondAdminClient } from './client';
-import { logEvent, evaluateConfidence, submitAction } from './index';
+import { logEvent, evaluateConfidence, submitAction, isActionApproved } from './index';
 import { getEntity, recordInvocation } from './registry';
 import { invokeEntity } from './invoker';
 import {
@@ -644,7 +644,7 @@ async function updateStepStatus(
     output_data?: Record<string, unknown>;
     error_message?: string;
     retry_count?: number;
-    action_id?: string;
+    action_id?: string | null;
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabaseClient?: any
@@ -791,27 +791,37 @@ async function executeStep(
         }
 
         if (decision.action === 'queue_for_review') {
-          // Submit as action for human review
-          const { action } = await submitAction({
-            agent_id: agentId,
-            action_type: `chain_step:${step.action}`,
-            description: `Chain step "${step.name}" requires review (entity: ${entity.name})`,
-            payload: resolvedInput,
-            confidence_score: confidenceScore,
-            risk_level: (step.risk_level || 'low') as ActionRiskLevel,
-          });
+          // If this exact action was already approved by a human, the resume
+          // path falls through to execution instead of re-queueing — that
+          // breaks the approve → resume → re-queue infinite loop.
+          const alreadyApproved = step.action_id
+            ? await isActionApproved(step.action_id)
+            : false;
 
-          await updateStepStatus(step.id, 'pending_review', {
-            action_id: action.id,
-            error_message: 'Queued for human review',
-          }, supabaseClient);
+          if (!alreadyApproved) {
+            // Submit as action for human review
+            const { action } = await submitAction({
+              agent_id: agentId,
+              action_type: `chain_step:${step.action}`,
+              description: `Chain step "${step.name}" requires review (entity: ${entity.name})`,
+              payload: resolvedInput,
+              confidence_score: confidenceScore,
+              risk_level: (step.risk_level || 'low') as ActionRiskLevel,
+            });
 
-          return {
-            success: false,
-            output: {},
-            error: 'Step queued for human review',
-            duration_ms: Date.now() - startTime,
-          };
+            await updateStepStatus(step.id, 'pending_review', {
+              action_id: action.id,
+              error_message: 'Queued for human review',
+            }, supabaseClient);
+
+            return {
+              success: false,
+              output: {},
+              error: 'Step queued for human review',
+              duration_ms: Date.now() - startTime,
+            };
+          }
+          // else: fall through — human approved this exact action for this run
         }
       }
 
@@ -857,11 +867,13 @@ async function executeStep(
 
       const duration_ms = Date.now() - startTime;
 
-      // Mark step completed
+      // Mark step completed — detach the review action so a completed step
+      // can't leak an approval into later runs (stale-approval guard).
       await updateStepStatus(step.id, 'completed', {
         completed_at: new Date().toISOString(),
         duration_ms,
         output_data: output,
+        action_id: null,
       }, supabaseClient);
 
       // Log audit event
@@ -1225,14 +1237,23 @@ export async function resumeChain(
   const resetStatuses: StepStatus[] = ['failed', 'blocked', 'retrying', 'waiting', 'running', 'pending_review', 'rejected', 'approved'];
   for (const step of steps) {
     if (resetStatuses.includes(step.status)) {
+      // Preserve the review-action link only when the linked action was
+      // approved — resume-after-approval needs it for the gate bypass.
+      // Rejected/stale links are cleared so they can't bypass a future run.
+      const action_id = step.action_id
+        ? (await isActionApproved(step.action_id) ? step.action_id : null)
+        : null;
+
       await updateStepStatus(step.id, 'pending', {
         error_message: undefined,
         retry_count: 0,
+        action_id,
       }, supabase);
       // Mutate the in-memory step so executeStepGroups sees 'pending'
       (step as { status: StepStatus }).status = 'pending';
       // Also reset in-memory retry_count so executeStep starts from 0 (item 19)
       (step as { retry_count: number }).retry_count = 0;
+      (step as { action_id: string | null }).action_id = action_id;
     }
   }
 

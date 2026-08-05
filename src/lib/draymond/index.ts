@@ -12,6 +12,7 @@
 
 import { createDraymondClient } from './client';
 import { randomBytes } from 'crypto';
+import { after } from 'next/server';
 import { publishApprovalNotification } from './ntfy';
 import type {
   AgentStatus,
@@ -383,9 +384,22 @@ export async function submitAction(
   if (error) throw new Error(`Failed to submit action: ${error.message}`);
 
   // Fire-and-forget the ntfy push. A notification failure must never fail
-  // the action submission itself.
+  // the action submission itself. Run post-response via `after()` when in a
+  // request scope (bare fire-and-forget promises can be terminated early in
+  // serverless), otherwise fall back to a detached promise.
   if (requiresReview) {
-    publishApprovalNotification(actionRecord as DraymondAction).catch(() => {});
+    const publish = (): Promise<void> => {
+      publishApprovalNotification(actionRecord as DraymondAction)
+        .catch((err) => {
+          console.warn('[ntfy] publishApprovalNotification failed:', err);
+        });
+      return Promise.resolve();
+    };
+    try {
+      after(publish);
+    } catch {
+      publish();
+    }
   }
 
   // Log the confidence decision
@@ -445,7 +459,104 @@ export async function reviewAction(
     metadata: { action_id: actionId, reviewer_id: reviewerId },
   });
 
+  // On approval, schedule the action's execution after the response is sent.
+  // The chain-step resume can run up to DEFAULT_CHAIN_TIMEOUT_MS (5 min),
+  // far beyond the route's maxDuration — so it must not be awaited inline.
+  if (approved) {
+    await scheduleApprovedActionExecution(typedAction);
+  }
+
   return typedAction;
+}
+
+/**
+ * Check whether an action has already been approved. Used by the chain
+ * confidence gate to bypass re-queueing a step whose action was approved.
+ */
+export async function isActionApproved(actionId: string | null): Promise<boolean> {
+  if (!actionId) return false;
+  const supabase = await createDraymondClient();
+  const { data, error } = await supabase
+    .from('draymond_actions')
+    .select('status')
+    .eq('id', actionId)
+    .maybeSingle();
+  if (error || !data) return false;
+  return data.status === 'approved';
+}
+
+/**
+ * Execute an approved action.
+ *
+ * Chain-step actions (action_type `chain_step:*`) are linked to a
+ * `draymond_chain_steps` row via `action_id`. Approving one resumes the
+ * parent chain from the pending step. The chain was left in `failed` status
+ * when the step queued for review, so `resumeChain` accepts it and resets
+ * non-terminal steps to `pending` before re-running.
+ *
+ * Standalone actions just record execution — their payload is consumed by the
+ * caller.
+ *
+ * Scheduling: the resume may take up to 5 minutes, so it runs via
+ * `after()` (post-response) rather than inline. Falls back to a fire-and-
+ * forget promise when `after()` is unavailable (non-request context). On
+ * failure, the fact is written to `result.resume_failed` so the dashboard can
+ * surface "approved but resume failed — retry".
+ *
+ * Dynamic import avoids a circular dependency (chains.ts imports this file).
+ */
+async function scheduleApprovedActionExecution(action: DraymondAction): Promise<void> {
+  const isChainStep = action.action_type?.startsWith('chain_step:') ?? false;
+
+  const run = async (): Promise<void> => {
+    let chainId: string | null = null;
+    try {
+      if (isChainStep) {
+        const { resumeChain } = await import('./chains');
+        const { data: step } = await (
+          await createDraymondClient()
+        )
+          .from('draymond_chain_steps')
+          .select('chain_id')
+          .eq('action_id', action.id)
+          .maybeSingle();
+        chainId = step?.chain_id ?? null;
+
+        if (chainId) {
+          await resumeChain(chainId, action.agent_id, { timeout_ms: 300000 });
+        }
+      }
+
+      const supabase = await createDraymondClient();
+      await supabase
+        .from('draymond_actions')
+        .update({
+          executed_at: new Date().toISOString(),
+          result: isChainStep
+            ? { chain_id: chainId, resumed: true }
+            : { status: 'recorded' },
+          error_message: undefined,
+        })
+        .eq('id', action.id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const supabase = await createDraymondClient();
+      await supabase
+        .from('draymond_actions')
+        .update({
+          result: { resume_failed: true, chain_id: chainId, error: message },
+          error_message: `Chain resume failed: ${message}`,
+        })
+        .eq('id', action.id);
+    }
+  };
+
+  try {
+    after(run);
+  } catch {
+    // Not in a request scope — fire and forget rather than throwing inline.
+    run().catch(() => {});
+  }
 }
 
 /**
