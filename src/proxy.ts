@@ -61,7 +61,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Marketing site URL for redirects
-  const MARKETING_SITE_URL = 'https://theupliftlab.com/tools/draymond-orchestrator';
+  const MARKETING_SITE_URL = 'https://overlay365.com';
 
   // 2. If no user, redirect to login or marketing with error
   if (!user) {
