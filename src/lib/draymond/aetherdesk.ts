@@ -88,3 +88,90 @@ export function buildAetherDeskUrl(
     body: hasBody ? body : null,
   };
 }
+
+export type AetherDeskExecutionResult = {
+  success: boolean;
+  output: Record<string, unknown>;
+  error?: string;
+  status_code?: number;
+};
+
+/**
+ * Execute an AetherDesk operation over its REST API.
+ * Never throws — always returns a structured result.
+ */
+export async function executeAetherDeskOperation(
+  operation: string,
+  input: Record<string, unknown>,
+  options?: { tenantId?: string; timeoutMs?: number }
+): Promise<AetherDeskExecutionResult> {
+  const baseUrl = process.env.AETHERDESK_BASE_URL;
+  const apiKey = process.env.AETHERDESK_API_KEY;
+
+  if (!baseUrl || !apiKey) {
+    return {
+      success: false,
+      output: {},
+      error: 'AETHERDESK_BASE_URL / AETHERDESK_API_KEY not configured',
+    };
+  }
+
+  const def = AETHERDESK_OPERATIONS[operation];
+  if (!def) {
+    return { success: false, output: {}, error: `Unknown AetherDesk operation "${operation}"` };
+  }
+
+  let url: string;
+  let body: Record<string, unknown> | null;
+  try {
+    const built = buildAetherDeskUrl(baseUrl, operation, input, options?.tenantId ?? 'TENANT-001');
+    url = built.url;
+    body = built.body;
+  } catch (err) {
+    return {
+      success: false,
+      output: {},
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  const timeoutMs = options?.timeoutMs ?? 30_000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const fetchOptions: RequestInit = {
+      method: def.method,
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+      signal: controller.signal,
+    };
+    if (body) fetchOptions.body = JSON.stringify(body);
+
+    const response = await fetch(url, fetchOptions);
+    clearTimeout(timer);
+
+    const bodyText = await response.text();
+    let output: Record<string, unknown>;
+    try {
+      output = JSON.parse(bodyText) as Record<string, unknown>;
+    } catch {
+      output = { raw_output: bodyText };
+    }
+
+    return {
+      success: response.ok,
+      output,
+      error: response.ok ? undefined : `HTTP ${response.status}: ${bodyText.slice(0, 500)}`,
+      status_code: response.status,
+    };
+  } catch (err) {
+    clearTimeout(timer);
+    const message = err instanceof Error ? err.message : String(err);
+    const isTimeout = err instanceof DOMException && err.name === 'AbortError';
+    return {
+      success: false,
+      output: {},
+      error: isTimeout ? `Request timed out after ${timeoutMs}ms` : message,
+    };
+  }
+}
