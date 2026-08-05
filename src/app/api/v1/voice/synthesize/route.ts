@@ -8,13 +8,24 @@ const AETHERDESK_BASE_URL =
   process.env.AETHERDESK_BASE_URL || 'http://127.0.0.1:8000/api/v1';
 const AETHERDESK_API_KEY = process.env.AETHERDESK_API_KEY || '';
 
+/** Max JSON body in bytes (parity with transcribe's audio cap). */
+const MAX_BODY_BYTES = 25 * 1024 * 1024;
+
 export async function POST(request: Request) {
   const authError = authorizeRequest(request);
   if (authError) return authError;
 
   let text = '';
   try {
-    const body = (await request.json()) as { text?: unknown };
+    const contentLength = parseInt(request.headers.get('content-length') ?? '', 10);
+    if (contentLength > MAX_BODY_BYTES) {
+      return NextResponse.json({ error: 'Request body too large' }, { status: 413 });
+    }
+    const raw = await request.text();
+    if (raw.length > MAX_BODY_BYTES) {
+      return NextResponse.json({ error: 'Request body too large' }, { status: 413 });
+    }
+    const body = JSON.parse(raw) as { text?: unknown };
     text = typeof body.text === 'string' ? body.text.trim() : '';
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
@@ -49,7 +60,21 @@ export async function POST(request: Request) {
       );
     }
 
-    const data = (await res.json()) as { audio?: string };
+    let data: { audio?: string };
+    try {
+      data = (await res.json()) as { audio?: string };
+    } catch {
+      await appendAuditLog({
+        event: 'voice_synthesize_error',
+        status_code: res.status,
+        error: 'AetherDesk returned non-JSON success response',
+        agent: 'draymond',
+      });
+      return NextResponse.json(
+        { error: 'AetherDesk synthesize returned an invalid response' },
+        { status: 502 },
+      );
+    }
     await appendAuditLog({
       event: 'voice_synthesize',
       text_preview: text.slice(0, 120),

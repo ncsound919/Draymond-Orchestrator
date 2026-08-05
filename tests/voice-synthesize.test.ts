@@ -50,6 +50,7 @@ describe('POST /api/v1/voice/synthesize', () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toBe('http://127.0.0.1:8000/api/v1/voice/synthesize');
     expect((init.headers as Record<string, string>)['x-api-key']).toBe('aetherdesk-key');
+    expect(init.method).toBe('POST');
     expect(JSON.parse(init.body as string)).toEqual({ text: 'hello world' });
   });
 
@@ -62,6 +63,52 @@ describe('POST /api/v1/voice/synthesize', () => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ text: '   ' }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 502 when AetherDesk is unreachable', async () => {
+    fetchMock.mockRejectedValue(new Error('connection refused'));
+    const { POST } = await import('../src/app/api/v1/voice/synthesize/route');
+    const req = new Request('http://localhost/api/v1/voice/synthesize', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer test-cron-secret',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text: 'hello' }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(502);
+  });
+
+  it('returns 502 when AetherDesk responds with an error status', async () => {
+    fetchMock.mockResolvedValue(
+      new Response('boom', { status: 503 }),
+    );
+    const { POST } = await import('../src/app/api/v1/voice/synthesize/route');
+    const req = new Request('http://localhost/api/v1/voice/synthesize', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer test-cron-secret',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text: 'hello' }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(502);
+  });
+
+  it('returns 400 for malformed JSON body', async () => {
+    const { POST } = await import('../src/app/api/v1/voice/synthesize/route');
+    const req = new Request('http://localhost/api/v1/voice/synthesize', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer test-cron-secret',
+        'Content-Type': 'application/json',
+      },
+      body: 'not json',
     });
     const res = await POST(req);
     expect(res.status).toBe(400);
