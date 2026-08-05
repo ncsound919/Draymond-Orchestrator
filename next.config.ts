@@ -42,6 +42,12 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
 
+  // Pin the workspace root — a stray pnpm-lock.yaml in a parent directory
+  // makes Next infer the wrong root and double the path (e.g. ./src\src\...).
+  turbopack: {
+    root: process.cwd(),
+  },
+
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [
@@ -58,6 +64,16 @@ const nextConfig: NextConfig = {
       {
         source: "/(.*)",
         headers: securityHeaders,
+      },
+      {
+        // CORS for API consumers: Open-Chat web, Aetherdesk, and local dev.
+        source: "/api/:path*",
+        headers: [
+          { key: "Access-Control-Allow-Origin", value: process.env.CORS_ORIGIN || "*" },
+          { key: "Access-Control-Allow-Methods", value: "GET, POST, PATCH, DELETE, OPTIONS" },
+          { key: "Access-Control-Allow-Headers", value: "Authorization, Content-Type, X-Review-Token, X-Api-Key" },
+          { key: "Access-Control-Max-Age", value: "86400" },
+        ],
       },
     ];
   },

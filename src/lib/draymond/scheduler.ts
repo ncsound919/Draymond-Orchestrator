@@ -397,6 +397,20 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         priority?: string;
       };
 
+      // Special-case the Daily Health Digest: type 'health_summary' with no
+      // explicit payload builds the digest from the live dashboard summary.
+      if (payload?.type === 'health_summary' && !payload.recipient) {
+        const { getDashboardSummary } = await import('./index');
+        const { sendHealthDigest } = await import('./notifications');
+        const recipient = getNotificationRecipient();
+        if (!recipient) {
+          throw new Error('Daily Health Digest requires DRAYMOND_ALERT_EMAIL or GMAIL_USER');
+        }
+        const summary = await getDashboardSummary();
+        const record = await sendHealthDigest(recipient, summary);
+        return { notification_id: record.id, sent_at: record.sent_at };
+      }
+
       if (!payload || !payload.recipient || !payload.subject || !payload.body) {
         throw new Error('notification job missing required job_config.payload (recipient, subject, body)');
       }
@@ -426,6 +440,20 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
 
     case 'custom': {
       const handler = config.handler as string | undefined;
+
+      if (handler === 'check_all_sites') {
+        const { checkAllSites } = await import('./monitors');
+        const result = await checkAllSites();
+        return {
+          handler,
+          checked_at: result.checked_at,
+          total: result.total,
+          up: result.up,
+          down: result.down,
+          errors: result.errors,
+        };
+      }
+
       console.log(
         `[Draymond Scheduler] Custom job "${job.name}" triggered (handler: ${handler ?? 'none'}). ` +
         `No built-in handler registered — skipping execution.`

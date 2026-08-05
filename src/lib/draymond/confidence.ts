@@ -113,7 +113,7 @@ export async function getEntityPerformance(
 
   // Current streak
   let streak = 0;
-  let streakType: 'success' | 'failure' = allLogs[0]?.success ? 'success' : 'failure';
+  const streakType: 'success' | 'failure' = allLogs[0]?.success ? 'success' : 'failure';
   for (const log of allLogs) {
     if (log.success === (streakType === 'success')) {
       streak++;

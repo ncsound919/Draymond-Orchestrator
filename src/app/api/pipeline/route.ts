@@ -58,9 +58,12 @@ export async function POST(req: NextRequest) {
 
     // Upsert episode record in Supabase
     // Note: The `episodes` table is not in the generated Supabase types (it's
-    // created by the CCE migration, not Draymond). Use a type assertion to
-    // bypass the strict generic constraint on `.from()`.
-    const { error: dbError } = await (supabase.from('episodes') as any).upsert({
+    // created by the CCE migration, not Draymond). Use a narrowed builder type
+    // to bypass the strict generic constraint on `.from()`.
+    type AnyQueryBuilder = {
+      upsert(values: unknown, opts?: unknown): Promise<{ error: { message: string } | null }>;
+    };
+    const { error: dbError } = await (supabase.from('episodes') as unknown as AnyQueryBuilder).upsert({
       id: episode_id,
       run_id,
       status: 'queued',

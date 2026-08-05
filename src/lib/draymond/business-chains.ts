@@ -115,12 +115,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     invocation_config: {
       module: 'tradingagents',
       entry_point: 'main',
-      working_dir:
-        process.env.TRADING_AGENTS_DIR ||
-        // Fallback for local dev on Windows — override via env var in production
-        (process.platform === 'win32'
-          ? 'C:\\Users\\User\\Desktop\\Uplift Ecosystem\\agents and systems\\TradingAgents-main'
-          : './agents/TradingAgents-main'),
+      working_dir: process.env.TRADING_AGENTS_DIR || './agents/TradingAgents-main',
       python_path: process.env.TRADING_AGENTS_PYTHON || 'python',
       // If a future HTTP wrapper is deployed:
       fallback_url: process.env.TRADING_AGENTS_URL || 'http://localhost:8040',
@@ -409,11 +404,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
       fallback: {
         command: process.env.SUB_TEAM_PYTHON || 'python',
         args: ['main.py'],
-        working_dir:
-          process.env.SUB_TEAM_DIR ||
-          (process.platform === 'win32'
-            ? 'C:\\Users\\User\\Desktop\\Uplift Lab Revised\\uplift-lab-v2\\Sub-Team'
-            : './agents/Sub-Team'),
+        working_dir: process.env.SUB_TEAM_DIR || './agents/Sub-Team',
         env: {
           DRAYMOND_TOTAL_BUDGET: '10000',
         },

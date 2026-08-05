@@ -11,6 +11,8 @@
 // ============================================================================
 
 import { createDraymondClient } from './client';
+import { randomBytes } from 'crypto';
+import { publishApprovalNotification } from './ntfy';
 import type {
   AgentStatus,
   ActionRiskLevel,
@@ -32,6 +34,9 @@ import type {
 // 1. AGENT HEALTH MONITORING & AUTO-RECOVERY
 // Solves: Single-Agent Fragility
 // ============================================================================
+
+/** TTL for action review tokens (48 hours). */
+const REVIEW_TOKEN_TTL_MS = 48 * 60 * 60 * 1000;
 
 /**
  * Record an agent heartbeat, resetting its consecutive error count
@@ -343,6 +348,15 @@ export async function submitAction(
         ? 'pending_review'
         : 'rejected';
 
+  const requiresReview = decision.action === 'queue_for_review';
+
+  // Per-action review token for ntfy push approval. Only minted when the
+  // action actually needs human review — never exposed on auto-executed work.
+  const reviewToken = requiresReview ? randomBytes(32).toString('hex') : null;
+  const reviewTokenExpiresAt = reviewToken
+    ? new Date(Date.now() + REVIEW_TOKEN_TTL_MS).toISOString()
+    : null;
+
   const { data: actionRecord, error } = await supabase
     .from('draymond_actions')
     .insert({
@@ -356,7 +370,9 @@ export async function submitAction(
       risk_level: input.risk_level || 'low',
       confidence_reasoning: decision.reasoning,
       status,
-      requires_human_review: decision.action === 'queue_for_review',
+      requires_human_review: requiresReview,
+      review_token: reviewToken,
+      review_token_expires_at: reviewTokenExpiresAt,
       goal_id: input.goal_id,
       goal_alignment_score: input.goal_alignment_score,
       expires_at: input.expires_at,
@@ -365,6 +381,12 @@ export async function submitAction(
     .single();
 
   if (error) throw new Error(`Failed to submit action: ${error.message}`);
+
+  // Fire-and-forget the ntfy push. A notification failure must never fail
+  // the action submission itself.
+  if (requiresReview) {
+    publishApprovalNotification(actionRecord as DraymondAction).catch(() => {});
+  }
 
   // Log the confidence decision
   await logEvent({

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import Link from 'next/link';
 import { createWorkflow } from './actions';
 import type { EntityKind } from '@/lib/draymond/types';
 
@@ -389,12 +390,12 @@ export default function WorkflowForm({ entities }: { entities: EntityOption[] })
         >
           {isPending ? 'Creating...' : 'Create Workflow'}
         </button>
-        <a
+        <Link
           href="/workflows"
           className="rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors bg-white/10 hover:bg-white/20 text-white"
         >
           Cancel
-        </a>
+        </Link>
       </div>
     </div>
   );

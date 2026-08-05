@@ -19,7 +19,9 @@ const REQUIRED_VARS: EnvVar[] = [
 ];
 
 const OPTIONAL_VARS: EnvVar[] = [
-  { name: 'NEXT_PUBLIC_CRON_SECRET', required: false, description: 'Client-side cron secret for QuickActionButton' },
+  { name: 'NTFY_URL', required: false, description: 'ntfy server URL for the push-approval relay (e.g. https://ntfy.sh)' },
+  { name: 'NTFY_TOPIC', required: false, description: 'ntfy topic for approval notifications' },
+  { name: 'DRAYMOND_PUBLIC_URL', required: false, description: 'Public base URL for ntfy Approve/Reject callbacks' },
   { name: 'OPENAI_API_KEY', required: false, description: 'OpenAI API key for swarm decomposition' },
   { name: 'ANTHROPIC_API_KEY', required: false, description: 'Anthropic API key for Claude calls' },
   { name: 'QWEN_API_KEY', required: false, description: 'Qwen API key for Uplift Guide AI' },
@@ -29,6 +31,9 @@ const OPTIONAL_VARS: EnvVar[] = [
   { name: 'GMAIL_USER', required: false, description: 'Gmail address for email notifications' },
   { name: 'GMAIL_APP_PASSWORD', required: false, description: 'Gmail app password for SMTP' },
   { name: 'DRAYMOND_ALERT_EMAIL', required: false, description: 'Alert recipient email' },
+  { name: 'NTFY_URL', required: false, description: 'ntfy server base URL (push-approval relay)' },
+  { name: 'NTFY_TOPIC', required: false, description: 'ntfy topic for approval requests' },
+  { name: 'DRAYMOND_PUBLIC_URL', required: false, description: 'Public URL for ntfy approval action callbacks' },
   { name: 'UPLIFT_BASE_URL', required: false, description: 'Uplift Agent base URL' },
   { name: 'SPORTS_STEVE_URL', required: false, description: 'Sports Steve agent URL' },
   { name: 'BET_BUDDY_URL', required: false, description: 'Bet Buddy agent URL' },

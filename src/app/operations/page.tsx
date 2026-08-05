@@ -8,6 +8,7 @@ import type { SiteMonitor } from '@/lib/draymond/monitors';
 import type { NotificationRecord } from '@/lib/draymond/notifications';
 import QuickActionButton from '@/components/QuickActionButton';
 import DataExportButton from '@/components/DataExportButton';
+import { runQuickAction } from './actions';
 
 export const metadata: Metadata = {
   title: 'Operations Center | Draymond Orchestrator',
@@ -807,34 +808,38 @@ export default async function OperationsPage() {
           <h2 className="text-xl font-semibold text-white mb-4">
             Quick Actions
           </h2>
-          {/* NOTE: These actions invoke server-side API routes that can mutate state
-              (health checks, site monitors, notifications, data seeding). Access is
-              gated by middleware.ts purchase verification. Re-enable the admin role
-              check in this page component before exposing to untrusted users. */}
+          {/* NOTE: These buttons invoke server-side admin actions (health checks,
+              site monitors, notifications, data seeding). The CRON_SECRET stays on
+              the server (runQuickAction); the client never sees it. Access is
+              gated by the server action's allowlist + per-route authorizeRequest. */}
           <div className="flex flex-wrap gap-3">
             <QuickActionButton
               label="Run Health Check"
               endpoint="/api/cron"
               method="POST"
               color="green"
+              onRun={runQuickAction}
             />
             <QuickActionButton
               label="Check All Sites"
               endpoint="/api/monitors/check"
               method="GET"
               color="blue"
+              onRun={runQuickAction}
             />
             <QuickActionButton
               label="Send Test Email"
               endpoint="/api/notifications/test"
               method="POST"
               color="purple"
+              onRun={runQuickAction}
             />
             <QuickActionButton
               label="Seed Business Data"
               endpoint="/api/seed"
               method="POST"
               color="yellow"
+              onRun={runQuickAction}
             />
           </div>
         </section>

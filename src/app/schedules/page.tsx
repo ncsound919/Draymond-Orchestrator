@@ -1,11 +1,11 @@
-import { listJobs } from '@/lib/draymond/scheduler';
+import { listJobs, type ScheduledJob } from '@/lib/draymond/scheduler';
 import { listChains } from '@/lib/draymond/chains';
 import SchedulesDashboard from './SchedulesDashboard';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SchedulesPage() {
-  let serializedJobs: Record<string, unknown>[] = [];
+  let serializedJobs: ScheduledJob[] = [];
   let chainOptions: { id: string; name: string; slug: string }[] = [];
 
   try {
@@ -20,9 +20,16 @@ export default async function SchedulesPage() {
     // Continue with empty arrays — dashboard will show empty state
   }
 
+  // The dashboard's local JobType excludes the internal 'decay_sweep' job;
+  // surface those as 'custom' so they still render in the schedule list.
+  const dashboardJobs = serializedJobs.map((j) => ({
+    ...j,
+    job_type: (j.job_type === 'decay_sweep' ? 'custom' : j.job_type) as 'chain' | 'health_check' | 'notification' | 'custom',
+  }));
+
   return (
     <div className="min-h-screen text-white">
-      <SchedulesDashboard initialJobs={serializedJobs as any} chainOptions={chainOptions} />
+      <SchedulesDashboard initialJobs={dashboardJobs} chainOptions={chainOptions} />
     </div>
   );
 }

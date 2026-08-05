@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 
 const COLOR_STYLES = {
   green:
@@ -17,35 +17,36 @@ export default function QuickActionButton({
   endpoint,
   method,
   color,
+  onRun,
 }: {
   label: string;
   endpoint: string;
   method: string;
   color: 'green' | 'blue' | 'purple' | 'yellow';
+  /** Server action that performs the admin call without exposing the secret. */
+  onRun: (endpoint: string, method: 'GET' | 'POST') => Promise<{ ok: boolean; status: number }>;
 }) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [isPending, startTransition] = useTransition();
 
-  async function handleClick() {
+  function handleClick() {
     setStatus('loading');
-    try {
-      const res = await fetch(endpoint, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_CRON_SECRET ?? ''}`,
-        },
-        body: method === 'GET' ? undefined : JSON.stringify({}),
-      });
-      setStatus(res.ok ? 'success' : 'error');
-    } catch {
-      setStatus('error');
-    }
-    // Reset status after 3 seconds
-    setTimeout(() => setStatus('idle'), 3000);
+    startTransition(async () => {
+      try {
+        const res = await onRun(endpoint, method as 'GET' | 'POST');
+        setStatus(res.ok ? 'success' : 'error');
+      } catch {
+        setStatus('error');
+      }
+      // Reset status after 3 seconds
+      setTimeout(() => setStatus('idle'), 3000);
+    });
   }
 
+  const busy = isPending || status === 'loading';
+
   const statusIndicator =
-    status === 'loading'
+    busy
       ? ' ...'
       : status === 'success'
         ? ' \u2713'
@@ -56,7 +57,7 @@ export default function QuickActionButton({
   return (
     <button
       onClick={handleClick}
-      disabled={status === 'loading'}
+      disabled={busy}
       className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${COLOR_STYLES[color]}`}
     >
       <span className="font-mono text-[10px] uppercase tracking-wider opacity-60">

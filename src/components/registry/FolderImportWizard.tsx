@@ -97,8 +97,10 @@ export default function FolderImportWizard({ onImported }: { onImported?: () => 
         const files: File[] = [];
         async function collectFiles(handle: FileSystemDirectoryHandle, prefix = '') {
           // The File System Access API's entries() method isn't in TypeScript's
-          // default lib types. Cast to any to access the async iterator.
-          for await (const [name, entry] of (handle as any).entries()) {
+          // default lib types. Access the async iterator via a structural cast.
+          type EntryIterable = { entries(): AsyncIterable<[string, FileSystemHandle]> };
+          const entries = (handle as unknown as EntryIterable).entries();
+          for await (const [name, entry] of entries) {
             if (entry.kind === 'file') {
               const file = await (entry as FileSystemFileHandle).getFile();
               Object.defineProperty(file, 'webkitRelativePath', {
