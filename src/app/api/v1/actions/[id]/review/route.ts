@@ -24,7 +24,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeRequest, parseJsonBody, requireValidIds } from '@/lib/draymond/api-auth';
 import { reviewAction } from '@/lib/draymond';
-import { createDraymondClient } from '@/lib/draymond/client';
+import { createDraymondAdminClient } from '@/lib/draymond/client';
 import { timingSafeEqual } from 'crypto';
 
 export const dynamic = 'force-dynamic';
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     typeof reviewer_id === 'string' && reviewer_id.trim() ? reviewer_id.trim() : 'admin';
   const reviewNotes = typeof notes === 'string' && notes.trim() ? notes.trim() : undefined;
 
-  const supabase = await createDraymondClient();
+  const supabase = createDraymondAdminClient();
   const { data: action, error: loadError } = await supabase
     .from('draymond_actions')
     .select('*')

@@ -11,7 +11,7 @@
 // 4. Returns a RouteResult with confidence and alternatives
 // ============================================================================
 
-import { createDraymondClient } from './client';
+import { createDraymondAdminClient } from './client';
 import { logEvent } from './index';
 import type {
   RouterIntent,
@@ -96,7 +96,7 @@ async function getRegistrySnapshot(): Promise<RegistrySnapshot> {
     return _snapshotCache.data;
   }
 
-  const supabase = await createDraymondClient();
+  const supabase = createDraymondAdminClient();
 
   const [entitiesResult, chainsResult] = await Promise.all([
     supabase

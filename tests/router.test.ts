@@ -15,7 +15,7 @@ const mockEntities = vi.hoisted(() => [
 
 // Mock the Supabase client so the router never touches next/headers.
 vi.mock('../src/lib/draymond/client', () => ({
-  createDraymondClient: vi.fn(async () => ({
+  createDraymondAdminClient: vi.fn(() => ({
     from: (table: string) => {
       if (table === 'draymond_entities') {
         return {

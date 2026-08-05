@@ -10,7 +10,7 @@
 // 6. Goal Management & Enforcement
 // ============================================================================
 
-import { createDraymondClient } from './client';
+import { createDraymondClient, createDraymondAdminClient } from './client';
 import { randomBytes } from 'crypto';
 import { after } from 'next/server';
 import { publishApprovalNotification } from './ntfy';
@@ -323,7 +323,7 @@ export function evaluateConfidence(
 export async function submitAction(
   input: DraymondActionInsert
 ): Promise<{ action: DraymondAction; decision: ConfidenceDecision }> {
-  const supabase = await createDraymondClient();
+  const supabase = createDraymondAdminClient();
 
   // Get agent configuration for thresholds
   const { data: agent } = await supabase
@@ -428,7 +428,7 @@ export async function reviewAction(
   approved: boolean,
   notes?: string
 ): Promise<DraymondAction> {
-  const supabase = await createDraymondClient();
+  const supabase = createDraymondAdminClient();
 
   const { data: action, error } = await supabase
     .from('draymond_actions')
@@ -475,7 +475,7 @@ export async function reviewAction(
  */
 export async function isActionApproved(actionId: string | null): Promise<boolean> {
   if (!actionId) return false;
-  const supabase = await createDraymondClient();
+  const supabase = createDraymondAdminClient();
   const { data, error } = await supabase
     .from('draymond_actions')
     .select('status')
@@ -730,7 +730,7 @@ export async function boostMemory(
  * Every decision, action, and state change is recorded.
  */
 export async function logEvent(input: DraymondEventInsert): Promise<void> {
-  const supabase = await createDraymondClient();
+  const supabase = createDraymondAdminClient();
 
   const { error } = await supabase.from('draymond_events').insert({
     agent_id: input.agent_id,

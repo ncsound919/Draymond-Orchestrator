@@ -182,8 +182,8 @@ export async function executeAetherDeskOperation(
  * Dynamic import of ./client keeps this module testable without Supabase.
  */
 export async function resolveAetherDeskAgentId(): Promise<string | null> {
-  const { createDraymondClient } = await import('./client');
-  const supabase = await createDraymondClient();
+  const { createDraymondAdminClient } = await import('./client');
+  const supabase = createDraymondAdminClient();
   const { data, error } = await supabase
     .from('draymond_agents')
     .select('id')
@@ -201,8 +201,8 @@ export async function resolveAetherDeskAgentId(): Promise<string | null> {
  * action is no longer `approved` or was already executed.
  */
 export async function executeApprovedAetherDeskAction(actionId: string): Promise<void> {
-  const { createDraymondClient } = await import('./client');
-  const supabase = await createDraymondClient();
+  const { createDraymondAdminClient } = await import('./client');
+  const supabase = createDraymondAdminClient();
 
   const { data: action, error } = await supabase
     .from('draymond_actions')

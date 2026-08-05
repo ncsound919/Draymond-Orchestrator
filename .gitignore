@@ -38,6 +38,9 @@ build_error.log
 .env*.local
 .env.local
 
+# runtime audit log
+/.audit/
+
 # vercel
 .vercel
 
