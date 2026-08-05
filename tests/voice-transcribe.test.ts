@@ -50,6 +50,22 @@ describe('POST /api/v1/voice/transcribe', () => {
     expect(init.method).toBe('POST');
   });
 
+  it('rejects oversized audio payloads (413)', async () => {
+    const { POST } = await import('../src/app/api/v1/voice/transcribe/route');
+    const big = new Uint8Array(30 * 1024 * 1024); // 30 MB
+    const req = new Request('http://localhost/api/v1/voice/transcribe', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer test-cron-secret',
+        'Content-Length': String(big.length),
+      },
+      body: big,
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(413);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('returns 502 when AetherDesk is unreachable', async () => {
     fetchMock.mockRejectedValue(new Error('connection refused'));
     const { POST } = await import('../src/app/api/v1/voice/transcribe/route');
