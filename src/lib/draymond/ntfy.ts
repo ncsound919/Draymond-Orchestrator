@@ -111,3 +111,45 @@ export async function publishApprovalNotification(action: DraymondAction): Promi
     return false;
   }
 }
+
+/**
+ * Publish an informational result notification (e.g. after an approved
+ * AetherDesk action executes) to a SEPARATE topic from approvals
+ * (NTFY_TOPIC_RESULTS). Best-effort; never throws.
+ */
+export async function publishResultNotification(input: {
+  operation: string;
+  success: boolean;
+  error?: string;
+  status_code?: number;
+}): Promise<boolean> {
+  const baseUrl = process.env.NTFY_URL;
+  const topic = process.env.NTFY_TOPIC_RESULTS;
+  if (!baseUrl || !topic) return false;
+
+  try {
+    const res = await fetch(baseUrl.replace(/\/+$/, ''), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        topic,
+        title: input.success ? 'Draymond · AetherDesk result' : 'Draymond · AetherDesk failed',
+        message: input.success
+          ? `AetherDesk "${input.operation}" completed${input.status_code ? ` (HTTP ${input.status_code})` : ''}.`
+          : `AetherDesk "${input.operation}" failed: ${input.error ?? 'unknown error'}`,
+        priority: input.success ? 3 : 5,
+        tags: input.success ? ['white_check_mark'] : ['x'],
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!res.ok) {
+      console.warn(`[ntfy] Result publish returned ${res.status} for "${input.operation}"`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn(`[ntfy] Result publish failed for "${input.operation}": ${err instanceof Error ? err.message : err}`);
+    return false;
+  }
+}
