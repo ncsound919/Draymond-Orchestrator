@@ -511,6 +511,17 @@ async function scheduleApprovedActionExecution(action: DraymondAction): Promise<
   const run = async (): Promise<void> => {
     let chainId: string | null = null;
     try {
+      // AetherDesk actions execute asynchronously via the AetherDesk REST
+      // executor, then record their own result and publish to the results
+      // ntfy topic. Fire-and-forget; return before the generic chain-step /
+      // standalone "mark completed / record" logic so the action is not
+      // double-processed.
+      if (action.action_type?.startsWith('aetherdesk:')) {
+        const { executeApprovedAetherDeskAction } = await import('./aetherdesk');
+        executeApprovedAetherDeskAction(action.id).catch(() => {});
+        return;
+      }
+
       if (isChainStep) {
         const { resumeChain } = await import('./chains');
         const { data: step } = await (
