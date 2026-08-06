@@ -479,6 +479,22 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         };
       }
 
+      if (handler === 'fleet_duty_sync') {
+        // Compute + log the on-duty roster (always-on / shift / on-call).
+        const { computeFleetDuty } = await import('../fleet-duty');
+        const roster = computeFleetDuty();
+        return {
+          handler,
+          checkedAt: new Date().toISOString(),
+          onDuty: roster.filter((r) => r.active).map((r) => r.agentId),
+          counts: {
+            alwaysOn: roster.filter((r) => r.duty === 'always-on').length,
+            shift: roster.filter((r) => r.duty === 'shift').length,
+            onCall: roster.filter((r) => r.duty === 'on-call').length,
+          },
+        };
+      }
+
       console.log(
         `[Draymond Scheduler] Custom job "${job.name}" triggered (handler: ${handler ?? 'none'}). ` +
         `No built-in handler registered — skipping execution.`
@@ -702,6 +718,14 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     cron_expression: '0 7 * * *',
     job_type: 'custom',
     job_config: { handler: 'run_overlay_qa' },
+    is_enabled: true,
+  },
+  {
+    name: 'Fleet Duty Sync',
+    description: 'Hourly check of the on-duty roster (always-on / shift / on-call).',
+    cron_expression: '0 * * * *',
+    job_type: 'custom',
+    job_config: { handler: 'fleet_duty_sync' },
     is_enabled: true,
   },
 ];

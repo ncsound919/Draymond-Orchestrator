@@ -80,6 +80,7 @@ function agent(def) {
     team: def.team || [],
     skills: def.skills || [],
     missionRole: def.missionRole || undefined,
+    duty: def.duty || 'always-on',
     memoryEnabled: true,
     persistentMemory: true,
     status: 'unknown',
@@ -225,6 +226,7 @@ const AGENTS = [
     team: ['overlay-marketing-voice', 'overlay-marketing-scheduler', 'overlay-marketing-format', 'overlay-marketing-tracker', 'marketing-tool'],
     workflows: ['wf-marketing-pulse'],
     missionRole: 'E2 marketing - content cadence, leads, pipeline top-of-funnel',
+    duty: 'shift',
   }),
   agent({
     slug: 'trading-agents',
@@ -684,6 +686,7 @@ const AGENTS = [
     args: ['tsx', '../overlay365/agent-team/agents/guardian/index.ts'],
     tags: ['overlay365', 'compliance', 'legal', 'health'],
     missionRole: 'Compliance gate - Aetherdesk consent + Justice/Health claims',
+    duty: 'on-call',
   }),
   agent({
     slug: 'overlay-auditor',
@@ -1333,6 +1336,7 @@ const AGENTS = [
     runtimeType: 'http',
     endpoint: process.env.AETHERDESK_BASE_URL?.replace('/api/v1', '') || 'http://127.0.0.1:8000',
     tags: ['b2b', 'calls', 'mission-e2'],
+    duty: 'shift',
     missionRole: 'E2 revenue — AI call center delivery ($100–300/site/mo)',
     team: [],
   }),
