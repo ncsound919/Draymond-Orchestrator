@@ -495,6 +495,50 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         };
       }
 
+      if (handler === 'ingest_news') {
+        const { ingestNews, renderNewsDigest } = await import('./news');
+        const { items, errors } = await ingestNews();
+        return {
+          handler, fetched: items.length, errors,
+          digest: renderNewsDigest(items.slice(0, 5)),
+        };
+      }
+
+      if (handler === 'self_learning_loop') {
+        const { distillLessons } = await import('./self-learning');
+        const lessons = await distillLessons();
+        return { handler, lessons: lessons.length, top: lessons.slice(0, 5).map((l) => l.lesson) };
+      }
+
+      if (handler === 'self_repair_check') {
+        const { checkAllSites } = await import('./monitors');
+        const { attemptRepair } = await import('./self-repair');
+        const result = await checkAllSites();
+        const down = result.results.filter((s) => !s.is_up);
+        const repairs = [];
+        for (const site of down.slice(0, 3)) {
+          repairs.push(await attemptRepair('monitor:down', `${site.monitor_name || site.url} is down`));
+        }
+        return { handler, down: down.length, repairs: repairs.map((r) => ({ signal: r.signal, status: r.status, detail: r.detail })) };
+      }
+
+      if (handler === 'rd_night') {
+        const { buildNightPlan } = await import('./rd-night');
+        const { newsDigest } = await import('./news');
+        const digest = await newsDigest();
+        const { tasks, brief } = await buildNightPlan(digest.items.slice(0, 5).map((i) => i.title));
+        return { handler, queued: tasks.filter((t) => t.status === 'queued').length, brief };
+      }
+
+      if (handler === 'generate_agent_avatars') {
+        // Generate agent portrait photos via the image-generation skill.
+        const { execFile } = await import('node:child_process');
+        const { promisify } = await import('node:util');
+        const run = promisify(execFile);
+        const out = await run('node', ['scripts/generate-agent-avatars.mjs'], { timeout: 600_000 });
+        return { handler, output: (out.stdout || '').trim().slice(0, 1500) };
+      }
+
       console.log(
         `[Draymond Scheduler] Custom job "${job.name}" triggered (handler: ${handler ?? 'none'}). ` +
         `No built-in handler registered — skipping execution.`
@@ -726,6 +770,54 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     cron_expression: '0 * * * *',
     job_type: 'custom',
     job_config: { handler: 'fleet_duty_sync' },
+    is_enabled: true,
+  },
+  {
+    name: 'News Digest',
+    description: 'Daily 6am ingest of news APIs (current information for the fleet).',
+    cron_expression: '0 6 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'ingest_news' },
+    is_enabled: true,
+  },
+  {
+    name: 'Self-Learning Loop',
+    description: 'Nightly lesson distillation from outcomes (QA/jobs/incidents).',
+    cron_expression: '30 0 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'self_learning_loop' },
+    is_enabled: true,
+  },
+  {
+    name: 'Self-Repair Check',
+    description: 'Hourly failure scan + safe auto-repairs; escalates unknowns to on-call.',
+    cron_expression: '15 * * * *',
+    job_type: 'custom',
+    job_config: { handler: 'self_repair_check' },
+    is_enabled: true,
+  },
+  {
+    name: 'Night Mode R&D',
+    description: 'Overnight research + dev planning from the news digest + backlog.',
+    cron_expression: '0 1 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'rd_night' },
+    is_enabled: true,
+  },
+  {
+    name: 'Evening Marketing Prep',
+    description: 'Each evening, the marketing team builds next-day content/tools.',
+    cron_expression: '0 20 * * *',
+    job_type: 'chain',
+    job_config: { chain: 'marketing-pulse' },
+    is_enabled: true,
+  },
+  {
+    name: 'Agent Avatar Generation',
+    description: 'Generate agent portrait photos via the image-generation skill.',
+    cron_expression: '0 4 * * 0',
+    job_type: 'custom',
+    job_config: { handler: 'generate_agent_avatars' },
     is_enabled: true,
   },
 ];
