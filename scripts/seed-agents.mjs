@@ -224,6 +224,7 @@ const AGENTS = [
     endpoint: process.env.SOCIAL_MEDIA_URL || 'http://localhost:8030',
     team: ['overlay-marketing-voice', 'overlay-marketing-scheduler', 'overlay-marketing-format', 'overlay-marketing-tracker', 'marketing-tool'],
     workflows: ['wf-marketing-pulse'],
+    missionRole: 'E2 marketing - content cadence, leads, pipeline top-of-funnel',
   }),
   agent({
     slug: 'trading-agents',
@@ -514,7 +515,8 @@ const AGENTS = [
       'Agent Browser is the control room for the whole empire. It was built to register music with the performance rights organizations, keep every service in the fleet humming, and open the library when an agent needs to learn something new.',
     bio: 'A strategic conductor that turns your music catalog into registered, monetized rights across ASCAP, HFA, and MLC. It also orchestrates the Agent Browser platform (Big Homie, Claw Protect, Mutly, VibeServe, RepoRank) and gives every agent access to a 133-book knowledge library.',
     specialties: ['Music Registration', 'ASCAP / HFA / MLC', 'Fleet Orchestration', 'Book Library Access'],
-    skills: ["music-rights","bookbridge","book-synthesis","overlay365-qa"],
+    skills: ["music-rights","bookbridge","book-synthesis","overlay365-qa","business-development"],
+    missionRole: 'E4 - music rights registration + fleet QA + orchestration',
     capabilities: [
       { id: 'ascap', label: 'ASCAP Registration', description: 'Extract + register compositions with ASCAP' },
       { id: 'hfa', label: 'HFA Upload', description: 'Harry Fox Agency mechanical licensing uploads' },
@@ -544,6 +546,7 @@ const AGENTS = [
     bio: 'A precise book-library daemon that gives every agent searchable, citeable knowledge: hybrid keyword+semantic search, full-text retrieval, knowledge graphs, reading plans, and APA/MLA/Chicago/BibTeX/IEEE citations.',
     specialties: ['Hybrid Search', 'Citations', 'Knowledge Graph', 'Reading Plans'],
     skills: ["bookbridge","web-reader"],
+    missionRole: 'E4 - grounded research/knowledge service',
     capabilities: [
       { id: 'search', label: 'Hybrid Search', description: 'FTS5 keyword + TF-IDF semantic search' },
       { id: 'retrieval', label: 'Full-Text Retrieval', description: 'Stream any page range from an offline cache' },
@@ -618,7 +621,7 @@ const AGENTS = [
     command: 'npx',
     args: ['tsx', '../overlay365/agent-team/agents/strategist/index.ts'],
     tags: ['overlay365', 'product', 'roadmap', 'feedback'],
-    missionRole: 'E1 roadmap � prioritize tier features from feedback',
+    missionRole: 'E1 roadmap - prioritize tier features from feedback',
   }),
   agent({
     slug: 'overlay-treasurer',
@@ -632,7 +635,7 @@ const AGENTS = [
       'Built on the stripe-pulse MRR/ARR engine, The Treasurer was taught that an estimate is a lie: MRR without subscription data stays null, and expense categories stay null until a source exists.',
     bio: 'Weekly cash-pulse agent across the three payment rails of Overlay365. Aggregates inflow by rail and platform, computes MRR only from real subscription data (null otherwise), flags anomalies against prior weeks, and never fabricates expense or pricing recommendations.',
     specialties: ['Revenue Reconciliation', 'MRR / ARR', 'Payment Rails', 'Anomaly Detection'],
-    skills: ['overlay-treasurer', 'finance', 'stock-analysis', 'charts', 'xlsx'],
+    skills: ['overlay-treasurer', 'finance', 'stock-analysis', 'charts', 'xlsx', 'business-development'],
     capabilities: [
       { id: 'aggregate', label: 'Multi-Rail Aggregation', description: 'Stripe API + CashApp/Venmo manual CSV imports' },
       { id: 'mrr', label: 'MRR Computation', description: 'Reuses stripe-pulse subscription math; null when data is thin' },
@@ -680,7 +683,7 @@ const AGENTS = [
     command: 'npx',
     args: ['tsx', '../overlay365/agent-team/agents/guardian/index.ts'],
     tags: ['overlay365', 'compliance', 'legal', 'health'],
-    missionRole: 'Compliance gate � Aetherdesk consent + Justice/Health claims',
+    missionRole: 'Compliance gate - Aetherdesk consent + Justice/Health claims',
   }),
   agent({
     slug: 'overlay-auditor',
@@ -694,7 +697,7 @@ const AGENTS = [
       'Born from tldraw\u2019s link checker and Draymond\u2019s own monitors module, The Auditor runs deterministic checks against the live Overlay365 sites and reports pass/fail structure — no LLM, no opinion, just measured facts.',
     bio: 'Weekly deterministic auditor for uplift-health, uplift-wealth, uplift-justice, and overlay365.com. Checks uptime, same-origin broken links, and payment/donate link resolution read-only. Never executes a real payment.',
     specialties: ['Uptime Monitoring', 'Broken Link Crawling', 'Payment Flow Integrity', 'Deterministic Checks'],
-    skills: ['overlay-auditor', 'web-reader', 'web-search', 'coding-agent', 'charts', 'supply-chain-health'],
+    skills: ['overlay-auditor', 'web-reader', 'web-search', 'coding-agent', 'charts', 'supply-chain-health', 'client-delivery'],
     capabilities: [
       { id: 'uptime', label: 'Uptime Checks', description: 'HTTP status + response time per live site' },
       { id: 'links', label: 'Broken Link Crawl', description: 'Same-origin crawl, depth 2, rate-limited' },
@@ -711,7 +714,7 @@ const AGENTS = [
     command: 'npx',
     args: ['tsx', '../overlay365/agent-team/agents/auditor/index.ts'],
     tags: ['overlay365', 'monitoring', 'uptime', 'audit'],
-    missionRole: 'Delivery QA � all shipped Overlay sites pass weekly',
+    missionRole: 'Delivery QA - all shipped Overlay sites pass weekly',
   }),
   // ── Overlay365 deterministic marketing team (led by The Observer) ───────────
   agent({
@@ -837,7 +840,7 @@ const AGENTS = [
       'The central intelligence of the DCA swarm. Replaces every LLM call with skill files, a deterministic MoE router, and a Monte Carlo planner — 100% reproducible when LLM-free, with optional LLM routing for complex planning.',
     bio: 'Control brain for the fleet. Runs deterministic decision trees, skill-file actions, and config-space planning. Pairs with the Draymond orchestrator for reproducible agent control.',
     specialties: ['Deterministic Control', 'MoE Routing', 'Monte Carlo Planning', 'Skill Files'],
-    skills: ['deterministic-brain', 'coding-agent', 'fullstack-dev', 'writing-plans'],
+    skills: ['deterministic-brain', 'coding-agent', 'fullstack-dev', 'writing-plans', 'business-development', 'client-delivery'],
     capabilities: [
       { id: 'moe', label: 'MoE Router', description: 'Config-driven deterministic decision tree' },
       { id: 'planner', label: 'Monte Carlo Planner', description: 'Exhaustive config-space search with deterministic scoring' },
@@ -912,6 +915,7 @@ const AGENTS = [
     command: 'python',
     args: ['marketing_tool.py'],
     tags: ['marketing', 'automation', 'engine'],
+    missionRole: 'E2 - marketing asset production on demand',
     team: [],
   }),
   agent({
@@ -939,6 +943,7 @@ const AGENTS = [
     command: 'python',
     args: ['run_episode.py'],
     tags: ['content', 'podcast', 'animation'],
+    missionRole: 'E2 - white-label animated content production',
     team: [],
   }),
   agent({
@@ -965,6 +970,7 @@ const AGENTS = [
     runtimeType: 'http',
     endpoint: undefined, // desktop/studio app � requires npm run setup (git submodules)
     tags: ['media', 'generation', 'studio'],
+    missionRole: 'E2 - image/video asset production for retainers',
     team: [],
   }),
   agent({
@@ -979,7 +985,7 @@ const AGENTS = [
       'Wired from the Heisenberg supply-chain health toolkit. Checks packages via deps.dev, SBOMs, and external advisories, and emits CSV health reports.',
     bio: 'Dependency health service for the Auditor. Inspects single packages or bulk-repo SBOMs for vulnerabilities, maintenance, and popularity — deterministic.',
     specialties: ['SBOM', 'Dependency Health', 'Vulnerability Reports'],
-    skills: ['supply-chain-health', 'xlsx'],
+    skills: ['supply-chain-health', 'xlsx', 'client-delivery'],
     capabilities: [
       { id: 'check', label: 'heisenberg check', description: 'Inspect a single package@version' },
       { id: 'bulk', label: 'heisenberg bulk', description: 'SBOM + parallel dependency health → CSV report' },
@@ -993,6 +999,7 @@ const AGENTS = [
     command: 'python',
     args: ['../integrations/heisenberg-ssc-health-check/heisenberg/main.py', '--help'],
     tags: ['security', 'supply-chain', 'sbom'],
+    missionRole: 'E3 - SBOM/dependency audit delivery',
     team: [],
   }),
   // ── Next KEEP batch (integrations/ round 2) ───────────────────────────────
@@ -1080,7 +1087,7 @@ const AGENTS = [
       'The OWASP SCA engine. Wires into the Auditor to complete the security trio (dep-scan + nuclei + heisenberg).',
     bio: 'Dependency/software-composition audit. Detects known CVEs and licensing risk in project dependencies.',
     specialties: ['SCA', 'CVE Detection', 'License Audit'],
-    skills: ['depscan', 'supply-chain-health'],
+    skills: ['depscan', 'supply-chain-health', 'client-delivery'],
     capabilities: [
       { id: 'scan', label: 'Dependency Scan', description: 'CVE + license audit for repos' },
     ],
@@ -1089,6 +1096,7 @@ const AGENTS = [
     command: 'python',
     args: ['-m', 'depscan', '--help'],
     tags: ['security', 'sca', 'auditor'],
+    missionRole: 'E3 - SCA audit delivery for clients',
     team: [],
   }),
   agent({
@@ -1103,7 +1111,7 @@ const AGENTS = [
       'ProjectDiscovery nuclei. The scheduled scanning arm for the Auditor/Guardian security trio.',
     bio: 'Vulnerability scanner powered by community templates. Scheduled scans against Overlay365 live sites.',
     specialties: ['Vuln Scanning', 'Template Engine', 'Exposure Mapping'],
-    skills: ['nuclei-scanner', 'supply-chain-health'],
+    skills: ['nuclei-scanner', 'supply-chain-health', 'client-delivery'],
     capabilities: [
       { id: 'scan', label: 'Template Scans', description: 'CVE + config + exposure templates' },
     ],
@@ -1112,6 +1120,7 @@ const AGENTS = [
     command: 'nuclei',
     args: ['-version'],
     tags: ['security', 'scanner', 'auditor'],
+    missionRole: 'E3 - vuln scan delivery for clients',
     team: [],
   }),
   agent({
@@ -1126,7 +1135,7 @@ const AGENTS = [
       'Full open-source wealth management (Angular + NestJS). Slots as the analytics engine under Overlay Wealth.',
     bio: 'Wealth management engine: portfolio tracking, net worth, performance, and benchmarks for the Wealth tier.',
     specialties: ['Portfolio Tracking', 'Net Worth', 'Performance', 'Benchmarks'],
-    skills: ['ghostfolio-engine', 'finance', 'charts'],
+    skills: ['ghostfolio-engine', 'finance', 'charts', 'business-development'],
     capabilities: [
       { id: 'portfolio', label: 'Portfolio Tracking', description: 'Holdings, net worth, allocations' },
       { id: 'benchmark', label: 'Benchmarks', description: 'Performance vs market' },
@@ -1135,6 +1144,7 @@ const AGENTS = [
     runtimeType: 'http',
     endpoint: process.env.GHOSTFOLIO_URL || 'http://localhost:3333',
     tags: ['wealth', 'finance', 'overlay-wealth'],
+    missionRole: 'E1 - Wealth tier analytics engine',
     team: [],
   }),
   // ── Final KEEP batch (integrations/ round 3) ───────────────────────────────
@@ -1276,6 +1286,7 @@ const AGENTS = [
     runtimeType: 'http',
     endpoint: process.env.PHOENIX_URL || 'http://localhost:6006',
     tags: ['observability', 'eval', 'llm'],
+    missionRole: 'E3 - agent evaluation for client builds',
     team: [],
   }),
   agent({
@@ -1313,7 +1324,7 @@ const AGENTS = [
       'The flagship B2B offering. An agent-based call center that answers, triages, and resolves customer calls for small businesses. Finalizing now; this is the wedge product for the 90-day mission.',
     bio: 'AI call center delivering phone support for SMB clients. Sells at $100–300/site/mo. Every call is recorded, transcribed, and QA-gated by the Guardian for consent compliance.',
     specialties: ['Call Handling', 'Triage', 'SMB Support', 'Consent Compliance'],
-    skills: ['aetherdesk', 'coding-agent', 'fullstack-dev'],
+    skills: ['aetherdesk', 'client-delivery', 'business-development'],
     capabilities: [
       { id: 'calls', label: 'Call Center', description: 'Answer + triage + resolve inbound calls' },
       { id: 'consent', label: 'Consent-Gated', description: 'Recording/consent compliance via Guardian' },
@@ -1535,6 +1546,11 @@ const SKILLS = [
   { id: 'skill-phoenix', name: 'Phoenix', slug: 'phoenix', category: 'observability', author: 'arize', version: '1.0', path: '../integrations/phoenix', description: 'LLM/agent observability and evaluation.' },
   { id: 'skill-stirling-pdf', name: 'Stirling PDF', slug: 'stirling-pdf', category: 'docs', author: 'Stirling-Tools', version: '1.0', path: '../integrations/Stirling-PDF', description: 'Locally-hosted PDF toolkit.' },
   { id: 'skill-overlay365-qa', name: 'Overlay365 QA', slug: 'overlay365-qa', category: 'qa', author: 'AgentBrowser', version: '1.0', path: '../agents/AgentBrowser-main/src/lib/site-testing', description: 'Playwright site tests — load, console errors, content presence, perf across all Overlay365 sites.' },
+  // Mission skills — align the fleet to the 90-day six-figure plan
+  { id: 'skill-aetherdesk', name: 'Aetherdesk Call Center', slug: 'aetherdesk', category: 'mission', author: 'ncsound919', version: '1.0', path: '../Aetherdesk-Call-Center', description: 'AI call center operations — answer, triage, resolve; E2 flagship product.' },
+  { id: 'skill-memory', name: 'Memory Framework', slug: 'memory', category: 'memory', author: 'MemAgent', version: '1.0', path: '../integrations/MemAgent', description: 'Long-term memory/recall for agents (MemAgent).' },
+  { id: 'skill-business-development', name: 'Business Development', slug: 'business-development', category: 'mission', author: 'draymond', version: '1.0', path: 'src/lib/draymond/business-pipeline.ts', description: 'Pipeline, proposals, closing — feed opportunities toward the revenue target.' },
+  { id: 'skill-client-delivery', name: 'Client Delivery', slug: 'client-delivery', category: 'mission', author: 'draymond', version: '1.0', path: 'agents/AgentBrowser-main/src/lib/site-testing', description: 'Selling + delivering a client engagement (QA/monitoring/audits) end-to-end.' },
 ].map((s) => ({ ...s, installedAt: now }));
 
 // ---------------------------------------------------------------------------
