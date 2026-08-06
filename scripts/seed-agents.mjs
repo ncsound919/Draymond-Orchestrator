@@ -77,6 +77,7 @@ function agent(def) {
       canSendEmail: false,
     },
     workflows: def.workflows || [],
+    skills: def.skills || [],
     memoryEnabled: true,
     persistentMemory: true,
     status: 'unknown',
@@ -99,6 +100,7 @@ const AGENTS = [
       'Uplift Agent began as a Hermes fork built to be the workhorse of the fleet — the one that actually ships code, runs tools, and learns from every task it touches.',
     bio: 'A strategic, autonomous coding agent that improves with every session. Expert in tool orchestration and multi-platform messaging, it pairs deep technical capability with a calm, direct operating style — the reliable backbone of the Uplift fleet.',
     specialties: ['TypeScript', 'Python', 'Tool Orchestration', 'Multi-platform Gateway'],
+    skills: ["coding-agent","fullstack-dev","writing-plans","ui-ux-pro-max","web-search"],
     capabilities: [
       { id: 'codegen', label: 'Code Generation', description: 'Writes and refactors production code across languages' },
       { id: 'tool-use', label: 'Tool Orchestration', description: '52 tools across file, web, terminal, and code' },
@@ -125,6 +127,7 @@ const AGENTS = [
       'Sports Steve lives in the numbers. Built on FastAPI with a React companion, it treats every game like a dataset and every bet like an experiment with a clear hypothesis.',
     bio: 'An analytical sports betting agent that reduces the noise of live odds to clean, decision-ready numbers. Combined with Bet Buddy, it manages risk, optimizes portfolios, and tracks every bet with cold precision.',
     specialties: ['Sports Analytics', 'Bankroll Management', 'Odds Modeling', 'Risk Assessment'],
+    skills: ["stock-analysis","finance","charts"],
     capabilities: [
       { id: 'odds', label: 'Live Odds', description: 'Real-time odds via lukhed-sports' },
       { id: 'portfolio', label: 'Portfolio Optimization', description: 'Bet Buddy risk & bankroll optimizer' },
@@ -150,6 +153,7 @@ const AGENTS = [
       'OmniResearch Pro was built to answer the question no one had time to fully research. It chains Gemini, Ollama, and web search into one methodical research pipeline.',
     bio: 'A precise deep-research agent that turns a question into a cited, multi-format report. It pairs semantic sector analysis with web search and Slack/Notion delivery — thorough by default, speculative only when asked.',
     specialties: ['Deep Research', 'Semantic Analysis', 'Report Generation', 'Notion/Drive Sync'],
+    skills: ["market-research","qingyan-research","multi-search-engine","web-search","contentanalysis"],
     capabilities: [
       { id: 'research', label: 'Deep Research', description: 'Multi-source synthesis with citations' },
       { id: 'local-llm', label: 'Ollama Support', description: 'Local model inference for privacy' },
@@ -176,6 +180,7 @@ const AGENTS = [
       'Megacode refuses to be locked to one model. It was forged as a provider-agnostic coding assistant that treats every LLM as a swappable tool in the same workbench.',
     bio: 'An assertive, provider-agnostic coding assistant that gets to the point. It bridges JetBrains, cycles LLM providers, and applies 900+ commands — built for engineers who want speed and zero vendor lock-in.',
     specialties: ['Multi-LLM', 'JetBrains Bridge', 'Refactoring', 'CLI Power Tools'],
+    skills: ["coding-agent","fullstack-dev","skill-creator","skill-vetter"],
     capabilities: [
       { id: 'multi-llm', label: 'Multi-LLM', description: 'Swap providers per task (OpenAI/Anthropic/local)' },
       { id: 'ide', label: 'JetBrains Bridge', description: 'Deep IDE integration via HTTP bridge' },
@@ -201,6 +206,7 @@ const AGENTS = [
       'Born from a terminal UI experiment, The Observer quietly watches every campaign metric so humans can focus on the conversation, not the spreadsheet.',
     bio: 'An empathetic analytics agent that turns campaign noise into a clear picture. It tracks engagement, pipeline, and revenue in a beautiful terminal dashboard — insightful about people, precise about numbers.',
     specialties: ['Campaign Analytics', 'Engagement Tracking', 'Terminal UI', 'Revenue Metrics'],
+    skills: ["marketing-mode","seo-content-writer","content-strategy","blog-writer","charts"],
     capabilities: [
       { id: 'campaigns', label: 'Campaign Analytics', description: 'Performance across campaigns' },
       { id: 'engagement', label: 'Engagement Tracking', description: 'Customer engagement signals' },
@@ -226,6 +232,7 @@ const AGENTS = [
       'TradingAgents approaches markets the way a chess player approaches a board — as a system of probabilities to be mapped before any move is made.',
     bio: 'A strategic market-analysis agent that models trading as a multi-agent research pipeline. It weighs signals, frames scenarios, and stays probabilistic — never certain, always prepared.',
     specialties: ['Market Analysis', 'Trading Strategy', 'Risk Framing', 'Scenario Modeling'],
+    skills: ["stock-analysis","finance","charts"],
     capabilities: [
       { id: 'analysis', label: 'Market Analysis', description: 'Multi-source signal synthesis' },
       { id: 'strategy', label: 'Strategy Generation', description: 'Probabilistic trading strategies' },
@@ -279,6 +286,7 @@ const AGENTS = [
       'UFC-MCP refuses to ship your media to the cloud. It was built as a local Model Context Protocol server that converts anything, anywhere, privately.',
     bio: 'A precise local file-converter MCP that handles audio, video, image, document, and scientific/business files via FFmpeg and local engines. Any agent in the fleet can hand it a file and get back the right format — no cloud, no uploads.',
     specialties: ['File Conversion', 'MCP Server', 'FFmpeg', 'Media Processing'],
+    skills: ["image-generation","image-edit","image-understand","video-generation","pdf","xlsx","ppt"],
     capabilities: [
       { id: 'audio', label: 'Audio Conversion', description: 'MP3, WAV, FLAC, AAC, OGG, M4A, AIFF, OPUS, WMA' },
       { id: 'video', label: 'Video Conversion', description: 'Transcode between major video containers' },
@@ -333,6 +341,7 @@ const AGENTS = [
       'Mutly sits beside the workspace like a tireless co-pilot — indexing symbols, understanding code semantically, and staging precise edits for the editor. It never sleeps and never gets tired of tests.',
     bio: 'An empathetic developer daemon that turns raw codebases into searchable, testable, editable terrain. It indexes symbols, runs isolated sandbox tests, and feeds block-level edits straight into VS Code, Zed, or OpenCode.',
     specialties: ['Codebase Indexing', 'Semantic Search', 'Sandbox Testing', 'IDE Integration'],
+    skills: ["coding-agent","fullstack-dev","skill-vetter","writing-plans"],
     capabilities: [
       { id: 'index', label: 'Symbol Indexing', description: 'Persistent codebase symbol index' },
       { id: 'search', label: 'Semantic Search', description: 'Vector-embedding codebase search' },
@@ -359,6 +368,7 @@ const AGENTS = [
       'Grader was built to answer one uncomfortable question honestly: is this codebase ready? It scores any public repo across security, quality, market fit, and compliance.',
     bio: 'An analytical codebase auditor powered by Gemini. It grades any public GitHub repository across security, quality, architecture, licensing, and valuation — the objective referee for every Draymond chain that touches code.',
     specialties: ['Security Audit', 'Code Quality', 'Architecture Review', 'Repo Valuation'],
+    skills: ["skill-vetter","qingyan-research"],
     capabilities: [
       { id: 'security', label: 'Security Audit', description: 'Dependency vulnerabilities + secret leaks' },
       { id: 'quality', label: 'Quality Scoring', description: 'Maintainability and complexity metrics' },
@@ -385,6 +395,7 @@ const AGENTS = [
       'RepoRank grew from a simple question: which codebases are production-ready, and how do we fix the rest? It combines analysis, security, benchmarks, and fixes in one platform.',
     bio: 'A strategic repo-analysis platform that scores codebases, surfaces engineering risks, and generates practical fixes — with API, web, worker, and CLI surfaces for every integration style.',
     specialties: ['Repo Scoring', 'Risk Surfacing', 'Automated Remediation', 'Benchmarking'],
+    skills: ["skill-vetter","web-search"],
     capabilities: [
       { id: 'scoring', label: 'Repo Scoring', description: 'AI production-readiness scoring' },
       { id: 'risk', label: 'Risk Surfacing', description: 'Engineering-risk identification' },
@@ -411,6 +422,7 @@ const AGENTS = [
       'The Clipper watches the long video so your audience does not have to — finding the best moments, detecting speakers, and cutting them into scroll-ready shorts.',
     bio: 'A creative video tool that turns long-form video into engaging YouTube Shorts. It uses GPT-4 and Whisper to find the highlights, detect speakers, and crop vertical content automatically.',
     specialties: ['Video Editing', 'Highlight Extraction', 'Speaker Detection', 'Vertical Cropping'],
+    skills: ["video-generation","video-understand","podcast-generate"],
     capabilities: [
       { id: 'highlights', label: 'Highlight Extraction', description: 'GPT-4 powered interesting-moment detection' },
       { id: 'speakers', label: 'Speaker Detection', description: 'Whisper-based speaker identification' },
@@ -439,6 +451,7 @@ const AGENTS = [
       'The Library is everything Claude Code ever learned, organized and searchable — skills, agents, commands, hooks, and rules, ready to install anywhere.',
     bio: 'A playful, encyclopedic collection of Claude Code skills, agents, commands, hooks, and rules. The fastest way to give any agent in the fleet a new capability is to reach into the Library.',
     specialties: ['Skill Library', 'Agent Definitions', 'Commands & Hooks', 'Rules'],
+    skills: ["skill-creator"],
     capabilities: [
       { id: 'skills', label: 'Skill Library', description: 'Hundreds of ready-to-install skills' },
       { id: 'agents', label: 'Agent Definitions', description: 'Subagent definitions for coding workflows' },
@@ -466,6 +479,7 @@ const AGENTS = [
       'Super Tool is the toolbox under the trading desk — a pile of sharp, specialized scripts for backtesting, unified risk, and marketing pipelines that just work.',
     bio: 'An analytical utility pack for trading and marketing pipelines: backtesting with backtrader, memory with mem0/engram, a unified risk engine, and workflow automation scripts.',
     specialties: ['Backtesting', 'Risk Engine', 'Trading Pipelines', 'Marketing Workflows'],
+    skills: ["finance","stock-analysis"],
     capabilities: [
       { id: 'backtest', label: 'Backtesting', description: 'backtrader strategy evaluation' },
       { id: 'risk', label: 'Unified Risk Engine', description: 'Cross-strategy risk management' },
@@ -482,6 +496,91 @@ const AGENTS = [
     runtimeType: 'subprocess',
     command: 'python',
     args: ['agents/super_tool/trading_pipeline.py'],
+  }),
+  agent({
+    slug: 'agent-browser',
+    name: 'Agent Browser',
+    codename: 'The Conductor',
+    role: 'Music Rights & Business Orchestrator',
+    tagline: 'Registers your music (ASCAP/HFA/MLC), runs the fleet, and opens the book library',
+    personality: 'strategic',
+    voice: 'orchestral, decisive, business-first',
+    backstory:
+      'Agent Browser is the control room for the whole empire. It was built to register music with the performance rights organizations, keep every service in the fleet humming, and open the library when an agent needs to learn something new.',
+    bio: 'A strategic conductor that turns your music catalog into registered, monetized rights across ASCAP, HFA, and MLC. It also orchestrates the Agent Browser platform (Big Homie, Claw Protect, Mutly, VibeServe, RepoRank) and gives every agent access to a 133-book knowledge library.',
+    specialties: ['Music Registration', 'ASCAP / HFA / MLC', 'Fleet Orchestration', 'Book Library Access'],
+    skills: ["music-rights","bookbridge","book-synthesis"],
+    capabilities: [
+      { id: 'ascap', label: 'ASCAP Registration', description: 'Extract + register compositions with ASCAP' },
+      { id: 'hfa', label: 'HFA Upload', description: 'Harry Fox Agency mechanical licensing uploads' },
+      { id: 'mlc', label: 'MLC Registration', description: 'Mechanical Licensing Collective catalog extraction' },
+      { id: 'orchestrate', label: 'Fleet Orchestration', description: 'Coordinates Big Homie, Claw Protect, Mutly, VibeServe, RepoRank' },
+      { id: 'library', label: 'Book Library', description: 'Searches and cites the 133-book knowledge library' },
+    ],
+    stats: [
+      { label: 'Music Ops', value: 93 },
+      { label: 'Orchestration', value: 95 },
+      { label: 'Rights Accuracy', value: 90 },
+      { label: 'Business Focus', value: 92 },
+    ],
+    endpoint: 'http://localhost:3000',
+  }),
+  agent({
+    slug: 'bookbridge',
+    name: 'BookBridge',
+    codename: 'The Librarian',
+    role: 'Book Library & Citation Engine',
+    tagline: 'Search, cite, and retrieve from your book library (REST :8777 / MCP :8778)',
+    personality: 'precise',
+    voice: 'scholarly, exact, cite-first',
+    backstory:
+      'The Librarian keeps 133 books at its fingertips — searching passages, mapping concepts across books, and always ready with the exact citation. Every agent in the fleet asks it for knowledge.',
+    bio: 'A precise book-library daemon that gives every agent searchable, citeable knowledge: hybrid keyword+semantic search, full-text retrieval, knowledge graphs, reading plans, and APA/MLA/Chicago/BibTeX/IEEE citations.',
+    specialties: ['Hybrid Search', 'Citations', 'Knowledge Graph', 'Reading Plans'],
+    skills: ["bookbridge","web-reader"],
+    capabilities: [
+      { id: 'search', label: 'Hybrid Search', description: 'FTS5 keyword + TF-IDF semantic search' },
+      { id: 'retrieval', label: 'Full-Text Retrieval', description: 'Stream any page range from an offline cache' },
+      { id: 'citations', label: 'Citations', description: 'APA, MLA, Chicago, BibTeX, Vancouver, IEEE' },
+      { id: 'mcp', label: 'MCP Tools', description: 'Nine MCP tools for direct agent integration' },
+    ],
+    stats: [
+      { label: 'Search', value: 94 },
+      { label: 'Citations', value: 93 },
+      { label: 'Coverage', value: 90 },
+      { label: 'Speed', value: 91 },
+    ],
+    endpoint: 'http://localhost:8777',
+  }),
+  agent({
+    slug: 'book-synthesis',
+    name: 'Book Synthesis Engine',
+    codename: 'The Synthesist',
+    role: 'Multi-Book Knowledge Synthesis',
+    tagline: 'Synthesizes up to 5 books into validated, illustrated reports with confidence scores',
+    personality: 'creative',
+    voice: 'synthetic, curious, evidence-conscious',
+    backstory:
+      'The Synthesist reads five books at once, cross-checks them against the web, and weaves the confirmed knowledge into a report — then draws a picture of the key ideas.',
+    bio: 'A creative synthesis engine that processes up to 5 books simultaneously, scans the web for validation, cross-references sources for accuracy, and produces illustrated JSON/text reports with confidence scores.',
+    specialties: ['Multi-Book Synthesis', 'Web Validation', 'Illustration', 'Report Generation'],
+    skills: ["book-synthesis","web-search","contentanalysis"],
+    capabilities: [
+      { id: 'multi', label: 'Multi-Book Processing', description: 'Up to 5 PDF/EPUB/DOCX/TXT books at once' },
+      { id: 'webscan', label: 'Web Scanning', description: 'Validates synthesized concepts online' },
+      { id: 'validity', label: 'Validity Comparison', description: 'Cross-references sources for accuracy' },
+      { id: 'reports', label: 'Comprehensive Reports', description: 'JSON + text reports with confidence scores' },
+    ],
+    stats: [
+      { label: 'Synthesis', value: 92 },
+      { label: 'Accuracy', value: 88 },
+      { label: 'Coverage', value: 90 },
+      { label: 'Creativity', value: 91 },
+    ],
+    endpoint: undefined,
+    runtimeType: 'subprocess',
+    command: 'python',
+    args: ['agents/Book-Synthesis-Engine-main/knowledge_synthesizer.py'],
   }),
 ];
 
@@ -583,6 +682,10 @@ const SKILLS = [
   // Research & misc
   { id: 'skill-multi-search', name: 'Multi Search Engine', slug: 'multi-search-engine', category: 'research', author: 'community', version: '2.0.1', path: 'agents/skills/multi-search-engine', description: 'Multi search engine v2.0.1.' },
   { id: 'skill-interview-designer', name: 'Interview Designer', slug: 'interview-designer', category: 'research', author: 'community', version: '1.0', path: 'agents/skills/interview-designer', description: 'Interview design.' },
+  // AgentBrowser / music-rights / book tools
+  { id: 'skill-music-rights', name: 'Music Rights (ASCAP/HFA/MLC)', slug: 'music-rights', category: 'music', author: 'AgentBrowser', version: '1.0', path: 'agents/AgentBrowser-main/mini-services/music-rights', description: 'Register compositions with ASCAP, HFA, and MLC from a catalog.' },
+  { id: 'skill-bookbridge', name: 'BookBridge', slug: 'bookbridge', category: 'knowledge', author: 'ncsound919', version: '1.0', path: 'agents/BookBridge--main', description: 'Search, cite, and retrieve from the book library (REST :8777 / MCP :8778).' },
+  { id: 'skill-book-synthesis', name: 'Book Synthesis Engine', slug: 'book-synthesis', category: 'knowledge', author: 'ncsound919', version: '1.0', path: 'agents/Book-Synthesis-Engine-main', description: 'Synthesize up to 5 books into validated, illustrated reports with confidence scores.' },
 ].map((s) => ({ ...s, installedAt: now }));
 
 // ---------------------------------------------------------------------------
@@ -637,5 +740,7 @@ for (const a of AGENTS) {
 console.log(`Avatars: ${created} generated, ${kept} kept (uploaded photos preserved).`);
 
 console.log('Seed complete.');
+
+
 
 

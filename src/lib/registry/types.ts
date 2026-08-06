@@ -108,6 +108,8 @@ export interface RegisteredAgent {
   capabilities: AgentCapability[];
   stats: AgentStat[];       // radar chart data
   tags: string[];
+  /** Skill slugs this agent is wired to use (from the registry skills catalog) */
+  skills?: string[];
 
   /** Runtime */
   runtime: RuntimeConfig;
