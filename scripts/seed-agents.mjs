@@ -582,6 +582,127 @@ const AGENTS = [
     command: 'python',
     args: ['agents/Book-Synthesis-Engine-main/knowledge_synthesizer.py'],
   }),
+  // ── Overlay365 business-operations team ────────────────────────────────────
+  agent({
+    slug: 'overlay-strategist',
+    name: 'The Strategist',
+    codename: 'The Compass',
+    role: 'Feedback Clustering & Roadmap Prioritization',
+    tagline: 'Turns scattered feedback into a ranked, audit-traced roadmap',
+    personality: 'strategic',
+    voice: 'measured, synthesis-first, evidence-cited',
+    backstory:
+      'Assembled from kodus-ai\u2019s clustering engine and OmniResearch\u2019s research discipline, The Strategist reads every support email, issue, and reply as one voice in a conversation — and only makes claims it can trace to a raw record.',
+    bio: 'Bi-weekly feedback clustering agent for the Overlay365 platforms (Health/Wealth/Justice). Clusters feedback by similarity, scores clusters on frequency/severity/brand alignment, and keeps every claim tied to evidence itemIds. Built to reject invented trends — thin data is reported as thin.',
+    specialties: ['Feedback Clustering', 'Roadmap Prioritization', 'Brand Alignment', 'Evidence Auditing'],
+    skills: ['overlay-strategist', 'market-research', 'contentanalysis', 'web-search', 'writing-plans', 'bookbridge'],
+    capabilities: [
+      { id: 'cluster', label: 'Evidence Clustering', description: 'Deterministic dedup + similarity clustering with full id trails' },
+      { id: 'score', label: 'Prioritization Scoring', description: 'Frequency/severity/brand-alignment weighted 0-100 scores' },
+      { id: 'audit', label: 'Audit-First Reporting', description: 'LLM narrative validated against evidence ids or dropped' },
+      { id: 'ground', label: 'Library Grounding', description: 'Grounds recommendations in the BookBridge knowledge library' },
+    ],
+    stats: [
+      { label: 'Clustering', value: 90 },
+      { label: 'Auditability', value: 95 },
+      { label: 'Research', value: 86 },
+      { label: 'Bias Control', value: 92 },
+    ],
+    runtimeType: 'cli',
+    command: 'npx',
+    args: ['tsx', '../overlay365/agent-team/agents/strategist/index.ts'],
+    tags: ['overlay365', 'product', 'roadmap', 'feedback'],
+  }),
+  agent({
+    slug: 'overlay-treasurer',
+    name: 'The Treasurer',
+    codename: 'The Cashier',
+    role: 'Cash Pulse & Revenue Reconciliation',
+    tagline: 'One weekly number across Stripe, CashApp, and Venmo — never a guess',
+    personality: 'precise',
+    voice: 'numerical, withholding, nulls-left-visible',
+    backstory:
+      'Built on the stripe-pulse MRR/ARR engine, The Treasurer was taught that an estimate is a lie: MRR without subscription data stays null, and expense categories stay null until a source exists.',
+    bio: 'Weekly cash-pulse agent across the three payment rails of Overlay365. Aggregates inflow by rail and platform, computes MRR only from real subscription data (null otherwise), flags anomalies against prior weeks, and never fabricates expense or pricing recommendations.',
+    specialties: ['Revenue Reconciliation', 'MRR / ARR', 'Payment Rails', 'Anomaly Detection'],
+    skills: ['overlay-treasurer', 'finance', 'stock-analysis', 'charts', 'xlsx'],
+    capabilities: [
+      { id: 'aggregate', label: 'Multi-Rail Aggregation', description: 'Stripe API + CashApp/Venmo manual CSV imports' },
+      { id: 'mrr', label: 'MRR Computation', description: 'Reuses stripe-pulse subscription math; null when data is thin' },
+      { id: 'anomaly', label: 'Inflow Anomalies', description: 'Flags drops vs multi-week averages' },
+      { id: 'report', label: 'Cash Pulse Report', description: 'One-page markdown with nulls visible, never hidden' },
+    ],
+    stats: [
+      { label: 'Accuracy', value: 94 },
+      { label: 'Data Discipline', value: 97 },
+      { label: 'Reconciliation', value: 90 },
+      { label: 'Conservatism', value: 96 },
+    ],
+    runtimeType: 'cli',
+    command: 'npx',
+    args: ['tsx', '../overlay365/agent-team/agents/treasurer/index.ts'],
+    tags: ['overlay365', 'finance', 'cash', 'revenue'],
+  }),
+  agent({
+    slug: 'overlay-guardian',
+    name: 'The Guardian',
+    codename: 'The Watch',
+    role: 'Compliance Flagging (Justice & Health)',
+    tagline: 'Flags for human review — never drafts, never fabricates legal citations',
+    personality: 'stoic',
+    voice: 'cautionary, rules-cited, boundary-holding',
+    backstory:
+      'Modeled on claw-protect\u2019s fail-closed discipline: when the rule corpus is absent, The Guardian is inert-but-functional and says so. It will not guess a law, a statute, or a medical guideline from memory.',
+    bio: 'Compliance guard for Justice (legal-adjacent) and Health (medical-adjacent) content. Evaluates content diffs and complaints against an uploaded ToS/Privacy/guideline corpus. Without that corpus it emits a single explicit flag and nothing else.',
+    specialties: ['Content Compliance', 'Rule Corpus Matching', 'Legal/Health Boundaries', 'Fail-Closed Auditing'],
+    skills: ['overlay-guardian', 'skill-vetter', 'book-synthesis', 'qingyan-research'],
+    capabilities: [
+      { id: 'corpus', label: 'Rule Corpus Matching', description: 'Trigger-pattern matching against uploaded reference docs only' },
+      { id: 'diff', label: 'Content Diff Flagging', description: 'Flags changed Justice/Health content for human review' },
+      { id: 'boundary', label: 'Scope Boundary', description: 'Never drafts final legal/medical text; flags only' },
+      { id: 'failclosed', label: 'Fail-Closed Corpus', description: 'Empty corpus → explicit status, zero fabricated findings' },
+    ],
+    stats: [
+      { label: 'Caution', value: 98 },
+      { label: 'Rule Fidelity', value: 95 },
+      { label: 'Scope Control', value: 97 },
+      { label: 'Traceability', value: 94 },
+    ],
+    runtimeType: 'cli',
+    command: 'npx',
+    args: ['tsx', '../overlay365/agent-team/agents/guardian/index.ts'],
+    tags: ['overlay365', 'compliance', 'legal', 'health'],
+  }),
+  agent({
+    slug: 'overlay-auditor',
+    name: 'The Auditor',
+    codename: 'The Inspector',
+    role: 'Deterministic Site Integrity Checks',
+    tagline: 'Uptime, broken links, and payment flow — verified, not asserted',
+    personality: 'analytical',
+    voice: 'verifiable, pass/fail, no prose where data suffices',
+    backstory:
+      'Born from tldraw\u2019s link checker and Draymond\u2019s own monitors module, The Auditor runs deterministic checks against the live Overlay365 sites and reports pass/fail structure — no LLM, no opinion, just measured facts.',
+    bio: 'Weekly deterministic auditor for uplift-health, uplift-wealth, uplift-justice, and overlay365.com. Checks uptime, same-origin broken links, and payment/donate link resolution read-only. Never executes a real payment.',
+    specialties: ['Uptime Monitoring', 'Broken Link Crawling', 'Payment Flow Integrity', 'Deterministic Checks'],
+    skills: ['overlay-auditor', 'web-reader', 'web-search', 'coding-agent', 'charts'],
+    capabilities: [
+      { id: 'uptime', label: 'Uptime Checks', description: 'HTTP status + response time per live site' },
+      { id: 'links', label: 'Broken Link Crawl', description: 'Same-origin crawl, depth 2, rate-limited' },
+      { id: 'payflow', label: 'Payment Flow', description: 'Read-only resolution of Stripe/CashApp/Venmo links' },
+      { id: 'report', label: 'Audit Report', description: 'structured pass/fail + overall health' },
+    ],
+    stats: [
+      { label: 'Determinism', value: 98 },
+      { label: 'Coverage', value: 92 },
+      { label: 'Speed', value: 90 },
+      { label: 'Read-Only Safety', value: 97 },
+    ],
+    runtimeType: 'cli',
+    command: 'npx',
+    args: ['tsx', '../overlay365/agent-team/agents/auditor/index.ts'],
+    tags: ['overlay365', 'monitoring', 'uptime', 'audit'],
+  }),
 ];
 
 const WORKFLOWS = [
@@ -636,6 +757,31 @@ const WORKFLOWS = [
     installedAt: now,
     sourceType: 'builtin',
   },
+  {
+    id: 'wf-overlay-founder-sync',
+    name: 'Overlay365 Weekly Founder Sync',
+    description:
+      'Consolidates the four Overlay365 agents (Strategist, Treasurer, Guardian, Auditor) into a single Founder Sync memo. Agents without wired data sources report "not-run" explicitly.',
+    version: '1.0.0',
+    steps: [
+      { id: 's1', type: 'task', label: 'Run site integrity audit', agent: 'overlay-auditor' },
+      { id: 's2', type: 'task', label: 'Compute weekly cash pulse', agent: 'overlay-treasurer' },
+      { id: 's3', type: 'task', label: 'Cluster feedback + roadmap', agent: 'overlay-strategist' },
+      { id: 's4', type: 'task', label: 'Flag compliance content', agent: 'overlay-guardian' },
+      { id: 's5', type: 'decision', label: 'Consolidate into Founder Sync memo' },
+    ],
+    assignedAgents: [
+      'overlay-auditor',
+      'overlay-treasurer',
+      'overlay-strategist',
+      'overlay-guardian',
+    ],
+    trigger: 'schedule',
+    schedule: '0 9 * * 1',
+    tags: ['overlay365', 'founder-sync', 'reporting'],
+    installedAt: now,
+    sourceType: 'builtin',
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -686,6 +832,11 @@ const SKILLS = [
   { id: 'skill-music-rights', name: 'Music Rights (ASCAP/HFA/MLC)', slug: 'music-rights', category: 'music', author: 'AgentBrowser', version: '1.0', path: 'agents/AgentBrowser-main/mini-services/music-rights', description: 'Register compositions with ASCAP, HFA, and MLC from a catalog.' },
   { id: 'skill-bookbridge', name: 'BookBridge', slug: 'bookbridge', category: 'knowledge', author: 'ncsound919', version: '1.0', path: 'agents/BookBridge--main', description: 'Search, cite, and retrieve from the book library (REST :8777 / MCP :8778).' },
   { id: 'skill-book-synthesis', name: 'Book Synthesis Engine', slug: 'book-synthesis', category: 'knowledge', author: 'ncsound919', version: '1.0', path: 'agents/Book-Synthesis-Engine-main', description: 'Synthesize up to 5 books into validated, illustrated reports with confidence scores.' },
+  // Overlay365 business-operations skills
+  { id: 'skill-overlay-strategist', name: 'Overlay365 Strategist', slug: 'overlay-strategist', category: 'business', author: 'overlay365-agent-team', version: '1.0', path: '../overlay365/agent-team', description: 'Evidence-clustered feedback triage and roadmap prioritization (audit-traced).' },
+  { id: 'skill-overlay-treasurer', name: 'Overlay365 Treasurer', slug: 'overlay-treasurer', category: 'business', author: 'overlay365-agent-team', version: '1.0', path: '../overlay365/agent-team', description: 'Weekly cash pulse across Stripe/CashApp/Venmo; MRR only from real subscription data.' },
+  { id: 'skill-overlay-guardian', name: 'Overlay365 Guardian', slug: 'overlay-guardian', category: 'business', author: 'overlay365-agent-team', version: '1.0', path: '../overlay365/agent-team', description: 'Compliance flagging for Justice/Health content against an uploaded rule corpus (fail-closed).' },
+  { id: 'skill-overlay-auditor', name: 'Overlay365 Auditor', slug: 'overlay-auditor', category: 'business', author: 'overlay365-agent-team', version: '1.0', path: '../overlay365/agent-team', description: 'Deterministic uptime, broken-link, and payment-flow checks on the live Overlay365 sites.' },
 ].map((s) => ({ ...s, installedAt: now }));
 
 // ---------------------------------------------------------------------------
