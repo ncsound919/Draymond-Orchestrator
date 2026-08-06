@@ -1,4 +1,4 @@
-import { listJobs, type ScheduledJob } from '@/lib/draymond/scheduler';
+import { listJobs, seedBasicJobs, type ScheduledJob } from '@/lib/draymond/scheduler';
 import { listChains } from '@/lib/draymond/chains';
 import SchedulesDashboard from './SchedulesDashboard';
 
@@ -9,6 +9,8 @@ export default async function SchedulesPage() {
   let chainOptions: { id: string; name: string; slug: string }[] = [];
 
   try {
+    // Prepopulate the seeded default jobs (basic tasks) on first run.
+    await seedBasicJobs();
     const [jobs, chains] = await Promise.all([
       listJobs(),
       listChains({ is_template: true }),

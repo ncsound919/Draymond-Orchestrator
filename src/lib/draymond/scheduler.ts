@@ -634,3 +634,53 @@ export async function runDueJobs(): Promise<JobRunResult[]> {
 
   return results;
 }
+
+// ---------------------------------------------------------------------------
+// Seeded default jobs (basic tasks) — created on first run so the scheduler
+// starts with useful automation even before the user adds any.
+// ---------------------------------------------------------------------------
+
+const BASIC_JOBS: ScheduledJobInsert[] = [
+  {
+    name: 'Fleet Health Check',
+    description: 'Daily 8am health check across all registered agents and monitors.',
+    cron_expression: '0 8 * * *',
+    job_type: 'health_check',
+    is_enabled: true,
+  },
+  {
+    name: 'Market News Digest',
+    description: 'Daily 7am market & news digest from research agents.',
+    cron_expression: '0 7 * * *',
+    job_type: 'notification',
+    is_enabled: true,
+  },
+  {
+    name: 'Weekly Operations Review',
+    description: 'Weekly Monday 9am operations rollup (campaign, portfolio, research).',
+    cron_expression: '0 9 * * 1',
+    job_type: 'chain',
+    job_config: { chain: 'weekly-operations-review' },
+    is_enabled: true,
+  },
+];
+
+/**
+ * Create the seeded default jobs if they are not already present.
+ * Best-effort: failures are logged and swallowed so the caller never breaks.
+ */
+export async function seedBasicJobs(): Promise<number> {
+  let created = 0;
+  for (const job of BASIC_JOBS) {
+    try {
+      const existing = await getJob(job.name);
+      if (!existing) {
+        await createJob(job);
+        created += 1;
+      }
+    } catch (err) {
+      console.error(`[Draymond Scheduler] Failed to seed job "${job.name}":`, err);
+    }
+  }
+  return created;
+}

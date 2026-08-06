@@ -103,6 +103,21 @@ export async function upsertAgent(agent: RegisteredAgent): Promise<void> {
   });
 }
 
+/**
+ * Update just the avatar for an agent (photo upload flow).
+ * Leaves every other field untouched.
+ */
+export async function updateAgentAvatar(slug: string, avatarUrl: string): Promise<void> {
+  return withLock(async () => {
+    const store = await readStore();
+    const idx = store.agents.findIndex((a) => a.slug === slug);
+    if (idx >= 0) {
+      store.agents[idx] = { ...store.agents[idx], avatarUrl, updatedAt: new Date().toISOString() };
+      await writeStore(store);
+    }
+  });
+}
+
 export async function deleteAgent(id: string): Promise<boolean> {
   return withLock(async () => {
     const store = await readStore();

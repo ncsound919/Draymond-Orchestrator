@@ -6,6 +6,7 @@
  */
 import Link from 'next/link';
 import { listChains } from '@/lib/draymond/chains';
+import { getAllWorkflows } from '@/lib/registry/agent-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,7 +57,42 @@ export default async function WorkflowsPage() {
     fetchError = true;
   }
 
-  if (fetchError) {
+  // Merge the file-based registry workflows (seeded templates) so basic tasks
+  // are visible even before any Supabase chain data exists.
+  let registryWorkflows: Awaited<ReturnType<typeof getAllWorkflows>> = [];
+  try {
+    registryWorkflows = await getAllWorkflows();
+  } catch (err) {
+    console.error('[WorkflowsPage] Failed to load registry workflows:', err);
+  }
+
+  const registryItems = registryWorkflows.map((wf) => ({
+    id: wf.id,
+    name: wf.name,
+    description: wf.description,
+    version: wf.version,
+    status: 'active',
+    trigger_type: wf.trigger || 'manual',
+    total_steps: wf.steps.length,
+    created_at: wf.installedAt,
+    isRegistry: true,
+  }));
+
+  const chainItems = chains.map((c) => ({
+    id: c.id,
+    name: c.name,
+    description: c.description,
+    version: c.version,
+    status: c.status,
+    trigger_type: c.trigger_type,
+    total_steps: c.total_steps,
+    created_at: c.created_at,
+    isRegistry: false,
+  }));
+
+  const items = [...chainItems, ...registryItems];
+
+  if (fetchError && items.length === 0) {
     return (
       <div className="min-h-screen text-white">
         <div className="max-w-7xl mx-auto px-6 py-24 text-center">
@@ -76,7 +112,7 @@ export default async function WorkflowsPage() {
           <div>
             <h1 className="text-3xl font-black tracking-tight">Workflows</h1>
             <p className="text-white/40 text-sm mt-1">
-              {chains.length} template{chains.length !== 1 ? 's' : ''} registered
+              {items.length} template{items.length !== 1 ? 's' : ''} registered
             </p>
           </div>
           <Link
@@ -90,7 +126,7 @@ export default async function WorkflowsPage() {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {chains.length === 0 ? (
+        {items.length === 0 ? (
           /* ---------- Empty state ---------- */
           <div className="text-center py-24">
             <p className="text-5xl mb-4 opacity-40">&#x2699;&#xFE0F;</p>
@@ -105,60 +141,67 @@ export default async function WorkflowsPage() {
         ) : (
           /* ---------- Grid ---------- */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {chains.map((chain) => (
-              <Link
-                key={chain.id}
-                href={`/workflows/${chain.id}`}
-                className="group rounded-xl bg-white/5 border border-white/10 p-5 transition-colors hover:border-white/20 hover:bg-white/[0.07]"
-              >
-                {/* Top row: name + status */}
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <h3 className="font-bold text-white group-hover:text-emerald-400 transition-colors truncate">
-                    {chain.name}
-                  </h3>
-                  <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-                      STATUS_STYLES[chain.status] ?? STATUS_STYLES.draft
-                    }`}
-                  >
-                    {chain.status}
-                  </span>
+            {items.map((chain) => {
+              const card = (
+                <div
+                  className={`group rounded-xl bg-white/5 border border-white/10 p-5 transition-colors hover:border-white/20 hover:bg-white/[0.07] ${chain.isRegistry ? 'cursor-default' : ''}`}
+                >
+                  {/* Top row: name + status */}
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <h3 className="font-bold text-white group-hover:text-emerald-400 transition-colors truncate">
+                      {chain.name}
+                    </h3>
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                        STATUS_STYLES[chain.status] ?? STATUS_STYLES.draft
+                      }`}
+                    >
+                      {chain.status}
+                    </span>
+                  </div>
+
+                  {/* Description */}
+                  <p className="text-white/60 text-sm line-clamp-2 mb-4">
+                    {chain.description || 'No description'}
+                  </p>
+
+                  {/* Meta row */}
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    {/* Version */}
+                    <span className="rounded-md bg-white/10 px-2 py-0.5 text-white/50 font-mono">
+                      v{chain.version}
+                    </span>
+
+                    {/* Trigger type */}
+                    <span
+                      className={`rounded-md px-2 py-0.5 font-medium ${
+                        TRIGGER_STYLES[chain.trigger_type] ?? 'bg-white/10 text-white/50'
+                      }`}
+                    >
+                      {chain.trigger_type}
+                    </span>
+
+                    {/* Steps count */}
+                    <span className="rounded-md bg-white/10 px-2 py-0.5 text-white/50">
+                      {chain.total_steps} step{chain.total_steps !== 1 ? 's' : ''}
+                    </span>
+
+                    {/* Spacer */}
+                    <span className="flex-1" />
+
+                    {/* Date */}
+                    <span className="text-white/30">{formatDate(chain.created_at)}</span>
+                  </div>
                 </div>
-
-                {/* Description */}
-                <p className="text-white/60 text-sm line-clamp-2 mb-4">
-                  {chain.description || 'No description'}
-                </p>
-
-                {/* Meta row */}
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  {/* Version */}
-                  <span className="rounded-md bg-white/10 px-2 py-0.5 text-white/50 font-mono">
-                    v{chain.version}
-                  </span>
-
-                  {/* Trigger type */}
-                  <span
-                    className={`rounded-md px-2 py-0.5 font-medium ${
-                      TRIGGER_STYLES[chain.trigger_type] ?? 'bg-white/10 text-white/50'
-                    }`}
-                  >
-                    {chain.trigger_type}
-                  </span>
-
-                  {/* Steps count */}
-                  <span className="rounded-md bg-white/10 px-2 py-0.5 text-white/50">
-                    {chain.total_steps} step{chain.total_steps !== 1 ? 's' : ''}
-                  </span>
-
-                  {/* Spacer */}
-                  <span className="flex-1" />
-
-                  {/* Date */}
-                  <span className="text-white/30">{formatDate(chain.created_at)}</span>
-                </div>
-              </Link>
-            ))}
+              );
+              return chain.isRegistry ? (
+                <div key={chain.id}>{card}</div>
+              ) : (
+                <Link key={chain.id} href={`/workflows/${chain.id}`}>
+                  {card}
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>

@@ -23,7 +23,6 @@ export default function KeyboardShortcuts() {
 
   useHotkeys('g+h', () => router.push('/operations'), { preventDefault: true });
   useHotkeys('g+a', () => router.push('/agents'), { preventDefault: true });
-  useHotkeys('g+p', () => router.push('/pipeline'), { preventDefault: true });
   useHotkeys('g+d', () => router.push('/admin'), { preventDefault: true });
 
   useHotkeys('escape', () => setIsOpen(false));

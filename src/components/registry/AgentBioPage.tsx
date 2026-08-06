@@ -11,7 +11,7 @@
  */
 import { useState, useTransition } from 'react';
 import { RegisteredAgent } from '@/lib/registry/types';
-import { invokeAgent, recoverAgent } from '@/app/agents/actions';
+import { invokeAgent, recoverAgent, uploadAgentAvatar } from '@/app/agents/actions';
 import Image from 'next/image';
 
 /** Shape of the optional Supabase entity passed from the server page. */
@@ -80,9 +80,56 @@ function PermissionPill({ label, granted }: { label: string; granted: boolean })
   );
 }
 
+/** Photo upload control — lets an admin replace the agent portrait. */
+function PhotoUpload({ slug, onUploaded }: { slug: string; onUploaded: (url: string) => void }) {
+  const [pending, startTransition] = useTransition();
+  const [message, setMessage] = useState<string | null>(null);
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('slug', slug);
+    fd.append('file', file);
+    startTransition(async () => {
+      const res = await uploadAgentAvatar(fd);
+      if (res.ok && res.avatarUrl) {
+        onUploaded(res.avatarUrl);
+        setMessage('Photo updated');
+      } else {
+        setMessage(res.error || 'Upload failed');
+      }
+      setTimeout(() => setMessage(null), 3000);
+    });
+  }
+
+  return (
+    <label
+      className="absolute -bottom-2 -right-2 w-9 h-9 rounded-full bg-black/70 border border-white/20
+                 flex items-center justify-center cursor-pointer hover:bg-black/90 transition-colors"
+      title="Upload photo"
+    >
+      {pending ? (
+        <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+      ) : (
+        <svg className="w-4 h-4 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      )}
+      <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleFile} />
+      {message && (
+        <span className="absolute top-full right-0 mt-1 text-[11px] whitespace-nowrap px-2 py-0.5 rounded bg-black/80 text-white/80">
+          {message}
+        </span>
+      )}
+    </label>
+  );
+}
+
 /** Interactive quick-action buttons for invoke / recover (via server actions). */
-function QuickActions({ entityId }: { entityId: string }) {
-  const [isPendingInvoke, startInvokeTransition] = useTransition();
+function QuickActions({ entityId }: { entityId: string }) {  const [isPendingInvoke, startInvokeTransition] = useTransition();
   const [isPendingRecover, startRecoverTransition] = useTransition();
   const [message, setMessage] = useState<{ text: string; type: 'ok' | 'err' } | null>(null);
 
@@ -137,6 +184,8 @@ function QuickActions({ entityId }: { entityId: string }) {
 
 export default function AgentBioPage({ agent, entity }: { agent: RegisteredAgent; entity?: EntitySnapshot }) {
   const accent = agent.theme.accentColor;
+  const [avatarUrl, setAvatarUrl] = useState(agent.avatarUrl);
+  const openChatUrl = process.env.NEXT_PUBLIC_OPENCHAT_URL || 'http://localhost:5173';
 
   return (
     <div className="min-h-screen text-white">
@@ -172,11 +221,11 @@ export default function AgentBioPage({ agent, entity }: { agent: RegisteredAgent
         <div className="flex gap-6 items-end">
           {/* Portrait */}
           <div
-            className="w-36 h-36 rounded-2xl overflow-hidden border-4 flex-shrink-0"
+            className="w-36 h-36 rounded-2xl overflow-hidden border-4 flex-shrink-0 relative"
             style={{ borderColor: accent, background: '#1a1a2e' }}
           >
-            {agent.avatarUrl ? (
-              <Image src={agent.avatarUrl} alt={agent.name} width={144} height={144} unoptimized className="w-full h-full object-cover" />
+            {avatarUrl ? (
+              <Image src={avatarUrl} alt={agent.name} width={144} height={144} unoptimized className="w-full h-full object-cover" />
             ) : (
               <div
                 className="w-full h-full flex items-center justify-center text-5xl font-black"
@@ -185,6 +234,7 @@ export default function AgentBioPage({ agent, entity }: { agent: RegisteredAgent
                 {(agent.name || '?')[0]}
               </div>
             )}
+            <PhotoUpload slug={agent.slug} onUploaded={setAvatarUrl} />
           </div>
 
           {/* Name block */}
@@ -205,6 +255,18 @@ export default function AgentBioPage({ agent, entity }: { agent: RegisteredAgent
             {agent.tagline && (
               <p className="text-white/40 italic mt-1 text-sm">{agent.tagline}</p>
             )}
+            <a
+              href={openChatUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-600/80 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.83L3 20l1.14-3.12A7.9 7.9 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              Open in Open Chat
+            </a>
           </div>
         </div>
 

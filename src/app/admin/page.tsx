@@ -103,12 +103,6 @@ export default async function AdminPage() {
             >
               Import Agents
             </Link>
-            <Link
-              href="/pipeline"
-              className="px-4 py-2 text-sm font-medium rounded-full bg-white/5 text-white/60 hover:bg-white/10 transition-colors"
-            >
-              Hood Alchemy Pipeline
-            </Link>
           </div>
         </div>
 
