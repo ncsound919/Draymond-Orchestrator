@@ -62,6 +62,9 @@ function agent(def) {
     runtime: {
       type: def.runtimeType || 'http',
       endpoint: def.endpoint,
+      command: def.command,
+      args: def.args,
+      mcpServer: def.mcpServer,
       healthPath: def.healthPath || '/health',
       timeoutMs: def.timeoutMs || 15000,
     },
@@ -236,6 +239,8 @@ const AGENTS = [
     ],
     endpoint: undefined,
     runtimeType: 'subprocess',
+    command: 'python',
+    args: ['agents/TradingAgents-main/main.py'],
   }),
   agent({
     slug: 'openchat',
@@ -288,6 +293,7 @@ const AGENTS = [
     ],
     endpoint: undefined,
     runtimeType: 'mcp',
+    mcpServer: 'agents/UFC-MCP-main',
   }),
   agent({
     slug: 'claw-protect',
@@ -418,6 +424,8 @@ const AGENTS = [
     ],
     endpoint: undefined,
     runtimeType: 'subprocess',
+    command: 'python',
+    args: ['agents/AI-Youtube-Shorts-Generator-main/Edit.py'],
   }),
   agent({
     slug: 'everything-claude-code',
@@ -472,6 +480,8 @@ const AGENTS = [
     ],
     endpoint: undefined,
     runtimeType: 'subprocess',
+    command: 'python',
+    args: ['agents/super_tool/trading_pipeline.py'],
   }),
 ];
 
@@ -619,3 +629,4 @@ for (const a of AGENTS) {
 }
 
 console.log('Seed complete.');
+
