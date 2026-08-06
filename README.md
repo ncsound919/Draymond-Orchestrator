@@ -25,7 +25,7 @@ git clone https://github.com/ncsound919/Draymond-Orchestrator.git
 cd Draymond-Orchestrator
 cp .env.example .env.local   # fill in your values
 npm install
-npm run dev                  # http://localhost:3000
+npm run dev                  # http://localhost:3444
 ```
 
 Prerequisites: **Node.js 20.19+**, a Supabase project (auth + Postgres), and the
@@ -161,7 +161,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3444](http://localhost:3444).
 
 ### Environment Variables
 
@@ -234,3 +234,5 @@ Draymond Orchestrator manages the following ecosystem:
 - **The Uplift Lab** — Community empowerment platform ([github.com/ncsound919/The-Uplift-Lab](https://github.com/ncsound919/The-Uplift-Lab))
 
 Each tool works standalone. Draymond adds centralized monitoring, multi-agent chain workflows, and scheduled job management — but connection is always optional.
+
+
