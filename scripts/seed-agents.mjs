@@ -208,7 +208,7 @@ const AGENTS = [
       'Born from a terminal UI experiment, The Observer quietly watches every campaign metric so humans can focus on the conversation, not the spreadsheet. Promoted to lead of the marketing team, it now consolidates its four deterministic members — Voice Keeper, Scheduler, Format Auditor, and Tracker — into one auditable weekly Marketing Pulse.',
     bio: 'Lead of the Overlay365 marketing team. The Observer turns campaign noise into a clear picture and signs off on the deterministic outputs of its four members. Every action item in the Marketing Pulse cites exactly which member produced it.',
     specialties: ['Marketing Team Lead', 'Campaign Analytics', 'Engagement Tracking', 'Marketing Pulse'],
-    skills: ["marketing-mode","seo-content-writer","content-strategy","blog-writer","charts","overlay-marketing"],
+    skills: ["marketing-mode","seo-content-writer","content-strategy","blog-writer","charts","overlay-marketing","agentmail","meme-generation","canvas"],
     capabilities: [
       { id: 'campaigns', label: 'Campaign Analytics', description: 'Performance across campaigns' },
       { id: 'engagement', label: 'Engagement Tracking', description: 'Customer engagement signals' },
@@ -515,7 +515,7 @@ const AGENTS = [
       'Agent Browser is the control room for the whole empire. It was built to register music with the performance rights organizations, keep every service in the fleet humming, and open the library when an agent needs to learn something new.',
     bio: 'A strategic conductor that turns your music catalog into registered, monetized rights across ASCAP, HFA, and MLC. It also orchestrates the Agent Browser platform (Big Homie, Claw Protect, Mutly, VibeServe, RepoRank) and gives every agent access to a 133-book knowledge library.',
     specialties: ['Music Registration', 'ASCAP / HFA / MLC', 'Fleet Orchestration', 'Book Library Access'],
-    skills: ["music-rights","bookbridge","book-synthesis","overlay365-qa","business-development"],
+    skills: ["music-rights","bookbridge","book-synthesis","overlay365-qa","business-development","fastmcp","blackbox"],
     missionRole: 'E4 - music rights registration + fleet QA + orchestration',
     capabilities: [
       { id: 'ascap', label: 'ASCAP Registration', description: 'Extract + register compositions with ASCAP' },
@@ -604,7 +604,7 @@ const AGENTS = [
       'Assembled from kodus-ai\u2019s clustering engine and OmniResearch\u2019s research discipline, The Strategist reads every support email, issue, and reply as one voice in a conversation — and only makes claims it can trace to a raw record.',
     bio: 'Bi-weekly feedback clustering agent for the Overlay365 platforms (Health/Wealth/Justice). Clusters feedback by similarity, scores clusters on frequency/severity/brand alignment, and keeps every claim tied to evidence itemIds. Built to reject invented trends — thin data is reported as thin.',
     specialties: ['Feedback Clustering', 'Roadmap Prioritization', 'Brand Alignment', 'Evidence Auditing'],
-    skills: ['overlay-strategist', 'market-research', 'contentanalysis', 'web-search', 'writing-plans', 'bookbridge'],
+    skills: ['overlay-strategist', 'market-research', 'contentanalysis', 'web-search', 'writing-plans', 'bookbridge', 'domain-intel', 'canvas', 'siyuan'],
     capabilities: [
       { id: 'cluster', label: 'Evidence Clustering', description: 'Deterministic dedup + similarity clustering with full id trails' },
       { id: 'score', label: 'Prioritization Scoring', description: 'Frequency/severity/brand-alignment weighted 0-100 scores' },
@@ -635,7 +635,7 @@ const AGENTS = [
       'Built on the stripe-pulse MRR/ARR engine, The Treasurer was taught that an estimate is a lie: MRR without subscription data stays null, and expense categories stay null until a source exists.',
     bio: 'Weekly cash-pulse agent across the three payment rails of Overlay365. Aggregates inflow by rail and platform, computes MRR only from real subscription data (null otherwise), flags anomalies against prior weeks, and never fabricates expense or pricing recommendations.',
     specialties: ['Revenue Reconciliation', 'MRR / ARR', 'Payment Rails', 'Anomaly Detection'],
-    skills: ['overlay-treasurer', 'finance', 'stock-analysis', 'charts', 'xlsx', 'business-development'],
+    skills: ['overlay-treasurer', 'finance', 'stock-analysis', 'charts', 'xlsx', 'business-development', 'solana', 'base-chain'],
     capabilities: [
       { id: 'aggregate', label: 'Multi-Rail Aggregation', description: 'Stripe API + CashApp/Venmo manual CSV imports' },
       { id: 'mrr', label: 'MRR Computation', description: 'Reuses stripe-pulse subscription math; null when data is thin' },
@@ -697,7 +697,7 @@ const AGENTS = [
       'Born from tldraw\u2019s link checker and Draymond\u2019s own monitors module, The Auditor runs deterministic checks against the live Overlay365 sites and reports pass/fail structure — no LLM, no opinion, just measured facts.',
     bio: 'Weekly deterministic auditor for uplift-health, uplift-wealth, uplift-justice, and overlay365.com. Checks uptime, same-origin broken links, and payment/donate link resolution read-only. Never executes a real payment.',
     specialties: ['Uptime Monitoring', 'Broken Link Crawling', 'Payment Flow Integrity', 'Deterministic Checks'],
-    skills: ['overlay-auditor', 'web-reader', 'web-search', 'coding-agent', 'charts', 'supply-chain-health', 'client-delivery'],
+    skills: ['overlay-auditor', 'web-reader', 'web-search', 'coding-agent', 'charts', 'supply-chain-health', 'client-delivery', 'domain-intel', 'sherlock', 'oss-forensics', 'docker-management'],
     capabilities: [
       { id: 'uptime', label: 'Uptime Checks', description: 'HTTP status + response time per live site' },
       { id: 'links', label: 'Broken Link Crawl', description: 'Same-origin crawl, depth 2, rate-limited' },
@@ -840,7 +840,7 @@ const AGENTS = [
       'The central intelligence of the DCA swarm. Replaces every LLM call with skill files, a deterministic MoE router, and a Monte Carlo planner — 100% reproducible when LLM-free, with optional LLM routing for complex planning.',
     bio: 'Control brain for the fleet. Runs deterministic decision trees, skill-file actions, and config-space planning. Pairs with the Draymond orchestrator for reproducible agent control.',
     specialties: ['Deterministic Control', 'MoE Routing', 'Monte Carlo Planning', 'Skill Files'],
-    skills: ['deterministic-brain', 'coding-agent', 'fullstack-dev', 'writing-plans', 'business-development', 'client-delivery'],
+    skills: ['deterministic-brain', 'coding-agent', 'fullstack-dev', 'writing-plans', 'business-development', 'client-delivery', 'blackbox', 'inference-sh-cli'],
     capabilities: [
       { id: 'moe', label: 'MoE Router', description: 'Config-driven deterministic decision tree' },
       { id: 'planner', label: 'Monte Carlo Planner', description: 'Exhaustive config-space search with deterministic scoring' },
@@ -1230,7 +1230,7 @@ const AGENTS = [
       'An open NotebookLM implementation. The research layer: ingest sources, ground answers, and keep a notebook of findings.',
     bio: 'Research workspace. Ingests documents, grounds answers in sources, and produces NotebookLM-style research notebooks.',
     specialties: ['Research Notebooks', 'Source Grounding', 'Document Ingestion'],
-    skills: ['open-notebook', 'market-research', 'contentanalysis'],
+    skills: ['open-notebook', 'market-research', 'contentanalysis', 'canvas', 'siyuan', 'memento-flashcards'],
     capabilities: [
       { id: 'notebook', label: 'Research Notebooks', description: 'Ingest + ground + synthesize' },
       { id: 'ground', label: 'Source Grounding', description: 'Answers trace to ingested docs' },
@@ -1324,7 +1324,7 @@ const AGENTS = [
       'The flagship B2B offering. An agent-based call center that answers, triages, and resolves customer calls for small businesses. Finalizing now; this is the wedge product for the 90-day mission.',
     bio: 'AI call center delivering phone support for SMB clients. Sells at $100–300/site/mo. Every call is recorded, transcribed, and QA-gated by the Guardian for consent compliance.',
     specialties: ['Call Handling', 'Triage', 'SMB Support', 'Consent Compliance'],
-    skills: ['aetherdesk', 'client-delivery', 'business-development'],
+    skills: ['aetherdesk', 'client-delivery', 'business-development', 'telephony', 'one-three-one-rule'],
     capabilities: [
       { id: 'calls', label: 'Call Center', description: 'Answer + triage + resolve inbound calls' },
       { id: 'consent', label: 'Consent-Gated', description: 'Recording/consent compliance via Guardian' },
@@ -1551,6 +1551,28 @@ const SKILLS = [
   { id: 'skill-memory', name: 'Memory Framework', slug: 'memory', category: 'memory', author: 'MemAgent', version: '1.0', path: '../integrations/MemAgent', description: 'Long-term memory/recall for agents (MemAgent).' },
   { id: 'skill-business-development', name: 'Business Development', slug: 'business-development', category: 'mission', author: 'draymond', version: '1.0', path: 'src/lib/draymond/business-pipeline.ts', description: 'Pipeline, proposals, closing — feed opportunities toward the revenue target.' },
   { id: 'skill-client-delivery', name: 'Client Delivery', slug: 'client-delivery', category: 'mission', author: 'draymond', version: '1.0', path: 'agents/AgentBrowser-main/src/lib/site-testing', description: 'Selling + delivering a client engagement (QA/monitoring/audits) end-to-end.' },
+  // Round 2 — optional-skills batch (mission-relevant, verified paths)
+  { id: 'skill-agentmail', name: 'AgentMail', slug: 'agentmail', category: 'email', author: 'optional', version: '1.0', path: 'agents/optional-skills/email/agentmail', description: 'Agent-managed email — send, receive, thread, triage.' },
+  { id: 'skill-telephony', name: 'Telephony', slug: 'telephony', category: 'voice', author: 'optional', version: '1.0', path: 'agents/optional-skills/productivity/telephony', description: 'Phone/voice automation — Aetherdesk adjacent.' },
+  { id: 'skill-domain-intel', name: 'Domain Intel', slug: 'domain-intel', category: 'security', author: 'optional', version: '1.0', path: 'agents/optional-skills/research/domain-intel', description: 'OSINT/domain intelligence gathering.' },
+  { id: 'skill-one-three-one-rule', name: 'One-Three-One Rule', slug: 'one-three-one-rule', category: 'communication', author: 'optional', version: '1.0', path: 'agents/optional-skills/communication/one-three-one-rule', description: 'Structured decision/response framing (proposals, trade-offs).' },
+  { id: 'skill-fastmcp', name: 'FastMCP', slug: 'fastmcp', category: 'mcp', author: 'optional', version: '1.0', path: 'agents/optional-skills/mcp/fastmcp', description: 'Build, test, deploy MCP servers.' },
+  { id: 'skill-docker-management', name: 'Docker Management', slug: 'docker-management', category: 'devops', author: 'optional', version: '1.0', path: 'agents/optional-skills/devops/docker-management', description: 'Container lifecycle operations.' },
+  { id: 'skill-inference-sh-cli', name: 'inference-sh CLI', slug: 'inference-sh-cli', category: 'devops', author: 'optional', version: '1.0', path: 'agents/optional-skills/devops/cli', description: 'Run LLM inference via CLI.' },
+  { id: 'skill-bioinformatics', name: 'Bioinformatics', slug: 'bioinformatics', category: 'health', author: 'optional', version: '1.0', path: 'agents/optional-skills/research/bioinformatics', description: 'Genomic/bio data analysis — Overlay Health.' },
+  { id: 'skill-neuroskill-bci', name: 'Neuroskill BCI', slug: 'neuroskill-bci', category: 'health', author: 'optional', version: '1.0', path: 'agents/optional-skills/health/neuroskill-bci', description: 'BCI wearable/biometric integration.' },
+  { id: 'skill-solana', name: 'Solana', slug: 'solana', category: 'blockchain', author: 'optional', version: '1.0', path: 'agents/optional-skills/blockchain/solana', description: 'Solana payments/tokens.' },
+  { id: 'skill-base-chain', name: 'Base (L2)', slug: 'base-chain', category: 'blockchain', author: 'optional', version: '1.0', path: 'agents/optional-skills/blockchain/base', description: 'Base chain tooling.' },
+  { id: 'skill-1password', name: '1Password', slug: '1password', category: 'security', author: 'optional', version: '1.0', path: 'agents/optional-skills/security/1password', description: 'Secrets management.' },
+  { id: 'skill-sherlock', name: 'Sherlock OSINT', slug: 'sherlock', category: 'security', author: 'optional', version: '1.0', path: 'agents/optional-skills/security/sherlock', description: 'OSINT username/handle search.' },
+  { id: 'skill-oss-forensics', name: 'OSS Forensics', slug: 'oss-forensics', category: 'security', author: 'optional', version: '1.0', path: 'agents/optional-skills/security/oss-forensics', description: 'Open-source forensics.' },
+  { id: 'skill-meme-generation', name: 'Meme Generation', slug: 'meme-generation', category: 'creative', author: 'optional', version: '1.0', path: 'agents/optional-skills/creative/meme-generation', description: 'Meme asset generation — marketing.' },
+  { id: 'skill-blender-mcp', name: 'Blender MCP', slug: 'blender-mcp', category: 'creative', author: 'optional', version: '1.0', path: 'agents/optional-skills/creative/blender-mcp', description: 'Blender 3D via MCP.' },
+  { id: 'skill-canvas', name: 'Canvas', slug: 'canvas', category: 'productivity', author: 'optional', version: '1.0', path: 'agents/optional-skills/productivity/canvas', description: 'Knowledge canvas/notes.' },
+  { id: 'skill-siyuan', name: 'SiYuan', slug: 'siyuan', category: 'productivity', author: 'optional', version: '1.0', path: 'agents/optional-skills/productivity/siyuan', description: 'SiYuan note-taking.' },
+  { id: 'skill-memento-flashcards', name: 'Memento Flashcards', slug: 'memento-flashcards', category: 'productivity', author: 'optional', version: '1.0', path: 'agents/optional-skills/productivity/memento-flashcards', description: 'Spaced-repetition flashcards.' },
+  { id: 'skill-blackbox', name: 'Blackbox', slug: 'blackbox', category: 'autonomous', author: 'optional', version: '1.0', path: 'agents/optional-skills/autonomous-ai-agents/blackbox', description: 'External agent CLI integration (Codex/OpenCode).' },
+  { id: 'skill-openclaw-migration', name: 'OpenClaw Migration', slug: 'openclaw-migration', category: 'migration', author: 'optional', version: '1.0', path: 'agents/optional-skills/migration/openclaw-migration', description: 'Migrate user state/customizations.' },
 ].map((s) => ({ ...s, installedAt: now }));
 
 // ---------------------------------------------------------------------------

@@ -89,3 +89,32 @@ has 65). Flagged by mission fit for the 90-day plan.
 2. **Research (C):** cheap to add â€” feed OmniResearch + open-notebook.
 3. **MLOps (B):** register as infra skills; only wire to agents when a training arm exists.
 4. **Personal (D):** keep as optional/available; not wired to mission agents.
+
+---
+
+## Round 2 — more skill sources reviewed
+
+### Superpowers (agents/skills/superpowers-main — 14 skills)
+Notable beyond the collection (only 'superpowers' collection slug is catalogued):
+- **test-driven-development**, **systematic-debugging**, **verification-before-completion**, **requesting-code-review**, **subagent-driven-development**, **brainstorming**, **writing-skills**, **using-git-worktrees**, **dispatching-parallel-agents**, **executing-plans**
+- These are engineering-workflow skills — wire to the coding agents (dca-brain, megacode, uplift-agent) + GSD.
+
+### everything-claude-code (agents/everything-claude-code-main — 116 skills) — the biggest source
+Most notable, grouped:
+
+**Dev / platform:** backend-patterns, frontend-patterns, api-design, coding-standards, docker-patterns, deployment-patterns, database-migrations, e2e-testing, security-review, postgres-patterns, python-patterns+testing, golang-patterns+testing, rust-patterns+testing, java-coding-standards, springboot-patterns+security, laravel-patterns, django-patterns, nextjs-turbopack, mcp-server-patterns, claude-api
+
+**Business/domain (feeds E2-E4):** market-research, deep-research, data-scraper-agent, investor-materials, investor-outreach, energy-procurement, carrier-relationship-management, inventory-demand-planning, logistics-exception-management, production-scheduling, quality-nonconformance, customs-trade-compliance, returns-reverse-logistics, x-api, crosspost, content-engine, article-writing, fal-ai-media, videodb, video-editing, nutrient-document-processing, frontend-slides
+
+**AI/agents (fleet ops):** agentic-engineering, ai-first-engineering, autonomous-loops, continuous-agent-loop, continuous-learning, eval-harness, ralphinho-rfc-pipeline, claude-devfleet, codebase-onboarding, context-budget, cost-aware-llm-pipeline, prompt-optimizer, security-scan, verification-loop, blueprint, enterprise-agent-ops, team-builder
+
+### OpenClaw (agents/skills/awesome-openclaw-skills-main — index of 5,490+)
+Local copy is an index (categories only). Notable categories worth pulling from when needed:
+web-qa-bot (already used for Auditor inspiration), social posting, browser automation, MCP servers. Pull specific skills on demand — do not bulk-vendor 5,490.
+
+---
+
+## Suggested wiring for Round 2 (highest value first)
+1. **everything-claude-code** ? register as a **'ecc' collection** skill (one entry, path agents/everything-claude-code-main) so all 116 are discoverable; wire individual entries as needed to agents (api-design?strategist, security-review?guardian, market-research?omniresearch, e2e-testing?agent-browser).
+2. **Superpowers** ? wire the 8 workflow skills to the coding agents.
+3. **OpenClaw** ? pull on demand.
