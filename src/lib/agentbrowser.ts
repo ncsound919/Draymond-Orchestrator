@@ -47,6 +47,36 @@ export async function fetchFileByUrl(url: string): Promise<BrowserTaskResult> {
   return browserFetch(url, "extract");
 }
 
+export interface SiteTestReport {
+  runAt: string;
+  suite: string;
+  overall: "pass" | "fail" | "partial";
+  sites: Array<{
+    siteId: string;
+    siteLabel: string;
+    url: string;
+    status: string;
+    loadMs: number;
+    consoleErrors: string[];
+    failedRequests: string[];
+  }>;
+  summary: { passed: number; failed: number; errored: number };
+}
+
+/**
+ * Run the Overlay365 Playwright QA suite via AgentBrowser's testing tool.
+ * suite: "all" | "overlay365" | "health" | "wealth" | "justice".
+ */
+export async function runSiteTests(suite = "all"): Promise<SiteTestReport> {
+  const res = await fetch(`${AGENTBROWSER_URL}/api/testing?suite=${encodeURIComponent(suite)}`, {
+    method: "GET",
+    headers: AGENTBROWSER_API_KEY ? { "X-Agent-Auth": AGENTBROWSER_API_KEY } : {},
+    signal: AbortSignal.timeout(300_000),
+  });
+  if (!res.ok) throw new Error(`AgentBrowser /api/testing failed: HTTP ${res.status}`);
+  return res.json() as Promise<SiteTestReport>;
+}
+
 export function agentBrowserUrl(): string {
   return AGENTBROWSER_URL;
 }

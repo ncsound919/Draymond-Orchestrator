@@ -513,13 +513,14 @@ const AGENTS = [
       'Agent Browser is the control room for the whole empire. It was built to register music with the performance rights organizations, keep every service in the fleet humming, and open the library when an agent needs to learn something new.',
     bio: 'A strategic conductor that turns your music catalog into registered, monetized rights across ASCAP, HFA, and MLC. It also orchestrates the Agent Browser platform (Big Homie, Claw Protect, Mutly, VibeServe, RepoRank) and gives every agent access to a 133-book knowledge library.',
     specialties: ['Music Registration', 'ASCAP / HFA / MLC', 'Fleet Orchestration', 'Book Library Access'],
-    skills: ["music-rights","bookbridge","book-synthesis"],
+    skills: ["music-rights","bookbridge","book-synthesis","overlay365-qa"],
     capabilities: [
       { id: 'ascap', label: 'ASCAP Registration', description: 'Extract + register compositions with ASCAP' },
       { id: 'hfa', label: 'HFA Upload', description: 'Harry Fox Agency mechanical licensing uploads' },
       { id: 'mlc', label: 'MLC Registration', description: 'Mechanical Licensing Collective catalog extraction' },
       { id: 'orchestrate', label: 'Fleet Orchestration', description: 'Coordinates Big Homie, Claw Protect, Mutly, VibeServe, RepoRank' },
       { id: 'library', label: 'Book Library', description: 'Searches and cites the 133-book knowledge library' },
+      { id: 'site-testing', label: 'Overlay365 QA', description: 'Playwright site tests (load, console errors, content) across all Overlay365 sites' },
     ],
     stats: [
       { label: 'Music Ops', value: 93 },
@@ -1477,6 +1478,7 @@ const SKILLS = [
   { id: 'skill-memagent', name: 'MemAgent', slug: 'memagent', category: 'memory', author: 'memagent', version: '1.0', path: '../integrations/MemAgent', description: 'Long-term memory framework for agents.' },
   { id: 'skill-phoenix', name: 'Phoenix', slug: 'phoenix', category: 'observability', author: 'arize', version: '1.0', path: '../integrations/phoenix', description: 'LLM/agent observability and evaluation.' },
   { id: 'skill-stirling-pdf', name: 'Stirling PDF', slug: 'stirling-pdf', category: 'docs', author: 'Stirling-Tools', version: '1.0', path: '../integrations/Stirling-PDF', description: 'Locally-hosted PDF toolkit.' },
+  { id: 'skill-overlay365-qa', name: 'Overlay365 QA', slug: 'overlay365-qa', category: 'qa', author: 'AgentBrowser', version: '1.0', path: '../agents/AgentBrowser-main/src/lib/site-testing', description: 'Playwright site tests — load, console errors, content presence, perf across all Overlay365 sites.' },
 ].map((s) => ({ ...s, installedAt: now }));
 
 // ---------------------------------------------------------------------------
