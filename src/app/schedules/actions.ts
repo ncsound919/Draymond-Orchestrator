@@ -2,6 +2,7 @@
 
 import { createJob, enableJob, disableJob, deleteJob } from '@/lib/draymond/scheduler';
 import type { ScheduledJobInsert } from '@/lib/draymond/scheduler';
+import { requireDraymondActionAuth } from '@/lib/draymond/auth';
 import { revalidatePath } from 'next/cache';
 
 // ---------------------------------------------------------------------------
@@ -31,6 +32,8 @@ export async function createScheduledJob(data: {
   job_config?: Record<string, unknown>;
   is_enabled?: boolean;
 }) {
+  await requireDraymondActionAuth();
+
   // Runtime validation
   if (!data || typeof data !== 'object') {
     throw new Error('Invalid input');
@@ -68,6 +71,7 @@ export async function createScheduledJob(data: {
 }
 
 export async function toggleJob(id: string, enable: boolean) {
+  await requireDraymondActionAuth();
   if (!id || typeof id !== 'string') {
     throw new Error('Invalid job ID');
   }
@@ -81,6 +85,7 @@ export async function toggleJob(id: string, enable: boolean) {
 }
 
 export async function removeJob(id: string) {
+  await requireDraymondActionAuth();
   if (!id || typeof id !== 'string') {
     throw new Error('Invalid job ID');
   }
@@ -88,3 +93,4 @@ export async function removeJob(id: string) {
   await deleteJob(id);
   revalidatePath('/schedules');
 }
+

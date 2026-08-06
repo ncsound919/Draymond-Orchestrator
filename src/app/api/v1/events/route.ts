@@ -76,19 +76,9 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // Support ?token=... for EventSource clients that can't set headers
-  const urlToken = new URL(request.url).searchParams.get('token');
-  let authorised: boolean;
-
-  if (urlToken) {
-    console.warn('[events] Token passed via query string — prefer Authorization header');
-    const syntheticRequest = new Request(request.url, {
-      headers: { Authorization: `Bearer ${urlToken}` },
-    });
-    authorised = !authorizeRequest(syntheticRequest as NextRequest);
-  } else {
-    authorised = !authorizeRequest(request);
-  }
+  // Authenticate via Authorization header only — never accept the admin
+  // secret in a query string (it would leak into logs/history/referers).
+  const authorised = !authorizeRequest(request);
 
   if (!authorised) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {

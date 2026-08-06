@@ -284,6 +284,9 @@ async function invokeHttpApi(
       method,
       headers,
       signal: controller.signal,
+      // Do not follow redirects: a validated public URL could redirect to a
+      // private/loopback address (SSRF bypass via redirect).
+      redirect: 'manual',
     };
 
     // GET requests should not have a body
@@ -368,6 +371,7 @@ async function invokeApiCall(
       headers,
       body: JSON.stringify({ action, input }),
       signal: controller.signal,
+      redirect: 'manual',
     });
     clearTimeout(timer);
 
@@ -519,12 +523,23 @@ async function invokeCliCommand(
     );
   }
 
+  // Validate args against the same blocked-pattern allowlist used by
+  // invokeSubprocess / invokeMcpStdio, so `--eval`, `-e`, `-c`, etc. can't
+  // smuggle code execution past the base-command allowlist.
+  const argsValidation = validateArgs(args);
+  if (!argsValidation.valid) {
+    return failResult(
+      argsValidation.error || 'Invalid command arguments',
+      Date.now() - start,
+    );
+  }
+
   const timeoutMs = resolveTimeoutMs(entity, options);
 
   return new Promise<InvocationResult>((resolve) => {
     execFile(
       baseCommand,
-      args,
+      argsValidation.sanitized,
       {
         timeout: timeoutMs,
         maxBuffer: 10 * 1024 * 1024, // 10 MB
@@ -602,6 +617,7 @@ async function invokeWebhook(
       headers,
       body: JSON.stringify(input),
       signal: controller.signal,
+      redirect: 'manual',
     });
     clearTimeout(timer);
 
@@ -813,6 +829,7 @@ async function invokeMcpTool(
       headers,
       body: JSON.stringify({ input, ...(action ? { action } : {}) }),
       signal: controller.signal,
+      redirect: 'manual',
     });
     clearTimeout(timer);
 

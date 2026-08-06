@@ -4,12 +4,15 @@ import { getEntity, recordInvocation } from '@/lib/draymond/registry';
 import { invokeEntity } from '@/lib/draymond/invoker';
 import type { EntityForInvocation } from '@/lib/draymond/invoker';
 import { initiateRecovery } from '@/lib/draymond/index';
+import { requireDraymondActionAuth } from '@/lib/draymond/auth';
 
 /**
- * Server action — invoke an entity from the QuickActions panel.
+ * Server action �?" invoke an entity from the QuickActions panel.
  * Runs server-side so CRON_SECRET is never exposed to the browser.
  */
 export async function invokeAgent(entityId: string): Promise<{ ok: boolean; message: string }> {
+  await requireDraymondActionAuth();
+
   if (!entityId || typeof entityId !== 'string') {
     return { ok: false, message: 'Invalid entity ID' };
   }
@@ -50,9 +53,11 @@ export async function invokeAgent(entityId: string): Promise<{ ok: boolean; mess
 }
 
 /**
- * Server action — trigger recovery for an entity from the QuickActions panel.
+ * Server action �?" trigger recovery for an entity from the QuickActions panel.
  */
 export async function recoverAgent(entityId: string): Promise<{ ok: boolean; message: string }> {
+  await requireDraymondActionAuth();
+
   if (!entityId || typeof entityId !== 'string') {
     return { ok: false, message: 'Invalid entity ID' };
   }

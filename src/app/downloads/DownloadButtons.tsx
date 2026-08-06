@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 
 interface Props {
   productId: string;
@@ -12,15 +14,25 @@ type State = 'idle' | 'loading' | 'error';
 export default function DownloadButtons({ productId, price }: Props) {
   const [state, setState] = useState<State>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const router = useRouter();
 
   async function handleDownload() {
     setState('loading');
     setErrorMsg('');
 
     try {
+      // Attach the Supabase session token so the signed-url endpoint can verify
+      // the purchase against the authenticated user (stripe_session_id fallback removed).
+      const supabase = createClient();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
       const res = await fetch('/api/downloads/signed-url', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
         body: JSON.stringify({ product_id: productId }),
       });
 
@@ -30,7 +42,7 @@ export default function DownloadButtons({ productId, price }: Props) {
         // 402 = payment required, 404 = no purchase found
         if (res.status === 402 || res.status === 404) {
           // Redirect to purchase / Stripe checkout
-          window.location.href = '/checkout?product=' + encodeURIComponent(productId);
+          router.push('/checkout?product=' + encodeURIComponent(productId));
           return;
         }
         throw new Error(data.error || 'Failed to get download link');

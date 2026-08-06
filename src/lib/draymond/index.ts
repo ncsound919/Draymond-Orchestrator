@@ -571,7 +571,9 @@ async function scheduleApprovedActionExecution(action: DraymondAction): Promise<
 }
 
 /**
- * Get all pending actions awaiting human review
+ * Get all pending actions awaiting human review.
+ * Sensitive fields (review_token / review_token_expires_at) are stripped so
+ * single-use review tokens never reach the browser.
  */
 export async function getPendingActions(): Promise<DraymondAction[]> {
   const supabase = await createDraymondClient();
@@ -583,7 +585,12 @@ export async function getPendingActions(): Promise<DraymondAction[]> {
     .order('created_at', { ascending: true });
 
   if (error) throw new Error(`Failed to fetch pending actions: ${error.message}`);
-  return (data || []) as DraymondAction[];
+  return ((data || []) as DraymondAction[]).map((action) => {
+    const { review_token: _t, review_token_expires_at: _e, ...publicAction } = action as DraymondAction & Record<string, unknown>;
+    void _t;
+    void _e;
+    return publicAction as DraymondAction;
+  });
 }
 
 // ============================================================================

@@ -54,7 +54,10 @@ export async function proxy(request: NextRequest) {
 
   // Public paths that don't need access gating
   const isAuthPath = request.nextUrl.pathname.startsWith('/auth');
-  const isStaticPath = request.nextUrl.pathname.match(/\.(.*)$/);
+  // Only known static asset extensions bypass the gate (avoid `/agents/foo.bar`).
+  const isStaticPath = /\.(svg|png|jpg|jpeg|gif|webp|ico|css|js|woff2?)$/i.test(
+    request.nextUrl.pathname
+  );
 
   if (isAuthPath || isStaticPath) {
     return response;
@@ -80,14 +83,10 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  if (accessError) {
+  if (accessError || !hasAccess) {
     console.warn(
-      `[Proxy] user_has_access RPC unavailable (failing open): ${accessError.message}`
+      `[Proxy] Purchase gate denied (${accessError ? accessError.message : 'no access'})`
     );
-    return response;
-  }
-
-  if (!hasAccess) {
     return NextResponse.redirect(`${MARKETING_SITE_URL}?error=access_denied`);
   }
 

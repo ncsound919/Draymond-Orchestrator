@@ -1,5 +1,7 @@
 'use server';
 
+import { requireDraymondActionAuth } from '@/lib/draymond/auth';
+
 /**
  * Server-side quick-action proxy for the operations dashboard.
  *
@@ -9,6 +11,8 @@
  * client bundle and anyone could call /api/cron, /api/seed, etc.
  */
 export async function runQuickAction(endpoint: string, method: 'GET' | 'POST'): Promise<{ ok: boolean; status: number }> {
+  await requireDraymondActionAuth();
+
   const secret = process.env.CRON_SECRET;
   const baseUrl = process.env.DRAYMOND_INTERNAL_URL || '';
   if (!secret) {

@@ -168,6 +168,20 @@ describe('invokeEntity subprocess / cli_command', () => {
     expect(result.success).toBe(true);
     expect(result.output).toEqual({ done: true });
   });
+
+  it('cli_command blocks dangerous args (e.g. --eval) to prevent code execution', async () => {
+    const result = await invokeEntity(
+      entity({
+        invocation_method: 'cli_command',
+        invocation_config: { command: "node --eval process.exit()" },
+      }),
+      'run',
+      {},
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Blocked dangerous argument/);
+    expect(execFileMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('invokeEntity webhook / internal / manual / python_module', () => {

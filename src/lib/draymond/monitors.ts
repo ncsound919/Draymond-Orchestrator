@@ -280,7 +280,7 @@ export async function checkSite(monitorId: string): Promise<SiteCheckResult> {
     const response = await fetch(monitor.url, {
       method: 'GET',
       signal: controller.signal,
-      redirect: 'follow',
+      redirect: 'manual',
       headers: {
         'User-Agent': 'Draymond-Monitor/1.0',
       },

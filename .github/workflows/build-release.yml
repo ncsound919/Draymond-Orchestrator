@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  electron:
     strategy:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
@@ -20,12 +20,23 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - run: npm ci
 
-      - run: npm run build
+      - name: Lint + Type-check
+        run: npm run lint && npm run type-check
+
+      - name: Test
+        run: npm test
+
+      - name: Build web bundle
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+          NEXT_PUBLIC_APP_URL: https://theupliftlab.com
 
       - name: Build Electron app
         run: npx electron-builder --publish never

@@ -37,3 +37,15 @@ export async function requireDraymondAuth(): Promise<
     return { error: Response.json({ error: 'Authentication failed' }, { status: 500 }) };
   }
 }
+
+/**
+ * Server-action variant of requireDraymondAuth: returns the user or throws,
+ * so 'use server' actions can guard privileged operations with a single call.
+ */
+export async function requireDraymondActionAuth(): Promise<{ id: string; email?: string }> {
+  const result = await requireDraymondAuth();
+  if (result.error) {
+    throw new Error('Unauthorized: admin access required');
+  }
+  return result.user;
+}

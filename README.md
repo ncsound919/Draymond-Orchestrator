@@ -4,6 +4,53 @@
 
 Draymond is not a DevOps control panel. It is a **Marvel-style character roster dashboard** where every AI agent, tool, skill, and service in the ecosystem gets a character bio card with capabilities, status indicators, and invocation controls. Think S.H.I.E.L.D. agent roster, not Kubernetes dashboard.
 
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+[![CI](https://img.shields.io/github/actions/workflow/status/ncsound919/Draymond-Orchestrator/ci.yml?label=CI)](https://github.com/ncsound919/Draymond-Orchestrator/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-317%20passing-brightgreen)](https://github.com/ncsound919/Draymond-Orchestrator/actions)
+![Coverage](https://img.shields.io/badge/coverage-75%25%20lines-orange)
+
+## 📦 Releases
+
+Desktop installers (Windows / macOS / Linux) are published on the
+**[GitHub Releases page](https://github.com/ncsound919/Draymond-Orchestrator/releases)**.
+Each release is built and tested automatically by CI.
+
+---
+
+## Getting Started
+
+```bash
+git clone https://github.com/ncsound919/Draymond-Orchestrator.git
+cd Draymond-Orchestrator
+cp .env.example .env.local   # fill in your values
+npm install
+npm run dev                  # http://localhost:3000
+```
+
+Prerequisites: **Node.js 20.19+**, a Supabase project (auth + Postgres), and the
+migrations in `supabase/migrations/` applied. The `user_has_access` RPC and the
+`profiles` table are required — the purchase gate in `src/proxy.ts` **fails
+closed** if they are missing.
+
+Key configuration: `CRON_SECRET` (admin API), `CORS_ORIGIN` (allowed browser
+origins), LLM keys (`DEEPSEEK_API_KEY`, `OPENCODE_API_KEY`, `GEMINI_API_KEY`,
+`ANTHROPIC_API_KEY`, `QWEN_API_KEY`), and `ALLOW_LOCAL_AGENTS=1` for local agent
+fleets.
+
+## Testing
+
+```bash
+npm run lint            # ESLint
+npm run type-check      # tsc --noEmit
+npm test                # 317 tests across 32 files
+npm run test:coverage   # Coverage enforced on src/lib/draymond/**
+```
+
+Coverage thresholds (`vitest.config.ts`): lines 75 / statements 70 / functions 75 /
+branches 55 — measured on `src/lib/draymond/**/*.ts` (the orchestration core:
+chains, scheduler, monitors, invoker, router, registry, confidence, llm).
+
 ---
 
 ## Core Capabilities

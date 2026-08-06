@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Lint, Type-check & Build
+    name: Lint, Type-check, Test & Build
     runs-on: ubuntu-latest
 
     steps:
@@ -21,13 +21,19 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Lint
         run: npm run lint
 
       - name: Type check
         run: npm run type-check
+
+      - name: Test
+        run: npm test
+
+      - name: Coverage
+        run: npm run test:coverage
 
       - name: Build
         run: npm run build

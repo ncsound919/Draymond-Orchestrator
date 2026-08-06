@@ -1,13 +1,16 @@
 'use server';
 
 import { instantiateChain, executeChain, deleteChain } from '@/lib/draymond/chains';
+import { requireDraymondActionAuth } from '@/lib/draymond/auth';
 import { redirect } from 'next/navigation';
 
 /**
- * Server action — instantiate a chain template and execute it.
+ * Server action �?" instantiate a chain template and execute it.
  * Returns actual execution status instead of hardcoded value.
  */
 export async function runWorkflow(chainId: string) {
+  await requireDraymondActionAuth();
+
   if (!chainId || typeof chainId !== 'string') {
     throw new Error('Invalid chain ID');
   }
@@ -31,9 +34,11 @@ export async function runWorkflow(chainId: string) {
 }
 
 /**
- * Server action — delete a chain template.
+ * Server action �?" delete a chain template.
  */
 export async function deleteWorkflowAction(chainId: string) {
+  await requireDraymondActionAuth();
+
   if (!chainId || typeof chainId !== 'string') {
     throw new Error('Invalid chain ID');
   }

@@ -33,14 +33,16 @@ export async function POST(request: NextRequest) {
     //              customer_email text, user_id uuid,
     //              created_at timestamptz, fulfilled_at timestamptz)
     //
-    // We accept buyer identity via:
-    //   a) Bearer token in Authorization header (Supabase Auth JWT)
-    //   b) stripe_session_id in the request body (from checkout success redirect)
+    // Buyer identity is verified ONLY via the Supabase Auth JWT in the
+    // Authorization header. The stripe_session_id fallback was removed: a
+    // checkout session id is not a secret (it appears in the success URL,
+    // history, and logs), so accepting it as proof of purchase was a bypass.
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    if (!supabaseUrl || !serviceRoleKey) {
+    if (!supabaseUrl || !serviceRoleKey || !anonKey) {
       console.error('Missing SUPABASE env vars');
       return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
     }
@@ -51,17 +53,11 @@ export async function POST(request: NextRequest) {
     });
 
     const authHeader = request.headers.get('authorization') ?? '';
-    const stripeSessionId = body?.stripe_session_id as string | undefined;
 
     let hasPurchase = false;
 
     if (authHeader.startsWith('Bearer ')) {
       // Verify Supabase JWT and look up by user_id
-      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      if (!anonKey) {
-        console.error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY env var');
-        return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
-      }
       const anonClient = createClient(
         supabaseUrl,
         anonKey,
@@ -80,15 +76,6 @@ export async function POST(request: NextRequest) {
           .maybeSingle();
         hasPurchase = !!purchase;
       }
-    } else if (stripeSessionId && typeof stripeSessionId === 'string' && stripeSessionId.startsWith('cs_')) {
-      // Fall back to stripe_session_id (set by checkout success redirect)
-      const { data: purchase } = await adminClient
-        .from('purchases')
-        .select('id')
-        .eq('product_id', productId)
-        .eq('stripe_session_id', stripeSessionId)
-        .maybeSingle();
-      hasPurchase = !!purchase;
     }
 
     if (!hasPurchase) {
