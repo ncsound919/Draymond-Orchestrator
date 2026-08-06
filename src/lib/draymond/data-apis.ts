@@ -145,3 +145,27 @@ export async function virusTotalUrlReport(url: string): Promise<{ ok: boolean; m
     return { ok: false, detail: err instanceof Error ? err.message : String(err) };
   }
 }
+
+/**
+ * Financial brief — bundled market/data context for the financial agents
+ * (Treasurer, trading-agents, ghostfolio, sports-steve). Fed each morning.
+ */
+export async function financialBrief(): Promise<{
+  crypto: Record<string, number>;
+  papers: Array<{ title: string; doi?: string }>;
+  stocks: Array<{ symbol: string; ok: boolean; price?: number; change_pct?: number }>;
+  brief: string;
+}> {
+  const [crypto, papers] = await Promise.all([
+    cryptoPrices().catch(() => ({}) as Record<string, number>),
+    openAlexWorks("artificial intelligence business", 3).catch(() => []),
+  ]);
+  const stocks = await Promise.all(
+    ["AAPL", "MSFT", "NVDA", "JPM"].map(async (s) => ({ symbol: s, ...(await finnhubQuote(s)) }))
+  );
+  const btc = crypto.bitcoin ? `BTC=$${Math.round(crypto.bitcoin)}` : "BTC=n/a";
+  const eth = crypto.ethereum ? `ETH=$${Math.round(crypto.ethereum)}` : "ETH=n/a";
+  const stockLine = stocks.filter((s) => s.ok).map((s) => `${s.symbol}=${s.price}`).join(" ");
+  const brief = `Market: ${btc}, ${eth}. ${stockLine || "stocks n/a (FINNHUB_API_KEY)"}. Top paper: ${papers[0]?.title ?? "n/a"}.`;
+  return { crypto, papers, stocks, brief };
+}
