@@ -1,6 +1,6 @@
 # Draymond Orchestrator
 
-**The central nervous system for the Uplift Ecosystem's AI agents.**
+**The central nervous system for the Overlay Ecosystem's AI agents.**
 
 Draymond is not a DevOps control panel. It is a **Marvel-style character roster dashboard** where every AI agent, tool, skill, and service in the ecosystem gets a character bio card with capabilities, status indicators, and invocation controls. Think S.H.I.E.L.D. agent roster, not Kubernetes dashboard.
 
