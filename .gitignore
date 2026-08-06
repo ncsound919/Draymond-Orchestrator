@@ -70,3 +70,9 @@ __pycache__/
 .idea/
 Thumbs.db
 sessions/
+
+# External agent packs (standalone repos, kept locally for integration)
+/agents/
+
+# Stray files
+/DS Font/

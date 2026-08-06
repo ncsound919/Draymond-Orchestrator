@@ -21,6 +21,10 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Generated coverage report.
     "coverage/**",
+    // External agent packs — standalone repos, not part of this app.
+    "agents/**",
+    "public/**",
+    "scripts/**",
   ]),
 ]);
 

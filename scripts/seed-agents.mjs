@@ -262,6 +262,217 @@ const AGENTS = [
     ],
     endpoint: 'http://localhost:5173',
   }),
+  agent({
+    slug: 'ufc-mcp',
+    name: 'UFC-MCP',
+    codename: 'The Converter',
+    role: 'Universal File Converter MCP',
+    tagline: 'Local MCP server — audio, video, image, and document conversion with no cloud',
+    personality: 'precise',
+    voice: 'efficient, technical, format-fluent',
+    backstory:
+      'UFC-MCP refuses to ship your media to the cloud. It was built as a local Model Context Protocol server that converts anything, anywhere, privately.',
+    bio: 'A precise local file-converter MCP that handles audio, video, image, document, and scientific/business files via FFmpeg and local engines. Any agent in the fleet can hand it a file and get back the right format — no cloud, no uploads.',
+    specialties: ['File Conversion', 'MCP Server', 'FFmpeg', 'Media Processing'],
+    capabilities: [
+      { id: 'audio', label: 'Audio Conversion', description: 'MP3, WAV, FLAC, AAC, OGG, M4A, AIFF, OPUS, WMA' },
+      { id: 'video', label: 'Video Conversion', description: 'Transcode between major video containers' },
+      { id: 'docs', label: 'Document Conversion', description: 'PDF, Office, and specialized formats' },
+      { id: 'local', label: '100% Local', description: 'No cloud dependencies — private by default' },
+    ],
+    stats: [
+      { label: 'Coverage', value: 94 },
+      { label: 'Privacy', value: 97 },
+      { label: 'Reliability', value: 90 },
+      { label: 'Speed', value: 85 },
+    ],
+    endpoint: undefined,
+    runtimeType: 'mcp',
+  }),
+  agent({
+    slug: 'claw-protect',
+    name: 'Claw Protect',
+    codename: 'The Sentinel',
+    role: 'Real-time Agent Security',
+    tagline: 'Enterprise security for OpenClaw & Hermes agents — prompt injection, exfiltration, secrets',
+    personality: 'stoic',
+    voice: 'watchful, factual, unyielding',
+    backstory:
+      'Claw Protect was built to harden the agent fleet against the 15 most critical vulnerabilities of the year — watching every prompt and packet so agents can run 24/7 without paranoia.',
+    bio: 'A stoic security sentinel for agentic frameworks. It detects prompt injection, data exfiltration, and secret leaks in real time, and exposes an HTTP dashboard for the whole fleet. Every Draymond security concern, automated.',
+    specialties: ['Security Monitoring', 'Prompt Injection Defense', 'Secrets Scanning', 'Threat Detection'],
+    capabilities: [
+      { id: 'injection', label: 'Prompt Injection Defense', description: 'Detects and blocks prompt-injection payloads' },
+      { id: 'exfil', label: 'Exfiltration Monitor', description: 'Tracks outbound data movement' },
+      { id: 'secrets', label: 'Secrets Scanner', description: 'Finds leaked keys and credentials' },
+      { id: 'audit', label: 'Security Dashboard', description: 'Real-time fleet security posture' },
+    ],
+    stats: [
+      { label: 'Threat Coverage', value: 93 },
+      { label: 'Detection', value: 91 },
+      { label: 'Hardening', value: 94 },
+      { label: 'Ops', value: 88 },
+    ],
+    endpoint: 'http://localhost:3110',
+  }),
+  agent({
+    slug: 'mutly',
+    name: 'Mutly',
+    codename: 'The Daemon',
+    role: 'Developer Daemon & IDE Companion',
+    tagline: 'Background coding assistant — index, semantic search, sandboxed tests, IDE integration',
+    personality: 'empathetic',
+    voice: 'calm, precise, quietly brilliant',
+    backstory:
+      'Mutly sits beside the workspace like a tireless co-pilot — indexing symbols, understanding code semantically, and staging precise edits for the editor. It never sleeps and never gets tired of tests.',
+    bio: 'An empathetic developer daemon that turns raw codebases into searchable, testable, editable terrain. It indexes symbols, runs isolated sandbox tests, and feeds block-level edits straight into VS Code, Zed, or OpenCode.',
+    specialties: ['Codebase Indexing', 'Semantic Search', 'Sandbox Testing', 'IDE Integration'],
+    capabilities: [
+      { id: 'index', label: 'Symbol Indexing', description: 'Persistent codebase symbol index' },
+      { id: 'search', label: 'Semantic Search', description: 'Vector-embedding codebase search' },
+      { id: 'sandbox', label: 'Sandbox Tests', description: 'Isolated test execution' },
+      { id: 'ide', label: 'IDE Bridge', description: 'VS Code, Zed, and OpenCode integration' },
+    ],
+    stats: [
+      { label: 'Indexing', value: 92 },
+      { label: 'Search', value: 91 },
+      { label: 'Tests', value: 88 },
+      { label: 'Integration', value: 90 },
+    ],
+    endpoint: 'http://localhost:3121',
+  }),
+  agent({
+    slug: 'grader',
+    name: 'Grader',
+    codename: 'The Auditor',
+    role: 'Codebase Grading Engine',
+    tagline: 'Data-backed grading of any GitHub repo — security, quality, architecture, valuation',
+    personality: 'analytical',
+    voice: 'data-driven, rigorous, honest',
+    backstory:
+      'Grader was built to answer one uncomfortable question honestly: is this codebase ready? It scores any public repo across security, quality, market fit, and compliance.',
+    bio: 'An analytical codebase auditor powered by Gemini. It grades any public GitHub repository across security, quality, architecture, licensing, and valuation — the objective referee for every Draymond chain that touches code.',
+    specialties: ['Security Audit', 'Code Quality', 'Architecture Review', 'Repo Valuation'],
+    capabilities: [
+      { id: 'security', label: 'Security Audit', description: 'Dependency vulnerabilities + secret leaks' },
+      { id: 'quality', label: 'Quality Scoring', description: 'Maintainability and complexity metrics' },
+      { id: 'compliance', label: 'Compliance', description: 'ISO 5055 and licensing checks' },
+      { id: 'valuation', label: 'Valuation', description: 'Market-fit and value scoring' },
+    ],
+    stats: [
+      { label: 'Depth', value: 90 },
+      { label: 'Accuracy', value: 89 },
+      { label: 'Coverage', value: 91 },
+      { label: 'Speed', value: 82 },
+    ],
+    endpoint: 'http://localhost:3130',
+  }),
+  agent({
+    slug: 'reporank',
+    name: 'RepoRank',
+    codename: 'The Analyst',
+    role: 'Repository Analysis Platform',
+    tagline: 'AI repo scoring, engineering-risk surfacing, and automated remediation',
+    personality: 'strategic',
+    voice: 'clear-eyed, systematic, actionable',
+    backstory:
+      'RepoRank grew from a simple question: which codebases are production-ready, and how do we fix the rest? It combines analysis, security, benchmarks, and fixes in one platform.',
+    bio: 'A strategic repo-analysis platform that scores codebases, surfaces engineering risks, and generates practical fixes — with API, web, worker, and CLI surfaces for every integration style.',
+    specialties: ['Repo Scoring', 'Risk Surfacing', 'Automated Remediation', 'Benchmarking'],
+    capabilities: [
+      { id: 'scoring', label: 'Repo Scoring', description: 'AI production-readiness scoring' },
+      { id: 'risk', label: 'Risk Surfacing', description: 'Engineering-risk identification' },
+      { id: 'remediation', label: 'Remediation', description: 'Generated fixes for findings' },
+      { id: 'api', label: 'API + CLI', description: 'Multiple integration surfaces' },
+    ],
+    stats: [
+      { label: 'Analysis', value: 90 },
+      { label: 'Remediation', value: 87 },
+      { label: 'Coverage', value: 89 },
+      { label: 'Scale', value: 91 },
+    ],
+    endpoint: 'http://localhost:3140',
+  }),
+  agent({
+    slug: 'youtube-shorts',
+    name: 'AI YouTube Shorts',
+    codename: 'The Clipper',
+    role: 'YouTube Shorts Generator',
+    tagline: 'Extracts highlights and crops vertical shorts from long-form video (GPT-4 + Whisper)',
+    personality: 'creative',
+    voice: 'energetic, visual, punchy',
+    backstory:
+      'The Clipper watches the long video so your audience does not have to — finding the best moments, detecting speakers, and cutting them into scroll-ready shorts.',
+    bio: 'A creative video tool that turns long-form video into engaging YouTube Shorts. It uses GPT-4 and Whisper to find the highlights, detect speakers, and crop vertical content automatically.',
+    specialties: ['Video Editing', 'Highlight Extraction', 'Speaker Detection', 'Vertical Cropping'],
+    capabilities: [
+      { id: 'highlights', label: 'Highlight Extraction', description: 'GPT-4 powered interesting-moment detection' },
+      { id: 'speakers', label: 'Speaker Detection', description: 'Whisper-based speaker identification' },
+      { id: 'shorts', label: 'Shorts Cropping', description: 'Automatic vertical crop for Shorts' },
+    ],
+    stats: [
+      { label: 'Creativity', value: 88 },
+      { label: 'Speed', value: 84 },
+      { label: 'Quality', value: 82 },
+      { label: 'Polish', value: 78 },
+    ],
+    endpoint: undefined,
+    runtimeType: 'subprocess',
+  }),
+  agent({
+    slug: 'everything-claude-code',
+    name: 'Everything Claude Code',
+    codename: 'The Library',
+    role: 'Skills, Agents & Commands Collection',
+    tagline: 'A curated library of Claude Code skills, agents, commands, hooks, and rules',
+    personality: 'playful',
+    voice: 'generous, organized, encyclopedic',
+    backstory:
+      'The Library is everything Claude Code ever learned, organized and searchable — skills, agents, commands, hooks, and rules, ready to install anywhere.',
+    bio: 'A playful, encyclopedic collection of Claude Code skills, agents, commands, hooks, and rules. The fastest way to give any agent in the fleet a new capability is to reach into the Library.',
+    specialties: ['Skill Library', 'Agent Definitions', 'Commands & Hooks', 'Rules'],
+    capabilities: [
+      { id: 'skills', label: 'Skill Library', description: 'Hundreds of ready-to-install skills' },
+      { id: 'agents', label: 'Agent Definitions', description: 'Subagent definitions for coding workflows' },
+      { id: 'commands', label: 'Commands & Hooks', description: 'Automation commands and lifecycle hooks' },
+      { id: 'rules', label: 'Rules', description: 'Best-practice rule packs' },
+    ],
+    stats: [
+      { label: 'Depth', value: 95 },
+      { label: 'Organization', value: 92 },
+      { label: 'Coverage', value: 93 },
+      { label: 'Docs', value: 94 },
+    ],
+    endpoint: undefined,
+    runtimeType: 'cli',
+  }),
+  agent({
+    slug: 'super-tool',
+    name: 'Super Tool',
+    codename: 'The Vault',
+    role: 'Trading & Marketing Pipeline Utilities',
+    tagline: 'Backtest, risk-engine, and workflow scripts (backtrader, mem0, unified risk)',
+    personality: 'analytical',
+    voice: 'quantitative, systematic, no-nonsense',
+    backstory:
+      'Super Tool is the toolbox under the trading desk — a pile of sharp, specialized scripts for backtesting, unified risk, and marketing pipelines that just work.',
+    bio: 'An analytical utility pack for trading and marketing pipelines: backtesting with backtrader, memory with mem0/engram, a unified risk engine, and workflow automation scripts.',
+    specialties: ['Backtesting', 'Risk Engine', 'Trading Pipelines', 'Marketing Workflows'],
+    capabilities: [
+      { id: 'backtest', label: 'Backtesting', description: 'backtrader strategy evaluation' },
+      { id: 'risk', label: 'Unified Risk Engine', description: 'Cross-strategy risk management' },
+      { id: 'pipeline', label: 'Trading Pipeline', description: 'Strategy-to-execution pipeline' },
+      { id: 'mkt', label: 'Marketing Workflow', description: 'Campaign automation scripts' },
+    ],
+    stats: [
+      { label: 'Utility', value: 85 },
+      { label: 'Risk', value: 84 },
+      { label: 'Automation', value: 82 },
+      { label: 'Polish', value: 70 },
+    ],
+    endpoint: undefined,
+    runtimeType: 'subprocess',
+  }),
 ];
 
 const WORKFLOWS = [
@@ -321,17 +532,64 @@ const WORKFLOWS = [
 // ---------------------------------------------------------------------------
 // Write registry.json
 // ---------------------------------------------------------------------------
+const SKILLS = [
+  // Curated collections
+  { id: 'skill-superpowers', name: 'Superpowers', slug: 'superpowers', category: 'workflows', author: 'obra/superpowers', curated: true, version: '1.0.0', path: 'agents/skills/superpowers-main', description: '30+ workflow skills: brainstorming, writing-plans, TDD, debugging, code review, subagent dispatch.' },
+  { id: 'skill-awesome-openclaw', name: 'Awesome OpenClaw Skills', slug: 'awesome-openclaw', category: 'directory', author: 'community', curated: true, version: '1.0.0', path: 'agents/skills/awesome-openclaw-skills-main', description: 'Index of 5,490+ community OpenClaw skills by category.' },
+  // Z.AI media/web suite
+  { id: 'skill-image-generation', name: 'Image Generation', slug: 'image-generation', category: 'media', author: 'Z.AI', version: '1.0', path: 'agents/skills/image-generation', description: 'Text-to-image generation via z-ai-web-dev-sdk.' },
+  { id: 'skill-image-edit', name: 'Image Edit', slug: 'image-edit', category: 'media', author: 'Z.AI', version: '1.0', path: 'agents/skills/image-edit', description: 'Text-driven image editing and transformation.' },
+  { id: 'skill-image-understand', name: 'Image Understanding', slug: 'image-understand', category: 'media', author: 'Z.AI', version: '1.0', path: 'agents/skills/image-understand', description: 'Analyze, describe, and extract info from images.' },
+  { id: 'skill-video-generation', name: 'Video Generation', slug: 'video-generation', category: 'media', author: 'Z.AI', version: '1.0', path: 'agents/skills/video-generation', description: 'Text/image-to-video generation (async).' },
+  { id: 'skill-video-understand', name: 'Video Understanding', slug: 'video-understand', category: 'media', author: 'Z.AI', version: '1.0', path: 'agents/skills/video-understand', description: 'Analyze and describe video content and motion.' },
+  { id: 'skill-web-reader', name: 'Web Reader', slug: 'web-reader', category: 'web', author: 'Z.AI', version: '1.0', path: 'agents/skills/web-reader', description: 'Fetch and extract web page content.' },
+  { id: 'skill-web-search', name: 'Web Search', slug: 'web-search', category: 'web', author: 'Z.AI', version: '1.0', path: 'agents/skills/web-search', description: 'Web search for current information.' },
+  // Content / research / marketing
+  { id: 'skill-market-research', name: 'Market Research Reports', slug: 'market-research', category: 'research', author: 'community', version: '1.0', path: 'agents/skills/market-research-reports', description: '50+ page consulting-grade market research reports (LaTeX, charts).' },
+  { id: 'skill-qingyan-research', name: 'Qingyan Research', slug: 'qingyan-research', category: 'research', author: 'community', version: '1.0', path: 'agents/skills/qingyan-research', description: 'Deep web research to polished HTML reports (GLM).' },
+  { id: 'skill-extract-wisdom', name: 'Extract Wisdom', slug: 'contentanalysis', category: 'content', author: 'community', version: '1.0', path: 'agents/skills/contentanalysis', description: 'Extract insights/wisdom from video, podcast, and article content.' },
+  { id: 'skill-seo-writer', name: 'SEO Content Writer', slug: 'seo-content-writer', category: 'content', author: 'aaron-he-zhu', version: '2.0.0', path: 'agents/skills/seo-content-writer', description: 'SEO-optimized, ranking-focused content writing.' },
+  { id: 'skill-blog-writer', name: 'Blog Writer', slug: 'blog-writer', category: 'content', author: 'community', version: '1.0', path: 'agents/skills/blog-writer', description: 'Blog post drafting and editing.' },
+  { id: 'skill-content-strategy', name: 'Content Strategy', slug: 'content-strategy', category: 'content', author: 'community', version: '1.0', path: 'agents/skills/content-strategy', description: 'Content planning and strategy.' },
+  { id: 'skill-marketing-mode', name: 'Marketing Mode', slug: 'marketing-mode', category: 'marketing', author: 'clawd', version: '1.0', path: 'agents/skills/marketing-mode', description: 'Growth-obsessed marketing strategist persona.' },
+  { id: 'skill-storyboard', name: 'Storyboard Manager', slug: 'storyboard-manager', category: 'creative', author: 'community', version: '1.0', path: 'agents/skills/storyboard-manager', description: 'Fiction writing: characters, plot, chapters, consistency.' },
+  { id: 'skill-podcast', name: 'Podcast Generate', slug: 'podcast-generate', category: 'media', author: 'community', version: '1.0', path: 'agents/skills/podcast-generate', description: 'Podcast generation.' },
+  // Documents & productivity
+  { id: 'skill-pdf', name: 'PDF Toolkit', slug: 'pdf', category: 'docs', author: 'Z.AI', version: '1.0', path: 'agents/skills/pdf', description: 'PDF creation and processing via ReportLab.' },
+  { id: 'skill-xlsx', name: 'XLSX Workbench', slug: 'xlsx', category: 'docs', author: 'community', version: '1.0', path: 'agents/skills/xlsx', description: 'Scene-driven spreadsheet workbench.' },
+  { id: 'skill-ppt', name: 'PPT', slug: 'ppt', category: 'docs', author: 'community', version: '1.0', path: 'agents/skills/ppt', description: 'PPT creation, editing, and analysis.' },
+  { id: 'skill-charts', name: 'Charts', slug: 'charts', category: 'docs', author: 'Z.AI', version: '1.0', path: 'agents/skills/charts', description: 'Chart and diagram creation.' },
+  // Development
+  { id: 'skill-coding-agent', name: 'Coding Agent', slug: 'coding-agent', category: 'dev', author: 'clawic', version: '1.0.4', path: 'agents/skills/coding-agent', description: 'Plan, implement, verify, and test coding workflow.' },
+  { id: 'skill-fullstack-dev', name: 'Fullstack Dev', slug: 'fullstack-dev', category: 'dev', author: 'community', version: '1.0', path: 'agents/skills/fullstack-dev', description: 'Fullstack web development workflow.' },
+  { id: 'skill-writing-plans', name: 'Writing Plans', slug: 'writing-plans', category: 'dev', author: 'superpowers', version: '1.0', path: 'agents/skills/writing-plans', description: 'Write structured implementation plans.' },
+  { id: 'skill-skill-creator', name: 'Skill Creator', slug: 'skill-creator', category: 'dev', author: 'superpowers', version: '1.0', path: 'agents/skills/skill-creator', description: 'Create and iteratively improve skills.' },
+  { id: 'skill-skill-vetter', name: 'Skill Vetter', slug: 'skill-vetter', category: 'dev', author: 'community', version: '1.0', path: 'agents/skills/skill-vetter', description: 'Vet and grade skill quality.' },
+  { id: 'skill-ui-ux-pro-max', name: 'UI/UX Pro Max', slug: 'ui-ux-pro-max', category: 'dev', author: 'community', version: '1.0', path: 'agents/skills/ui-ux-pro-max', description: 'UI/UX design intelligence and implementation guidance.' },
+  { id: 'skill-visual-design', name: 'Visual Design Foundations', slug: 'visual-design-foundations', category: 'design', author: 'community', version: '1.0', path: 'agents/skills/visual-design-foundations', description: 'Visual design fundamentals.' },
+  // Finance
+  { id: 'skill-finance', name: 'Finance', slug: 'finance', category: 'finance', author: 'community', version: '1.0', path: 'agents/skills/finance', description: 'Financial analysis skill pack.' },
+  { id: 'skill-stock-analysis', name: 'Stock Analysis', slug: 'stock-analysis', category: 'finance', author: 'community', version: '1.0', path: 'agents/skills/stock-analysis-skill', description: 'Stock analysis workflow.' },
+  // Research & misc
+  { id: 'skill-multi-search', name: 'Multi Search Engine', slug: 'multi-search-engine', category: 'research', author: 'community', version: '2.0.1', path: 'agents/skills/multi-search-engine', description: 'Multi search engine v2.0.1.' },
+  { id: 'skill-interview-designer', name: 'Interview Designer', slug: 'interview-designer', category: 'research', author: 'community', version: '1.0', path: 'agents/skills/interview-designer', description: 'Interview design.' },
+].map((s) => ({ ...s, installedAt: now }));
+
+// ---------------------------------------------------------------------------
+// Write registry.json
+// ---------------------------------------------------------------------------
 const store = {
   agents: AGENTS,
   workflows: WORKFLOWS,
   systems: [],
+  skills: SKILLS,
   updatedAt: now,
 };
 
 fs.mkdirSync(registryDir, { recursive: true });
 const registryFile = path.join(registryDir, 'registry.json');
 fs.writeFileSync(registryFile, JSON.stringify(store, null, 2) + '\n', 'utf-8');
-console.log(`Wrote ${registryFile} (${AGENTS.length} agents, ${WORKFLOWS.length} workflows)`);
+console.log(`Wrote ${registryFile} (${AGENTS.length} agents, ${WORKFLOWS.length} workflows, ${SKILLS.length} skills)`);
 
 // ---------------------------------------------------------------------------
 // Generate placeholder avatars (solid accent + initial) into public/avatars/

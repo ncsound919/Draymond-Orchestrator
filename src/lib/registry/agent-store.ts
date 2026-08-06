@@ -5,7 +5,7 @@
  */
 import fs from 'fs/promises';
 import path from 'path';
-import { RegisteredAgent, RegisteredWorkflow, RegisteredSystem } from './types';
+import { RegisteredAgent, RegisteredWorkflow, RegisteredSystem, RegisteredSkill } from './types';
 
 const REGISTRY_DIR = process.env.DRAYMOND_REGISTRY_DIR
   ?? path.join(process.cwd(), '.draymond');
@@ -15,6 +15,7 @@ interface RegistryStore {
   agents: RegisteredAgent[];
   workflows: RegisteredWorkflow[];
   systems: RegisteredSystem[];
+  skills?: RegisteredSkill[];
   updatedAt: string;
 }
 
@@ -54,10 +55,14 @@ async function readStore(): Promise<RegistryStore> {
       !Array.isArray((parsed as Record<string, unknown>).systems)
     ) {
       console.error('[agent-store] registry.json has invalid shape, returning empty store');
-      return { agents: [], workflows: [], systems: [], updatedAt: new Date().toISOString() };
+      return { agents: [], workflows: [], systems: [], skills: [], updatedAt: new Date().toISOString() };
     }
 
-    return parsed as RegistryStore;
+    const parsedStore = parsed as RegistryStore;
+    if (!Array.isArray(parsedStore.skills)) {
+      parsedStore.skills = [];
+    }
+    return parsedStore;
   } catch (err) {
     // Log non-ENOENT errors (corrupt file, bad JSON, etc.)
     if (err instanceof SyntaxError) {
@@ -197,4 +202,19 @@ export async function deleteSystem(id: string): Promise<boolean> {
 
 export async function getFullRegistry(): Promise<RegistryStore> {
   return readStore();
+}
+
+export async function getAllSkills(): Promise<RegisteredSkill[]> {
+  return (await readStore()).skills ?? [];
+}
+
+export async function upsertSkill(skill: RegisteredSkill): Promise<void> {
+  return withLock(async () => {
+    const store = await readStore();
+    store.skills = store.skills ?? [];
+    const idx = store.skills.findIndex((s) => s.id === skill.id);
+    if (idx >= 0) store.skills[idx] = skill;
+    else store.skills.push(skill);
+    await writeStore(store);
+  });
 }

@@ -173,3 +173,20 @@ export interface RegisteredSystem {
   installedAt: string;
   sourceType: 'folder' | 'config' | 'auto-detected';
 }
+
+/** A reusable skill pack (SKILL.md / Claude Code / OpenClaw format). */
+export interface RegisteredSkill {
+  id: string;
+  name: string;
+  slug: string;
+  category: string;
+  description: string;
+  version?: string;
+  /** Path to the pack inside agents/skills */
+  path: string;
+  /** Skill authors / source */
+  author?: string;
+  /** Whether this skill comes from a curated collection */
+  curated?: boolean;
+  installedAt: string;
+}
