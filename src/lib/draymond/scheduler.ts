@@ -481,8 +481,8 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
 
       if (handler === 'fleet_duty_sync') {
         // Compute + log the on-duty roster (always-on / shift / on-call).
-        const { computeFleetDuty } = await import('../fleet-duty');
-        const roster = computeFleetDuty();
+        const { computeFleetDuty } = await import('./fleet-duty');
+        const roster: import('./fleet-duty').DutyStatus[] = computeFleetDuty();
         return {
           handler,
           checkedAt: new Date().toISOString(),
