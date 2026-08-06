@@ -60,30 +60,33 @@ const nextConfig: NextConfig = {
   },
 
   async headers() {
-    // CORS for API consumers (Open-Chat web, Aetherdesk, local dev). Deny by
-    // default: when CORS_ORIGIN is unset, no CORS headers are emitted so
-    // cross-origin browsers can't read API responses. Server-side clients
-    // (Node fetch / curl) are unaffected.
-    const corsHeaders: { key: string; value: string }[] = [];
-    if (process.env.CORS_ORIGIN) {
-      corsHeaders.push(
-        { key: "Access-Control-Allow-Origin", value: process.env.CORS_ORIGIN },
-        { key: "Access-Control-Allow-Methods", value: "GET, POST, PATCH, DELETE, OPTIONS" },
-        { key: "Access-Control-Allow-Headers", value: "Authorization, Content-Type, X-Review-Token, X-Api-Key" },
-        { key: "Access-Control-Max-Age", value: "86400" },
-      );
-    }
-
-    return [
+    const result: {
+      source: string;
+      headers: { key: string; value: string }[];
+    }[] = [
       {
         source: "/(.*)",
         headers: securityHeaders,
       },
-      {
-        source: "/api/:path*",
-        headers: corsHeaders,
-      },
     ];
+
+    // CORS for API consumers (Open-Chat web, Aetherdesk, local dev). Deny by
+    // default: when CORS_ORIGIN is unset, no CORS header rule is emitted so
+    // cross-origin browsers can't read API responses. Server-side clients
+    // (Node fetch / curl) are unaffected.
+    if (process.env.CORS_ORIGIN) {
+      result.push({
+        source: "/api/:path*",
+        headers: [
+          { key: "Access-Control-Allow-Origin", value: process.env.CORS_ORIGIN },
+          { key: "Access-Control-Allow-Methods", value: "GET, POST, PATCH, DELETE, OPTIONS" },
+          { key: "Access-Control-Allow-Headers", value: "Authorization, Content-Type, X-Review-Token, X-Api-Key" },
+          { key: "Access-Control-Max-Age", value: "86400" },
+        ],
+      });
+    }
+
+    return result;
   },
 
   async redirects() {
