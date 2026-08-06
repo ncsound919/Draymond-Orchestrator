@@ -79,6 +79,7 @@ function agent(def) {
     workflows: def.workflows || [],
     team: def.team || [],
     skills: def.skills || [],
+    missionRole: def.missionRole || undefined,
     memoryEnabled: true,
     persistentMemory: true,
     status: 'unknown',
@@ -617,6 +618,7 @@ const AGENTS = [
     command: 'npx',
     args: ['tsx', '../overlay365/agent-team/agents/strategist/index.ts'],
     tags: ['overlay365', 'product', 'roadmap', 'feedback'],
+    missionRole: 'E1 roadmap � prioritize tier features from feedback',
   }),
   agent({
     slug: 'overlay-treasurer',
@@ -647,6 +649,7 @@ const AGENTS = [
     command: 'npx',
     args: ['tsx', '../overlay365/agent-team/agents/treasurer/index.ts'],
     tags: ['overlay365', 'finance', 'cash', 'revenue'],
+    missionRole: 'Revenue pulse - cash sync vs the 33k/mo mission target',
   }),
   agent({
     slug: 'overlay-guardian',
@@ -677,6 +680,7 @@ const AGENTS = [
     command: 'npx',
     args: ['tsx', '../overlay365/agent-team/agents/guardian/index.ts'],
     tags: ['overlay365', 'compliance', 'legal', 'health'],
+    missionRole: 'Compliance gate � Aetherdesk consent + Justice/Health claims',
   }),
   agent({
     slug: 'overlay-auditor',
@@ -707,6 +711,7 @@ const AGENTS = [
     command: 'npx',
     args: ['tsx', '../overlay365/agent-team/agents/auditor/index.ts'],
     tags: ['overlay365', 'monitoring', 'uptime', 'audit'],
+    missionRole: 'Delivery QA � all shipped Overlay sites pass weekly',
   }),
   // ── Overlay365 deterministic marketing team (led by The Observer) ───────────
   agent({
@@ -1295,6 +1300,31 @@ const AGENTS = [
     tags: ['pdf', 'documents', 'infra'],
     team: [],
   }),
+  // ── Mission Control: Aetherdesk (E2 B2B engine, being finalized) ────────────
+  agent({
+    slug: 'aetherdesk',
+    name: 'Aetherdesk Call Center',
+    codename: 'The Receptionist',
+    role: 'AI Call Center / Virtual Receptionist (B2B SaaS)',
+    tagline: 'Mission engine E2 — the flagship B2B product',
+    personality: 'empathetic',
+    voice: 'professional, courteous, resolution-first',
+    backstory:
+      'The flagship B2B offering. An agent-based call center that answers, triages, and resolves customer calls for small businesses. Finalizing now; this is the wedge product for the 90-day mission.',
+    bio: 'AI call center delivering phone support for SMB clients. Sells at $100–300/site/mo. Every call is recorded, transcribed, and QA-gated by the Guardian for consent compliance.',
+    specialties: ['Call Handling', 'Triage', 'SMB Support', 'Consent Compliance'],
+    skills: ['aetherdesk', 'coding-agent', 'fullstack-dev'],
+    capabilities: [
+      { id: 'calls', label: 'Call Center', description: 'Answer + triage + resolve inbound calls' },
+      { id: 'consent', label: 'Consent-Gated', description: 'Recording/consent compliance via Guardian' },
+    ],
+    stats: [{ label: 'Reliability', value: 93 }, { label: 'CX', value: 90 }],
+    runtimeType: 'http',
+    endpoint: process.env.AETHERDESK_BASE_URL?.replace('/api/v1', '') || 'http://127.0.0.1:8000',
+    tags: ['b2b', 'calls', 'mission-e2'],
+    missionRole: 'E2 revenue — AI call center delivery ($100–300/site/mo)',
+    team: [],
+  }),
 ];
 
 const WORKFLOWS = [
@@ -1397,6 +1427,32 @@ const WORKFLOWS = [
     trigger: 'schedule',
     schedule: '0 10 * * 1',
     tags: ['marketing', 'pulse', 'reporting'],
+    installedAt: now,
+    sourceType: 'builtin',
+  },
+  {
+    id: 'wf-mission-sync',
+    name: 'Mission Control — Weekly Pipeline Sync',
+    description:
+      'Unifies the fleet toward the 90-day six-figure target: revenue pulse, delivery QA, feedback, and pipeline review each week.',
+    version: '1.0.0',
+    steps: [
+      { id: 's1', type: 'task', label: 'Revenue pulse vs target', agent: 'overlay-treasurer' },
+      { id: 's2', type: 'task', label: 'Delivery QA on all sites', agent: 'overlay-auditor' },
+      { id: 's3', type: 'task', label: 'Feedback → roadmap', agent: 'overlay-strategist' },
+      { id: 's4', type: 'task', label: 'Marketing pipeline top-of-funnel', agent: 'social-media-dashboard' },
+      { id: 's5', type: 'decision', label: 'Consolidate pipeline + mission KPIs' },
+    ],
+    assignedAgents: [
+      'overlay-treasurer',
+      'overlay-auditor',
+      'overlay-strategist',
+      'social-media-dashboard',
+      'aetherdesk',
+    ],
+    trigger: 'schedule',
+    schedule: '30 9 * * 1',
+    tags: ['mission', 'pipeline', 'revenue'],
     installedAt: now,
     sourceType: 'builtin',
   },
