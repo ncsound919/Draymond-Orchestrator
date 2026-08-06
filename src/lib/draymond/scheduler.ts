@@ -539,6 +539,14 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         return { handler, output: (out.stdout || '').trim().slice(0, 1500) };
       }
 
+      if (handler === 'fetch_market_data') {
+        // Daily snapshot of free market/research sources for the fleet.
+        const { cryptoPrices, openAlexWorks } = await import('./data-apis');
+        const crypto = await cryptoPrices();
+        const papers = await openAlexWorks('artificial intelligence business', 3);
+        return { handler, crypto, topPapers: papers.map((p) => p.title) };
+      }
+
       console.log(
         `[Draymond Scheduler] Custom job "${job.name}" triggered (handler: ${handler ?? 'none'}). ` +
         `No built-in handler registered — skipping execution.`
@@ -818,6 +826,14 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     cron_expression: '0 4 * * 0',
     job_type: 'custom',
     job_config: { handler: 'generate_agent_avatars' },
+    is_enabled: true,
+  },
+  {
+    name: 'Market Data Snapshot',
+    description: 'Daily free-API market/research snapshot (crypto, papers) for the fleet.',
+    cron_expression: '0 7 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'fetch_market_data' },
     is_enabled: true,
   },
 ];
