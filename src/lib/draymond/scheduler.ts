@@ -454,6 +454,13 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         };
       }
 
+      if (handler === 'scan_book_library') {
+        // Trigger a BookBridge library scan (auto-ingest new books).
+        const { scanBookLibrary } = await import('../bookbridge');
+        const result = await scanBookLibrary();
+        return { handler, ...result };
+      }
+
       console.log(
         `[Draymond Scheduler] Custom job "${job.name}" triggered (handler: ${handler ?? 'none'}). ` +
         `No built-in handler registered — skipping execution.`
@@ -661,6 +668,14 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     cron_expression: '0 9 * * 1',
     job_type: 'chain',
     job_config: { chain: 'weekly-operations-review' },
+    is_enabled: true,
+  },
+  {
+    name: 'Daily Book Library Scan',
+    description: 'Daily 3am scan of the book library folders to auto-ingest new books.',
+    cron_expression: '0 3 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'scan_book_library' },
     is_enabled: true,
   },
 ];

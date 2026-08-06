@@ -157,6 +157,26 @@ async function generateBlueprint(
     userMessage += `\n<context>${JSON.stringify(request.context)}</context>`;
   }
 
+  // Ground the chain-builder with the book library when enabled
+  // (DRAYMOND_BOOK_GROUNDING=true and BookBridge reachable). Failures are
+  // non-fatal — the chain still builds on the prompt alone.
+  if (process.env.DRAYMOND_BOOK_GROUNDING === 'true') {
+    try {
+      const { groundWithBooks } = await import('../bookbridge');
+      const grounding = await groundWithBooks(request.description, 3, 0.2);
+      if (grounding.grounded && grounding.passages.length) {
+        userMessage +=
+          `\n<library_grounding>Relevant passages from the knowledge library (verify claims against these):\n` +
+          grounding.passages
+            .map((p) => `- [${p.book}] ${p.passage}`)
+            .join('\n') +
+          `\n</library_grounding>`;
+      }
+    } catch {
+      // bookbridge offline — proceed ungrounded
+    }
+  }
+
   const content = await callLLM({
     provider: 'opencode-free',
     model: BUILDER_MODEL,

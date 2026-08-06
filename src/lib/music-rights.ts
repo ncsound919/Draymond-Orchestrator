@@ -157,3 +157,57 @@ export async function listRegistrations(limit = 50): Promise<RegistrationRecord[
   const records = await readRecords();
   return records.slice(0, limit);
 }
+
+const OTHER_ORGS: Record<MusicOrg, MusicOrg[]> = {
+  ascap: ["hfa", "mlc"],
+  hfa: ["ascap", "mlc"],
+  mlc: ["ascap", "hfa"],
+};
+
+/**
+ * Cross-platform registration flow: after the user registers a song on ONE
+ * platform, they report it here and Draymond produces the registration payloads
+ * (the "files") for the remaining platforms so each can be submitted next.
+ */
+export async function generateCrossPlatformFiles(
+  completedOrg: MusicOrg,
+  songs: SongEntry[],
+): Promise<{
+  completed: MusicOrg;
+  songCount: number;
+  pending: {
+    org: MusicOrg;
+    script: string;
+    status: "ready_to_submit";
+    payload: Record<string, unknown>;
+  }[];
+}> {
+  const check = validateCatalog(songs);
+  if (!check.valid) throw new Error(check.error || "Invalid catalog");
+
+  const scriptDir = baseDir();
+  const pending = OTHER_ORGS[completedOrg].map((org) => ({
+    org,
+    script: path.join(scriptDir, SCRIPTS[org]),
+    status: "ready_to_submit" as const,
+    payload: {
+      org,
+      catalog: songs.map((s) => ({
+        title: s.title,
+        artist: s.artist,
+        album: s.album,
+        isrc: s.isrc,
+        iswc: s.iswc,
+        duration_seconds: s.duration_seconds,
+        writers: s.writers,
+        publisher: s.publisher,
+        publisher_ipi: s.publisher_ipi,
+        publisher_p_number: s.publisher_p_number,
+        split_pct: s.split_pct,
+        genre: s.genre,
+      })),
+    },
+  }));
+
+  return { completed: completedOrg, songCount: songs.length, pending };
+}
