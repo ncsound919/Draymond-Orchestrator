@@ -461,6 +461,24 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         return { handler, ...result };
       }
 
+      if (handler === 'run_overlay_qa') {
+        // Run the Overlay365 Playwright QA suite via AgentBrowser.
+        const { runSiteTests } = await import('../agentbrowser');
+        const report = await runSiteTests('all');
+        return {
+          handler,
+          overall: report.overall,
+          summary: report.summary,
+          sites: report.sites.map((s) => ({
+            site: s.siteLabel,
+            status: s.status,
+            loadMs: s.loadMs,
+            brokenLinks: s.brokenLinks?.length ?? 0,
+            consoleErrors: s.consoleErrors?.length ?? 0,
+          })),
+        };
+      }
+
       console.log(
         `[Draymond Scheduler] Custom job "${job.name}" triggered (handler: ${handler ?? 'none'}). ` +
         `No built-in handler registered — skipping execution.`
@@ -676,6 +694,14 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     cron_expression: '0 3 * * *',
     job_type: 'custom',
     job_config: { handler: 'scan_book_library' },
+    is_enabled: true,
+  },
+  {
+    name: 'Overlay365 QA',
+    description: 'Daily 7am Playwright QA pass across all Overlay365 sites (AgentBrowser).',
+    cron_expression: '0 7 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'run_overlay_qa' },
     is_enabled: true,
   },
 ];

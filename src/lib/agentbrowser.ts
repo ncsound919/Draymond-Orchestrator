@@ -59,6 +59,7 @@ export interface SiteTestReport {
     loadMs: number;
     consoleErrors: string[];
     failedRequests: string[];
+    brokenLinks: string[];
   }>;
   summary: { passed: number; failed: number; errored: number };
 }
