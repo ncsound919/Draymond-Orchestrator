@@ -15,7 +15,8 @@ export type LLMProvider =
   | 'gemini'
   | 'openai'
   | 'anthropic'
-  | 'qwen';
+  | 'qwen'
+  | 'litellm';
 
 export interface LLMCallOptions {
   /** Preferred provider. Falls back through the chain when it fails. */
@@ -37,6 +38,7 @@ const PROVIDER_URLS: Record<LLMProvider, string> = {
   openai: 'https://api.openai.com/v1/chat/completions',
   anthropic: 'https://api.anthropic.com/v1/messages',
   qwen: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions',
+  litellm: 'http://localhost:4000/v1/chat/completions',
 };
 
 const PROVIDER_ENV: Record<LLMProvider, string> = {
@@ -47,6 +49,7 @@ const PROVIDER_ENV: Record<LLMProvider, string> = {
   openai: 'OPENAI_API_KEY',
   anthropic: 'ANTHROPIC_API_KEY',
   qwen: 'QWEN_API_KEY',
+  litellm: 'LITELLM_API_KEY',
 };
 
 const DEFAULT_MODELS: Record<LLMProvider, string> = {
@@ -57,10 +60,12 @@ const DEFAULT_MODELS: Record<LLMProvider, string> = {
   openai: 'gpt-4o-mini',
   anthropic: 'claude-sonnet-4-5',
   qwen: 'qwen-plus',
+  litellm: 'gpt-4o-mini',
 };
 
 /** Resolution order when no explicit provider is requested. */
 const FALLBACK_ORDER: LLMProvider[] = [
+  'litellm',
   'opencode-free',
   'opencode',
   'deepseek',

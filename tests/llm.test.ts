@@ -9,6 +9,7 @@ describe('shared llm helper', () => {
     delete process.env.DEEPSEEK_API_KEY;
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.OPENAI_API_KEY;
+    delete process.env.LITELLM_API_KEY;
     fetchMock.mockReset();
   });
 
@@ -91,5 +92,37 @@ describe('shared llm helper', () => {
     await expect(
       callLLM({ provider: 'deepseek', system: 's', userMessage: 'u' }),
     ).rejects.toThrow(/402/);
+  });
+
+  it('prefers litellm when its key is set (first in fallback order)', () => {
+    process.env.LITELLM_API_KEY = 'lk';
+    expect(resolveLLMProvider()).toBe('litellm');
+    delete process.env.LITELLM_API_KEY;
+  });
+
+  it('routes litellm to the OpenAI-compatible gateway endpoint', async () => {
+    process.env.LITELLM_API_KEY = 'lk';
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({ choices: [{ message: { content: 'via litellm' } }] }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const text = await callLLM({
+      provider: 'litellm',
+      system: 'sys',
+      userMessage: 'hi',
+      maxTokens: 64,
+    });
+
+    expect(text).toBe('via litellm');
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toBe('http://localhost:4000/v1/chat/completions');
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer lk');
+    const body = JSON.parse(init.body as string);
+    expect(body.messages[0]).toMatchObject({ role: 'system', content: 'sys' });
+    delete process.env.LITELLM_API_KEY;
   });
 });
