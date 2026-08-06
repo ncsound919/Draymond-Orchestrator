@@ -9,7 +9,7 @@
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { runDueJobs } from '@/lib/draymond/scheduler';
+import { runDueJobs, seedBasicJobs } from '@/lib/draymond/scheduler';
 import { checkAllAgentHealth } from '@/lib/draymond/index';
 import { authorizeRequest } from '@/lib/draymond/api-auth';
 
@@ -21,6 +21,15 @@ export async function GET(request: NextRequest) {
   if (authError) return authError;
 
   const startTime = Date.now();
+
+  // ── Ensure the scheduled job set exists (idempotent) ──────────────────
+  let seededJobs = 0;
+  try {
+    seededJobs = await seedBasicJobs();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[Cron] seedBasicJobs failed:', message);
+  }
 
   // ── Execute due jobs ────────────────────────────────────────────────
   const errors: string[] = [];
@@ -53,6 +62,7 @@ export async function GET(request: NextRequest) {
     ok: errors.length === 0,
     timestamp: new Date().toISOString(),
     duration_ms: durationMs,
+    seeded_jobs: seededJobs,
     jobs: {
       total: jobResults.length,
       succeeded,

@@ -33,7 +33,7 @@ const REPAIR_MAP: Record<string, RepairAction> = {
     name: "restart:service", service: "unknown", command: [], safe: false, // escalated — no blind restart
   },
   "qa:fail": {
-    name: "reindex:qa", service: "agent-browser", command: ["npx", "tsx", "scripts/run-site-tests.ts", "all"], safe: true,
+    name: "reindex:qa", service: "agent-browser", command: ["npx", "tsx", "agents/AgentBrowser-main/scripts/run-site-tests.ts", "all"], safe: true,
   },
   "job:error": {
     name: "retry:job", service: "draymond-scheduler", command: [], safe: true,
