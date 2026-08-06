@@ -622,11 +622,19 @@ function makePlaceholderPng(slug, name, color) {
 }
 
 fs.mkdirSync(avatarsDir, { recursive: true });
+let created = 0;
+let kept = 0;
 for (const a of AGENTS) {
   const file = path.join(avatarsDir, `${a.slug}.png`);
+  if (fs.existsSync(file)) {
+    kept += 1; // preserve uploaded photos — never overwrite a real avatar
+    continue;
+  }
   fs.writeFileSync(file, makePlaceholderPng(a.slug, a.name, accent(a.slug)));
+  created += 1;
   console.log(`Avatar -> public/avatars/${a.slug}.png`);
 }
+console.log(`Avatars: ${created} generated, ${kept} kept (uploaded photos preserved).`);
 
 console.log('Seed complete.');
 
