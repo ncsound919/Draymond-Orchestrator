@@ -63,6 +63,13 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
+  // Local development: bypass the session + purchase gate so the dashboard is
+  // reachable at http://localhost:* without a Supabase login. The gate is
+  // enforced for production builds (next start / electron).
+  if (process.env.NODE_ENV === 'development') {
+    return response;
+  }
+
   // Marketing site URL for redirects
   const MARKETING_SITE_URL = 'https://overlay365.com';
 
