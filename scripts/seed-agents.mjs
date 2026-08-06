@@ -319,7 +319,7 @@ const AGENTS = [
       { label: 'Hardening', value: 94 },
       { label: 'Ops', value: 88 },
     ],
-    endpoint: 'http://localhost:3110',
+    endpoint: 'http://localhost:3333',
   }),
   agent({
     slug: 'mutly',
@@ -345,7 +345,7 @@ const AGENTS = [
       { label: 'Tests', value: 88 },
       { label: 'Integration', value: 90 },
     ],
-    endpoint: 'http://localhost:3121',
+    endpoint: 'http://localhost:4000',
   }),
   agent({
     slug: 'grader',
@@ -371,7 +371,7 @@ const AGENTS = [
       { label: 'Coverage', value: 91 },
       { label: 'Speed', value: 82 },
     ],
-    endpoint: 'http://localhost:3130',
+    endpoint: 'http://localhost:3000',
   }),
   agent({
     slug: 'reporank',
@@ -397,7 +397,7 @@ const AGENTS = [
       { label: 'Coverage', value: 89 },
       { label: 'Scale', value: 91 },
     ],
-    endpoint: 'http://localhost:3140',
+    endpoint: 'http://localhost:3001',
   }),
   agent({
     slug: 'youtube-shorts',
@@ -425,7 +425,7 @@ const AGENTS = [
     endpoint: undefined,
     runtimeType: 'subprocess',
     command: 'python',
-    args: ['agents/AI-Youtube-Shorts-Generator-main/Edit.py'],
+    args: ['agents/AI-Youtube-Shorts-Generator-main/main.py'],
   }),
   agent({
     slug: 'everything-claude-code',
@@ -637,4 +637,5 @@ for (const a of AGENTS) {
 console.log(`Avatars: ${created} generated, ${kept} kept (uploaded photos preserved).`);
 
 console.log('Seed complete.');
+
 
