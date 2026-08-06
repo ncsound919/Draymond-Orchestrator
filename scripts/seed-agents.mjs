@@ -102,7 +102,7 @@ const AGENTS = [
       'Uplift Agent began as a Hermes fork built to be the workhorse of the fleet — the one that actually ships code, runs tools, and learns from every task it touches.',
     bio: 'A strategic, autonomous coding agent that improves with every session. Expert in tool orchestration and multi-platform messaging, it pairs deep technical capability with a calm, direct operating style — the reliable backbone of the Uplift fleet.',
     specialties: ['TypeScript', 'Python', 'Tool Orchestration', 'Multi-platform Gateway'],
-    skills: ["coding-agent","fullstack-dev","writing-plans","ui-ux-pro-max","web-search"],
+    skills: ["coding-agent","fullstack-dev","writing-plans","ui-ux-pro-max","web-search","sp-tdd","sp-debugging","sp-brainstorming","sp-git-worktrees","sp-writing-skills"],
     capabilities: [
       { id: 'codegen', label: 'Code Generation', description: 'Writes and refactors production code across languages' },
       { id: 'tool-use', label: 'Tool Orchestration', description: '52 tools across file, web, terminal, and code' },
@@ -182,7 +182,7 @@ const AGENTS = [
       'Megacode refuses to be locked to one model. It was forged as a provider-agnostic coding assistant that treats every LLM as a swappable tool in the same workbench.',
     bio: 'An assertive, provider-agnostic coding assistant that gets to the point. It bridges JetBrains, cycles LLM providers, and applies 900+ commands — built for engineers who want speed and zero vendor lock-in.',
     specialties: ['Multi-LLM', 'JetBrains Bridge', 'Refactoring', 'CLI Power Tools'],
-    skills: ["coding-agent","fullstack-dev","skill-creator","skill-vetter"],
+    skills: ["coding-agent","fullstack-dev","skill-creator","skill-vetter","sp-tdd","sp-debugging","sp-verification","sp-code-review","sp-writing-skills"],
     capabilities: [
       { id: 'multi-llm', label: 'Multi-LLM', description: 'Swap providers per task (OpenAI/Anthropic/local)' },
       { id: 'ide', label: 'JetBrains Bridge', description: 'Deep IDE integration via HTTP bridge' },
@@ -515,7 +515,7 @@ const AGENTS = [
       'Agent Browser is the control room for the whole empire. It was built to register music with the performance rights organizations, keep every service in the fleet humming, and open the library when an agent needs to learn something new.',
     bio: 'A strategic conductor that turns your music catalog into registered, monetized rights across ASCAP, HFA, and MLC. It also orchestrates the Agent Browser platform (Big Homie, Claw Protect, Mutly, VibeServe, RepoRank) and gives every agent access to a 133-book knowledge library.',
     specialties: ['Music Registration', 'ASCAP / HFA / MLC', 'Fleet Orchestration', 'Book Library Access'],
-    skills: ["music-rights","bookbridge","book-synthesis","overlay365-qa","business-development","fastmcp","blackbox"],
+    skills: ["music-rights","bookbridge","book-synthesis","overlay365-qa","business-development","fastmcp","blackbox","ecc-e2e-testing"],
     missionRole: 'E4 - music rights registration + fleet QA + orchestration',
     capabilities: [
       { id: 'ascap', label: 'ASCAP Registration', description: 'Extract + register compositions with ASCAP' },
@@ -604,7 +604,7 @@ const AGENTS = [
       'Assembled from kodus-ai\u2019s clustering engine and OmniResearch\u2019s research discipline, The Strategist reads every support email, issue, and reply as one voice in a conversation — and only makes claims it can trace to a raw record.',
     bio: 'Bi-weekly feedback clustering agent for the Overlay365 platforms (Health/Wealth/Justice). Clusters feedback by similarity, scores clusters on frequency/severity/brand alignment, and keeps every claim tied to evidence itemIds. Built to reject invented trends — thin data is reported as thin.',
     specialties: ['Feedback Clustering', 'Roadmap Prioritization', 'Brand Alignment', 'Evidence Auditing'],
-    skills: ['overlay-strategist', 'market-research', 'contentanalysis', 'web-search', 'writing-plans', 'bookbridge', 'domain-intel', 'canvas', 'siyuan'],
+    skills: ['overlay-strategist', 'market-research', 'contentanalysis', 'web-search', 'writing-plans', 'bookbridge', 'domain-intel', 'canvas', 'siyuan', 'ecc-api-design'],
     capabilities: [
       { id: 'cluster', label: 'Evidence Clustering', description: 'Deterministic dedup + similarity clustering with full id trails' },
       { id: 'score', label: 'Prioritization Scoring', description: 'Frequency/severity/brand-alignment weighted 0-100 scores' },
@@ -666,7 +666,7 @@ const AGENTS = [
       'Modeled on claw-protect\u2019s fail-closed discipline: when the rule corpus is absent, The Guardian is inert-but-functional and says so. It will not guess a law, a statute, or a medical guideline from memory.',
     bio: 'Compliance guard for Justice (legal-adjacent) and Health (medical-adjacent) content. Evaluates content diffs and complaints against an uploaded ToS/Privacy/guideline corpus. Without that corpus it emits a single explicit flag and nothing else.',
     specialties: ['Content Compliance', 'Rule Corpus Matching', 'Legal/Health Boundaries', 'Fail-Closed Auditing'],
-    skills: ['overlay-guardian', 'skill-vetter', 'book-synthesis', 'qingyan-research'],
+    skills: ['overlay-guardian', 'skill-vetter', 'book-synthesis', 'qingyan-research', 'ecc-security-review'],
     capabilities: [
       { id: 'corpus', label: 'Rule Corpus Matching', description: 'Trigger-pattern matching against uploaded reference docs only' },
       { id: 'diff', label: 'Content Diff Flagging', description: 'Flags changed Justice/Health content for human review' },
@@ -840,7 +840,7 @@ const AGENTS = [
       'The central intelligence of the DCA swarm. Replaces every LLM call with skill files, a deterministic MoE router, and a Monte Carlo planner — 100% reproducible when LLM-free, with optional LLM routing for complex planning.',
     bio: 'Control brain for the fleet. Runs deterministic decision trees, skill-file actions, and config-space planning. Pairs with the Draymond orchestrator for reproducible agent control.',
     specialties: ['Deterministic Control', 'MoE Routing', 'Monte Carlo Planning', 'Skill Files'],
-    skills: ['deterministic-brain', 'coding-agent', 'fullstack-dev', 'writing-plans', 'business-development', 'client-delivery', 'blackbox', 'inference-sh-cli'],
+    skills: ['deterministic-brain', 'coding-agent', 'fullstack-dev', 'writing-plans', 'business-development', 'client-delivery', 'blackbox', 'inference-sh-cli', 'sp-tdd', 'sp-debugging', 'sp-verification', 'sp-code-review', 'sp-subagent-dev', 'sp-parallel-agents', 'sp-executing-plans'],
     capabilities: [
       { id: 'moe', label: 'MoE Router', description: 'Config-driven deterministic decision tree' },
       { id: 'planner', label: 'Monte Carlo Planner', description: 'Exhaustive config-space search with deterministic scoring' },
@@ -1573,6 +1573,21 @@ const SKILLS = [
   { id: 'skill-memento-flashcards', name: 'Memento Flashcards', slug: 'memento-flashcards', category: 'productivity', author: 'optional', version: '1.0', path: 'agents/optional-skills/productivity/memento-flashcards', description: 'Spaced-repetition flashcards.' },
   { id: 'skill-blackbox', name: 'Blackbox', slug: 'blackbox', category: 'autonomous', author: 'optional', version: '1.0', path: 'agents/optional-skills/autonomous-ai-agents/blackbox', description: 'External agent CLI integration (Codex/OpenCode).' },
   { id: 'skill-openclaw-migration', name: 'OpenClaw Migration', slug: 'openclaw-migration', category: 'migration', author: 'optional', version: '1.0', path: 'agents/optional-skills/migration/openclaw-migration', description: 'Migrate user state/customizations.' },
+  // Round 3 — everything-claude-code (ECC) + superpowers workflow skills
+  { id: 'skill-ecc', name: 'Everything Claude Code (ECC)', slug: 'ecc', category: 'collection', author: 'everything-claude-code', curated: true, version: '1.0', path: 'agents/everything-claude-code-main', description: '116-skill ECC library — dev, business, AI/agents. Wire individual skills as needed.' },
+  { id: 'skill-ecc-api-design', name: 'API Design', slug: 'ecc-api-design', category: 'dev', author: 'ecc', version: '1.0', path: 'agents/everything-claude-code-main/skills/api-design', description: 'REST API design patterns (resources, status, pagination, versioning).' },
+  { id: 'skill-ecc-security-review', name: 'Security Review', slug: 'ecc-security-review', category: 'security', author: 'ecc', version: '1.0', path: 'agents/everything-claude-code-main/skills/security-review', description: 'Security checklist + patterns for auth, input, secrets, payments.' },
+  { id: 'skill-ecc-e2e-testing', name: 'E2E Testing', slug: 'ecc-e2e-testing', category: 'qa', author: 'ecc', version: '1.0', path: 'agents/everything-claude-code-main/skills/e2e-testing', description: 'Playwright E2E patterns, POM, CI, flaky-test strategies.' },
+  { id: 'skill-sp-tdd', name: 'Superpowers TDD', slug: 'sp-tdd', category: 'workflow', author: 'superpowers', version: '1.0', path: 'agents/skills/superpowers-main/skills/test-driven-development', description: 'Red-green-refactor test-driven development.' },
+  { id: 'skill-sp-debugging', name: 'Systematic Debugging', slug: 'sp-debugging', category: 'workflow', author: 'superpowers', version: '1.0', path: 'agents/skills/superpowers-main/skills/systematic-debugging', description: 'Root-cause debugging before proposing fixes.' },
+  { id: 'skill-sp-verification', name: 'Verification Before Completion', slug: 'sp-verification', category: 'workflow', author: 'superpowers', version: '1.0', path: 'agents/skills/superpowers-main/skills/verification-before-completion', description: 'Evidence-before-assertions verification.' },
+  { id: 'skill-sp-code-review', name: 'Code Review', slug: 'sp-code-review', category: 'workflow', author: 'superpowers', version: '1.0', path: 'agents/skills/superpowers-main/skills/requesting-code-review', description: 'Request + receive structured code review.' },
+  { id: 'skill-sp-subagent-dev', name: 'Subagent-Driven Development', slug: 'sp-subagent-dev', category: 'workflow', author: 'superpowers', version: '1.0', path: 'agents/skills/superpowers-main/skills/subagent-driven-development', description: 'Execute plans via independent subagents.' },
+  { id: 'skill-sp-brainstorming', name: 'Brainstorming', slug: 'sp-brainstorming', category: 'workflow', author: 'superpowers', version: '1.0', path: 'agents/skills/superpowers-main/skills/brainstorming', description: 'Explore intent before implementation.' },
+  { id: 'skill-sp-writing-skills', name: 'Writing Skills', slug: 'sp-writing-skills', category: 'workflow', author: 'superpowers', version: '1.0', path: 'agents/skills/superpowers-main/skills/writing-skills', description: 'Create + verify reusable skills.' },
+  { id: 'skill-sp-git-worktrees', name: 'Git Worktrees', slug: 'sp-git-worktrees', category: 'workflow', author: 'superpowers', version: '1.0', path: 'agents/skills/superpowers-main/skills/using-git-worktrees', description: 'Isolate feature work in worktrees.' },
+  { id: 'skill-sp-parallel-agents', name: 'Parallel Agents', slug: 'sp-parallel-agents', category: 'workflow', author: 'superpowers', version: '1.0', path: 'agents/skills/superpowers-main/skills/dispatching-parallel-agents', description: 'Dispatch independent parallel agents.' },
+  { id: 'skill-sp-executing-plans', name: 'Executing Plans', slug: 'sp-executing-plans', category: 'workflow', author: 'superpowers', version: '1.0', path: 'agents/skills/superpowers-main/skills/executing-plans', description: 'Execute written plans with review checkpoints.' },
 ].map((s) => ({ ...s, installedAt: now }));
 
 // ---------------------------------------------------------------------------
