@@ -9,6 +9,8 @@
 // ============================================================================
 
 import { randomBytes } from 'crypto';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { createDraymondAdminClient } from './client';
 import { getEntity } from './registry';
 import { createChain, addSteps, instantiateChain, executeChain } from './chains';
@@ -30,7 +32,6 @@ export interface VentureSubmitInput {
   revenue_lane: 'service' | 'subscription' | 'checkout' | 'tooling';
   revenue_note?: string;
   steps: VentureStepInput[];
-  risk_level?: ActionRiskLevel;
   agent_id?: string;
 }
 
@@ -45,6 +46,10 @@ export interface VentureRecord {
 }
 
 // Keywords that escalate a step's risk. Payments are always critical.
+// Substring matching is intentionally permissive and can false-positive on
+// unrelated actions (e.g. "post" matches postgres_query, "pay" matches payroll,
+// "share" matches shared_memory, "deploy" matches deploy_preview) — that is
+// acceptable: a false high/critical only routes to review, never auto-runs.
 const PAYMENT_HINTS = ['billing', 'checkout', 'purchase', 'pay', 'stripe', 'gumroad', 'charge'];
 const EXTERNAL_HINTS = ['schedule_posts', 'publish', 'social', 'post', 'send_email', 'share', 'notify'];
 const IRREVERSIBLE_HINTS = ['mint', 'transfer', 'deploy', 'delete', 'withdraw', 'execute_trade'];
@@ -59,13 +64,12 @@ export function classifyVentureRisk(steps: VentureStepInput[]): ActionRiskLevel 
   return 'low';
 }
 
-const DIR = process.env.DRAYMOND_REGISTRY_DIR ?? process.cwd();
-const RECORDS_FILE = `${DIR}/.draymond/ventures.json`;
+const DIR = process.env.DRAYMOND_REGISTRY_DIR ?? path.join(process.cwd(), '.draymond');
+const RECORDS_FILE = path.join(DIR, 'ventures.json');
 
 async function readRecords(): Promise<VentureRecord[]> {
   try {
-    const { readFile } = await import('node:fs/promises');
-    const raw = await readFile(RECORDS_FILE, 'utf-8');
+    const raw = await fs.readFile(RECORDS_FILE, 'utf-8');
     const parsed = JSON.parse(raw) as { records?: VentureRecord[] };
     return Array.isArray(parsed.records) ? parsed.records : [];
   } catch {
@@ -74,9 +78,8 @@ async function readRecords(): Promise<VentureRecord[]> {
 }
 
 async function writeRecords(records: VentureRecord[]): Promise<void> {
-  const { mkdir, writeFile } = await import('node:fs/promises');
-  await mkdir(`${DIR}/.draymond`, { recursive: true });
-  await writeFile(RECORDS_FILE, JSON.stringify({ records: records.slice(-200), updatedAt: new Date().toISOString() }, null, 2), 'utf-8');
+  await fs.mkdir(DIR, { recursive: true });
+  await fs.writeFile(RECORDS_FILE, JSON.stringify({ records: records.slice(-200), updatedAt: new Date().toISOString() }, null, 2), 'utf-8');
 }
 
 export async function listVentures(): Promise<VentureRecord[]> {
@@ -89,6 +92,7 @@ export async function validateVentureRefs(steps: VentureStepInput[]): Promise<Ma
   for (const s of steps) {
     const entity = await getEntity(s.entity_slug);
     if (!entity) throw new Error(`Venture references unknown entity "${s.entity_slug}"`);
+    if (!entity.is_active) throw new Error(`Venture references inactive entity "${s.entity_slug}"`);
     slugs.set(s.entity_slug, entity.id);
   }
   return slugs;
@@ -104,7 +108,7 @@ export async function createVentureChain(input: VentureSubmitInput): Promise<Dra
     name: input.name,
     slug,
     description: input.description ?? input.revenue_note ?? '',
-    is_template: false,
+    is_template: true,
     created_by: 'overlay-strategist',
     agent_id: input.agent_id,
     status: 'draft',
@@ -146,6 +150,8 @@ export async function executeVentureChain(chain: DraymondChain): Promise<{ ok: b
  * return status 'pending_review'.
  */
 export async function submitVenture(input: VentureSubmitInput): Promise<VentureRecord & { action_id?: string }> {
+  if (input.steps.length === 0) throw new Error('Venture requires at least one step');
+
   const risk = classifyVentureRisk(input.steps);
   const chain = await createVentureChain(input);
 
@@ -186,7 +192,7 @@ export async function submitVenture(input: VentureSubmitInput): Promise<VentureR
     await writeRecords(await readRecords().then((r) => [...r, record]));
 
     const action = { ...(actionRecord as DraymondAction), review_token: reviewToken };
-    publishApprovalNotification(action).catch(() => {});
+    publishApprovalNotification(action);
     return { ...record, action_id: actionRecord.id };
   }
 
