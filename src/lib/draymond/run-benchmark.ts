@@ -10,11 +10,15 @@ import { deepScore } from './deep-scorers';
 import { buildWeaknessScores } from './weakness-scoring';
 import { queueWeakest } from './upgrade-queue';
 import { createDraymondAdminClient } from './client';
-import type { ComponentClass } from './types';
+import type { ComponentClass, DeepScoreResult } from './types';
 
+// PostgREST caps a bare `select('*')` at 1000 rows (`db-max-rows`) and
+// silently truncates anything beyond it. Explicitly pin the limit to 1000 so
+// truncation is at least deterministic; pagination is a future enhancement.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function fetchRows(supabase: any, table: string): Promise<any[]> {
-  const { data, error } = await supabase.from(table).select('*');
+  // 1000-row PostgREST cap; pagination is a future enhancement (see above).
+  const { data, error } = await supabase.from(table).select('*').limit(1000);
   if (error) throw new Error(`Failed to fetch ${table}: ${error.message}`);
   return data ?? [];
 }
@@ -34,6 +38,9 @@ async function fetchEntityEventStats(
   entityRows: Array<Record<string, any>>
 ): Promise<Record<string, { errors: number; invocations: number; avg_latency_ms: number }>> {
   const slugByAgentId: Record<string, string> = {};
+  // Assumes one agent → one entity: if multiple entities share a
+  // `linked_agent_id`, the last row processed wins and events would be
+  // misattributed to that entity.
   for (const row of entityRows) {
     if (row.linked_agent_id != null) slugByAgentId[String(row.linked_agent_id)] = String(row.slug);
   }
@@ -45,6 +52,10 @@ async function fetchEntityEventStats(
     .gte('created_at', since);
   if (error) throw new Error(`Failed to fetch events: ${error.message}`);
   const out: Record<string, { errors: number; invocations: number; avg_latency_ms: number }> = {};
+  // `draymond_events` has no latency column (migration 004 lines 84-100 only
+  // carry metadata jsonb), so avg_latency_ms is always 0 here and the entity
+  // latency weight in weakness-scoring.ts (0.2) is currently inert. It becomes
+  // live once a real latency source exists.
   for (const e of (data ?? []) as Array<{ agent_id: string | null; severity: string }>) {
     if (e.agent_id == null) continue;
     const slug = slugByAgentId[e.agent_id];
@@ -71,6 +82,7 @@ export async function runBenchmarkCycle(
   queued: number;
   deepScored: number;
 }> {
+  const limit = Math.max(1, opts.queueLimit ?? 5);
   const supabase = createDraymondAdminClient();
   const tableFor: Record<ComponentClass, string> = {
     entity: 'draymond_entities',
@@ -88,34 +100,40 @@ export async function runBenchmarkCycle(
     metrics = collectMetrics(componentClass, rows, {});
   }
 
-  // Compute trends from existing history.
+  // Compute trends from existing history (one query per metric, in parallel).
   const trendHistory: Record<string, number[]> = {};
-  for (const m of metrics) {
-    trendHistory[m.component_slug] = await getTrend(componentClass, m.component_slug);
-  }
+  await Promise.all(
+    metrics.map(async (m) => {
+      trendHistory[m.component_slug] = await getTrend(componentClass, m.component_slug);
+    })
+  );
 
   const scored = buildWeaknessScores(componentClass, metrics, trendHistory);
-  const ranked = [...scored].sort((a, b) => b.score - a.score);
+  const ranked = [...scored].sort(
+    (a, b) => b.score - a.score || a.component_slug.localeCompare(b.component_slug)
+  );
   const scoresMap: Record<string, number> = {};
   for (const s of scored) scoresMap[s.component_slug] = s.score;
 
   const { recorded } = await recordRun(componentClass, metrics, scoresMap);
 
-  const weakest = ranked.slice(0, Math.max(1, opts.queueLimit ?? 5));
+  const weakest = ranked.slice(0, limit);
 
   // Deep-score only if requested (Thursday run passes deepScoreLimit > 0).
   let deepScored = 0;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let deep: Record<string, any> = {};
+  const deep: Record<string, Record<string, DeepScoreResult>> = {};
   if (opts.deepScoreLimit && opts.deepScoreLimit > 0) {
-    deep = {};
     for (const w of weakest.slice(0, opts.deepScoreLimit)) {
-      deep[w.component_slug] = await deepScore(componentClass, w.component_slug, w.component_name);
-      deepScored++;
+      const results = await deepScore(componentClass, w.component_slug, w.component_name);
+      deep[w.component_slug] = results;
+      // Count successes, not attempts: a component whose scorers all soft-fail
+      // (every score null) wasn't really deep-scored.
+      const scoredAny = Object.values(results).some((r) => r.score != null);
+      if (scoredAny) deepScored++;
     }
   }
 
-  const { queued } = await queueWeakest(weakest, Math.max(1, opts.queueLimit ?? 5), deep);
+  const { queued } = await queueWeakest(weakest, limit, deep);
 
   return {
     componentClass,
