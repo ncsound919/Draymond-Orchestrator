@@ -4,7 +4,7 @@
 
 create table if not exists public.draymond_benchmarks (
   id uuid primary key default gen_random_uuid(),
-  run_id uuid not null,
+  run_id text not null,
   component_class text not null
     check (component_class in ('entity','site','cron','chain')),
   component_slug text not null,

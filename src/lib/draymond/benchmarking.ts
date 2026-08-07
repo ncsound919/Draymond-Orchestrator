@@ -22,7 +22,10 @@ export function buildRunId(componentClass: ComponentClass, now = new Date()): st
 // ── Slug helpers (mirror the existing registry slug conventions) ───────────
 
 function toSlug(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  // Cap at 64 chars (component_slug is text but stays comfortably under
+  // typical URL/label limits) and fall back to 'unknown' for empty names.
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64);
+  return slug || 'unknown';
 }
 
 // ── Collection ──────────────────────────────────────────────────────────────
@@ -48,6 +51,8 @@ export function collectMetrics(
       return collectEntityMetrics(rows, extras);
     case 'chain':
       return collectChainMetrics(rows);
+    default:
+      throw new Error('Unknown component class: ' + componentClass);
   }
 }
 
@@ -65,6 +70,7 @@ function collectSiteMetrics(rows: Array<Record<string, any>>): BenchmarkMetric[]
         status,
         failures,
         latency_ms: latency,
+        // Treat anything other than 'up' as 0% uptime for the run snapshot.
         uptime_pct: status === 'up' ? 100 : 0,
         check_interval_seconds: Number(r.check_interval_seconds ?? 300),
       },
@@ -159,6 +165,7 @@ export async function recordRun(
   scores?: Record<string, number>,
   runId = buildRunId(componentClass)
 ): Promise<{ run_id: string; recorded: number }> {
+  if (metrics.length === 0) return { run_id: runId, recorded: 0 };
   const supabase = createDraymondAdminClient();
   const rows = metrics.map((m) => ({
     run_id: runId,
@@ -169,7 +176,6 @@ export async function recordRun(
     weakness_score: scores?.[m.component_slug] ?? 0,
     evidence: m.evidence,
   }));
-  if (rows.length === 0) return { run_id: runId, recorded: 0 };
   const { error } = await supabase.from('draymond_benchmarks').insert(rows).select();
   if (error) throw new Error(`Failed to record benchmarks: ${error.message}`);
   return { run_id: runId, recorded: rows.length };
@@ -183,6 +189,7 @@ export async function getTrend(
   componentSlug: string,
   limit = 10
 ): Promise<number[]> {
+  const safe = Math.min(Math.max(1, limit), 100);
   const supabase = createDraymondAdminClient();
   const { data, error } = await supabase
     .from('draymond_benchmarks')
@@ -190,7 +197,7 @@ export async function getTrend(
     .eq('component_class', componentClass)
     .eq('component_slug', componentSlug)
     .order('run_at', { ascending: false })
-    .limit(limit);
+    .limit(safe);
   if (error) throw new Error(`Failed to fetch trend: ${error.message}`);
   return (data ?? []).map((r: { weakness_score: number }) => Number(r.weakness_score)).reverse();
 }
