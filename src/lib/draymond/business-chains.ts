@@ -427,6 +427,121 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     tags: ['agentic', 'crewai', 'workforce', 'hardware', 'verilog', 'python', 'rtl', 'research', 'security'],
     category: 'engineering',
   },
+
+  // ── 11. Hemp-OS ─────────────────────────────────────────────────────
+  // Deterministic hemp/biomanufacturing simulation OS with autonomous
+  // intelligence cycles (insights → research tasks → public content)
+  {
+    name: 'Hemp-OS',
+    slug: 'hemp-os',
+    kind: 'agent',
+    description:
+      'Deterministic scientific operating system for hemp processing and biomanufacturing simulation. Runs autonomous intelligence cycles every 6h: cross-references datasets, stores insights, creates research tasks, and auto-produces public education content.',
+    invocation_method: 'http_api',
+    invocation_config: {
+      url: agentUrl('HEMP_OS_URL', 'http://localhost:3100'),
+      method: 'POST',
+      health_url: `${agentUrl('HEMP_OS_URL', 'http://localhost:3100')}/health`,
+      endpoints: {
+        kernel: '/api/kernel',
+        ai: '/api/ai',
+        ingest: '/api/ingest',
+        integration: '/api/integration',
+        ollama: '/api/ollama',
+      },
+    },
+    capabilities: [
+      'research',
+      'simulation',
+      'analysis',
+      'generation',
+      'automation',
+      'cross_referencing',
+      'content_generation',
+      'paper_generation',
+    ],
+    tags: ['hemp', 'research', 'simulation', 'kernel', 'autonomy'],
+    category: 'research',
+    health_endpoint: '/health',
+  },
+
+  // ── 12. HempForge ───────────────────────────────────────────────────
+  // Compliance + COA verification + literature intelligence for the hemp division
+  {
+    name: 'HempForge',
+    slug: 'hempforge',
+    kind: 'service',
+    description:
+      'Compliance, COA verification, and scientific literature intelligence platform. Literature ingest (PubMed/OpenAlex/Europe PMC), trend snapshots, autonomous research pipeline, ALCOA++ audit chain, and GxP workflows. Provenance-classified AI outputs.',
+    invocation_method: 'http_api',
+    invocation_config: {
+      url: agentUrl('HEMPFORGE_URL', 'http://localhost:3000'),
+      method: 'POST',
+      health_url: `${agentUrl('HEMPFORGE_URL', 'http://localhost:3000')}/api/health`,
+      endpoints: {
+        literature_search: '/api/literature/search',
+        literature_ingest_defaults: '/api/literature/ingest-defaults',
+        literature_trends: '/api/literature/trends-insights',
+        literature_trend_snapshot: '/api/literature/trend-snapshot',
+        literature_autonomous: '/api/literature/run-autonomous-pipeline',
+        literature_production: '/api/literature/production/run',
+        audit_verify_chain: '/api/audit/verify-chain',
+        reports_generate: '/api/reports/generate',
+      },
+    },
+    capabilities: [
+      'coa_intake',
+      'compliance_ledger',
+      'audit_trail',
+      'literature_intelligence',
+      'trend_detection',
+      'regulatory_risk',
+      'workflow_management',
+      'reporting',
+    ],
+    tags: ['hemp', 'compliance', 'literature', 'audit', 'gxp', 'regulatory'],
+    category: 'compliance',
+    health_endpoint: '/api/health',
+  },
+
+  // ── 13. Recursive IP Builder ────────────────────────────────────────
+  // IP registry, grading, and tokenization platform (Ventures/Justice arm)
+  {
+    name: 'Recursive IP Builder',
+    slug: 'recursive-ip',
+    kind: 'service',
+    description:
+      'Intellectual property platform — create, grade, and tokenize IP on-chain. CRUD, five-dimension grading, NFT minting, portfolio analytics, keyword search, comparison, export, version history, and IP relationships.',
+    invocation_method: 'http_api',
+    invocation_config: {
+      url: agentUrl('RECURSIVE_IP_URL', 'http://localhost:8000'),
+      method: 'POST',
+      health_url: `${agentUrl('RECURSIVE_IP_URL', 'http://localhost:8000')}/api/v1/health`,
+      endpoints: {
+        list: '/api/v1/ip',
+        create: '/api/v1/ip',
+        analytics: '/api/v1/ip/analytics',
+        search: '/api/v1/ip/search',
+        compare: '/api/v1/ip/compare',
+        grade_preview: '/api/v1/grade',
+        grade_by_id: '/api/v1/ip/{id}/grade',
+        mint: '/api/v1/ip/{id}/mint',
+      },
+    },
+    capabilities: [
+      'ip_registry',
+      'ip_grading',
+      'nft_minting',
+      'portfolio_analytics',
+      'ip_search',
+      'ip_comparison',
+      'version_history',
+      'ip_relationships',
+    ],
+    tags: ['ip', 'patent', 'trademark', 'copyright', 'blockchain', 'nft', 'grading'],
+    category: 'finance',
+    health_endpoint: '/api/v1/health',
+  },
 ];
 
 // ============================================================================
@@ -940,6 +1055,122 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
       },
     ],
   },
+
+  // ── Chain 9: Hemp Research & News Pipeline ──────────────────────────
+  // Research front that reports as a news outlet. Runs the Hemp-OS
+  // intelligence cycle in parallel with HempForge literature ingest, then
+  // produces a trend snapshot and publishes a public-education digest.
+  {
+    name: 'Hemp Research & News Pipeline',
+    slug: 'hemp-research-news',
+    description:
+      'Hemp division research front: Hemp-OS intelligence cycle + HempForge literature ingest (parallel), deterministic production run, trend snapshot, then published as a public news/research digest.',
+    steps: [
+      {
+        name: 'Hemp-OS Intelligence Cycle',
+        entitySlug: 'hemp-os',
+        action: 'run_cycle',
+        input_mapping: { scope: '$.input.scope' },
+        output_key: 'insights',
+        step_order: 1,
+        depends_on_indices: [],
+      },
+      {
+        name: 'Literature Ingest',
+        entitySlug: 'hempforge',
+        action: 'ingest_defaults',
+        input_mapping: { query: '$.input.literature_query' },
+        output_key: 'papers',
+        step_order: 1,
+        parallel_group: 'hemp_gather',
+        depends_on_indices: [],
+      },
+      {
+        name: 'Literature Production',
+        entitySlug: 'hempforge',
+        action: 'run_production',
+        input_mapping: {
+          papers: '$.steps.papers.output',
+          insights: '$.steps.insights.output',
+        },
+        output_key: 'production_digest',
+        step_order: 2,
+        depends_on_indices: [0, 1],
+      },
+      {
+        name: 'Trend Snapshot',
+        entitySlug: 'hempforge',
+        action: 'trend_snapshot',
+        input_mapping: {
+          digest: '$.steps.production_digest.output',
+        },
+        output_key: 'trends',
+        step_order: 3,
+        depends_on_indices: [2],
+      },
+      {
+        name: 'Publish News Digest',
+        entitySlug: 'uplift-agent',
+        action: 'batch',
+        input_mapping: {
+          task: 'compile_hemp_news_digest',
+          insights: '$.steps.insights.output',
+          digest: '$.steps.production_digest.output',
+          trends: '$.steps.trends.output',
+        },
+        output_key: 'published_digest',
+        step_order: 4,
+        depends_on_indices: [3],
+      },
+    ],
+  },
+
+  // ── Chain 10: IP Portfolio Grading & Protection ─────────────────────
+  // Ventures/Justice arm: scan the IP portfolio, grade candidates, and
+  // compile a protection report.
+  {
+    name: 'IP Portfolio Grading & Protection',
+    slug: 'ip-portfolio-grading',
+    description:
+      'Intellectual property workflow: portfolio analytics, keyword search for candidate records, grading previews, and a compiled IP protection report.',
+    steps: [
+      {
+        name: 'IP Portfolio Analytics',
+        entitySlug: 'recursive-ip',
+        action: 'analytics',
+        input_mapping: {},
+        output_key: 'portfolio_stats',
+        step_order: 1,
+        depends_on_indices: [],
+      },
+      {
+        name: 'IP Registry Scan',
+        entitySlug: 'recursive-ip',
+        action: 'list',
+        input_mapping: {
+          type: '$.input.ip_type',
+          industry: '$.input.industry',
+        },
+        output_key: 'ip_records',
+        step_order: 1,
+        parallel_group: 'ip_scan',
+        depends_on_indices: [],
+      },
+      {
+        name: 'Compile Protection Report',
+        entitySlug: 'uplift-agent',
+        action: 'batch',
+        input_mapping: {
+          task: 'compile_ip_protection_report',
+          stats: '$.steps.portfolio_stats.output',
+          records: '$.steps.ip_records.output',
+        },
+        output_key: 'protection_report',
+        step_order: 2,
+        depends_on_indices: [0, 1],
+      },
+    ],
+  },
 ];
 
 // ============================================================================
@@ -1094,6 +1325,47 @@ const JOB_DEFS: JobSeedDef[] = [
         platforms: ['twitter', 'linkedin', 'instagram'],
       },
     },
+  },
+
+  // ── Hemp Research & News (7AM daily) ────────────────────────────────
+  {
+    name: 'Hemp Research & News Digest',
+    cron_expression: '0 7 * * *',
+    job_type: 'chain',
+    job_config: {
+      chain_slug: 'hemp-research-news',
+      input: {
+        scope: 'all',
+        literature_query: 'hemp OR cannabis OR cannabinoid',
+      },
+    },
+    notify_on_failure: true,
+  },
+
+  // ── IP Portfolio Grading (9AM Mondays) ──────────────────────────────
+  {
+    name: 'IP Portfolio Grading',
+    cron_expression: '0 9 * * 1',
+    job_type: 'chain',
+    job_config: {
+      chain_slug: 'ip-portfolio-grading',
+      input: {
+        ip_type: 'all',
+        industry: 'all',
+      },
+    },
+    notify_on_failure: true,
+  },
+
+  // ── Brain Wiki sync (daily 3AM) ─────────────────────────────────────
+  {
+    name: 'Brain Wiki Sync',
+    cron_expression: '0 3 * * *',
+    job_type: 'custom',
+    job_config: {
+      handler: 'wiki_sync',
+    },
+    notify_on_failure: true,
   },
 ];
 
