@@ -256,7 +256,18 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
   let lastErr: unknown;
   for (const provider of order) {
     try {
-      return await callProvider(provider, options);
+      // Budget gate: skip a provider whose daily token budget is exhausted or
+      // whose rolling rate window is full — don't over-hit the API feeds.
+      const { canCallProvider, consumeTokens } = await import('./workflow-budget');
+      const gate = canCallProvider(provider);
+      if (!gate.ok) {
+        lastErr = new Error(gate.reason);
+        console.warn(`[llm] ${gate.reason}. Trying next.`);
+        continue;
+      }
+      const text = await callProvider(provider, options);
+      consumeTokens(provider, (options.maxTokens ?? 1024) + 512); // approximate cost
+      return text;
     } catch (err) {
       lastErr = err;
       console.warn(
