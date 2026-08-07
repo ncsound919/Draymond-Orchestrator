@@ -1,6 +1,11 @@
+import type { Metadata } from 'next';
 import { latestBenchmarks, upgradeQueue } from '@/lib/benchmarks/queries';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Benchmarks',
+};
 
 function Sparkline({ values }: { values: number[] }) {
   if (values.length < 2) return <span className="text-sm text-white/50">no history</span>;
@@ -16,11 +21,18 @@ function Sparkline({ values }: { values: number[] }) {
 
 export default async function BenchmarksPage() {
   const [rows, queue] = await Promise.all([
-    latestBenchmarks(200).catch(() => []),
-    upgradeQueue('queued').catch(() => []),
+    latestBenchmarks(200).catch((err) => { console.error('[BenchmarksPage] Failed to load benchmarks:', err); return [] as Awaited<ReturnType<typeof latestBenchmarks>>; }),
+    upgradeQueue('queued').catch((err) => { console.error('[BenchmarksPage] Failed to load upgrade queue:', err); return [] as Awaited<ReturnType<typeof upgradeQueue>>; }),
   ]);
 
+  const seen = new Set<string>();
   const ranked = [...rows]
+    .filter((r) => {
+      const key = `${r.component_class}:${r.component_slug}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
     .sort((a, b) => b.weakness_score - a.weakness_score)
     .slice(0, 50);
 
