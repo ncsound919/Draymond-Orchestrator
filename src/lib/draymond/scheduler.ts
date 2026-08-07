@@ -499,13 +499,17 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         const { listUpgradeQueue } = await import('./upgrade-queue');
         const { runBenchmarkCycle } = await import('./run-benchmark');
         const queued = await listUpgradeQueue('queued');
+        // Dedupe by class: running the full cycle once per class is enough to
+        // deep-score that class's weakest component (repeated cycles on the
+        // same class would re-collect/re-score identical data).
+        const classes = [...new Set(queued.map((i) => i.component_class))].slice(0, 5);
         const results: Array<{ class: string; componentClass: import('./types').ComponentClass; measured: number; recorded: number; weakest: Array<{ slug: string; score: number }>; queued: number; deepScored: number }> = [];
-        for (const item of queued.slice(0, 5)) {
-          const r = await runBenchmarkCycle(item.component_class, {
+        for (const cls of classes) {
+          const r = await runBenchmarkCycle(cls, {
             queueLimit: 3,
             deepScoreLimit: 1,
           });
-          results.push({ class: item.component_class, ...r });
+          results.push({ class: cls, ...r });
         }
         return { handler, deepScored: results.reduce((n, r) => n + r.deepScored, 0), results };
       }

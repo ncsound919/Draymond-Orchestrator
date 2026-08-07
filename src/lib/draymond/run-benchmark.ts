@@ -119,12 +119,22 @@ export async function runBenchmarkCycle(
 
   const weakest = ranked.slice(0, limit);
 
+  // Map entity slugs to their source_url so deep-scorers can score the real
+  // repository (reporank/Grader need a repo URL). Sites/crons/chains have no
+  // repo URL concept — deepScore falls back to `repo:<name>` for those.
+  const repoBySlug: Record<string, string> = {};
+  if (componentClass === 'entity') {
+    for (const row of rows) {
+      if (row.source_url && row.slug) repoBySlug[String(row.slug)] = String(row.source_url);
+    }
+  }
+
   // Deep-score only if requested (Thursday run passes deepScoreLimit > 0).
   let deepScored = 0;
   const deep: Record<string, Record<string, DeepScoreResult>> = {};
   if (opts.deepScoreLimit && opts.deepScoreLimit > 0) {
     for (const w of weakest.slice(0, opts.deepScoreLimit)) {
-      const results = await deepScore(componentClass, w.component_slug, w.component_name);
+      const results = await deepScore(componentClass, w.component_slug, w.component_name, repoBySlug[w.component_slug]);
       deep[w.component_slug] = results;
       // Count successes, not attempts: a component whose scorers all soft-fail
       // (every score null) wasn't really deep-scored.

@@ -78,7 +78,7 @@ describe('createDraymondClient', () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://x.supabase.co';
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon';
     await createDraymondClient();
-    const opts = mockCreateServerClient.mock.calls[0][2] as {
+    const opts = ((mockCreateServerClient.mock as unknown as { calls: unknown[][] }).calls[0]?.[2] as unknown) as {
       cookies: { getAll: () => unknown; setAll: (c: Array<{ name: string; value: string; options?: unknown }>) => void };
     };
     expect(opts.cookies.getAll()).toEqual([{ name: 'a', value: 'b' }]);

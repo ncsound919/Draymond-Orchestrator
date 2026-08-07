@@ -170,6 +170,8 @@ describe('runBenchmarkCycle', () => {
 
     const result = await cycle('entity', { deepScoreLimit: 1 });
     expect(result.deepScored).toBe(0);
-    expect(result.queued).toBe(1);
+    // This entity is healthy (score 0 — no error events, healthy status), so the
+    // score-0 gate keeps it out of the upgrade queue.
+    expect(result.queued).toBe(0);
   });
 });

@@ -53,7 +53,12 @@ export async function queueWeakest(
   deepScores?: Record<string, Record<string, DeepScoreResult>>
 ): Promise<{ queued: number; skipped: number }> {
   const supabase = createDraymondAdminClient();
-  const weakest = [...ranked].sort((a, b) => b.score - a.score).slice(0, limit);
+  // Only queue actual weaknesses: a score of 0 means healthy, and filling the
+  // review queue with healthy components would bury the real failures.
+  const weakest = [...ranked]
+    .filter((i) => i.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
   let queued = 0;
   for (const item of weakest) {
     const row = {

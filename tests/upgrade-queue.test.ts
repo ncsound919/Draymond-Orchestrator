@@ -189,6 +189,34 @@ describe('upgrade queue', () => {
     await expect(qw([], 5)).resolves.toEqual({ queued: 0, skipped: 0 });
   });
 
+  it('excludes healthy (score 0) components from the queue', async () => {
+    const inserted: Array<Record<string, unknown>> = [];
+    const supabase = {
+      from: vi.fn(() => {
+        const builder = {
+          select: vi.fn(() => builder),
+          eq: vi.fn(() => builder),
+          maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+          insert: vi.fn((row: Record<string, unknown>) => {
+            inserted.push(row);
+            return { error: null };
+          }),
+          update: vi.fn(() => ({ eq: vi.fn(async () => ({ error: null })) })),
+        };
+        return builder;
+      }),
+    };
+    const { queueWeakest: qw } = await loadUpgradeQueueModule(supabase);
+    const ranked: WeaknessScore[] = [
+      { component_class: 'entity', component_slug: 'weak', component_name: 'Weak', score: 80, reasons: ['x'], trend: 'worsening' },
+      { component_class: 'entity', component_slug: 'healthy', component_name: 'Healthy', score: 0, reasons: [], trend: 'flat' },
+    ];
+    const res = await qw(ranked, 5);
+    expect(res).toEqual({ queued: 1, skipped: 0 });
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0].component_slug).toBe('weak');
+  });
+
   it('proposes routing/TLS review for a site with an unrelated reason', () => {
     const action = proposeActions('site', 'site-slow', ['latency 3000ms exceeds 2s budget']);
     expect(action.toLowerCase()).toMatch(/routing|tls/);

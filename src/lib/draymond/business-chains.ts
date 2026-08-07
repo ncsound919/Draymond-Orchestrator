@@ -1370,7 +1370,7 @@ const JOB_DEFS: JobSeedDef[] = [
 
   // ── Benchmarking loop (staggered Mon–Fri) ───────────────────────────
   {
-    name: 'Benchmark: Entities + Sites',
+    name: 'Benchmark: Entities',
     cron_expression: '0 6 * * 1',
     job_type: 'custom',
     job_config: { handler: 'benchmark_entities' },

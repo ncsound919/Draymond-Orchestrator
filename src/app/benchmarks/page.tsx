@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { latestBenchmarks, upgradeQueue } from '@/lib/benchmarks/queries';
+import { latestBenchmarks, trendsFor, upgradeQueue } from '@/lib/benchmarks/queries';
+import QueueActions from './QueueActions';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +37,10 @@ export default async function BenchmarksPage() {
     .sort((a, b) => b.weakness_score - a.weakness_score)
     .slice(0, 50);
 
+  // One batched query per class covers all 50 rows' sparklines.
+  const trends = await trendsFor(ranked.map((r) => ({ component_class: r.component_class, component_slug: r.component_slug })))
+    .catch((err) => { console.error('[BenchmarksPage] Failed to load trends:', err); return {} as Record<string, number[]>; });
+
   return (
     <div className="min-h-screen text-white p-8">
       <h1 className="text-3xl font-bold text-white mb-2">Benchmarks</h1>
@@ -52,6 +57,7 @@ export default async function BenchmarksPage() {
             <thead><tr className="border-b-2 border-white/10">
               <th className="p-2 text-white/70">Component</th><th className="p-2 text-white/70">Class</th>
               <th className="p-2 text-white/70">Score</th><th className="p-2 text-white/70">Action</th>
+              <th className="p-2 text-white/70">Review</th>
             </tr></thead>
             <tbody>
               {queue.map((q) => (
@@ -60,6 +66,7 @@ export default async function BenchmarksPage() {
                   <td className="p-2 text-sm text-white/60">{q.component_class}</td>
                   <td className="p-2">{q.weakness_score}</td>
                   <td className="p-2 text-sm">{q.proposed_action ?? '—'}</td>
+                  <td className="p-2"><QueueActions id={q.id} /></td>
                 </tr>
               ))}
             </tbody>
@@ -80,7 +87,7 @@ export default async function BenchmarksPage() {
                 <td className="p-2 font-medium">{r.component_name}</td>
                 <td className="p-2 text-sm text-white/60">{r.component_class}</td>
                 <td className="p-2">{r.weakness_score}</td>
-                <td className="p-2"><Sparkline values={[]} /></td>
+                <td className="p-2"><Sparkline values={trends[`${r.component_class}:${r.component_slug}`] ?? []} /></td>
                 <td className="p-2 text-xs text-white/50">{new Date(r.run_at).toISOString().slice(0, 10)}</td>
               </tr>
             ))}
