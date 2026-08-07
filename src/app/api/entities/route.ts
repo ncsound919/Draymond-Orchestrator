@@ -16,7 +16,7 @@ import type { EntitySearchFilters, DraymondEntityInsert } from '@/lib/draymond/t
 export const dynamic = 'force-dynamic';
 
 // Valid values for the `kind` filter
-const VALID_KINDS = ['agent', 'tool', 'service', 'workflow', 'data_source', 'integration'] as const;
+const VALID_KINDS = ['agent', 'tool', 'skill', 'extension', 'mcp_server', 'service', 'workflow', 'data_source', 'integration'] as const;
 
 // ── GET /api/entities ───────────────────────────────────────────────────────
 
