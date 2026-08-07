@@ -45,7 +45,8 @@ async function readOutcomes(): Promise<LearningOutcome[]> {
 async function readLessons(): Promise<Lesson[]> {
   try {
     const raw = await fs.readFile(LESSONS_FILE, "utf-8");
-    return JSON.parse(raw) as Lesson[];
+    const parsed = JSON.parse(raw) as { lessons?: Lesson[] };
+    return Array.isArray(parsed.lessons) ? parsed.lessons : [];
   } catch {
     return [];
   }

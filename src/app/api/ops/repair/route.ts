@@ -5,8 +5,8 @@ import { attemptRepair, repairLog } from '@/lib/draymond/self-repair';
 export const dynamic = 'force-dynamic';
 
 /** GET /api/ops/repair — recent repair attempts */
-export async function GET() {
-  const authError = authorizeRequest(new NextRequest('http://localhost'));
+export async function GET(request: NextRequest) {
+  const authError = authorizeRequest(request);
   if (authError) return authError;
   return NextResponse.json({ log: await repairLog() });
 }

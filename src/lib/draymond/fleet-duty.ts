@@ -38,6 +38,7 @@ export interface DutyAssignment {
 export const FLEET_DUTY: DutyAssignment[] = [
   // Always-on — the autonomous business engine
   { agentId: 'draymond', duty: 'always-on', cron: '*/5 * * * *' },
+  { agentId: 'big-homie', duty: 'always-on', cron: '*/5 * * * *', onCallFor: 'task quality gates' },
   { agentId: 'overlay-auditor', duty: 'always-on', cron: '0 7 * * *' },
   { agentId: 'overlay-treasurer', duty: 'always-on', cron: '0 8 * * *' },
   { agentId: 'overlay-strategist', duty: 'always-on', cron: '0 6 * * 1,4' },

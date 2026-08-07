@@ -7,8 +7,8 @@ export const dynamic = 'force-dynamic';
 const PHASES: DayPhase[] = ['morning', 'midday', 'evening', 'night'];
 
 /** GET /api/ops/day — today's orchestration plan + what's due next */
-export async function GET() {
-  const authError = authorizeRequest(new NextRequest('http://localhost'));
+export async function GET(request: NextRequest) {
+  const authError = authorizeRequest(request);
   if (authError) return authError;
   const plan = dayPlan();
   return NextResponse.json({ ...plan, totalSteps: DAY_FLOW.length });

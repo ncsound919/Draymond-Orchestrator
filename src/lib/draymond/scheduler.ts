@@ -547,6 +547,49 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         return { handler, crypto, topPapers: papers.map((p) => p.title) };
       }
 
+      if (handler === 'phase_recap') {
+        // Build + save + send a workplace recap for a day phase (email + Open-Chat).
+        const phase = (job.job_config as { phase?: string })?.phase ?? 'evening';
+        const { buildRecap, saveRecap, sendRecap } = await import('./communicator');
+        const recap = await buildRecap(phase as never);
+        await saveRecap(recap);
+        const sent = await sendRecap(recap);
+        return { handler, phase, summary: recap.summary, sent };
+      }
+
+      if (handler === 'evening_call_recap') {
+        // Prepare the evening recap for a voice call via Aetherdesk/Open-Chat.
+        const { buildRecap, renderRecap } = await import('./communicator');
+        const recap = await buildRecap('evening');
+        const text = renderRecap(recap);
+        const callUrl = process.env.AETHERDESK_BASE_URL;
+        let call = 'not-wired';
+        if (callUrl) {
+          try {
+            const res = await fetch(`${callUrl.replace(/\/+$/, '')}/api/call`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ text, priority: 'recap' }),
+              signal: AbortSignal.timeout(15_000),
+            });
+            call = `HTTP ${res.status}`;
+          } catch { call = 'aetherdesk unreachable'; }
+        }
+        return { handler, summary: recap.summary, call, callTextLength: text.length };
+      }
+
+      if (handler === 'rotate_tokens') {
+        // Report provider budget/rate health so keys can be rotated/refreshed
+        // before they get exhausted or rate-limited.
+        const { canCallProvider, laneSnapshot } = await import('./workflow-budget');
+        const providers = ['opencode-free', 'opencode', 'deepseek', 'gemini', 'openai', 'anthropic', 'qwen', 'litellm'];
+        return {
+          handler,
+          providerStatus: providers.map((p) => ({ provider: p, ok: canCallProvider(p).ok, reason: canCallProvider(p).reason ?? 'ok' })),
+          lanes: laneSnapshot(),
+        };
+      }
+
       console.log(
         `[Draymond Scheduler] Custom job "${job.name}" triggered (handler: ${handler ?? 'none'}). ` +
         `No built-in handler registered — skipping execution.`
@@ -834,6 +877,54 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     cron_expression: '0 7 * * *',
     job_type: 'custom',
     job_config: { handler: 'fetch_market_data' },
+    is_enabled: true,
+  },
+  {
+    name: 'Morning Recap (email)',
+    description: 'Morning workplace recap email + Open-Chat: money, issues, insights, upgrades.',
+    cron_expression: '5 8 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'phase_recap', phase: 'morning' },
+    is_enabled: true,
+  },
+  {
+    name: 'Midday Recap (email)',
+    description: 'Midday workplace recap email + Open-Chat.',
+    cron_expression: '5 12 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'phase_recap', phase: 'midday' },
+    is_enabled: true,
+  },
+  {
+    name: 'Evening Recap (email)',
+    description: 'Evening workplace recap email + Open-Chat.',
+    cron_expression: '5 20 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'phase_recap', phase: 'evening' },
+    is_enabled: true,
+  },
+  {
+    name: 'Evening Call Recap',
+    description: 'Evening shift recap — Open-Chat calls you with the day\u2019s summary.',
+    cron_expression: '30 20 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'evening_call_recap' },
+    is_enabled: true,
+  },
+  {
+    name: 'Night Recap (email)',
+    description: 'Night workplace recap email + Open-Chat.',
+    cron_expression: '5 0 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'phase_recap', phase: 'night' },
+    is_enabled: true,
+  },
+  {
+    name: 'Token Rotation Check',
+    description: 'Daily provider budget/rate health — rotate keys before exhaustion.',
+    cron_expression: '0 11 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'rotate_tokens' },
     is_enabled: true,
   },
 ];
