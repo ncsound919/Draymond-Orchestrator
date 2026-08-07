@@ -515,19 +515,30 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         const fs = await import('node:fs');
         const path = await import('node:path');
         const queued = await listUpgradeQueue('queued');
+        // The scheduler runs locally / on the orchestrator host where the nested
+        // VibeServe repo is checked out, so anchoring to process.cwd() works as
+        // long as the process is launched from the repo root (this file is bundled
+        // into .next/server by Next.js, so a module-anchored path via
+        // fileURLToPath(import.meta.url) would resolve to a build chunk, not the
+        // source layout). On Vercel serverless the FS is read-only and the nested
+        // repo is not deployed, so the write is a no-op that is caught and logged
+        // to stdout only — acceptable for the current runtime; revisit if the cron
+        // moves fully to the cloud.
         const pagePath = path.resolve(
           process.cwd(),
           'agents/VibeServe-main/ide/packages/deterministic-brain/wiki/business/system-health.md'
         );
+        const cell = (s: string) => String(s).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
         const rows = queued
           .slice(0, 10)
-          .map((i) => `| ${i.component_name} | ${i.component_class} | ${i.weakness_score} | ${i.proposed_action ?? '—'} |`)
+          .map((i) => `| ${cell(i.component_name)} | ${i.component_class} | ${i.weakness_score} | ${cell(i.proposed_action ?? '—')} |`)
           .join('\n');
         const body = [
           '---',
           'title: System Health',
           'tags: [health, benchmarks, weakness]',
           'namespace: business',
+          'aliases: [system health, health report, weakest components]',
           'sources:',
           '  - code: src/lib/draymond/run-benchmark.ts',
           '---',
