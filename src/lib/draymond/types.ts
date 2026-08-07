@@ -975,3 +975,51 @@ export type ChainBuildResult = {
     missing_entities: string[];
   };
 };
+
+// ============================================================================
+// BENCHMARKING
+// ============================================================================
+
+export type ComponentClass = 'entity' | 'site' | 'cron' | 'chain';
+
+export interface BenchmarkMetric {
+  component_class: ComponentClass;
+  component_slug: string;
+  component_name: string;
+  /** Free-form metric bag: fail_count, latency_ms, uptime_pct, errors, etc. */
+  metrics: Record<string, unknown>;
+  /** Raw evidence string for auditability (never fabricated). */
+  evidence: string;
+}
+
+export interface WeaknessScore {
+  component_class: ComponentClass;
+  component_slug: string;
+  component_name: string;
+  /** 0 = healthy, 100 = worst. */
+  score: number;
+  reasons: string[];
+  trend: 'improving' | 'flat' | 'worsening';
+}
+
+export interface DeepScoreResult {
+  scorer: string;
+  score: number | null;
+  summary: string;
+  detail?: string;
+  error?: string;
+}
+
+export interface UpgradeQueueItem {
+  id: string;
+  component_class: ComponentClass;
+  component_slug: string;
+  component_name: string;
+  weakness_score: number;
+  reasons: string[];
+  proposed_action: string;
+  deep_scores: Record<string, DeepScoreResult>;
+  status: 'queued' | 'in_progress' | 'completed' | 'dismissed';
+  created_at: string;
+  completed_at: string | null;
+}
