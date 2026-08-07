@@ -8,7 +8,7 @@
 // self-learning so future compositions improve.
 // ============================================================================
 
-import { randomBytes } from 'crypto';
+import { randomBytes, timingSafeEqual } from 'crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createDraymondAdminClient } from './client';
@@ -84,6 +84,12 @@ async function writeRecords(records: VentureRecord[]): Promise<void> {
 
 export async function listVentures(): Promise<VentureRecord[]> {
   return readRecords();
+}
+
+/** Timing-safe comparison for 64-char hex review tokens. */
+function safeTokenCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
 }
 
 /** Validate that every referenced entity exists and is active. */
@@ -215,7 +221,8 @@ export async function submitVenture(input: VentureSubmitInput): Promise<VentureR
 
 /**
  * Review a gated venture. With CRON_SECRET auth the token is not required;
- * otherwise a single-use review token must match. On approval the chain runs.
+ * otherwise a valid, unexpired single-use review token must match.
+ * Auth is enforced for BOTH approve and reject. On approval the chain runs.
  * The review action is matched by session_id (`venture-<id>`), which is how
  * submitVenture writes the draymond_actions row.
  */
@@ -234,17 +241,28 @@ export async function reviewVenture(
   const existing = await getChain(record.chain_id);
   if (!existing) throw new Error('Venture chain not found');
 
-  if (approved) {
-    if (!cronAuthorized) {
-      const supabase = createDraymondAdminClient();
-      const { data: action, error } = await supabase
-        .from('draymond_actions')
-        .select('review_token')
-        .eq('session_id', `venture-${id}`)
-        .maybeSingle();
-      if (error) throw new Error('Failed to load review token');
-      if (!action || action.review_token !== token) throw new Error('Unauthorized');
+  // Auth: CRON_SECRET bearer OR valid, unexpired single-use review token.
+  // Enforced for BOTH approve and reject.
+  if (!cronAuthorized) {
+    const supabase = createDraymondAdminClient();
+    const { data: action, error } = await supabase
+      .from('draymond_actions')
+      .select('review_token, review_token_expires_at')
+      .eq('session_id', `venture-${id}`)
+      .maybeSingle();
+    if (error) throw new Error('Failed to load review token');
+    if (!action || typeof action.review_token !== 'string' || !safeTokenCompare(action.review_token, token)) {
+      throw new Error('Unauthorized');
     }
+    const expiresAt = typeof action.review_token_expires_at === 'string'
+      ? new Date(action.review_token_expires_at).getTime()
+      : 0;
+    if (expiresAt > 0 && Date.now() > expiresAt) {
+      throw new Error('Review token expired');
+    }
+  }
+
+  if (approved) {
     const outcome = await executeVentureChain(existing);
     record.status = outcome.ok ? 'completed' : 'failed';
     const { recordOutcome } = await import('./self-learning');

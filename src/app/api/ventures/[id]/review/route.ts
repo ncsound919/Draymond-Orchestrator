@@ -23,6 +23,12 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     const record = await reviewVenture(id, token, bodyResult.data.approved, cronAuthorized);
     return NextResponse.json({ ok: true, venture: record });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed to review venture' }, { status: 500 });
+    const message = err instanceof Error ? err.message : 'Failed to review venture';
+    const status =
+      message === 'Unauthorized' ? 401 :
+      message === 'Review token expired' ? 410 :
+      message === 'Venture not found' ? 404 :
+      message.includes('not pending review') ? 409 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

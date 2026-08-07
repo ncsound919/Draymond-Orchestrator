@@ -5,7 +5,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeRequest, parseJsonBody, sanitizeError } from '@/lib/draymond/api-auth';
-import { submitVenture, listVentures } from '@/lib/draymond/ventures';
+import { submitVenture, listVentures, type VentureStepInput } from '@/lib/draymond/ventures';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +25,14 @@ export async function POST(request: NextRequest) {
   if (typeof body.name !== 'string' || !Array.isArray(body.steps) || body.steps.length === 0) {
     return NextResponse.json({ ok: false, error: 'name and steps[] are required' }, { status: 400 });
   }
+  const malformed = (body.steps as unknown[]).some(
+    (s) =>
+      typeof (s as Record<string, unknown>)?.entity_slug !== 'string' ||
+      typeof (s as Record<string, unknown>)?.action !== 'string',
+  );
+  if (malformed) {
+    return NextResponse.json({ ok: false, error: 'each step requires string entity_slug and action' }, { status: 400 });
+  }
   const lane = ['service', 'subscription', 'checkout', 'tooling'].includes(String(body.revenue_lane))
     ? (String(body.revenue_lane) as 'service' | 'subscription' | 'checkout' | 'tooling')
     : 'service';
@@ -35,7 +43,7 @@ export async function POST(request: NextRequest) {
       description: typeof body.description === 'string' ? body.description : undefined,
       revenue_lane: lane,
       revenue_note: typeof body.revenue_note === 'string' ? body.revenue_note : undefined,
-      steps: body.steps as never,
+      steps: body.steps as VentureStepInput[],
       agent_id: typeof body.agent_id === 'string' ? body.agent_id : undefined,
     });
     return NextResponse.json({ ok: true, venture: record }, { status: record.status === 'pending_review' ? 202 : 200 });
