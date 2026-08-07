@@ -511,10 +511,48 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
       }
 
       if (handler === 'benchmark_upgrade_review') {
-        // Friday: log the queue and summarize into the wiki health page.
         const { listUpgradeQueue } = await import('./upgrade-queue');
+        const fs = await import('node:fs');
+        const path = await import('node:path');
         const queued = await listUpgradeQueue('queued');
-        return { handler, queued: queued.length, items: queued.slice(0, 10).map((i) => ({ slug: i.component_slug, score: i.weakness_score, action: i.proposed_action })) };
+        const pagePath = path.resolve(
+          process.cwd(),
+          'agents/VibeServe-main/ide/packages/deterministic-brain/wiki/business/system-health.md'
+        );
+        const rows = queued
+          .slice(0, 10)
+          .map((i) => `| ${i.component_name} | ${i.component_class} | ${i.weakness_score} | ${i.proposed_action ?? '—'} |`)
+          .join('\n');
+        const body = [
+          '---',
+          'title: System Health',
+          'tags: [health, benchmarks, weakness]',
+          'namespace: business',
+          'sources:',
+          '  - code: src/lib/draymond/run-benchmark.ts',
+          '---',
+          '',
+          '# System Health',
+          '',
+          `Updated: ${new Date().toISOString().slice(0, 10)}`,
+          '',
+          '## Current weakest components',
+          '',
+          '| Component | Class | Score | Action |',
+          '|---|---|---|---|',
+          rows || '| _none queued_ | — | — | — |',
+          '',
+        ].join('\n');
+        try {
+          fs.writeFileSync(pagePath, body, 'utf8');
+        } catch (err) {
+          console.error(`[benchmark_upgrade_review] failed to write wiki page: ${err}`);
+        }
+        return {
+          handler,
+          queued: queued.length,
+          items: queued.slice(0, 10).map((i) => ({ slug: i.component_slug, score: i.weakness_score, action: i.proposed_action })),
+        };
       }
 
       if (handler === 'run_overlay_qa') {
