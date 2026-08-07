@@ -101,6 +101,37 @@ describe('upgrade queue', () => {
     expect(updates[0]).not.toHaveProperty('created_at');
   });
 
+  it('preserves stored deep scores on update when none are provided', async () => {
+    const updates: Array<Record<string, unknown>> = [];
+    const supabase = {
+      from: vi.fn(() => {
+        const builder = {
+          select: vi.fn(() => builder),
+          eq: vi.fn(() => builder),
+          maybeSingle: vi.fn(async () => ({
+            data: { id: 'abc', created_at: '2026-01-01T00:00:00.000Z' },
+            error: null,
+          })),
+          insert: vi.fn(() => ({ error: null })),
+          update: vi.fn((payload: Record<string, unknown>) => {
+            updates.push(payload);
+            return { eq: vi.fn(async () => ({ error: null })) };
+          }),
+        };
+        return builder;
+      }),
+    };
+    const { queueWeakest: qw } = await loadUpgradeQueueModule(supabase);
+    const ranked: WeaknessScore[] = [
+      { component_class: 'entity', component_slug: 'a', component_name: 'A', score: 90, reasons: ['x'], trend: 'worsening' },
+    ];
+    // No deepScores passed (e.g. a Mon/Wed/Fri run that doesn't deep-score).
+    const res = await qw(ranked, 1);
+    expect(res).toEqual({ queued: 1, skipped: 0 });
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).not.toHaveProperty('deep_scores');
+  });
+
   it('skips an item when the queued-row lookup fails', async () => {
     const supabase = {
       from: vi.fn(() => {

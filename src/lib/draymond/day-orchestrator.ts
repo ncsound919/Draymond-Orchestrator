@@ -118,6 +118,12 @@ export async function runPhase(phase: DayPhase): Promise<PhaseRunResult> {
     },
     scan_book_library: async () => (await import('../bookbridge')).scanBookLibrary(),
     wiki_sync: async () => {
+      // Fail-soft: without Supabase env vars the sync script exits non-zero.
+      // In ephemeral/test environments (or a read-only runtime) skip cleanly so
+      // the night phase doesn't collect a spurious wiki error.
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        return { skipped: 'wiki sync requires NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY' };
+      }
       const { execFile } = await import('node:child_process');
       const { promisify } = await import('node:util');
       return promisify(execFile)('node', ['scripts/sync-wiki-to-supabase.mjs'], { timeout: 120_000 });

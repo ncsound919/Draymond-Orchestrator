@@ -80,15 +80,19 @@ export async function queueWeakest(
     }
 
     if (existing) {
+      // Only refresh deep_scores when this run actually deep-scored the
+      // component. A Mon/Wed/Fri run (deepScoreLimit unset) must not wipe a
+      // previous Thursday's deep scores back to {}.
+      const updatePayload: Record<string, unknown> = {
+        component_name: row.component_name,
+        weakness_score: row.weakness_score,
+        reasons: row.reasons,
+        proposed_action: row.proposed_action,
+      };
+      if (Object.keys(row.deep_scores).length > 0) updatePayload.deep_scores = row.deep_scores;
       const { error } = await supabase
         .from('draymond_upgrade_queue')
-        .update({
-          component_name: row.component_name,
-          weakness_score: row.weakness_score,
-          reasons: row.reasons,
-          proposed_action: row.proposed_action,
-          deep_scores: row.deep_scores,
-        })
+        .update(updatePayload)
         .eq('id', existing.id);
       if (error) {
         console.error(`[upgrade-queue] failed to update ${item.component_slug}: ${error.message}`);
