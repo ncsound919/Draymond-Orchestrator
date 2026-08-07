@@ -38,6 +38,7 @@ export const DAY_FLOW: OrchestrationStep[] = [
   { id: 'learn', phase: 'night', time: '00:30', job: 'self_learning_loop', purpose: 'Distill lessons from the day' },
   { id: 'rd', phase: 'night', time: '01:00', job: 'rd_night', purpose: 'Overnight research + dev plan' },
   { id: 'books', phase: 'night', time: '03:00', job: 'scan_book_library', purpose: 'Ingest new books' },
+  { id: 'wiki', phase: 'night', time: '03:30', job: 'wiki_sync', purpose: 'Sync brain wiki to Supabase cache', feedsTo: ['deterministic-brain'] },
   { id: 'avatars', phase: 'night', time: '04:00', job: 'generate_agent_avatars', purpose: 'Refresh agent photos (weekly)' },
 ];
 
@@ -115,6 +116,11 @@ export async function runPhase(phase: DayPhase): Promise<PhaseRunResult> {
       return r.buildNightPlan(digest.items.slice(0, 5).map((i) => i.title));
     },
     scan_book_library: async () => (await import('../bookbridge')).scanBookLibrary(),
+    wiki_sync: async () => {
+      const { execFile } = await import('node:child_process');
+      const { promisify } = await import('node:util');
+      return promisify(execFile)('node', ['scripts/sync-wiki-to-supabase.mjs'], { timeout: 120_000 });
+    },
     fleet_duty_sync: async () => (await import('./fleet-duty')).computeFleetDuty(),
     generate_agent_avatars: async () => {
       const { execFile } = await import('node:child_process');

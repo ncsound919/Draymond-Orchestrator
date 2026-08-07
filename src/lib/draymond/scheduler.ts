@@ -461,6 +461,15 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         return { handler, ...result };
       }
 
+      if (handler === 'wiki_sync') {
+        // Sync the deterministic-brain wiki (markdown) into Supabase cache.
+        const { execFile } = await import('node:child_process');
+        const { promisify } = await import('node:util');
+        const run = promisify(execFile);
+        const out = await run('node', ['scripts/sync-wiki-to-supabase.mjs'], { timeout: 120_000 });
+        return { handler, output: (out.stdout || '').trim().slice(0, 1500) };
+      }
+
       if (handler === 'run_overlay_qa') {
         // Run the Overlay365 Playwright QA suite via AgentBrowser.
         const { runSiteTests } = await import('../agentbrowser');
