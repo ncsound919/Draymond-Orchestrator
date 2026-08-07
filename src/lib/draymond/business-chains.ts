@@ -1367,7 +1367,56 @@ const JOB_DEFS: JobSeedDef[] = [
     },
     notify_on_failure: true,
   },
+
+  // ── Benchmarking loop (staggered Mon–Fri) ───────────────────────────
+  {
+    name: 'Benchmark: Entities + Sites',
+    cron_expression: '0 6 * * 1',
+    job_type: 'custom',
+    job_config: { handler: 'benchmark_entities' },
+    notify_on_failure: true,
+  },
+  {
+    name: 'Benchmark: Sites',
+    cron_expression: '0 7 * * 1',
+    job_type: 'custom',
+    job_config: { handler: 'benchmark_sites' },
+    notify_on_failure: true,
+  },
+  {
+    name: 'Benchmark: Crons',
+    cron_expression: '0 6 * * 2',
+    job_type: 'custom',
+    job_config: { handler: 'benchmark_crons' },
+    notify_on_failure: true,
+  },
+  {
+    name: 'Benchmark: Chains',
+    cron_expression: '0 6 * * 3',
+    job_type: 'custom',
+    job_config: { handler: 'benchmark_chains' },
+    notify_on_failure: true,
+  },
+  {
+    name: 'Benchmark: Deep Score',
+    cron_expression: '0 6 * * 4',
+    job_type: 'custom',
+    job_config: { handler: 'benchmark_deep_score' },
+    notify_on_failure: true,
+  },
+  {
+    name: 'Benchmark: Upgrade Review',
+    cron_expression: '0 7 * * 5',
+    job_type: 'custom',
+    job_config: { handler: 'benchmark_upgrade_review' },
+    notify_on_failure: true,
+  },
 ];
+
+/** Return a copy of the seeded scheduled job definitions (JOB_DEFS). */
+export function getSeedJobDefs(): JobSeedDef[] {
+  return [...JOB_DEFS];
+}
 
 // ============================================================================
 // SEED IMPLEMENTATION

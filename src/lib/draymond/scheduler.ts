@@ -470,6 +470,53 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         return { handler, output: (out.stdout || '').trim().slice(0, 1500) };
       }
 
+      if (handler === 'benchmark_entities') {
+        const { runBenchmarkCycle } = await import('./run-benchmark');
+        const r = await runBenchmarkCycle('entity', { queueLimit: 5 });
+        return { handler, ...r };
+      }
+
+      if (handler === 'benchmark_sites') {
+        const { runBenchmarkCycle } = await import('./run-benchmark');
+        const r = await runBenchmarkCycle('site', { queueLimit: 5 });
+        return { handler, ...r };
+      }
+
+      if (handler === 'benchmark_crons') {
+        const { runBenchmarkCycle } = await import('./run-benchmark');
+        const r = await runBenchmarkCycle('cron', { queueLimit: 5 });
+        return { handler, ...r };
+      }
+
+      if (handler === 'benchmark_chains') {
+        const { runBenchmarkCycle } = await import('./run-benchmark');
+        const r = await runBenchmarkCycle('chain', { queueLimit: 5 });
+        return { handler, ...r };
+      }
+
+      if (handler === 'benchmark_deep_score') {
+        // Thursday: deep-score the current weakest queued items.
+        const { listUpgradeQueue } = await import('./upgrade-queue');
+        const { runBenchmarkCycle } = await import('./run-benchmark');
+        const queued = await listUpgradeQueue('queued');
+        const results: Array<{ class: string; componentClass: import('./types').ComponentClass; measured: number; recorded: number; weakest: Array<{ slug: string; score: number }>; queued: number; deepScored: number }> = [];
+        for (const item of queued.slice(0, 5)) {
+          const r = await runBenchmarkCycle(item.component_class, {
+            queueLimit: 3,
+            deepScoreLimit: 1,
+          });
+          results.push({ class: item.component_class, ...r });
+        }
+        return { handler, deepScored: results.reduce((n, r) => n + r.deepScored, 0), results };
+      }
+
+      if (handler === 'benchmark_upgrade_review') {
+        // Friday: log the queue and summarize into the wiki health page.
+        const { listUpgradeQueue } = await import('./upgrade-queue');
+        const queued = await listUpgradeQueue('queued');
+        return { handler, queued: queued.length, items: queued.slice(0, 10).map((i) => ({ slug: i.component_slug, score: i.weakness_score, action: i.proposed_action })) };
+      }
+
       if (handler === 'run_overlay_qa') {
         // Run the Overlay365 Playwright QA suite via AgentBrowser.
         const { runSiteTests } = await import('../agentbrowser');
