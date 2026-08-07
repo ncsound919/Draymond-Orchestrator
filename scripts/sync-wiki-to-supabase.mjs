@@ -95,6 +95,9 @@ async function main() {
   const files = walk(wikiDir);
   let added = 0, updated = 0, removed = 0;
 
+  const { data: existingRows } = await supabase.from('brain_wiki_pages').select('slug');
+  const existing = new Set((existingRows || []).map((r) => r.slug));
+
   for (const file of files) {
     const rel = path.relative(wikiDir, file).replace(/\\/g, '/');
     const slug = rel.replace(/\.md$/, '');
@@ -107,31 +110,37 @@ async function main() {
     const sources = Array.isArray(fm.sources) ? fm.sources : [];
 
     const row = { slug, namespace, title, content: body, tags, sources, aliases };
-    const { data, error } = await supabase
+    if (dryRun) {
+      if (existing.has(slug)) updated++; else added++;
+      console.log(`[sync] (dry-run) would upsert ${slug}`);
+      continue;
+    }
+    const { error } = await supabase
       .from('brain_wiki_pages')
-      .upsert(row, { onConflict: 'slug', ignoreDuplicates: false })
-      .select('created_at, updated_at')
-      .single();
+      .upsert(row, { onConflict: 'slug', ignoreDuplicates: false });
     if (error) {
       console.error(`[sync] FAIL ${slug}: ${error.message}`);
       continue;
     }
-    if (data.created_at === data.updated_at) added++; else updated++;
+    if (existing.has(slug)) updated++; else added++;
   }
 
   // Remove pages whose source file is gone.
-  const { data: existing } = await supabase.from('brain_wiki_pages').select('slug');
   const known = new Set(files.map((f) => path.relative(wikiDir, f).replace(/\\/g, '/').replace(/\.md$/, '')));
-  const stale = (existing || []).map((r) => r.slug).filter((s) => !known.has(s));
+  const stale = [...existing].filter((s) => !known.has(s));
   for (const slug of stale) {
-    if (dryRun) { console.log(`[sync] would remove ${slug}`); continue; }
+    if (dryRun) { console.log(`[sync] would remove ${slug}`); removed++; continue; }
     const { error } = await supabase.from('brain_wiki_pages').delete().eq('slug', slug);
     if (error) console.error(`[sync] FAIL remove ${slug}: ${error.message}`);
     else removed++;
   }
 
-  console.log(`[sync] done: +${added} added, ~${updated} updated, -${removed} removed (${files.length} files)`);
-  if (dryRun) console.log('[sync] DRY RUN — no writes performed');
+  if (dryRun) {
+    console.log(`[sync] done: +${added} would add, ~${updated} would update, -${removed} would remove (${files.length} files)`);
+    console.log('[sync] DRY RUN — no writes performed');
+  } else {
+    console.log(`[sync] done: +${added} added, ~${updated} updated, -${removed} removed (${files.length} files)`);
+  }
 }
 
 main().catch((err) => { console.error(err); process.exit(1); });
