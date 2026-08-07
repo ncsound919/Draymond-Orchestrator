@@ -212,3 +212,54 @@ export async function submitVenture(input: VentureSubmitInput): Promise<VentureR
 
   return record;
 }
+
+/**
+ * Review a gated venture. With CRON_SECRET auth the token is not required;
+ * otherwise a single-use review token must match. On approval the chain runs.
+ * The review action is matched by session_id (`venture-<id>`), which is how
+ * submitVenture writes the draymond_actions row.
+ */
+export async function reviewVenture(
+  id: string,
+  token: string,
+  approved: boolean,
+  cronAuthorized = false
+): Promise<VentureRecord> {
+  const records = await readRecords();
+  const record = records.find((r) => r.id === id);
+  if (!record) throw new Error('Venture not found');
+  if (record.status !== 'pending_review') throw new Error(`Venture is not pending review (${record.status})`);
+
+  const { getChain } = await import('./chains');
+  const existing = await getChain(record.chain_id);
+  if (!existing) throw new Error('Venture chain not found');
+
+  if (approved) {
+    if (!cronAuthorized) {
+      const supabase = createDraymondAdminClient();
+      const { data: action, error } = await supabase
+        .from('draymond_actions')
+        .select('review_token')
+        .eq('session_id', `venture-${id}`)
+        .maybeSingle();
+      if (error) throw new Error('Failed to load review token');
+      if (!action || action.review_token !== token) throw new Error('Unauthorized');
+    }
+    const outcome = await executeVentureChain(existing);
+    record.status = outcome.ok ? 'completed' : 'failed';
+    const { recordOutcome } = await import('./self-learning');
+    await recordOutcome({
+      agentId: 'overlay-strategist',
+      kind: 'manual',
+      summary: `venture ${record.name} ${outcome.ok ? 'completed' : 'failed'}`,
+      success: outcome.ok,
+      detail: outcome.detail,
+    }).catch(() => {});
+  } else {
+    record.status = 'rejected';
+  }
+
+  const next = records.map((r) => (r.id === record.id ? record : r));
+  await writeRecords(next);
+  return record;
+}
