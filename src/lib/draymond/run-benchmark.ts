@@ -19,9 +19,25 @@ async function fetchRows(supabase: any, table: string): Promise<any[]> {
   return data ?? [];
 }
 
-/** Aggregate recent event error counts per entity. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function fetchEntityEventStats(supabase: any): Promise<Record<string, { errors: number; invocations: number; avg_latency_ms: number }>> {
+/**
+ * Aggregate recent event error counts per entity, keyed by entity slug.
+ *
+ * `draymond_events.agent_id` references `draymond_agents(id)`, but
+ * `collectEntityMetrics` looks stats up by entity slug. Link agent ids back to
+ * slugs via `draymond_entities.linked_agent_id` so error stats actually attach
+ * to each entity. Events for agents that aren't linked to an entity are skipped.
+ */
+async function fetchEntityEventStats(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  entityRows: Array<Record<string, any>>
+): Promise<Record<string, { errors: number; invocations: number; avg_latency_ms: number }>> {
+  const slugByAgentId: Record<string, string> = {};
+  for (const row of entityRows) {
+    if (row.linked_agent_id != null) slugByAgentId[String(row.linked_agent_id)] = String(row.slug);
+  }
+
   const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
   const { data, error } = await supabase
     .from('draymond_events')
@@ -30,7 +46,9 @@ async function fetchEntityEventStats(supabase: any): Promise<Record<string, { er
   if (error) throw new Error(`Failed to fetch events: ${error.message}`);
   const out: Record<string, { errors: number; invocations: number; avg_latency_ms: number }> = {};
   for (const e of (data ?? []) as Array<{ agent_id: string | null; severity: string }>) {
-    const slug = e.agent_id ?? 'unknown';
+    if (e.agent_id == null) continue;
+    const slug = slugByAgentId[e.agent_id];
+    if (!slug) continue;
     out[slug] ??= { errors: 0, invocations: 0, avg_latency_ms: 0 };
     if (e.severity === 'error' || e.severity === 'critical') out[slug].errors++;
     out[slug].invocations++;
@@ -65,7 +83,7 @@ export async function runBenchmarkCycle(
 
   let metrics;
   if (componentClass === 'entity') {
-    metrics = collectMetrics(componentClass, rows, await fetchEntityEventStats(supabase));
+    metrics = collectMetrics(componentClass, rows, await fetchEntityEventStats(supabase, rows));
   } else {
     metrics = collectMetrics(componentClass, rows, {});
   }
