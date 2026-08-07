@@ -12,7 +12,7 @@ vi.mock('@/lib/supabase/server', () => ({
   })),
 }));
 
-import { requireDraymondAuth } from '../src/lib/draymond/auth';
+import { requireDraymondAuth, requireDraymondActionAuth } from '../src/lib/draymond/auth';
 
 function stubProfile(data: unknown) {
   mockFrom.mockReturnValue({
@@ -61,5 +61,19 @@ describe('requireDraymondAuth', () => {
     mockGetUser.mockRejectedValue(new Error('boom'));
     const result = await requireDraymondAuth();
     expect(result.error?.status).toBe(500);
+  });
+});
+
+describe('requireDraymondActionAuth', () => {
+  it('throws when the underlying auth fails', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+    await expect(requireDraymondActionAuth()).rejects.toThrow(/Unauthorized/);
+  });
+
+  it('returns the user when authorized', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'u1', email: 'admin@b.c' } }, error: null });
+    stubProfile({ role: 'admin' });
+    const user = await requireDraymondActionAuth();
+    expect(user.id).toBe('u1');
   });
 });

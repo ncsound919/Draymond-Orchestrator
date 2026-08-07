@@ -117,4 +117,12 @@ describe('publishResultNotification', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 500 })));
     expect(await publishResultNotification({ operation: 'health', success: true })).toBe(false);
   });
+
+  it('returns false when publish rejects', async () => {
+    setNtfyEnv();
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(await publishResultNotification({ operation: 'health', success: true })).toBe(false);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('network down'));
+  });
 });
