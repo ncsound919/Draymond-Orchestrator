@@ -9,10 +9,12 @@
 import type { BenchmarkMetric, ComponentClass, WeaknessScore } from './types';
 
 function clamp(n: number): number {
+  if (!Number.isFinite(n)) return 0;
   return Math.max(0, Math.min(100, n));
 }
 
 function clamp01(n: number): number {
+  if (!Number.isFinite(n)) return 0;
   return Math.max(0, Math.min(1, n));
 }
 
@@ -44,10 +46,12 @@ export function scoreMetrics(
     const statusPenalty = status === 'down' ? 100 : status === 'degraded' ? 50 : 0;
     const failPenalty = clamp01(failures / 3) * 60;
     const latencyPen = latencyPenalty(m.latency_ms, 2000);
+    // uptime_pct is binary from the collector (100 = 'up', 0 otherwise), so
+    // 0.1 * (100 - uptime_pct) is a flat 10 when the site is down.
     score = 0.4 * statusPenalty + 0.3 * failPenalty + 0.2 * latencyPen + 0.1 * (100 - uptime);
     if (statusPenalty > 0) reasons.push(`${status} status`);
     if (failPenalty > 0) reasons.push(`${failures} consecutive failures`);
-    if (latencyPen > 50) reasons.push(`latency ${m.latency_ms}ms exceeds 2s budget`);
+    if (latencyPen >= 100) reasons.push(`latency ${m.latency_ms}ms exceeds 2s budget`);
   } else if (componentClass === 'cron') {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const m = metric.metrics as Record<string, any>;
@@ -57,10 +61,11 @@ export function scoreMetrics(
     const failRatePenalty = clamp01(failRate) * 100;
     const durationPen = latencyPenalty(duration, 60_000);
     const recencyPenalty = lastStatus === 'failed' ? 50 : lastStatus === 'never' ? 30 : 0;
-    score = 0.4 * failRatePenalty + 0.25 * recencyPenalty + 0.2 * durationPen + 0.15 * failRatePenalty;
+    // failure rate weighs 0.55 (0.4 primary + 0.15 robustness)
+    score = 0.55 * failRatePenalty + 0.25 * recencyPenalty + 0.2 * durationPen;
     if (failRate > 0.3) reasons.push(`failure rate ${(failRate * 100).toFixed(0)}%`);
     if (lastStatus === 'failed') reasons.push('last run failed');
-    if (durationPen > 50) reasons.push(`duration ${duration}ms exceeds 60s budget`);
+    if (durationPen >= 100) reasons.push(`duration ${duration}ms exceeds 60s budget`);
   } else if (componentClass === 'entity') {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const m = metric.metrics as Record<string, any>;
@@ -76,7 +81,7 @@ export function scoreMetrics(
     if (errorRate > 0.3) reasons.push(`error rate ${(errorRate * 100).toFixed(0)}%`);
     if (healthPenalty > 0) reasons.push(`${health} health`);
     if (stalePen > 40) reasons.push(`stale (${staleness} days since invocation)`);
-  } else {
+  } else if (componentClass === 'chain') {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const m = metric.metrics as Record<string, any>;
     const failedStepRate = Number(m.failed_step_rate ?? 0);
@@ -85,10 +90,13 @@ export function scoreMetrics(
     const failPenalty = clamp01(failedStepRate) * 100;
     const durationPen = latencyPenalty(duration, 120_000);
     const statusPenalty = status === 'failed' ? 100 : status === 'running' ? 40 : 0;
-    score = 0.4 * failPenalty + 0.25 * statusPenalty + 0.2 * durationPen + 0.15 * failPenalty;
+    // failure rate weighs 0.55 (0.4 primary + 0.15 robustness)
+    score = 0.55 * failPenalty + 0.25 * statusPenalty + 0.2 * durationPen;
     if (failedStepRate > 0.3) reasons.push(`${(failedStepRate * 100).toFixed(0)}% failed steps`);
     if (statusPenalty > 0) reasons.push(`chain status ${status}`);
-    if (durationPen > 50) reasons.push(`duration ${duration}ms exceeds 2m budget`);
+    if (durationPen >= 100) reasons.push(`duration ${duration}ms exceeds 2m budget`);
+  } else {
+    throw new Error('Unknown component class: ' + componentClass);
   }
 
   // Always explain the score: a healthy component gets a derived all-clear
