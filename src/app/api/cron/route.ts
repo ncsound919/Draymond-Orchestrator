@@ -44,6 +44,27 @@ export async function GET(request: NextRequest) {
     errors.push(`runDueJobs: ${message}`);
   }
 
+  // ── Deploy the repair team on any failed jobs ──────────────────────────
+  let repair: { failed: number; fixed: number } | null = null;
+  try {
+    const { listJobs, updateJob } = await import('@/lib/draymond/scheduler');
+    const { repairFailedJob } = await import('@/lib/draymond/repair-team');
+    const failed = (await listJobs()).filter((j) => j.last_run_status === 'failed');
+    let fixed = 0;
+    for (const j of failed.slice(0, 10)) {
+      const report = await repairFailedJob(
+        { id: j.id, name: j.name, job_type: j.job_type, job_config: j.job_config ?? {} },
+        j.last_error ?? 'unknown error',
+        { updateJobConfig: (id, config) => updateJob(id, { job_config: config }) },
+      );
+      if (report.action === 'fixed') fixed++;
+    }
+    repair = { failed: failed.length, fixed };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[Cron] repair team failed:', message);
+  }
+
   // ── Run agent health checks ─────────────────────────────────────────
   try {
     healthResults = await checkAllAgentHealth();
@@ -63,6 +84,7 @@ export async function GET(request: NextRequest) {
     timestamp: new Date().toISOString(),
     duration_ms: durationMs,
     seeded_jobs: seededJobs,
+    repair: repair,
     jobs: {
       total: jobResults.length,
       succeeded,

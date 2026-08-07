@@ -590,6 +590,24 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         };
       }
 
+      if (handler === 'repair_failed_jobs') {
+        // Deploy the repair team on failed jobs (config fixes, crew assignment).
+        const { listJobs, updateJob } = await import('./scheduler');
+        const { repairFailedJob } = await import('./repair-team');
+        const failed = (await listJobs()).filter((j) => j.last_run_status === 'failed');
+        const reports = [];
+        for (const j of failed.slice(0, 10)) {
+          reports.push(
+            await repairFailedJob(
+              { id: j.id, name: j.name, job_type: j.job_type, job_config: j.job_config ?? {} },
+              j.last_error ?? 'unknown error',
+              { updateJobConfig: (id, config) => updateJob(id, { job_config: config }) },
+            ),
+          );
+        }
+        return { handler, failed: failed.length, reports };
+      }
+
       console.log(
         `[Draymond Scheduler] Custom job "${job.name}" triggered (handler: ${handler ?? 'none'}). ` +
         `No built-in handler registered — skipping execution.`
@@ -860,7 +878,7 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     description: 'Each evening, the marketing team builds next-day content/tools.',
     cron_expression: '0 20 * * *',
     job_type: 'chain',
-    job_config: { chain: 'marketing-pulse' },
+    job_config: { chain_slug: 'marketing-pulse' },
     is_enabled: true,
   },
   {
@@ -925,6 +943,14 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     cron_expression: '0 11 * * *',
     job_type: 'custom',
     job_config: { handler: 'rotate_tokens' },
+    is_enabled: true,
+  },
+  {
+    name: 'Repair Team (failed jobs)',
+    description: 'Hourly — scan failed jobs and deploy coding/skill agents to repair them.',
+    cron_expression: '5 * * * *',
+    job_type: 'custom',
+    job_config: { handler: 'repair_failed_jobs' },
     is_enabled: true,
   },
 ];
