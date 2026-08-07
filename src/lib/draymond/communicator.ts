@@ -125,6 +125,32 @@ export async function sendRecap(recap: PhaseRecap): Promise<{ channels: string[]
     detail.push("openchat: OPENCHAT_WEBHOOK not configured");
   }
 
+  // ntfy push (tagged "recap") so Open-Chat on the phone can auto-speak it.
+  const ntfyBase = process.env.NTFY_URL;
+  const ntfyTopic = process.env.NTFY_TOPIC_RECAPS ?? process.env.NTFY_TOPIC_RESULTS;
+  if (ntfyBase && ntfyTopic) {
+    try {
+      const res = await fetch(ntfyBase.replace(/\/+$/, ""), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          topic: ntfyTopic,
+          title: `Draymond ${recap.phase} recap`,
+          message: recap.summary,
+          tags: ["recap"],
+          priority: 3,
+        }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      channels.push("ntfy");
+      detail.push(`ntfy HTTP ${res.status}`);
+    } catch (err) {
+      detail.push(`ntfy: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  } else {
+    detail.push("ntfy: NTFY_URL/TOPIC not configured");
+  }
+
   // Email via the existing Gmail memo path.
   if (process.env.GMAIL_USER || process.env.DRAYMOND_ALERT_EMAIL) {
     try {
