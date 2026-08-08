@@ -39,22 +39,31 @@ automation to the actual bottleneck: pipeline → close → deliver → invoice 
 
 | ID | Service | Agents (all online) | Tiers (USD) | Est. delivery cost | Monthly target (day 90) |
 |---|---|---|---|---|---|
+| `aetherdesk` | **Aetherdesk AI Call Center** (flagship, E2) | Aetherdesk platform + its own Stripe webhook billing | Rental periods: hour 2.00 · 4hr 7.20 · day 13.30 · week 64 · **month 239** · quarter 644 · 6mo 1,204 · year 2,239; overage 0.03–0.05/min; top-ups 100–5000 min | infra + LLM ~0.01/min | **$1,000** (a few rentals + top-ups) |
 | `maas` | Marketing-as-a-Service | Observer/SMD, OmniResearch, Megacode, Uplift Agent | Starter 500 · Growth 1,000 · Scale 1,500 /mo | ~$15–30 tokens | **$2,000** (2 clients) |
 | `audit` | Codebase Audit & QA | Grader, RepoRank, Claw-Protect, Uplift Agent | Standard 250 · Deep 500 · Enterprise 1,000 /audit | ~$5–10 | **$1,000** (2–4 audits) |
 | `research` | Research Briefs | OmniResearch, Kaggle/brain, Uplift Agent | Brief 500 · Deep 1,000 · Custom 2,000 /brief | ~$8–20 | **$1,000** (1–2 briefs) |
 
-**Total: $4,000/mo run-rate by day 90.** First dollar by day 30. Runway model computes the
+**Total: $5,000/mo run-rate by day 90.** First dollar by day 30. Runway model computes the
 required daily run-rate from revenue-to-date.
+
+**Aetherdesk pricing discipline:** deliberate low-price volume model — ~$2.00 per 40
+agent-minutes at the hour tier, discounted per period (4hr −10%, day −17%, week −20%, month
+−25%). Overage billed per minute (DeepSeek $0.05, BYOK $0.03). Revenue for `aetherdesk` is
+settled Stripe charges from `checkout.session.completed` (its existing webhook) — the mission
+engine attributes those charges to the `aetherdesk` service line, it does not re-invent billing.
 
 ### 3.1 Pricing catalog ↔ Stripe
 
 Each tier maps to a Stripe product + price (`price_*`) via `metadata.service = <id>`:
 - `maas` tiers are **recurring subscriptions** (monthly).
 - `audit` / `research` tiers are **one-time payments**.
+- `aetherdesk` rental periods + top-up packs are **one-time payments** (created on the
+  Aetherdesk product); its own webhook activates the rental window and credits minutes.
 
-Metadata `platform` on each price keeps the Treasurer's `platformFromMetadata` attribution
-working (`maas`/`audit`/`research` → `cross-platform` fallback accepted, but explicit
-`metadata.service` is recorded on invoices).
+All prices were created live via the Stripe CLI on 2026-08-08 (see `.draymond/stripe-pricing.json`
+for IDs). Metadata `service` on each price keeps the Treasurer's `platformFromMetadata` attribution
+working; `metadata.service` is recorded on invoices.
 
 ## 4. Architecture
 
@@ -99,6 +108,9 @@ working (`maas`/`audit`/`research` → `cross-platform` fallback accepted, but e
      (`{id, opportunityId, serviceId, tierId, amountCents, status: "open"|"paid", stripeChargeId?}`).
    - `recordInvoiceSettled(chargeId, amountCents, serviceId)` → marks invoice `paid`, advances
      `invoiced → paid`, attributes revenue to the service line.
+   - Aetherdesk charges (rentals/top-ups) carry `metadata.service = aetherdesk` from its own
+     webhook — the mission engine attributes them to the `aetherdesk` line via
+     `recordInvoiceSettled` on `checkout.session.completed` (no separate invoice needed).
    - `missionDashboard()` → unified KPI: strategy + pipeline + treasury + delivery stats + velocity
      (leads/wk, win rate, won→paid days).
 
@@ -157,14 +169,18 @@ Set `STRIPE_SECRET_KEY` in `Draymond-Orchestrator/.env.local`. Record created `p
 
 ## 9. Out of Scope / Deferred
 
-- Aetherdesk GA, Overlay platform tiers, music-rights, sports/trading monetization.
+- Overlay platform tiers (Health/Wealth/Justice signups), music-rights, sports/trading monetization.
+- Aetherdesk **production GA** (Twilio/FreeSWITCH, tenant onboarding) is outside this build — but its
+  **pricing, Stripe catalog, and revenue attribution** are in scope (flagship E2 line).
 - Third-party CRM / invoicing / workflow stacks (n8n, Invoice Ninja, Twenty, Ghost, etc.).
 - Deploying the fleet to production (separate workstream; mission engine runs on Draymond).
 
 ## 10. Acceptance Criteria
 
-1. `GET /api/mission/strategy` returns the 3-service catalog with targets + unit economics.
+1. `GET /api/mission/strategy` returns the 4-service catalog (aetherdesk + maas + audit + research)
+   with targets + unit economics.
 2. `POST /api/mission/dispatch` runs the correct chain and advances `won → invoiced` on success.
-3. A settled Stripe charge flips an invoice `open → paid` and attributes revenue to the service.
-4. Monday 08:00 `mission_strategy_review` produces a memo with pipeline + revenue vs $4k target.
+3. A settled Stripe charge flips an invoice `open → paid` and attributes revenue to the service —
+   including Aetherdesk rental/top-up charges.
+4. Monday 08:00 `mission_strategy_review` produces a memo with pipeline + revenue vs $5k target.
 5. All existing 317 tests + new mission tests pass; type-check and lint clean.
