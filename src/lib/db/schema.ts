@@ -745,7 +745,7 @@ CREATE INDEX IF NOT EXISTS idx_worker_tasks_status ON draymond_worker_tasks(stat
 CREATE TABLE IF NOT EXISTS draymond_worker_proposals (
   id TEXT PRIMARY KEY,
   worker_id TEXT NOT NULL,
-  pack JSON NOT NULL,
+  pack TEXT NOT NULL DEFAULT '{}',
   status TEXT NOT NULL DEFAULT 'pending',
   created_at TEXT NOT NULL,
   reviewed_at TEXT
