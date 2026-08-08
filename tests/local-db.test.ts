@@ -292,3 +292,14 @@ describe('schema upgrades', () => {
     expect(cols.filter((c) => c === 'deep_scores')).toHaveLength(1);
   });
 });
+
+describe('worker protocol tables', () => {
+  it('creates skill_packs, worker_tasks, worker_proposals tables', () => {
+    const db = createTestDb();
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[];
+    const names = new Set(tables.map((t) => t.name));
+    expect(names.has('draymond_skill_packs')).toBe(true);
+    expect(names.has('draymond_worker_tasks')).toBe(true);
+    expect(names.has('draymond_worker_proposals')).toBe(true);
+  });
+});

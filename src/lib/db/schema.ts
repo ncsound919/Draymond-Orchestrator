@@ -120,6 +120,18 @@ export const COLUMN_MAPS: Record<string, ColumnMap> = {
     json: [],
     bool: [],
   },
+  draymond_skill_packs: {
+    json: ['triggers', 'tools', 'platforms', 'outputs'],
+    bool: [],
+  },
+  draymond_worker_tasks: {
+    json: ['payload', 'result', 'artifact_refs'],
+    bool: [],
+  },
+  draymond_worker_proposals: {
+    json: ['pack'],
+    bool: [],
+  },
 };
 
 /** Names of the draymond tables that carry an auto-managed `id` (uuid) column. */
@@ -691,5 +703,51 @@ CREATE TABLE IF NOT EXISTS purchases (
   user_id TEXT,
   created_at TEXT NOT NULL,
   fulfilled_at TEXT
+);
+
+-- ============================================================================
+-- Remote worker protocol
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS draymond_skill_packs (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  version TEXT NOT NULL DEFAULT '1.0.0',
+  purpose TEXT NOT NULL DEFAULT '',
+  triggers TEXT NOT NULL DEFAULT '[]',
+  instructions TEXT NOT NULL DEFAULT '',
+  tools TEXT NOT NULL DEFAULT '[]',
+  platforms TEXT NOT NULL DEFAULT '[]',
+  outputs TEXT NOT NULL DEFAULT '[]',
+  review_status TEXT NOT NULL DEFAULT 'approved',
+  source TEXT NOT NULL DEFAULT 'draymond',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_skill_packs_name ON draymond_skill_packs(name);
+
+CREATE TABLE IF NOT EXISTS draymond_worker_tasks (
+  id TEXT PRIMARY KEY,
+  worker_id TEXT,
+  skill_pack_id TEXT,
+  payload TEXT NOT NULL DEFAULT '{}',
+  status TEXT NOT NULL DEFAULT 'queued',
+  due_at TEXT,
+  claimed_at TEXT,
+  completed_at TEXT,
+  result TEXT NOT NULL DEFAULT '{}',
+  artifact_refs TEXT NOT NULL DEFAULT '[]',
+  error TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_worker_tasks_status ON draymond_worker_tasks(status);
+
+CREATE TABLE IF NOT EXISTS draymond_worker_proposals (
+  id TEXT PRIMARY KEY,
+  worker_id TEXT NOT NULL,
+  pack JSON NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL,
+  reviewed_at TEXT
 );
 `;
