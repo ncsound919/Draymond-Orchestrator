@@ -774,6 +774,13 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         return { handler, failed: failed.length, reports };
       }
 
+      if (handler === 'dispatch_worker_tasks') {
+        // Dispatch marketing/social/email tasks to remote workers (Open Chat).
+        const { dispatchWorkerTasks } = await import('./worker-tasks');
+        const r = await dispatchWorkerTasks(config as import('./worker-tasks').DispatchWorkerTasksConfig);
+        return { handler, ...r };
+      }
+
       console.log(
         `[Draymond Scheduler] Custom job "${job.name}" triggered (handler: ${handler ?? 'none'}). ` +
         `No built-in handler registered — skipping execution.`

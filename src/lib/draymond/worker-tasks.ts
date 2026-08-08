@@ -140,3 +140,15 @@ export async function getWorkerTask(id: string): Promise<WorkerTask | null> {
   }
   return (data as WorkerTask | null) ?? null;
 }
+
+export interface DispatchWorkerTasksConfig {
+  tasks?: Array<{ skill_pack_id?: string; payload?: Record<string, unknown>; due_at?: string }>;
+}
+
+export async function dispatchWorkerTasks(config: DispatchWorkerTasksConfig): Promise<{ enqueued: number }> {
+  const tasks = config.tasks ?? [];
+  for (const t of tasks) {
+    await enqueueWorkerTask({ skill_pack_id: t.skill_pack_id, payload: t.payload, due_at: t.due_at });
+  }
+  return { enqueued: tasks.length };
+}
