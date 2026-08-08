@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
   const auth = await requireMathAuth();
   if (auth.error) return auth.error;
 
-  const parsed = await readJson<{ data?: string; mediaType?: string }>(request);
+  const parsed = await readJson<{ data?: string; mediaType?: string }>(request, 8 * 1024 * 1024);
   if (parsed.error) return parsed.error;
   const { data, mediaType } = parsed.data;
 

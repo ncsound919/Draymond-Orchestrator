@@ -28,17 +28,19 @@ export function usePyodide() {
     // Always route readiness through the async channel (a sync setState in the
     // effect body trips react-hooks/set-state-in-effect).
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const check = async () => {
       try {
         await manager.run('pass');
         if (!cancelled) setStatus((s) => ({ ...s, ready: true, loading: false }));
       } catch {
-        if (!cancelled) setTimeout(check, 500);
+        if (!cancelled) timer = setTimeout(check, 500);
       }
     };
     check();
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
     };
   }, []);
 

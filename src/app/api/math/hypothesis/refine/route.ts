@@ -19,6 +19,12 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
   }
+  if (!['supported', 'refuted', 'inconclusive'].includes(verdict)) {
+    return NextResponse.json(
+      { error: 'verdict must be one of: supported, refuted, inconclusive' },
+      { status: 400 },
+    );
+  }
   try {
     const result = await refineHypothesis(conjecture, testResult, verdict);
     return NextResponse.json(result);

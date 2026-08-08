@@ -113,6 +113,14 @@ describe('exportContent', () => {
     expect(result.filename).toBe('my-math-notes.tex');
     expect(result.body).toBe('\\documentclass{article}');
   });
+
+  it('sanitizes filenames against header injection', async () => {
+    mocks.callLLM.mockReset();
+    mocks.callLLM.mockResolvedValue('# doc');
+    const result = await exportContent('x', 'markdown', 'note"; drop table -- 🎉');
+    expect(result.filename).toMatch(/^[a-z0-9._-]+\.md$/);
+    expect(result.filename).not.toMatch(/[";`\n\r]/);
+  });
 });
 
 describe('extractLatex', () => {
@@ -128,6 +136,14 @@ describe('extractLatex', () => {
     const result = await extractLatex('aGk=', 'image/png');
     expect(result.latex).toBe('$x^2$');
     expect(mocks.callLLM).toHaveBeenCalledWith(expect.objectContaining({ images: [{ dataB64: 'aGk=', mediaType: 'image/png' }] }));
+  });
+
+  it('fails fast when no vision-capable provider is configured', async () => {
+    mocks.callLLM.mockReset();
+    mocks.hasKey.mockReturnValue(false);
+    await expect(extractLatex('aGk=', 'image/png')).rejects.toThrow(/vision-capable provider/);
+    expect(mocks.callLLM).not.toHaveBeenCalled();
+    mocks.hasKey.mockReturnValue(true);
   });
 });
 

@@ -37,13 +37,13 @@ export default function MathLabPage() {
 
   const runCode = useCallback(
     async (code: string): Promise<string> => {
-      if (status.extraPackages.some((p) => code.includes(p))) {
-        // no-op — packages are lazy-loaded on demand below
+      // Lazy-load pandas/statsmodels when the generated code needs them.
+      // numpy/scipy/sympy are in the worker's base package set.
+      if (code.includes('pandas') && !status.extraPackages.includes('pandas')) {
+        await loadExtra(['pandas']).catch(() => {});
       }
-      if (/import pandas|import numpy|from numpy|from scipy|from sympy/.test(code)) {
-        if (!status.extraPackages.includes('pandas') && code.includes('pandas')) {
-          await loadExtra(['pandas']).catch(() => {});
-        }
+      if (code.includes('statsmodels') && !status.extraPackages.includes('statsmodels')) {
+        await loadExtra(['statsmodels']).catch(() => {});
       }
       return compute(code);
     },

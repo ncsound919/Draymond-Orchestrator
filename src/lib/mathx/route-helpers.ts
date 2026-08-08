@@ -14,25 +14,35 @@ export async function requireMathAuth(): Promise<
   return requireDraymondAuth();
 }
 
-/** Read a JSON body with a bounded size guard. */
+/** Read a JSON body with a hard size guard (mirrors api-auth.parseJsonBody). */
 export async function readJson<T>(
   request: NextRequest,
   maxBytes = 1_048_576,
 ): Promise<{ data: T; error?: never } | { data?: never; error: NextResponse }> {
   const contentLength = parseInt(request.headers.get('content-length') ?? '', 10);
-  if (contentLength > maxBytes) {
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
     return { error: NextResponse.json({ error: 'Request body too large' }, { status: 413 }) };
   }
   try {
-    const data = (await request.json()) as T;
+    const text = await request.text();
+    if (text.length > maxBytes) {
+      return { error: NextResponse.json({ error: 'Request body too large' }, { status: 413 }) };
+    }
+    const data = JSON.parse(text) as T;
     return { data };
   } catch {
     return { error: NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 }) };
   }
 }
 
-/** Uniform 500 shape that never leaks internals. */
+/** Uniform 500 shape that never leaks internals.
+ *  Known config/availability problems keep their actionable message. */
 export function mathErrorResponse(err: unknown): NextResponse {
   console.error('[math] route error:', err);
-  return NextResponse.json({ error: sanitizeError(err) }, { status: 500 });
+  const raw = err instanceof Error ? err.message : String(err);
+  const actionable =
+    /no llm|api key|vision|provider|unreachable|not configured|timed out|timeout/i.test(raw) &&
+    raw.length < 300;
+  const message = actionable ? raw : sanitizeError(err);
+  return NextResponse.json({ error: message }, { status: 500 });
 }

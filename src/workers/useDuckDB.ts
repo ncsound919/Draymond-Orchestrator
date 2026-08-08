@@ -12,6 +12,7 @@ export function useDuckDB() {
   const [ready, setReady] = useState(false);
   const dbRef = useRef<any>(null);
   const connRef = useRef<any>(null);
+  const workerRef = useRef<Worker | null>(null);
 
   useEffect(() => {
     let disposed = false;
@@ -24,6 +25,7 @@ export function useDuckDB() {
           new Blob([`importScripts('${bundle.mainWorker}');`], { type: 'application/javascript' }),
         );
         const worker = new Worker(workerUrl);
+        workerRef.current = worker;
         const logger = new duckdb.ConsoleLogger();
         const db = new duckdb.AsyncDuckDB(logger, worker);
         await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
@@ -38,6 +40,8 @@ export function useDuckDB() {
     init();
     return () => {
       disposed = true;
+      workerRef.current?.terminate();
+      workerRef.current = null;
     };
   }, []);
 

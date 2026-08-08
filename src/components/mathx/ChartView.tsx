@@ -80,7 +80,7 @@ export function ChartView({ data, type = 'auto', height = 320 }: ChartViewProps)
 
   useEffect(() => {
     if (!containerRef.current || !data) return;
-    if (!chartRef.current) chartRef.current = echarts.init(containerRef.current, 'dark');
+    if (!chartRef.current) chartRef.current = echarts.init(containerRef.current);
     const option = buildOption(data, type);
     if (Object.keys(option).length > 0) chartRef.current.setOption(option, true);
     const ro = new ResizeObserver(() => chartRef.current?.resize());

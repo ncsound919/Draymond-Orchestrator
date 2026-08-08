@@ -35,6 +35,8 @@ interface MathxLlmOptions {
   userMessage: string;
   maxTokens?: number;
   images?: Array<{ dataB64: string; mediaType: string }>;
+  /** Truncate the input to fit the token budget (safety net for huge context). */
+  truncate?: boolean;
 }
 
 async function mathxLlm(opts: MathxLlmOptions): Promise<string> {
@@ -46,6 +48,7 @@ async function mathxLlm(opts: MathxLlmOptions): Promise<string> {
     userMessage: opts.userMessage,
     maxTokens: opts.maxTokens,
     images: opts.images,
+    truncate: opts.truncate,
     temperature: 0.2,
   });
 }
@@ -95,6 +98,7 @@ export async function mathChat(input: MathChatInput): Promise<{ text: string }> 
     system: MATHX_SYSTEM,
     userMessage,
     maxTokens: maxTokensForMode(mode),
+    truncate: true,
   });
   return { text };
 }
@@ -463,7 +467,14 @@ export async function exportContent(
   });
 
   const meta = EXPORT_META[format];
-  const filename = `${(title || 'mathx-export').replace(/\s+/g, '-').toLowerCase()}${meta.ext}`;
+  // Sanitize the filename for Content-Disposition — a crafted title must not
+  // smuggle header delimiters (CR/LF, quotes, semicolons) into the response.
+  const safeTitle = (title || 'mathx-export')
+    .replace(/\s+/g, '-')
+    .replace(/[^a-zA-Z0-9._-]/g, '')
+    .replace(/-+/g, '-')
+    .slice(0, 80);
+  const filename = `${safeTitle.toLowerCase() || 'mathx-export'}${meta.ext}`;
   return { body, contentType: meta.contentType, filename };
 }
 
@@ -488,6 +499,9 @@ export async function extractLatex(
 ): Promise<{ latex: string }> {
   if (!SUPPORTED_IMAGE_TYPES.includes(mediaType as (typeof SUPPORTED_IMAGE_TYPES)[number])) {
     throw new Error(`Unsupported media type "${mediaType}" — use image/jpeg, image/png, image/gif, or image/webp`);
+  }
+  if (!hasKey('anthropic') && !hasKey('gemini') && !hasKey('openai')) {
+    throw new Error('OCR requires a vision-capable provider (ANTHROPIC_API_KEY, GEMINI_API_KEY, or OPENAI_API_KEY)');
   }
   const latex = await mathxLlm({
     mode: 'scientist',
