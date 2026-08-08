@@ -1645,14 +1645,33 @@ export async function seedBusinessAutomation(): Promise<BusinessSeedResult> {
         }))
       );
 
-      // Patch depends_on_steps with real step IDs
+      // Patch depends_on_steps with real step IDs.
+      // Align by (step_order, name) — NOT array index — because addSteps
+      // returns inserted rows via `WHERE id IN (...)` re-select, whose order
+      // is not guaranteed to match the input array (item: template dep seed).
+      const stepByKey = new Map<string, (typeof steps)[number]>();
+      for (const s of steps) {
+        stepByKey.set(`${s.step_order}|${s.name}`, s);
+      }
       const patchNeeded: Array<{ id: string; depends_on_steps: string[] }> = [];
       for (let i = 0; i < tpl.steps.length; i++) {
         const depIndices = tpl.steps[i].depends_on_indices;
         if (depIndices.length > 0) {
+          const target = stepByKey.get(`${tpl.steps[i].step_order}|${tpl.steps[i].name}`);
+          if (!target) {
+            errors.push(
+              `[chain:${tpl.slug}] Could not locate step "${tpl.steps[i].name}" (order ${tpl.steps[i].step_order}) after insert`
+            );
+            continue;
+          }
+          const resolved = depIndices
+            .map((idx) => tpl.steps[idx])
+            .map((dep) => stepByKey.get(`${dep.step_order}|${dep.name}`))
+            .filter((s): s is (typeof steps)[number] => !!s)
+            .map((s) => s.id);
           patchNeeded.push({
-            id: steps[i].id,
-            depends_on_steps: depIndices.map((idx) => steps[idx].id),
+            id: target.id,
+            depends_on_steps: resolved,
           });
         }
       }
