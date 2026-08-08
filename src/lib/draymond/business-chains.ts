@@ -53,7 +53,7 @@ function agentUrl(envVar: string, fallback: string): string {
 interface EntitySeedDef {
   name: string;
   slug: string;
-  kind: 'agent' | 'service';
+  kind: 'agent' | 'service' | 'tool';
   description: string;
   invocation_method: InvocationMethod;
   invocation_config: Record<string, unknown>;
@@ -114,7 +114,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     invocation_method: 'python_module',
     invocation_config: {
       module: 'tradingagents',
-      entry_point: 'main',
+      function: 'main',
       working_dir: process.env.TRADING_AGENTS_DIR || './agents/TradingAgents-main',
       python_path: process.env.TRADING_AGENTS_PYTHON || 'python',
       // If a future HTTP wrapper is deployed:
@@ -142,7 +142,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     invocation_config: {
       url: agentUrl('SPORTS_STEVE_URL', 'http://localhost:8010'),
       method: 'POST',
-      health_url: `${agentUrl('SPORTS_STEVE_URL', 'http://localhost:8010')}/health`,
+      health_url: `${agentUrl('SPORTS_STEVE_URL', 'http://localhost:8010')}/api/v1/health`,
       endpoints: {
         daily_run: '/api/v1/daily-run',
         resolve_bets: '/api/v1/resolve-bets',
@@ -541,6 +541,42 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     tags: ['ip', 'patent', 'trademark', 'copyright', 'blockchain', 'nft', 'grading'],
     category: 'finance',
     health_endpoint: '/api/v1/health',
+  },
+
+  // ── 13. Kaggle ─────────────────────────────────────────────────────
+  // Data provider — research datasets through the deterministic brain
+  {
+    name: 'Kaggle',
+    slug: 'kaggle',
+    kind: 'tool',
+    description:
+      'Data provider — pull Kaggle datasets/competitions into research. Downloads datasets as deterministic content-hashed snapshots and feeds them into the knowledge bank via the deterministic brain (localhost:3210 /kaggle/*). Feeds OmniResearch, backtesting, and the retrieval layer.',
+    invocation_method: 'http_api',
+    invocation_config: {
+      url: agentUrl('BRAIN_URL', 'http://localhost:3210'),
+      method: 'POST',
+      health_url: `${agentUrl('BRAIN_URL', 'http://localhost:3210')}/kaggle/status`,
+      endpoints: {
+        status: '/kaggle/status',
+        whoami: '/kaggle/whoami',
+        search: '/kaggle/datasets/search',
+        files: '/kaggle/datasets/files',
+        download: '/kaggle/datasets/download',
+        snapshots: '/kaggle/snapshots',
+        research_feed: '/kaggle/research/feed',
+        research_feeds: '/kaggle/research/feeds',
+      },
+    },
+    capabilities: [
+      'data_provider',
+      'dataset_search',
+      'dataset_download',
+      'snapshotting',
+      'research_feed',
+    ],
+    tags: ['data', 'research', 'datasets', 'kaggle'],
+    category: 'research',
+    health_endpoint: '/kaggle/status',
   },
 ];
 
@@ -1171,6 +1207,45 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
       },
     ],
   },
+
+  // ── Chain 11: Research Data Pipeline ─────────────────────────────────
+  // Research arm: pull a Kaggle dataset through the brain, feed it into the
+  // knowledge bank, then hand the resulting knowledge to OmniResearch for
+  // synthesis into a structured research brief.
+  {
+    name: 'Research Data Pipeline',
+    slug: 'research-data-pipeline',
+    description:
+      'Kaggle → knowledge → research: downloads a dataset (deterministic snapshot), ingests it into the knowledge bank + TF-IDF index, then OmniResearch synthesizes a research brief from the fed knowledge.',
+    steps: [
+      {
+        name: 'Fetch Kaggle Dataset',
+        entitySlug: 'kaggle',
+        action: 'research_feed',
+        input_mapping: {
+          dataset: '$.input.dataset',
+          tags: '$.input.tags',
+          force: '$.input.force',
+        },
+        output_key: 'feed_result',
+        step_order: 1,
+        depends_on_indices: [],
+      },
+      {
+        name: 'Synthesize Research Brief',
+        entitySlug: 'omni-research',
+        action: 'research_news',
+        input_mapping: {
+          query: '$.input.topic',
+          dataset: '$.input.dataset',
+          feed: '$.steps.feed_result.output',
+        },
+        output_key: 'research_brief',
+        step_order: 2,
+        depends_on_indices: [0],
+      },
+    ],
+  },
 ];
 
 // ============================================================================
@@ -1357,6 +1432,23 @@ const JOB_DEFS: JobSeedDef[] = [
     notify_on_failure: true,
   },
 
+  // ── Research Data Pipeline (6AM Wednesdays) ─────────────────────────
+  {
+    name: 'Research Data Feed',
+    cron_expression: '0 6 * * 3',
+    job_type: 'chain',
+    job_config: {
+      chain_slug: 'research-data-pipeline',
+      input: {
+        dataset: 'nathanlauga/nba-games',
+        topic: 'NBA performance trends',
+        tags: 'research,data',
+        force: false,
+      },
+    },
+    notify_on_failure: true,
+  },
+
   // ── Brain Wiki sync (daily 3AM) ─────────────────────────────────────
   {
     name: 'Brain Wiki Sync',
@@ -1416,6 +1508,15 @@ const JOB_DEFS: JobSeedDef[] = [
     cron_expression: '0 8 * * 5',
     job_type: 'custom',
     job_config: { handler: 'benchmark_sync_roster' },
+    notify_on_failure: true,
+  },
+
+  // ── Editorial Morning Push (7AM daily) ──────────────────────────────
+  {
+    name: 'Editorial Morning Push',
+    cron_expression: '0 7 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'editorial_push' },
     notify_on_failure: true,
   },
 ];

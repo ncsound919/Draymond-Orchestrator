@@ -349,6 +349,57 @@ export async function disableJob(id: string): Promise<ScheduledJob> {
 }
 
 // ============================================================================
+// IN-PROCESS SCHEDULER TICK
+// ============================================================================
+// The scheduler previously ONLY ran when something external hit GET /api/cron.
+// If that trigger fires rarely (e.g. once at 6am) then runDueJobs() executes
+// EVERY overdue job in one burst — the "night recap at 6am" problem. This tick
+// runs runDueJobs() every minute inside the server process so each job fires at
+// its real scheduled minute. A single-flight lock prevents overlapping ticks.
+// ============================================================================
+
+const TICK_INTERVAL_MS = Number(process.env.DRAYMOND_SCHEDULER_TICK_MS ?? 60_000);
+
+let _tickTimer: ReturnType<typeof setInterval> | null = null;
+let _tickRunning = false;
+/** Max how late a job may be before it is SKIPPED (not run late) and rescheduled. */
+const CATCH_UP_GRACE_MS = Number(process.env.DRAYMOND_CRON_GRACE_MS ?? 15 * 60 * 1000);
+
+/**
+ * Start the in-process scheduler loop (idempotent). Called from
+ * instrumentation.ts at server startup.
+ */
+export function startInProcessScheduler(): void {
+  if (_tickTimer) return; // already running
+  _tickTimer = setInterval(() => {
+    if (_tickRunning) return; // single-flight — never overlap
+    _tickRunning = true;
+    runDueJobs()
+      .catch((err) => {
+        console.error(`[Draymond Scheduler] in-process tick failed: ${err instanceof Error ? err.message : err}`);
+      })
+      .finally(() => {
+        _tickRunning = false;
+      });
+  }, TICK_INTERVAL_MS);
+  // unref() so the timer never keeps the process alive by itself.
+  _tickTimer.unref?.();
+}
+
+/** Stop the in-process scheduler loop (tests / teardown). */
+export function stopInProcessScheduler(): void {
+  if (_tickTimer) {
+    clearInterval(_tickTimer);
+    _tickTimer = null;
+  }
+}
+
+/** True while a tick is running (tests). */
+export function isSchedulerTickRunning(): boolean {
+  return _tickRunning;
+}
+
+// ============================================================================
 // JOB EXECUTION ENGINE
 // ============================================================================
 
@@ -379,7 +430,26 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
       // Instantiate and execute the chain
       const instance = await instantiateChain(chainSlug, input, undefined, agentId);
       const result = await executeChain(instance.id, agentId);
-      return result;
+
+      // executeChain returns the execution context even when steps fail — it
+      // does not throw. Derive the outcome from the recorded step statuses so
+      // a job whose chain failed doesn't report "success".
+      const stepResults = Object.values(result.steps ?? {});
+      const failedSteps = stepResults.filter(
+        (s) => s.status === 'failed' || s.status === 'blocked' || s.status === 'retrying'
+      ).length;
+      const completedSteps = stepResults.filter((s) => s.status === 'completed').length;
+      if (failedSteps > 0) {
+        const firstError = stepResults.find((s) => s.status === 'failed')?.error;
+        throw new Error(
+          `Chain "${chainSlug}" failed: ${failedSteps}/${stepResults.length} steps failed` +
+          (firstError ? ` (${firstError.slice(0, 200)})` : '')
+        );
+      }
+      return {
+        ...result,
+        summary: { totalSteps: stepResults.length, completedSteps, failedSteps: 0 },
+      };
     }
 
     case 'health_check': {
@@ -685,7 +755,36 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         for (const site of down.slice(0, 3)) {
           repairs.push(await attemptRepair('monitor:down', `${site.monitor_name || site.url} is down`));
         }
-        return { handler, down: down.length, repairs: repairs.map((r) => ({ signal: r.signal, status: r.status, detail: r.detail })) };
+        // Ecosystem services down (BookBridge, brain, hemp stack) are started
+        // directly — the real fix, not a report.
+        const servicesDown: string[] = [];
+        const serviceSlugs = ['bookbridge', 'deterministic-brain', 'hemp-os', 'hempforge', 'sports-steve', 'uplift'];
+        for (const site of down.slice(0, 5)) {
+          const name = String(site.monitor_name ?? '').toLowerCase().replace(/[\s-_]+/g, '');
+          for (const slug of serviceSlugs) {
+            if (name.includes(slug.replace(/[\s-_]+/g, ''))) {
+              servicesDown.push(slug);
+              break;
+            }
+          }
+        }
+        const startedServices: Array<{ slug: string; up: boolean; detail: string }> = [];
+        if (servicesDown.length > 0) {
+          const { startDownServices } = await import('./service-manager');
+          const started = await startDownServices([...new Set(servicesDown)].slice(0, 3));
+          startedServices.push(...started.map((s) => ({ slug: s.slug, up: s.up, detail: s.detail })));
+        }
+        // Learning→repair feedback: escalate any repair loops (blind repairs
+        // that keep being re-applied) to on-call instead of hammering them.
+        const { escalateRepairLoops } = await import('./learning-repair');
+        const loops = await escalateRepairLoops();
+        return {
+          handler,
+          down: down.length,
+          repairs: repairs.map((r) => ({ signal: r.signal, status: r.status, detail: r.detail })),
+          servicesStarted: startedServices,
+          loops: loops.map((l) => ({ signal: l.signal, attempts: l.attempts })),
+        };
       }
 
       if (handler === 'rd_night') {
@@ -758,20 +857,79 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
 
       if (handler === 'repair_failed_jobs') {
         // Deploy the repair team on failed jobs (config fixes, crew assignment).
+        // The crew consults distilled lessons for each job (learning → repair).
         const { listJobs, updateJob } = await import('./scheduler');
         const { repairFailedJob } = await import('./repair-team');
+        const { repairHintsFor } = await import('./learning-repair');
         const failed = (await listJobs()).filter((j) => j.last_run_status === 'failed');
         const reports = [];
+        const hintsByJob: Array<{ job: string; hints: number }> = [];
         for (const j of failed.slice(0, 10)) {
+          const hints = await repairHintsFor(`scheduler:${j.name}`);
+          hintsByJob.push({ job: j.name, hints: hints.length });
           reports.push(
             await repairFailedJob(
               { id: j.id, name: j.name, job_type: j.job_type, job_config: j.job_config ?? {} },
               j.last_error ?? 'unknown error',
               { updateJobConfig: (id, config) => updateJob(id, { job_config: config }) },
+              hints.map((h) => h.lesson),
             ),
           );
         }
-        return { handler, failed: failed.length, reports };
+        return { handler, failed: failed.length, hintsByJob, reports };
+      }
+
+      if (handler === 'brain_decision_cycle') {
+        // Draymond consults the deterministic brain's reasoning engine, aligned
+        // to the operating agenda, and routes hiccups to the repair/coding
+        // teams while feeding self-learning. See brain-decision.ts.
+        const { runBrainDecision } = await import('./brain-decision');
+        const decision = await runBrainDecision();
+        return { handler, ...decision };
+      }
+
+      if (handler === 'agent_heartbeat_sweep') {
+        // Ping every roster service health endpoint and record real liveness
+        // so agents never sit at "unknown" forever. Down services are flagged.
+        const { runHeartbeatSweep, getHeartbeats } = await import('./heartbeat');
+        const sweep = await runHeartbeatSweep();
+        const beats = await getHeartbeats();
+        return { handler, ...sweep, heartbeats: beats };
+      }
+
+      if (handler === 'service_health_repair') {
+        // Probe the ecosystem services; auto-start the ones that are down
+        // (BookBridge, brain, hemp stack, ...). The repair team's job handler.
+        const { probeAllServices, startDownServices } = await import('./service-manager');
+        const all = await probeAllServices();
+        const down = all.filter((s) => !s.up).map((s) => s.slug);
+        const started = await startDownServices(down.slice(0, 5));
+        return {
+          handler,
+          checked: all.length,
+          up: all.filter((s) => s.up).length,
+          down,
+          started: started.map((s) => ({ slug: s.slug, up: s.up, detail: s.detail })),
+        };
+      }
+
+      if (handler === 'api_key_audit') {
+        // Audit which free-API keys are configured and feed the result to
+        // self-learning so the fleet tracks the acquisition list. Never logs
+        // key values — only configured? yes/no.
+        const { auditApiKeys, missingCriticalKeys } = await import('./api-keys');
+        const audit = auditApiKeys();
+        try {
+          const { recordOutcome } = await import('./self-learning');
+          await recordOutcome({
+            agentId: 'api-key-audit',
+            kind: 'incident',
+            summary: `api key audit: ${audit.configured} configured, ${audit.missing} missing, ${audit.noKey} keyless`,
+            success: audit.missing === 0,
+            detail: `missing: ${audit.missingNames.join(', ') || 'none'}`,
+          });
+        } catch { /* learning store best-effort */ }
+        return { handler, ...audit, criticalMissing: missingCriticalKeys() };
       }
 
       if (handler === 'dispatch_worker_tasks') {
@@ -779,6 +937,69 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         const { dispatchWorkerTasks } = await import('./worker-tasks');
         const r = await dispatchWorkerTasks(config as import('./worker-tasks').DispatchWorkerTasksConfig);
         return { handler, ...r };
+      }
+
+      if (handler === 'file_share_check') {
+        // Exercise the file-sharing / browser-fetch surface (AgentBrowser).
+        // Fetches a target URL via the browser pipeline and reports content.
+        const { browserFetch, isAgentBrowserConfigured } = await import('../agentbrowser');
+        const target =
+          (config as { url?: string }).url ?? process.env.OVERLAY_HEALTH_URL ?? 'https://uplift-health.vercel.app/';
+        if (!isAgentBrowserConfigured()) {
+          return { handler, status: 'skipped', reason: 'AgentBrowser not configured (AGENTBROWSER_URL + AGENTBROWSER_API_KEY)' };
+        }
+        const result = await browserFetch(target, 'get-content');
+        return {
+          handler,
+          url: target,
+          ok: result.success === true,
+          error: result.error ?? null,
+          contentBytes: (result.content ?? result.text ?? '').length,
+        };
+      }
+
+      if (handler === 'code_review_check') {
+        // Exercise the local deep-analysis / code-review scorer (Codegang).
+        const { codegangAnalyzeFile, codegangIsUp } = await import('../ide/codegang-client');
+        if (!(await codegangIsUp())) {
+          return { handler, status: 'skipped', reason: 'Codegang offline (CODEGANG_URL)' };
+        }
+        const sample =
+          (config as { content?: string }).content ??
+          'export function add(a: number, b: number): number { return a + b; }\n\nfunction unusedHelper(n: number): number { return n * 2; }';
+        const res = await codegangAnalyzeFile({ filePath: 'overlay/sample.ts', content: sample, language: 'typescript' });
+        return {
+          handler,
+          ok: res.success === true,
+          error: res.error ?? null,
+          qualityScore: res.metrics?.qualityScore ?? null,
+          totalIssues: res.metrics?.totalIssues ?? null,
+          criticalCount: res.metrics?.criticalCount ?? null,
+          highCount: res.metrics?.highCount ?? null,
+        };
+      }
+
+      if (handler === 'systemic_consolidate') {
+        // Run the systemic interconnection consolidation: distill lessons,
+        // persist them as memory, and align agenda goals.
+        const { consolidateSystem } = await import('./systemic');
+        const result = await consolidateSystem();
+        return { handler, ...result };
+      }
+
+      if (handler === 'systemic_interconnect') {
+        // Full one-shot: seed agenda + knowledge graph + consolidate.
+        const { interconnectSystem } = await import('./systemic');
+        const result = await interconnectSystem();
+        return { handler, ...result };
+      }
+
+      if (handler === 'editorial_push') {
+        // Build + push the morning editorial articles to Sports Steve.
+        const { buildEditorialArticles, pushEditorialToSteve } = await import('../sports-steve-editorial');
+        const articles = await buildEditorialArticles();
+        const pushed = await pushEditorialToSteve(articles);
+        return { handler, built: articles.length, pushed: pushed.imported };
       }
 
       console.log(
@@ -826,8 +1047,57 @@ export async function runDueJobs(): Promise<JobRunResult[]> {
     return results;
   }
 
-  // 2. Execute each due job with atomic claim
+  // 2. Partition into "run now" vs "too late — skip + reschedule".
+  // A job whose next_run_at is far in the past (machine off overnight, external
+  // cron only fired at 6am, etc.) should NOT fire late: that's the "night recap
+  // at 6am" bug. It gets skipped (no execution, no email spam) and rescheduled
+  // to its next real slot. Freshly-due jobs (within CATCH_UP_GRACE_MS) run.
+  const nowMs = now.getTime();
+  const runnable: ScheduledJob[] = [];
+  const stale: ScheduledJob[] = [];
   for (const raw of dueJobs) {
+    const job = raw as ScheduledJob;
+    const dueMs = job.next_run_at ? new Date(job.next_run_at).getTime() : nowMs;
+    if (Number.isFinite(dueMs) && nowMs - dueMs > CATCH_UP_GRACE_MS) {
+      stale.push(job);
+    } else {
+      runnable.push(job);
+    }
+  }
+
+  // Reschedule stale jobs WITHOUT executing them. No notifications, no
+  // learning outcomes, no token burn — just advance next_run_at.
+  for (const job of stale) {
+    try {
+      const nextRunAt = getNextRunTime(job.cron_expression, now).toISOString();
+      await supabase
+        .from('draymond_scheduled_jobs')
+        .update({
+          last_run_at: now.toISOString(),
+          last_run_status: 'skipped',
+          last_error: `Missed window (overdue by ${Math.round((nowMs - new Date(job.next_run_at!).getTime()) / 60000)}min) — skipped and rescheduled to avoid late/duplicate execution`,
+          next_run_at: nextRunAt,
+        })
+        .eq('id', job.id);
+      results.push({
+        job_id: job.id,
+        job_name: job.name,
+        job_type: job.job_type,
+        status: 'skipped',
+        duration_ms: 0,
+        error: 'Missed window — rescheduled',
+      });
+    } catch (err) {
+      console.error(`[Draymond Scheduler] Failed to reschedule stale job "${job.name}":`, err);
+    }
+  }
+
+  if (runnable.length === 0) {
+    return results;
+  }
+
+  // 3. Execute each runnable job with atomic claim
+  for (const raw of runnable) {
     const job = raw as ScheduledJob;
 
     // Atomic claim: only mark as running if still not running.
@@ -932,6 +1202,29 @@ export async function runDueJobs(): Promise<JobRunResult[]> {
         .eq('id', job.id);
 
       emitJobFailed(job.id, job.name, job.job_type, errorMessage);
+
+      // Feed the failure to the learning loop (distilled into lessons nightly)
+      // and to Sentry for aggregation — both best-effort, never break the job.
+      try {
+        const { recordOutcome } = await import('./self-learning');
+        await recordOutcome({
+          agentId: `scheduler:${job.name}`,
+          kind: 'job',
+          summary: `scheduler job failed: ${job.name}`,
+          success: false,
+          detail: errorMessage.slice(0, 500),
+        });
+      } catch {
+        /* learning store best-effort */
+      }
+      try {
+        const { captureException } = await import('../sentry');
+        await captureException(err instanceof Error ? err : new Error(errorMessage), {
+          tags: { component: 'scheduler', job: job.name, job_type: job.job_type },
+        });
+      } catch {
+        /* observability best-effort */
+      }
 
       results.push({
         job_id: job.id,
@@ -1170,6 +1463,38 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     cron_expression: '5 * * * *',
     job_type: 'custom',
     job_config: { handler: 'repair_failed_jobs' },
+    is_enabled: true,
+  },
+  {
+    name: 'Brain Decision Cycle',
+    description: 'Every 30min — Draymond consults the deterministic brain reasoning engine, aligned to the agenda, and routes hiccups to the repair/coding teams.',
+    cron_expression: '*/30 * * * *',
+    job_type: 'custom',
+    job_config: { handler: 'brain_decision_cycle' },
+    is_enabled: true,
+  },
+  {
+    name: 'Agent Heartbeat Sweep',
+    description: 'Every 15min — ping every roster service health endpoint and record real liveness (no more permanent "unknown").',
+    cron_expression: '*/15 * * * *',
+    job_type: 'custom',
+    job_config: { handler: 'agent_heartbeat_sweep' },
+    is_enabled: true,
+  },
+  {
+    name: 'Service Health Repair',
+    description: 'Hourly — probe ecosystem services and auto-start any that are down (BookBridge, brain, hemp stack, ...).',
+    cron_expression: '20 * * * *',
+    job_type: 'custom',
+    job_config: { handler: 'service_health_repair' },
+    is_enabled: true,
+  },
+  {
+    name: 'Free-API Key Audit',
+    description: 'Daily 9am — audit which free-API keys are configured (never the values) and feed the acquisition list to self-learning.',
+    cron_expression: '0 9 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'api_key_audit' },
     is_enabled: true,
   },
 ];
