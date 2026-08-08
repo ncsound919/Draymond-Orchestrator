@@ -12,6 +12,7 @@ function buildEntitySupabase(options: {
   trendRows?: Array<{ weakness_score: number }>;
 }) {
   const insertCalls: Array<{ table: string; rows: Array<Record<string, unknown>> }> = [];
+  const updateCalls: Array<{ table: string; payload: Record<string, unknown>; filters: string[] }> = [];
   const supabase = {
     from: vi.fn((table: string) => {
       if (table === 'draymond_entities') {
@@ -43,6 +44,18 @@ function buildEntitySupabase(options: {
             insertCalls.push({ table, rows });
             return { select: vi.fn(async () => ({ error: null })) };
           }),
+          update: vi.fn((payload: Record<string, unknown>) => {
+            const filters: string[] = [];
+            const rec = {
+              eq: (col: string, val: unknown) => {
+                filters.push(`${col}=${val}`);
+                return rec;
+              },
+              then: async (resolve: (value: unknown) => void) => resolve({ error: null }),
+            };
+            updateCalls.push({ table, payload, filters });
+            return rec;
+          }),
         };
       }
       // draymond_upgrade_queue
@@ -63,7 +76,7 @@ function buildEntitySupabase(options: {
       };
     }),
   };
-  return { supabase, insertCalls };
+  return { supabase, insertCalls, updateCalls };
 }
 
 describe('runBenchmarkCycle', () => {
@@ -129,17 +142,41 @@ describe('runBenchmarkCycle', () => {
     });
   });
 
-  it('deep-scores the weakest entity and counts it as a success', async () => {
+  it('deep-scores the weakest entity, counts it as a success, and persists deep scores', async () => {
     vi.stubEnv('REPORANK_URL', 'http://localhost:4000');
+    vi.stubEnv('REPORANK_API_KEY', 'gr_rr');
+    vi.stubEnv('REPORANK_POLL_INTERVAL_MS', '1');
     vi.stubEnv('GRADER_URL', 'http://localhost:5000');
+    vi.stubEnv('GRADER_API_KEY', 'gr_gr');
     vi.stubEnv('VIBE_REALITY_URL', 'http://localhost:6000');
-    globalThis.fetch = vi.fn(
-      async () => new Response(JSON.stringify({ trust: 90, summary: 'ok' }), { status: 200 })
-    );
+    vi.stubEnv('VIBE_REALITY_ID_TOKEN', 'tok');
+    vi.stubEnv('VIBE_POLL_INTERVAL_MS', '1');
 
-    const { supabase } = buildEntitySupabase({
+    // RepoRank: submit scan → poll complete. Grader: /api/grade. Vibe: submit + poll.
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = (init?.method ?? 'GET').toUpperCase();
+      if (url.includes('/api/v1/scans') && method === 'POST') {
+        return new Response(JSON.stringify({ data: { scanId: 's1', status: 'queued' } }), { status: 201 });
+      }
+      if (url.includes('/api/v1/scans/') && method === 'GET') {
+        return new Response(JSON.stringify({ data: { status: 'complete', result: { overallScore: 90, gradeCategory: 'A' } } }), { status: 200 });
+      }
+      if (url.includes('/api/grade')) {
+        return new Response(JSON.stringify({ overallScore: 88, gradeCategory: 'A' }), { status: 200 });
+      }
+      if (url.includes('/api/analyze')) {
+        return new Response(JSON.stringify({ jobId: 'j1' }), { status: 200 });
+      }
+      if (url.includes('/api/jobs/')) {
+        return new Response(JSON.stringify({ status: 'complete', result: { realityScore: 75 } }), { status: 200 });
+      }
+      return new Response('not found', { status: 404 });
+    });
+
+    const { supabase, updateCalls } = buildEntitySupabase({
       entityRows: [
-        { slug: 'uplift-agent', name: 'Uplift Agent', linked_agent_id: 'agent-uuid-1', health_status: 'healthy', last_invoked_at: null },
+        { slug: 'uplift-agent', name: 'Uplift Agent', linked_agent_id: 'agent-uuid-1', health_status: 'healthy', last_invoked_at: null, source_url: 'https://github.com/uplift/uplift' },
       ],
       eventRows: [{ agent_id: 'agent-uuid-1', severity: 'error' }],
     });
@@ -150,17 +187,33 @@ describe('runBenchmarkCycle', () => {
     const result = await cycle('entity', { deepScoreLimit: 1 });
     expect(result.deepScored).toBe(1);
     expect(result.queued).toBe(1);
+
+    // Deep scores must be persisted onto the benchmark row for the run.
+    const deepUpdate = updateCalls.find(
+      (u) => u.table === 'draymond_benchmarks' && u.payload.deep_scores
+    );
+    expect(deepUpdate).toBeDefined();
+    expect(deepUpdate!.payload.deep_scores).toMatchObject({
+      reporank: { scorer: 'reporank', score: 90 },
+      grader: { scorer: 'grader', score: 88 },
+    });
+    expect(deepUpdate!.filters.some((f) => f.startsWith('run_id=entity-'))).toBe(true);
+    expect(deepUpdate!.filters).toContain('component_class=entity');
+    expect(deepUpdate!.filters).toContain('component_slug=uplift-agent');
   });
 
   it('counts deepScored as zero when every scorer errors', async () => {
     vi.stubEnv('REPORANK_URL', 'http://localhost:4000');
+    vi.stubEnv('REPORANK_API_KEY', 'gr_rr');
     vi.stubEnv('GRADER_URL', 'http://localhost:5000');
+    vi.stubEnv('GRADER_API_KEY', 'gr_gr');
     vi.stubEnv('VIBE_REALITY_URL', 'http://localhost:6000');
+    vi.stubEnv('VIBE_REALITY_ID_TOKEN', 'tok');
     globalThis.fetch = vi.fn(async () => new Response('oops', { status: 500 }));
 
     const { supabase } = buildEntitySupabase({
       entityRows: [
-        { slug: 'uplift-agent', name: 'Uplift Agent', linked_agent_id: 'agent-uuid-1', health_status: 'healthy', last_invoked_at: null },
+        { slug: 'uplift-agent', name: 'Uplift Agent', linked_agent_id: 'agent-uuid-1', health_status: 'healthy', last_invoked_at: null, source_url: 'https://github.com/uplift/uplift' },
       ],
       eventRows: [],
     });

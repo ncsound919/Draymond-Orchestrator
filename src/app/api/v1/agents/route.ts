@@ -21,13 +21,14 @@ export async function GET(request: NextRequest) {
     const registeredAgents = await getAllAgents();
 
     // Normalise to the shape Open-Chat expects:
-    // { id, name, capabilities[], status, last_heartbeat }
+    // { id, name, capabilities[], status, last_heartbeat, avatar_url }
     const agents = registeredAgents.map((a) => ({
       id: a.id,
       name: a.name,
       capabilities: a.capabilities ?? [],
       status: a.status ?? 'unknown',
       last_heartbeat: a.updatedAt ?? null,
+      avatar_url: a.avatarUrl ?? null,
     }));
 
     return NextResponse.json({ agents, total: agents.length });

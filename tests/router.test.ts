@@ -103,6 +103,8 @@ describe('router opencode-free provider', () => {
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer test-key');
     const body = JSON.parse(init.body as string);
     expect(body.model).toBe('deepseek-v4-flash-free');
+    // structured output (the outlines analog) for deterministic intent JSON
+    expect(body.response_format).toEqual({ type: 'json_object' });
   });
 
   it('falls back to intent unknown on non-JSON response (tolerant parser)', async () => {
@@ -118,5 +120,51 @@ describe('router opencode-free provider', () => {
     const result = await routeTask('list agents');
     expect(result.intent).toBe('unknown');
     expect(result.confidence).toBe(0);
+  });
+
+  it('direct-matches web search patterns without calling the LLM', async () => {
+    process.env.OPENCODE_API_KEY = 'test-key';
+    const result = await routeTask('search the web for react 19 features');
+    expect(result.intent).toBe('web_search');
+    expect(result.confidence).toBe(0.92);
+    expect(result.input).toEqual({ query: 'react 19 features' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('direct-matches lookup/query patterns for web search', async () => {
+    const result = await routeTask('look up the weather in chicago');
+    expect(result.intent).toBe('web_search');
+    expect(result.input).toEqual({ query: 'the weather in chicago' });
+  });
+
+  it('direct-matches deep system queries (crons, workflows, agenda, repairs)', async () => {
+    for (const q of [
+      'how are my crons doing',
+      'how are the workflows running',
+      'what needs repair',
+      'what is on the agenda today',
+      'how are the agents doing',
+      'what did the brain find',
+    ]) {
+      const result = await routeTask(q);
+      expect(result.intent, `expected query_status for "${q}"`).toBe('query_status');
+      expect(result.confidence).toBeGreaterThanOrEqual(0.9);
+    }
+  });
+
+  it('direct-matches a brain sweep request to the deterministic-brain entity', async () => {
+    const result = await routeTask('run the brain');
+    expect(result.intent).toBe('invoke_entity');
+    expect(result.entity_slug).toBe('deterministic-brain');
+    expect(result.action).toBe('sweep');
+  });
+
+  it('does not let an unresolved generic entity candidate block brain commands', async () => {
+    // "invoke" is an entity prefix — without the reserved-command-first ordering
+    // the parser would capture filler word "the" and bail before the brain matcher.
+    const result = await routeTask('invoke the brain');
+    expect(result.intent).toBe('invoke_entity');
+    expect(result.entity_slug).toBe('deterministic-brain');
+    expect(result.action).toBe('sweep');
   });
 });

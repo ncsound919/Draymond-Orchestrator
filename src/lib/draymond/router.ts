@@ -153,14 +153,15 @@ function buildSystemPrompt(snapshot: RegistrySnapshot): string {
     'Classify the intent as one of:',
     '  - invoke_entity: the task should be handled by a specific entity',
     '  - execute_chain: the task requires a multi-step chain',
-    '  - query_status: the user wants system status, health, or analytics info',
+    '  - query_status: the user wants system status, health, analytics, crons/schedules, workflows/chains, the agenda/goals, repairs/recovery, or any question about how the Draymond system is doing',
     '  - manage_memory: the user wants to store, retrieve, or manage memory',
     '  - decompose_goal: the task is complex and needs to be broken into subtasks',
+    '  - web_search: the user wants current/online information that requires a live web search',
     '  - unknown: you cannot determine the intent',
     '',
     'Respond ONLY with valid JSON (no markdown fences):',
     '{',
-    '  "intent": "invoke_entity|execute_chain|query_status|manage_memory|decompose_goal|unknown",',
+    '  "intent": "invoke_entity|execute_chain|query_status|manage_memory|decompose_goal|web_search|unknown",',
     '  "confidence": 0.0-1.0,',
     '  "entity_slug": "slug or null",',
     '  "chain_slug": "slug or null",',
@@ -180,6 +181,7 @@ const VALID_INTENTS: Set<RouterIntent> = new Set([
   'query_status',
   'manage_memory',
   'decompose_goal',
+  'web_search',
   'unknown',
 ]);
 
@@ -298,6 +300,7 @@ export async function routeTask(
       maxTokens: _config.max_tokens,
       temperature: _config.temperature,
       timeoutMs: _config.timeout_ms,
+      responseFormat: { type: 'json_object' },
     });
     const latencyMs = Date.now() - startMs;
     const result = parseRouterResponse(raw, snapshot, latencyMs);
@@ -374,27 +377,47 @@ export async function routeAndClassify(
 const ENTITY_PREFIX_RE = /^(?:run|invoke|execute|use|call)\s+(?:entity\s+)?['""]?([a-z0-9_-]+)['""]?/i;
 const CHAIN_PREFIX_RE = /^(?:run|execute|start)\s+(?:chain\s+)?['""]?([a-z0-9_-]+)['""]?\s*chain/i;
 const STATUS_RE = /^(?:show|get|what(?:'s| is))\s+(?:the\s+)?(?:status|health|dashboard)/i;
+const SYSTEM_QUERY_RE =
+  /^(?:how|what|why|any|are|is|show|get|check|list)\b.*\b(crons?|scheduled jobs?|workflows?|chains?|repairs?|recovery|upgrade queue|agenda|goals?|monitors?|benchmarks?|system|jobs?|brain)\b|(?:\b)(crons?|scheduled jobs?|workflows?|chains?|repairs?|monitors?|agents?|goals?|system|jobs?|brain)\b.*\b(doing|status|health|running|failing|progress|up|down|needs|find)\b/i;
+const WEB_SEARCH_RE = /^(?:search(?: the web| online| google)?|google|look up|lookup|find(?: information)?(?: about)?|research online)\s+(?:for\s+)?(.+)$/i;
+const BRAIN_RUN_RE = /^(?:run|invoke|trigger|fire)\s+(?:the\s+)?brain(?:\s+sweep)?\s*$/i;
 
 function tryDirectMatch(task: string, snapshot: RegistrySnapshot): RouteResult | null {
   const trimmed = task.trim();
+
+  // Reserved system commands are evaluated BEFORE generic entity parsing so
+  // command filler words ("the") can never be mistaken for an entity slug.
+  if (BRAIN_RUN_RE.test(trimmed)) {
+    return {
+      intent: 'invoke_entity',
+      confidence: 0.9,
+      entity_slug: 'deterministic-brain',
+      action: 'sweep',
+      reasoning: 'Direct deterministic-brain sweep request — skipped LLM routing',
+      alternatives: [],
+      resolved_at: new Date().toISOString(),
+      latency_ms: 0,
+    };
+  }
 
   // Check for entity invocation pattern
   const entityMatch = ENTITY_PREFIX_RE.exec(trimmed);
   if (entityMatch) {
     const slug = entityMatch[1].toLowerCase();
-    // Validate that the entity actually exists in the registry
-    if (!snapshot.entities.some((e) => e.slug === slug)) {
-      return null; // Slug not in registry — fall through to LLM routing
+    // Only match when the entity actually exists in the registry.
+    if (snapshot.entities.some((e) => e.slug === slug)) {
+      return {
+        intent: 'invoke_entity',
+        confidence: 0.95,
+        entity_slug: slug,
+        reasoning: 'Direct entity slug pattern detected and validated against registry — skipped LLM routing',
+        alternatives: [],
+        resolved_at: new Date().toISOString(),
+        latency_ms: 0,
+      };
     }
-    return {
-      intent: 'invoke_entity',
-      confidence: 0.95,
-      entity_slug: slug,
-      reasoning: 'Direct entity slug pattern detected and validated against registry — skipped LLM routing',
-      alternatives: [],
-      resolved_at: new Date().toISOString(),
-      latency_ms: 0,
-    };
+    // Unmatched candidate — fall through to the more specific matchers below
+    // (chain, web search, brain, status) instead of returning early.
   }
 
   // Check for chain execution pattern
@@ -416,12 +439,26 @@ function tryDirectMatch(task: string, snapshot: RegistrySnapshot): RouteResult |
     };
   }
 
+  // Check for web search pattern
+  const webMatch = WEB_SEARCH_RE.exec(trimmed);
+  if (webMatch && webMatch[1]) {
+    return {
+      intent: 'web_search',
+      confidence: 0.92,
+      input: { query: webMatch[1].trim() },
+      reasoning: 'Direct web search pattern detected — skipped LLM routing',
+      alternatives: [],
+      resolved_at: new Date().toISOString(),
+      latency_ms: 0,
+    };
+  }
+
   // Check for status query
-  if (STATUS_RE.test(trimmed)) {
+  if (STATUS_RE.test(trimmed) || SYSTEM_QUERY_RE.test(trimmed)) {
     return {
       intent: 'query_status',
       confidence: 0.9,
-      reasoning: 'Status query pattern detected — skipped LLM routing',
+      reasoning: 'Status / system query pattern detected — skipped LLM routing',
       alternatives: [],
       resolved_at: new Date().toISOString(),
       latency_ms: 0,

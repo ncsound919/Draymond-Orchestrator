@@ -51,6 +51,9 @@ next-env.d.ts
 # Draymond operational data store
 /.draymond/
 
+# Local SQLite database, Supabase dumps, and paid release binaries
+/data/
+
 # Non-project directories
 /downloads/
 /Graphics/
@@ -76,3 +79,6 @@ sessions/
 
 # Stray files
 /DS Font/
+
+# stray runtime logs
+/cronfix.log

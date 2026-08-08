@@ -441,6 +441,14 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
     case 'custom': {
       const handler = config.handler as string | undefined;
 
+      if (handler === 'benchmark_roster') {
+        // Deep-score every pictured roster agent's repo (RepoRank/Grader/
+        // Vibe-Reality) and queue the weakest for the self-learning loop.
+        const { benchmarkRoster } = await import('./roster-benchmark');
+        const r = await benchmarkRoster({ queueLimit: 10 });
+        return { handler, ...r };
+      }
+
       if (handler === 'check_all_sites') {
         const { checkAllSites } = await import('./monitors');
         const result = await checkAllSites();
@@ -466,7 +474,7 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         const { execFile } = await import('node:child_process');
         const { promisify } = await import('node:util');
         const run = promisify(execFile);
-        const out = await run('node', ['scripts/sync-wiki-to-supabase.mjs'], { timeout: 120_000 });
+        const out = await run('node', ['scripts/sync-wiki-to-sqlite.mjs'], { timeout: 120_000 });
         return { handler, output: (out.stdout || '').trim().slice(0, 1500) };
       }
 
@@ -512,6 +520,55 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
           results.push({ class: cls, ...r });
         }
         return { handler, deepScored: results.reduce((n, r) => n + r.deepScored, 0), results };
+      }
+
+      if (handler === 'benchmark_sync_roster') {
+        // Sync RepoRank/Grader/Vibe-Reality benchmark scores onto the agent
+        // roster stats and record % gains into the self-learning loop so the
+        // system recognises the value of component improvements.
+        const { syncRosterBenchmarks } = await import('./roster-stats');
+        const { recordBenchmarkGains } = await import('./self-learning');
+        const sync = await syncRosterBenchmarks();
+        // Map gains per component to the roster agent slug that owns it.
+        const { latestDeepScoredBenchmarks } = await import('./roster-stats');
+        const { getAllAgents } = await import('@/lib/registry/agent-store');
+        const [snapshots, agents] = await Promise.all([
+          latestDeepScoredBenchmarks(),
+          getAllAgents(),
+        ]);
+        const agentBySlug = new Map(agents.map((a) => [a.slug, a]));
+        const { computeBenchmarkGains } = await import('./roster-stats');
+        const gains: Array<{
+          agentId: string;
+          component: string;
+          scorer: string;
+          baseline: number | null;
+          current: number | null;
+          gainPct: number | null;
+        }> = [];
+        for (const s of snapshots) {
+          // Agent slug matches entity slug for roster-owned components.
+          const agent = agentBySlug.get(s.component_slug);
+          const agentId = agent?.id ?? agent?.slug ?? s.component_slug;
+          const perComponent = await computeBenchmarkGains(s.component_class, s.component_slug);
+          for (const g of perComponent) {
+            gains.push({
+              agentId,
+              component: g.component_slug,
+              scorer: g.scorer,
+              baseline: g.baseline,
+              current: g.current,
+              gainPct: g.gainPct,
+            });
+          }
+        }
+        const outcomes = await recordBenchmarkGains(gains);
+        return {
+          handler,
+          rosterAgentsUpdated: sync.updated,
+          statsBySlug: sync.statsBySlug,
+          gainsRecorded: outcomes.length,
+        };
       }
 
       if (handler === 'benchmark_upgrade_review') {
@@ -892,6 +949,28 @@ export async function runDueJobs(): Promise<JobRunResult[]> {
           console.error(`[Draymond Scheduler] Failed to send failure notification for "${job.name}":`, notifyErr);
         }
       }
+
+      // Real-time chat alert via the tunnel so the user can diagnose + repair
+      // from Open-Chat without waiting for the batched email.
+      if (job.notify_on_failure) {
+        try {
+          const { publishIssueNotification } = await import('./ntfy');
+          await publishIssueNotification({
+            title: `Draymond · ${job.name} FAILED`,
+            message: `Job "${job.name}" (${job.job_type}) failed after ${durationMs}ms.\n\nError: ${errorMessage}\n\nFail count: ${job.fail_count + 1} / Run count: ${job.run_count + 1}`,
+            priority: 5,
+            tags: ['rotating_light', 'warning'],
+            repair: {
+              kind: 'job',
+              signal: 'job:error',
+              detail: errorMessage,
+              job: { id: job.id, name: job.name, job_type: job.job_type, job_config: job.job_config ?? {} },
+            },
+          });
+        } catch (notifyErr) {
+          console.error(`[Draymond Scheduler] Failed to push failure chat alert for "${job.name}":`, notifyErr);
+        }
+      }
     }
   }
 
@@ -916,6 +995,17 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     description: 'Daily 7am market & news digest from research agents.',
     cron_expression: '0 7 * * *',
     job_type: 'notification',
+    // Previously seeded with no job_config at all, so the notification
+    // validator always rejected it. Give it a working payload (recipient
+    // resolved from env so the job survives without hard-coded email config).
+    job_config: {
+      payload: {
+        recipient: process.env.DRAYMOND_ALERT_EMAIL ?? process.env.GMAIL_USER ?? 'admin@localhost',
+        subject: 'Daily Market & News Digest',
+        body: 'Morning market and news digest is ready — see the Draymond dashboard / Open-Chat for the full briefing.',
+        channel: 'email',
+      },
+    },
     is_enabled: true,
   },
   {
@@ -923,8 +1013,11 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     description: 'Weekly Monday 9am operations rollup (campaign, portfolio, research).',
     cron_expression: '0 9 * * 1',
     job_type: 'chain',
-    job_config: { chain: 'weekly-operations-review' },
-    is_enabled: true,
+    // The old seed referenced job_config.chain and a 'weekly-operations-review'
+    // chain template that was never created, so this job could only fail.
+    // Disabled until a real operations-review chain exists.
+    job_config: { chain_slug: 'weekly-operations-review' },
+    is_enabled: false,
   },
   {
     name: 'Daily Book Library Scan',
@@ -987,7 +1080,9 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     description: 'Each evening, the marketing team builds next-day content/tools.',
     cron_expression: '0 20 * * *',
     job_type: 'chain',
-    job_config: { chain_slug: 'marketing-pulse' },
+    // 'marketing-pulse' was never a defined chain template; point at the real
+    // marketing chain so this job actually runs.
+    job_config: { chain_slug: 'daily-marketing-run' },
     is_enabled: true,
   },
   {
@@ -996,6 +1091,14 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     cron_expression: '0 4 * * 0',
     job_type: 'custom',
     job_config: { handler: 'generate_agent_avatars' },
+    is_enabled: true,
+  },
+  {
+    name: 'Roster Benchmark',
+    description: 'Deep-score pictured agents\' repos (RepoRank/Grader) and queue the weakest for self-learning.',
+    cron_expression: '30 6 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'benchmark_roster' },
     is_enabled: true,
   },
   {

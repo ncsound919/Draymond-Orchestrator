@@ -1411,6 +1411,13 @@ const JOB_DEFS: JobSeedDef[] = [
     job_config: { handler: 'benchmark_upgrade_review' },
     notify_on_failure: true,
   },
+  {
+    name: 'Benchmark: Sync Roster',
+    cron_expression: '0 8 * * 5',
+    job_type: 'custom',
+    job_config: { handler: 'benchmark_sync_roster' },
+    notify_on_failure: true,
+  },
 ];
 
 /** Return a copy of the seeded scheduled job definitions (JOB_DEFS). */

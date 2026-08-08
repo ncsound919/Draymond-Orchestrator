@@ -33,7 +33,8 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self'",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com",
+      "connect-src 'self' https://api.openai.com https://cdn.jsdelivr.net",
+      "worker-src 'self' blob:",
       "frame-ancestors 'none'",
     ].join("; "),
   },
@@ -42,7 +43,10 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
 
-  // Pin the workspace root — a stray pnpm-lock.yaml in a parent directory
+  // better-sqlite3 is a native module — never bundle it into server builds.
+  serverExternalPackages: ['better-sqlite3'],
+
+  // Pin the workspace root �?" a stray pnpm-lock.yaml in a parent directory
   // makes Next infer the wrong root and double the path (e.g. ./src\src\...).
   turbopack: {
     root: process.cwd(),

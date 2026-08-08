@@ -25,6 +25,8 @@ const eslintConfig = defineConfig([
     "agents/**",
     "public/**",
     "scripts/**",
+    // Archived upstream snapshot — reference only, not part of this app.
+    "docs/mathx-source-reference/**",
   ]),
 ]);
 

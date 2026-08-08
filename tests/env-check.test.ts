@@ -1,12 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { checkEnv } from '../src/lib/draymond/env-check';
 
-const REQUIRED = [
-  'NEXT_PUBLIC_SUPABASE_URL',
-  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-  'SUPABASE_SERVICE_ROLE_KEY',
-  'CRON_SECRET',
-];
+const REQUIRED = ['CRON_SECRET'];
 
 describe('checkEnv', () => {
   const originalEnv = { ...process.env };
@@ -59,6 +54,7 @@ describe('checkEnv', () => {
       'CCE_ROOT', 'CCE_PYTHON', 'TRADING_AGENTS_PYTHON', 'TRADING_AGENTS_DIR',
       'SUB_TEAM_PYTHON', 'SUB_TEAM_DIR', 'DRAYMOND_REGISTRY_DIR', 'AUDIT_LOG_PATH',
       'DEEPSEEK_API_KEY', 'AETHERDESK_BASE_URL', 'AETHERDESK_API_KEY', 'NTFY_TOPIC_RESULTS',
+      'DRAYMOND_DB_PATH', 'DRAYMOND_ADMIN_EMAIL', 'DRAYMOND_ADMIN_PASSWORD', 'DRAYMOND_RELEASES_DIR',
     ];
     for (const k of REQUIRED) process.env[k] = 'set';
     for (const k of OPTIONAL) process.env[k] = 'set';

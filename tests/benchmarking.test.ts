@@ -153,3 +153,49 @@ describe('benchmarking recordRun', () => {
     await expect(rr('entity', [])).resolves.toEqual({ run_id: expect.stringMatching(/^entity-[\d-]+$/), recorded: 0 });
   });
 });
+
+describe('benchmarking recordDeepScores', () => {
+  it('updates deep scores for each scored component under the run', async () => {
+    const updates: Array<{ payload: unknown; runId: string; cls: string; slug: string }> = [];
+    const supabase = {
+      from: vi.fn(() => {
+        const chain = {
+          update: vi.fn((payload: unknown) => ({
+            eq: vi.fn((col1: string, v1: unknown) => ({
+              eq: vi.fn((col2: string, v2: unknown) => ({
+                eq: vi.fn((col3: string, v3: unknown) => {
+                  updates.push({ payload, runId: String(v1), cls: String(v2), slug: String(v3) });
+                  return { error: null };
+                }),
+              })),
+            })),
+          })),
+        };
+        return chain;
+      }),
+    };
+    vi.doMock('../src/lib/draymond/client', () => ({ createDraymondAdminClient: () => supabase }));
+    vi.resetModules();
+    const { recordDeepScores } = await import('../src/lib/draymond/benchmarking');
+
+    const deep = {
+      'uplift-agent': { reporank: { scorer: 'reporank', score: 90, summary: 'ok' } },
+      megacode: { grader: { scorer: 'grader', score: 80, summary: 'ok' } },
+    };
+    const count = await recordDeepScores('entity-20260807', 'entity', deep);
+    expect(count).toBe(2);
+    expect(updates).toHaveLength(2);
+    expect(updates[0].runId).toBe('entity-20260807');
+    expect(updates[0].cls).toBe('entity');
+    expect(updates[0].payload).toEqual({ deep_scores: deep['uplift-agent'] });
+  });
+
+  it('returns 0 and never touches the client when there are no deep scores', async () => {
+    vi.doMock('../src/lib/draymond/client', () => ({
+      createDraymondAdminClient: () => { throw new Error('client should not be created'); },
+    }));
+    vi.resetModules();
+    const { recordDeepScores } = await import('../src/lib/draymond/benchmarking');
+    await expect(recordDeepScores('entity-20260807', 'entity', {})).resolves.toBe(0);
+  });
+});

@@ -10,6 +10,7 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
+import { codingStackSummary, resolveCodingTools } from "./coding-stack";
 
 export type FailureKind = 'chain_config' | 'notification_config' | 'missing_env' | 'service_down' | 'code_error' | 'unknown';
 
@@ -44,17 +45,30 @@ export function classifyFailure(error: string): FailureKind {
   return "unknown";
 }
 
-/** Assemble the repair crew from the fleet's coding + skill agents. */
+/** Assemble the repair crew from the master coding stack. */
 export function assembleCrew(kind: FailureKind): RepairCrew {
   switch (kind) {
     case "chain_config":
     case "notification_config":
-    case "code_error":
+    case "code_error": {
+      // Definitive coding stack: codegen (Uplift Agent primary) + review
+      // (RepoRank) + IDE daemon (Mutly), supervised by Big Homie.
+      const codegen = resolveCodingTools("codegen");
+      const review = resolveCodingTools("review");
+      const ide = resolveCodingTools("ide");
+      const lead = codegen[0] ?? "uplift-agent";
+      const members = [
+        ...codegen.slice(1),
+        ...ide,
+        review[0],
+        "big-homie",
+      ].filter((m) => m !== lead);
       return {
-        lead: "dca-brain",
-        members: ["megacode", "uplift-agent", "big-homie"],
-        reason: "config/code fix — coding agents apply the patch, Big Homie supervises",
+        lead,
+        members,
+        reason: `master coding stack (${codingStackSummary()}) — coding agents apply the patch, Big Homie supervises`,
       };
+    }
     case "missing_env":
       return {
         lead: "uplift-agent",

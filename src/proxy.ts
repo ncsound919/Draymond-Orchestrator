@@ -1,59 +1,69 @@
 /**
  * Proxy (Next.js 16 — renamed from middleware)
  *
- * Guards the dashboard pages behind a Supabase session + purchase check.
- * `/api/*` is intentionally EXCLUDED from the matcher: API routes are
- * protected solely by per-route `authorizeRequest` (CRON_SECRET Bearer /
- * per-action review tokens), so the ntfy approve/reject callbacks and the
- * Open-Chat / Hermes integrations can authenticate without a browser session.
+ * Two responsibilities:
  *
- * Purchase gate: calls `user_has_access(p_user_id, p_entity_slug)`. If that
- * RPC does not exist yet in the database, we FAIL OPEN (log + allow) rather
- * than bricking the dashboard for every logged-in user.
+ * 1. Guard dashboard pages behind a local admin session.
+ * 2. Add permissive CORS to `/api/*` so mobile clients (Open-Chat on a phone
+ *    WebView) and LAN tools can call the orchestrator. Every API route is
+ *    protected by its own `authorizeRequest` (CRON_SECRET Bearer / review
+ *    tokens), so a wide CORS origin does not weaken auth. Preflight OPTIONS
+ *    is answered here (204) so browser clients with `Authorization` headers
+ *    work from any origin.
+ *
+ * Supabase Auth + the `user_has_access` purchase gate are gone: this is a
+ * private self-hosted instance, so the session check is the only page gate.
  */
-import { createServerClient } from '@supabase/ssr';
-import type { CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { SESSION_COOKIE, getUserBySessionToken } from '@/lib/db/auth';
+
+const CORS_ALLOW_HEADERS =
+  'Authorization, Content-Type, X-Review-Token, X-Api-Key';
+const CORS_EXPOSE_HEADERS = 'Content-Type';
+
+function corsHeaders(): Record<string, string> {
+  const origin =
+    process.env.CORS_ORIGIN && process.env.CORS_ORIGIN.trim()
+      ? process.env.CORS_ORIGIN.trim()
+      : '*';
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': CORS_ALLOW_HEADERS,
+    'Access-Control-Expose-Headers': CORS_EXPOSE_HEADERS,
+    'Access-Control-Max-Age': '86400',
+  };
+}
 
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({
+  const isApiPath = request.nextUrl.pathname.startsWith('/api');
+
+  // ── API: CORS + preflight ────────────────────────────────────────────────
+  if (isApiPath) {
+    if (request.method === 'OPTIONS') {
+      return new NextResponse(null, {
+        status: 204,
+        headers: corsHeaders(),
+      });
+    }
+    const response = NextResponse.next({
+      request: { headers: request.headers },
+    });
+    for (const [key, value] of Object.entries(corsHeaders())) {
+      response.headers.set(key, value);
+    }
+    return response;
+  }
+
+  // ── Pages: session gate ───────────────────────────────────────────────────
+  const response = NextResponse.next({
     request: {
       headers: request.headers,
     },
   });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
-          cookiesToSet.forEach(({ name, value }: { name: string; value: string }) =>
-            request.cookies.set(name, value)
-          );
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          });
-          cookiesToSet.forEach(({ name, value, options }: { name: string; value: string; options: CookieOptions }) =>
-            response.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  // 1. Check for active session
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // Public paths that don't need access gating
-  const isAuthPath = request.nextUrl.pathname.startsWith('/auth');
+  // Public paths that don't need a session
+  const isAuthPath = request.nextUrl.pathname.startsWith('/login');
   // Only known static asset extensions bypass the gate (avoid `/agents/foo.bar`).
   const isStaticPath = /\.(svg|png|jpg|jpeg|gif|webp|ico|css|js|woff2?)$/i.test(
     request.nextUrl.pathname
@@ -63,50 +73,21 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // Local development: bypass the session + purchase gate so the dashboard is
-  // reachable at http://localhost:* without a Supabase login. The gate is
-  // enforced for production builds (next start / electron).
-  if (process.env.NODE_ENV === 'development') {
-    return response;
-  }
+  // Check for an active local session
+  const token = request.cookies.get(SESSION_COOKIE)?.value;
+  const user = getUserBySessionToken(token);
 
-  // Marketing site URL for redirects
-  const MARKETING_SITE_URL = 'https://overlay365.com';
-
-  // 2. If no user, redirect to login or marketing with error
   if (!user) {
-    return NextResponse.redirect(`${MARKETING_SITE_URL}?error=login_required`);
-  }
-
-  // 3. Verify purchase for 'draymond-orchestrator'
-  // Uses user_has_access(p_user_id, p_entity_slug). The RPC is defined in
-  // Supabase; if it is missing, fail OPEN (log + allow) so the dashboard stays
-  // usable — do NOT redirect every logged-in user to the marketing site.
-  const { data: hasAccess, error: accessError } = await supabase.rpc(
-    'user_has_access',
-    {
-      p_user_id: user.id,
-      p_entity_slug: 'draymond-orchestrator',
-    }
-  );
-
-  if (accessError || !hasAccess) {
-    console.warn(
-      `[Proxy] Purchase gate denied (${accessError ? accessError.message : 'no access'})`
-    );
-    return NextResponse.redirect(`${MARKETING_SITE_URL}?error=access_denied`);
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
   return response;
 }
 
 export const config = {
-  /*
-   * Pages only — /api/* is excluded so per-route authorizeRequest owns API
-   * auth (CRON_SECRET Bearer / X-Review-Token). Also skip static assets,
-   * _next/* and image-optimization paths.
-   */
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // API + everything else. The page gate below skips /api (handled above),
+    // static assets, and _next/*.
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

@@ -3,6 +3,9 @@ import {
   buildApprovalPayload,
   publishApprovalNotification,
   publishResultNotification,
+  publishIssueNotification,
+  issueRepairToken,
+  consumeRepairToken,
 } from '../src/lib/draymond/ntfy';
 
 const action = {
@@ -124,5 +127,101 @@ describe('publishResultNotification', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(await publishResultNotification({ operation: 'health', success: true })).toBe(false);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('network down'));
+  });
+});
+
+describe('publishIssueNotification', () => {
+  it('returns false when results topic is unconfigured', async () => {
+    setNtfyEnv();
+    delete process.env.NTFY_TOPIC_RESULTS;
+    expect(await publishIssueNotification({ title: 'x', message: 'y' })).toBe(false);
+  });
+
+  it('publishes an issue alert to the results topic', async () => {
+    setNtfyEnv();
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const ok = await publishIssueNotification({
+      title: 'Draymond · daily-report FAILED',
+      message: 'boom',
+      priority: 5,
+      tags: ['rotating_light', 'warning'],
+    });
+    expect(ok).toBe(true);
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body.topic).toBe('results');
+    expect(body.title).toContain('daily-report FAILED');
+    expect(body.priority).toBe(5);
+    expect(body.tags).toEqual(['rotating_light', 'warning']);
+    expect(body.actions).toBeUndefined();
+  });
+
+  it('adds a Diagnose & Repair action with a single-use token when the tunnel is set', async () => {
+    setNtfyEnv();
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const ok = await publishIssueNotification({
+      title: 'Draymond · alert',
+      message: 'detail',
+      repair: { kind: 'job', signal: 'job:error', detail: 'boom', job: { id: 'j1', name: 'x', job_type: 'custom', job_config: {} } },
+    });
+    expect(ok).toBe(true);
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    const action = body.actions[0];
+    expect(action.label).toBe('Diagnose & Repair');
+    expect(action.method).toBe('POST');
+    expect(action.url).toBe('https://draymond.example.com/api/ops/repair-triage');
+    expect(action.headers['Content-Type']).toBe('application/json');
+    expect(typeof action.headers['X-Repair-Token']).toBe('string');
+    expect(JSON.parse(action.body)).toEqual({ signal: 'job:error', detail: 'boom' });
+    // Simulate the Open-Chat button tap → the endpoint consumes the token once.
+    const claim = consumeRepairToken(action.headers['X-Repair-Token']);
+    expect(claim).toEqual({ kind: 'job', signal: 'job:error', detail: 'boom', job: { id: 'j1', name: 'x', job_type: 'custom', job_config: {} } });
+    expect(consumeRepairToken(action.headers['X-Repair-Token'])).toBeNull(); // single-use
+  });
+
+  it('omits the action when no public tunnel URL is configured', async () => {
+    setNtfyEnv();
+    delete process.env.DRAYMOND_PUBLIC_URL;
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await publishIssueNotification({
+      title: 'x',
+      message: 'y',
+      repair: { kind: 'monitor', signal: 'monitor:down', detail: 'down' },
+    });
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body.actions).toBeUndefined();
+  });
+
+  it('returns false on a non-2xx response', async () => {
+    setNtfyEnv();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 500 })));
+    expect(await publishIssueNotification({ title: 'x', message: 'y' })).toBe(false);
+  });
+
+  it('returns false when publish rejects', async () => {
+    setNtfyEnv();
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(await publishIssueNotification({ title: 'x', message: 'y' })).toBe(false);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('network down'));
+  });
+});
+
+describe('repair tokens', () => {
+  it('mints and consumes a single-use repair token', () => {
+    const { token } = issueRepairToken({ kind: 'monitor', signal: 'monitor:down', detail: 'down' });
+    expect(typeof token).toBe('string');
+    expect(token).toHaveLength(64);
+    const claim = consumeRepairToken(token);
+    expect(claim).not.toBeNull();
+    expect(claim!.signal).toBe('monitor:down');
+    expect(consumeRepairToken(token)).toBeNull(); // already consumed
+  });
+
+  it('returns null for unknown or empty tokens', () => {
+    expect(consumeRepairToken('nope')).toBeNull();
+    expect(consumeRepairToken('')).toBeNull();
   });
 });

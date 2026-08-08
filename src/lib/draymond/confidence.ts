@@ -4,16 +4,20 @@
 // Replaces the hardcoded DEFAULT_ENTITY_CONFIDENCE_SCORE = 0.85 with real
 // confidence scores derived from multiple signals:
 //
-// 1. Historical success rate — what % of past invocations succeeded
+// 1. Historical success rate — Bayesian shrunk toward a baseline (mathx/shrinkage)
 // 2. Entity health — current health status and consecutive errors
 // 3. Recent execution trend — are recent runs succeeding or failing
 // 4. Chain context — does the step's position in the chain affect risk
 // 5. LLM assessment — optional LLM-based confidence for complex cases
 //
-// The system self-tunes: thresholds adapt based on actual outcomes.
+// The system self-tunes: the recommended threshold is derived from the Bayesian
+// posterior mean (mathx/betaPosterior), so small samples are never trusted as
+// much as large ones. Formulas live in src/lib/mathx and are shared with the
+// deterministic brain and the /math lab.
 // ============================================================================
 
 import { createDraymondClient } from './client';
+import { shrinkage, betaPosterior, percentile } from '../mathx';
 import type {
   ConfidenceSignal,
   AdaptiveConfidenceResult,
@@ -164,11 +168,16 @@ export async function computeConfidence(
   const perf = await getEntityPerformance(entityId, entitySlug);
 
   if (perf.total_executions >= MIN_EXECUTIONS_FOR_HISTORY) {
+    // Shrink the observed rate toward the baseline by 5 pseudo-observations so
+    // a 2-for-2 streak and a 200-for-200 record are not scored identically.
+    const shrunk = shrinkage(perf.success_rate, perf.total_executions, BASELINE_CONFIDENCE, 5);
     signals.push({
       source: 'historical_rate',
       weight: SIGNAL_WEIGHTS.historical_rate,
-      score: perf.success_rate,
-      reasoning: `${perf.successful_executions}/${perf.total_executions} executions succeeded (${(perf.success_rate * 100).toFixed(1)}%)`,
+      score: shrunk,
+      reasoning:
+        `${perf.successful_executions}/${perf.total_executions} executions succeeded ` +
+        `(${(perf.success_rate * 100).toFixed(1)}%), shrunk toward baseline ${BASELINE_CONFIDENCE}`,
     });
   } else {
     signals.push({
@@ -394,21 +403,25 @@ function computeThresholdRecommendation(perf: EntityPerformanceRecord): number {
     return 0.8; // Conservative for unknown entities
   }
 
-  // Inverse relationship: high success rate → lower threshold needed
-  // success_rate 1.0 → threshold 0.6
-  // success_rate 0.5 → threshold 0.85
-  // success_rate 0.0 → threshold 0.95
-  const threshold = 0.95 - perf.success_rate * 0.35;
+  // Inverse relationship: high success rate → lower threshold needed.
+  // The rate is the Bayesian posterior mean (Beta conjugate prior), so small
+  // samples are pulled toward 0.5 instead of being trusted at face value.
+  //   success_rate 1.0 → threshold 0.6
+  //   success_rate 0.5 → threshold 0.85
+  //   success_rate 0.0 → threshold 0.95
+  const posteriorMean = betaPosterior(
+    perf.successful_executions,
+    perf.failed_executions,
+    1,
+    1,
+  ).mean;
+  const threshold = 0.95 - posteriorMean * 0.35;
   return Number(Math.max(0.5, Math.min(0.95, threshold)).toFixed(3));
 }
 
 // ── Utility ──────────────────────────────────────────────────────────────────
 
-function percentile(sorted: number[], p: number): number {
-  if (sorted.length === 0) return 0;
-  const idx = Math.ceil(sorted.length * p) - 1;
-  return sorted[Math.max(0, idx)];
-}
+// percentile(sorted, p) is provided by @/lib/mathx/stats (linear-interpolated).
 
 // ── Batch performance report ─────────────────────────────────────────────────
 

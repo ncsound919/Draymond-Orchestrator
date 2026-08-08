@@ -52,7 +52,7 @@ export default async function AdminPage() {
         <div className="max-w-6xl mx-auto px-4 py-24 text-center text-white">
           <p className="text-5xl mb-4 opacity-40">&#x26A0;</p>
           <h1 className="text-xl font-bold mb-2">Failed to load admin data</h1>
-          <p className="text-white/40 text-sm">Could not connect to the database. Check your Supabase configuration.</p>
+          <p className="text-white/40 text-sm">Could not connect to the database. Check your local SQLite configuration.</p>
         </div>
       </div>
     );
@@ -116,7 +116,7 @@ export default async function AdminPage() {
             </div>
             <div className="flex justify-between p-3 rounded-lg bg-white/[0.03] border border-white/5">
               <span className="text-white/40">Database</span>
-              <span className="text-white/80 font-mono">Supabase (PostgreSQL)</span>
+              <span className="text-white/80 font-mono">SQLite (local)</span>
             </div>
             <div className="flex justify-between p-3 rounded-lg bg-white/[0.03] border border-white/5">
               <span className="text-white/40">Agent Backend</span>

@@ -5,7 +5,7 @@
 // so the staggered cron only deep-scores the weakest on its Thursday run.
 // ============================================================================
 
-import { collectMetrics, getTrend, recordRun } from './benchmarking';
+import { collectMetrics, getTrend, recordDeepScores, recordRun } from './benchmarking';
 import { deepScore } from './deep-scorers';
 import { buildWeaknessScores } from './weakness-scoring';
 import { queueWeakest } from './upgrade-queue';
@@ -115,7 +115,7 @@ export async function runBenchmarkCycle(
   const scoresMap: Record<string, number> = {};
   for (const s of scored) scoresMap[s.component_slug] = s.score;
 
-  const { recorded } = await recordRun(componentClass, metrics, scoresMap);
+  const { run_id, recorded } = await recordRun(componentClass, metrics, scoresMap);
 
   const weakest = ranked.slice(0, limit);
 
@@ -140,6 +140,13 @@ export async function runBenchmarkCycle(
       // (every score null) wasn't really deep-scored.
       const scoredAny = Object.values(results).some((r) => r.score != null);
       if (scoredAny) deepScored++;
+    }
+    // Persist the RepoRank/Grader/Vibe-Reality results onto this run's rows so
+    // Draymond keeps a baseline and can compute % gains on the next cycle.
+    try {
+      await recordDeepScores(run_id, componentClass, deep);
+    } catch (err) {
+      console.error(`[run-benchmark] failed to persist deep scores for ${componentClass}:`, err);
     }
   }
 

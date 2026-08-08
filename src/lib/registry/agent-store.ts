@@ -5,11 +5,28 @@
  */
 import fs from 'fs/promises';
 import path from 'path';
+import { existsSync, statSync } from 'node:fs';
 import { RegisteredAgent, RegisteredWorkflow, RegisteredSystem, RegisteredSkill } from './types';
 
 const REGISTRY_DIR = process.env.DRAYMOND_REGISTRY_DIR
   ?? path.join(process.cwd(), '.draymond');
 const REGISTRY_FILE = path.join(REGISTRY_DIR, 'registry.json');
+
+const AVATAR_DIR = path.join(process.cwd(), 'public', 'avatars');
+
+/**
+ * True when the agent has a real portrait file (not the 533-byte default
+ * placeholder). Used to sort the roster so piced agents float to the top.
+ */
+export function hasRealAvatar(agent: Pick<RegisteredAgent, 'avatarUrl'>): boolean {
+  if (!agent.avatarUrl) return false;
+  try {
+    const file = path.join(AVATAR_DIR, path.basename(agent.avatarUrl));
+    return existsSync(file) && statSync(file).size > 1024;
+  } catch {
+    return false;
+  }
+}
 
 interface RegistryStore {
   agents: RegisteredAgent[];
@@ -87,7 +104,11 @@ async function writeStore(store: RegistryStore): Promise<void> {
 // ── Agents ───────────────────────────────────────────────────────────────────
 
 export async function getAllAgents(): Promise<RegisteredAgent[]> {
-  return (await readStore()).agents;
+  const agents = (await readStore()).agents;
+  // Piced agents first, stable within each group.
+  return [...agents].sort(
+    (a, b) => Number(hasRealAvatar(b)) - Number(hasRealAvatar(a))
+  );
 }
 
 export async function getAgentBySlug(slug: string): Promise<RegisteredAgent | null> {
@@ -118,6 +139,21 @@ export async function updateAgentAvatar(slug: string, avatarUrl: string): Promis
     const idx = store.agents.findIndex((a) => a.slug === slug);
     if (idx >= 0) {
       store.agents[idx] = { ...store.agents[idx], avatarUrl, updatedAt: new Date().toISOString() };
+      await writeStore(store);
+    }
+  });
+}
+
+/**
+ * Update just the stats (roster benchmark bars) for an agent.
+ * Leaves every other field untouched.
+ */
+export async function updateAgentStats(slug: string, stats: RegisteredAgent['stats']): Promise<void> {
+  return withLock(async () => {
+    const store = await readStore();
+    const idx = store.agents.findIndex((a) => a.slug === slug);
+    if (idx >= 0) {
+      store.agents[idx] = { ...store.agents[idx], stats, updatedAt: new Date().toISOString() };
       await writeStore(store);
     }
   });

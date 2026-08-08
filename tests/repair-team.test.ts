@@ -12,9 +12,10 @@ describe('repair team', () => {
 
   it('assembles a coding crew for config failures', () => {
     const crew = assembleCrew('chain_config');
-    expect(crew.lead).toBe('dca-brain');
+    expect(crew.lead).toBe('uplift-agent');
     expect(crew.members).toContain('megacode');
     expect(crew.members).toContain('big-homie');
+    expect(crew.members).toContain('reporank');
   });
 
   it('fixes a chain job by rewriting chain -> chain_slug', async () => {

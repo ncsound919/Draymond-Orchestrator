@@ -10,10 +10,21 @@ function startNextServer() {
   // Use next start to run the production server
   const nextBin = path.join(__dirname, '../node_modules/.bin/next');
   const nextCmd = process.platform === 'win32' ? `${nextBin}.cmd` : nextBin;
-  
+
+  // The packaged app's asar is read-only, so point the SQLite DB and the
+  // releases directory at Electron's writable userData folder unless the user
+  // overrode them in the environment.
+  const env = { ...process.env, PORT: String(PORT), NODE_ENV: 'production' };
+  if (!env.DRAYMOND_DB_PATH) {
+    env.DRAYMOND_DB_PATH = path.join(app.getPath('userData'), 'draymond.db');
+  }
+  if (!env.DRAYMOND_RELEASES_DIR) {
+    env.DRAYMOND_RELEASES_DIR = path.join(app.getPath('userData'), 'paid-releases');
+  }
+
   serverProcess = spawn(nextCmd, ['start', '--port', String(PORT)], {
     cwd: path.join(__dirname, '..'),
-    env: { ...process.env, PORT: String(PORT), NODE_ENV: 'production' },
+    env,
     stdio: 'pipe',
     shell: process.platform === 'win32',
   });

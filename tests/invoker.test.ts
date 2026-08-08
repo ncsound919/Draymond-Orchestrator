@@ -89,6 +89,59 @@ describe('invokeEntity http_api', () => {
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/timed out|abort/i);
   });
+
+  it('routes to an endpoint path from the endpoints map with :param substitution', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ ok: true }));
+    const result = await invokeEntity(
+      entity({
+        invocation_config: {
+          url: 'http://localhost:4000',
+          endpoints: {
+            pipeline_status: { path: '/api/pipeline/status/:pipelineId', method: 'GET' },
+            analyze: { path: '/api/agent/analyze', method: 'POST' },
+          },
+        },
+      }),
+      'pipeline_status',
+      { pipelineId: 'p-1', tag: 'x' },
+    );
+    expect(result.success).toBe(true);
+    const [url, init] = fetchMock.mock.calls[0];
+    // :param consumed from input and carried as a query param on GET
+    expect(String(url)).toBe('http://localhost:4000/api/pipeline/status/p-1?tag=x');
+    expect(init.method).toBe('GET');
+  });
+
+  it('POSTs endpoint actions with remaining input as the body', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ ok: true }));
+    const result = await invokeEntity(
+      entity({
+        invocation_config: {
+          url: 'http://localhost:4000',
+          endpoints: { analyze: { path: '/api/agent/analyze', method: 'POST' } },
+        },
+      }),
+      'analyze',
+      { query: 'vector search' },
+    );
+    expect(result.success).toBe(true);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toBe('http://localhost:4000/api/agent/analyze');
+    expect(JSON.parse(init.body as string)).toEqual({ action: 'analyze', query: 'vector search' });
+  });
+
+  it('falls back to the base url when the action has no endpoint entry', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ ok: true }));
+    const result = await invokeEntity(
+      entity({
+        invocation_config: { url: 'https://api.example.com/invoke', endpoints: { a: { path: '/a' } } },
+      }),
+      'nope',
+      { x: 1 },
+    );
+    expect(result.success).toBe(true);
+    expect(String(fetchMock.mock.calls[0][0])).toBe('https://api.example.com/invoke');
+  });
 });
 
 describe('invokeEntity api_call', () => {
@@ -259,6 +312,63 @@ describe('invokeEntity mcp_tool / mcp_stdio', () => {
     );
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/empty stdout/);
+  });
+
+  it('mcp_stdio sends the initialize handshake + tools/call and matches by id', async () => {
+    const written: string[] = [];
+    execFileMock.mockImplementation((_cmd, _args, _opts, cb) => {
+      const handshake = { jsonrpc: '2.0', id: 0, result: { protocolVersion: '2024-11-05' } };
+      const call = { jsonrpc: '2.0', id: 1, result: { content: [{ type: 'text', text: 'done' }] } };
+      cb(null, `${JSON.stringify(handshake)}\n${JSON.stringify(call)}`, '');
+      return { stdin: { write: (s: string) => written.push(s), end: () => {} } };
+    });
+    const result = await invokeEntity(
+      entity({ invocation_method: 'mcp_stdio', invocation_config: { command: 'node', args: ['mcp.js'] } }),
+      'convert_document',
+      { from: 'md', to: 'json' },
+    );
+    expect(result.success).toBe(true);
+    expect(result.output.content).toBeTruthy();
+    // Three JSON-RPC messages were written to stdin
+    const messages = written.join('').trim().split('\n').map((l) => JSON.parse(l));
+    expect(messages[0].method).toBe('initialize');
+    expect(messages[1].method).toBe('notifications/initialized');
+    expect(messages[2].method).toBe('tools/call');
+    // action became the MCP tool name
+    expect(messages[2].params.name).toBe('convert_document');
+    expect(messages[2].params.arguments).toEqual({ from: 'md', to: 'json' });
+  });
+
+  it('mcp_stdio uses config.tool_name over the action when both are present', async () => {
+    execFileMock.mockImplementation((_cmd, _args, _opts, cb) => {
+      cb(null, JSON.stringify({ jsonrpc: '2.0', id: 1, result: { content: [{ type: 'text', text: 'ok' }] } }), '');
+      return { stdin: { write: () => {}, end: () => {} } };
+    });
+    const result = await invokeEntity(
+      entity({ invocation_method: 'mcp_stdio', invocation_config: { command: 'node', args: ['mcp.js'], tool_name: 'fixed_tool' } }),
+      'whatever',
+      {},
+    );
+    expect(result.success).toBe(true);
+  });
+
+  it('mcp_stdio passes cwd through to the spawned process', async () => {
+    const capturedOptions: Array<{ cwd?: string }> = [];
+    execFileMock.mockImplementation((_cmd, _args, o, cb) => {
+      capturedOptions.push(o as { cwd?: string });
+      cb(null, JSON.stringify({ jsonrpc: '2.0', id: 1, result: { content: [{ type: 'text', text: 'ok' }] } }), '');
+      return { stdin: { write: () => {}, end: () => {} } };
+    });
+    const result = await invokeEntity(
+      entity({
+        invocation_method: 'mcp_stdio',
+        invocation_config: { command: 'node', args: ['dist/index.js'], cwd: 'agents/UFC-MCP-main' },
+      }),
+      'get_supported_formats',
+      {},
+    );
+    expect(result.success).toBe(true);
+    expect(capturedOptions[0]?.cwd).toBe('agents/UFC-MCP-main');
   });
 });
 

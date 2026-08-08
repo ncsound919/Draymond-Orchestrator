@@ -1,20 +1,21 @@
 #!/usr/bin/env node
 /**
- * Sync the deterministic-brain wiki (Markdown) into Supabase brain_wiki_pages.
+ * Sync the deterministic-brain wiki (Markdown) into the local SQLite
+ * brain_wiki_pages table.
  *
  * Usage:
- *   node scripts/sync-wiki-to-supabase.mjs [--wiki-dir <path>] [--dry-run]
+ *   node scripts/sync-wiki-to-sqlite.mjs [--wiki-dir <path>] [--dry-run]
  *
- * Requires: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in env.
- * Idempotent — upserts by slug, deletes pages whose source file is gone.
+ * Requires: the app has been started once so data/draymond.db exists
+ * (DRAYMOND_DB_PATH overrides the location). Idempotent — upserts by slug,
+ * deletes pages whose source file is gone.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { createClient } from '@supabase/supabase-js';
+import { createRequire } from 'node:module';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(__dirname, '..');
+const require = createRequire(import.meta.url);
+const root = path.resolve(import.meta.dirname, '..');
 const defaultWikiDir = path.join(
   root,
   'agents',
@@ -29,8 +30,7 @@ const wikiDir = process.argv.includes('--wiki-dir')
   : defaultWikiDir;
 const dryRun = process.argv.includes('--dry-run');
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const dbPath = process.env.DRAYMOND_DB_PATH ?? path.join(root, 'data', 'draymond.db');
 
 function parseFrontmatter(text) {
   const m = text.match(/^---\s*\n([\s\S]*?)\n---\s*\n?/);
@@ -83,20 +83,42 @@ function walk(dir) {
   return out;
 }
 
-async function main() {
-  if (!supabaseUrl || !serviceRoleKey) {
-    console.error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+function toStored(value) {
+  if (value == null) return null;
+  if (typeof value === 'boolean') return value ? 1 : 0;
+  if (typeof value === 'object') return JSON.stringify(value);
+  return value;
+}
+
+function main() {
+  if (!fs.existsSync(dbPath)) {
+    console.error(
+      `[sync] Database not found at ${dbPath}. Start the app once (npm run dev) so the schema is created, then re-run.`
+    );
     process.exit(1);
   }
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  const Database = require('better-sqlite3');
+  const db = new Database(dbPath);
 
   const files = walk(wikiDir);
   let added = 0, updated = 0, removed = 0;
 
-  const { data: existingRows } = await supabase.from('brain_wiki_pages').select('slug');
-  const existing = new Set((existingRows || []).map((r) => r.slug));
+  const existing = new Set(
+    db.prepare('SELECT slug FROM brain_wiki_pages').all().map((r) => r.slug)
+  );
+
+  const upsert = db.prepare(
+    `INSERT INTO brain_wiki_pages (id, slug, namespace, title, content, tags, sources, aliases, updated_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (slug) DO UPDATE SET
+       namespace = excluded.namespace,
+       title = excluded.title,
+       content = excluded.content,
+       tags = excluded.tags,
+       sources = excluded.sources,
+       aliases = excluded.aliases,
+       updated_at = excluded.updated_at`
+  );
 
   for (const file of files) {
     const rel = path.relative(wikiDir, file).replace(/\\/g, '/');
@@ -109,31 +131,33 @@ async function main() {
     const aliases = Array.isArray(fm.aliases) ? fm.aliases.map(String) : [];
     const sources = Array.isArray(fm.sources) ? fm.sources : [];
 
-    const row = { slug, namespace, title, content: body, tags, sources, aliases };
     if (dryRun) {
       if (existing.has(slug)) updated++; else added++;
       console.log(`[sync] (dry-run) would upsert ${slug}`);
       continue;
     }
-    const { error } = await supabase
-      .from('brain_wiki_pages')
-      .upsert(row, { onConflict: 'slug', ignoreDuplicates: false });
-    if (error) {
-      console.error(`[sync] FAIL ${slug}: ${error.message}`);
-      continue;
-    }
+    const now = new Date().toISOString();
+    const id = existing.has(slug)
+      ? db.prepare('SELECT id FROM brain_wiki_pages WHERE slug = ?').get(slug).id
+      : require('node:crypto').randomUUID();
+    upsert.run(
+      id, slug, namespace, title, body,
+      toStored(tags), toStored(sources), toStored(aliases), now, now
+    );
     if (existing.has(slug)) updated++; else added++;
   }
 
   // Remove pages whose source file is gone.
   const known = new Set(files.map((f) => path.relative(wikiDir, f).replace(/\\/g, '/').replace(/\.md$/, '')));
   const stale = [...existing].filter((s) => !known.has(s));
+  const del = db.prepare('DELETE FROM brain_wiki_pages WHERE slug = ?');
   for (const slug of stale) {
     if (dryRun) { console.log(`[sync] would remove ${slug}`); removed++; continue; }
-    const { error } = await supabase.from('brain_wiki_pages').delete().eq('slug', slug);
-    if (error) console.error(`[sync] FAIL remove ${slug}: ${error.message}`);
-    else removed++;
+    del.run(slug);
+    removed++;
   }
+
+  db.close();
 
   if (dryRun) {
     console.log(`[sync] done: +${added} would add, ~${updated} would update, -${removed} would remove (${files.length} files)`);
@@ -143,4 +167,4 @@ async function main() {
   }
 }
 
-main().catch((err) => { console.error(err); process.exit(1); });
+main();

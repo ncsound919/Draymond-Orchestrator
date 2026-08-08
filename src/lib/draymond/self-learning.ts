@@ -12,7 +12,7 @@ import path from "node:path";
 export interface LearningOutcome {
   id: string;
   agentId: string;
-  kind: "job" | "qa" | "incident" | "repair" | "manual";
+  kind: "job" | "qa" | "incident" | "repair" | "benchmark" | "manual";
   summary: string;
   success: boolean;
   /** Optional context: what was tried / what happened. */
@@ -68,6 +68,52 @@ export async function recordOutcome(input: Omit<LearningOutcome, "id" | "created
   outcomes.push(outcome);
   await fs.writeFile(OUTCOMES_FILE, JSON.stringify(outcomes.slice(-500), null, 2), "utf-8");
   return outcome;
+}
+
+/**
+ * Record a benchmark gain as a self-learning outcome. A positive gain is a
+ * success (the component improved); a negative gain or a regression is logged
+ * so `distillLessons` can cluster repeated regressions into a lesson.
+ */
+export async function recordBenchmarkGain(input: {
+  agentId: string;
+  component: string;
+  scorer: string;
+  baseline: number | null;
+  current: number | null;
+  gainPct: number | null;
+}): Promise<LearningOutcome> {
+  const { agentId, component, scorer, baseline, current, gainPct } = input;
+  const gain =
+    gainPct != null
+      ? `${gainPct > 0 ? "+" : ""}${gainPct}%`
+      : "n/a";
+  const detail = `benchmark ${component} ${scorer}: baseline=${baseline ?? "n/a"} current=${current ?? "n/a"} gain=${gain}`;
+  return recordOutcome({
+    agentId,
+    kind: "benchmark",
+    summary: `${component} ${scorer} benchmark`,
+    success: gainPct != null && gainPct >= 0,
+    detail,
+  });
+}
+
+/** Record a full set of benchmark gains (one outcome per component+scorer). */
+export async function recordBenchmarkGains(
+  gains: Array<{
+    agentId: string;
+    component: string;
+    scorer: string;
+    baseline: number | null;
+    current: number | null;
+    gainPct: number | null;
+  }>
+): Promise<LearningOutcome[]> {
+  const recorded: LearningOutcome[] = [];
+  for (const g of gains) {
+    recorded.push(await recordBenchmarkGain(g));
+  }
+  return recorded;
 }
 
 /** Cluster recent outcomes into lessons. Call nightly. */

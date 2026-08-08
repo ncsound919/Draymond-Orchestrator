@@ -354,6 +354,41 @@ export async function checkSite(monitorId: string): Promise<SiteCheckResult> {
       }
 
       emitSiteDown(monitor.id, monitor.name, monitor.url, statusCode, responseTimeMs, newConsecutiveFailures);
+
+      // Real-time chat alert via the tunnel so the user can diagnose + repair
+      // from Open-Chat without waiting for the batched email.
+      if (monitor.notify_on_down) {
+        try {
+          const { publishIssueNotification } = await import('./ntfy');
+          await publishIssueNotification({
+            title: `Draymond · ${monitor.name} DOWN`,
+            message: [
+              `Site "${monitor.name}" (${monitor.url}) is unreachable.`,
+              '',
+              `Expected status: ${monitor.expected_status_code}`,
+              `Received status: ${statusCode ?? 'N/A'}`,
+              `Response time: ${responseTimeMs ?? 'N/A'}ms`,
+              `Consecutive failures: ${newConsecutiveFailures}`,
+              fetchError ? `Error: ${fetchError}` : '',
+            ]
+              .filter(Boolean)
+              .join('\n'),
+            priority: 5,
+            tags: ['rotating_light', 'sos'],
+            repair: {
+              kind: 'monitor',
+              signal: 'monitor:down',
+              detail: fetchError ?? `HTTP ${statusCode ?? 'N/A'} on ${monitor.url}`,
+              repoUrl: undefined,
+            },
+          });
+        } catch (notifErr) {
+          console.error(
+            `[Draymond Monitors] Failed to push site_down chat alert for ${monitor.name}:`,
+            notifErr instanceof Error ? notifErr.message : notifErr
+          );
+        }
+      }
     }
   } else {
     // Site is up

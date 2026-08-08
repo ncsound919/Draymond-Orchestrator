@@ -1,38 +1,28 @@
-import { createClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/db/session';
 
 /**
  * Verify the request is from an authenticated admin user.
  * Returns the user if authenticated and admin, or a Response object to return immediately.
  *
- * Mirrors the admin check in src/app/admin/draymond/page.tsx:
- *   profiles.role === 'admin'
+ * The old implementation checked `profiles.role === 'admin'` via Supabase.
+ * The local equivalent checks the `role` column on the local_users row bound
+ * to the session cookie.
  */
 export async function requireDraymondAuth(): Promise<
   { user: { id: string; email?: string }; error?: never } | { user?: never; error: Response }
 > {
   try {
-    const supabase = await createClient();
-    const { data: { user }, error } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
 
-    if (error || !user) {
+    if (!user) {
       return { error: Response.json({ error: 'Unauthorized' }, { status: 401 }) };
     }
 
-    // Check admin role — matches the pattern in the admin page
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase SSR/client type mismatch
-    const sb = supabase as any;
-
-    const { data: profile } = await sb
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single() as { data: { role: string } | null };
-
-    if (!profile || profile.role !== 'admin') {
+    if (user.role !== 'admin') {
       return { error: Response.json({ error: 'Forbidden: admin access required' }, { status: 403 }) };
     }
 
-    return { user: { id: user.id, email: user.email ?? undefined } };
+    return { user: { id: user.id, email: user.email } };
   } catch {
     return { error: Response.json({ error: 'Authentication failed' }, { status: 500 }) };
   }

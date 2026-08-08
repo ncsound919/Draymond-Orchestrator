@@ -119,7 +119,7 @@ describe('shared llm helper', () => {
 
     expect(text).toBe('via litellm');
     const [url, init] = fetchMock.mock.calls[0];
-    expect(String(url)).toBe('http://localhost:4000/v1/chat/completions');
+    expect(String(url)).toBe('http://localhost:4100/v1/chat/completions');
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer lk');
     const body = JSON.parse(init.body as string);
     expect(body.messages[0]).toMatchObject({ role: 'system', content: 'sys' });

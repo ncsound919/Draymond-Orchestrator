@@ -8,6 +8,8 @@
  * phase runner.
  */
 
+import { estimateTokens, costAwareOrder } from '../mathx';
+
 export type DayPhase = 'morning' | 'midday' | 'evening' | 'night';
 
 export interface OrchestrationStep {
@@ -88,13 +90,68 @@ export interface PhaseRunResult {
   phase: DayPhase;
   executed: string[];
   errors: string[];
+  /** Steps skipped because the optional token budget could not cover them. */
+  dropped?: string[];
+  /** Estimated tokens the executed steps would consume. */
+  estimated_tokens?: number;
 }
 
-/** Run every step in a phase group (best-effort, order preserved). */
-export async function runPhase(phase: DayPhase): Promise<PhaseRunResult> {
+const PHASE_WEIGHT: Record<DayPhase, number> = { morning: 3, midday: 2, evening: 2, night: 1 };
+
+const PHASE_OFFSET: Record<DayPhase, number> = { morning: 0, midday: 1440, evening: 2880, night: 4320 };
+
+/** Estimate the LLM-context tokens a step will need (prose heuristic). */
+export function estimateStepTokens(step: OrchestrationStep): number {
+  return estimateTokens(`${step.purpose} ${step.job} ${step.id}`, 'prose');
+}
+
+/** Total estimated token cost of the full day plan, per phase. */
+export function dayTokenBudget(): { total: number; byPhase: Record<DayPhase, number> } {
+  const byPhase = { morning: 0, midday: 0, evening: 0, night: 0 } as Record<DayPhase, number>;
+  for (const s of DAY_FLOW) byPhase[s.phase] += estimateStepTokens(s);
+  return { total: Object.values(byPhase).reduce((a, b) => a + b, 0), byPhase };
+}
+
+/** Absolute deadline (minutes since midnight of the first phase) for a step. */
+function stepDeadline(step: OrchestrationStep): number {
+  const base = PHASE_OFFSET[step.phase];
+  if (step.time === 'hourly') return base + 60;
+  if (step.time.startsWith(':')) {
+    const m = Number(step.time.slice(1)) || 15;
+    return base + m;
+  }
+  const [h, m] = step.time.split(':').map(Number);
+  return base + ((h ?? 0) * 60 + (m ?? 0));
+}
+
+/**
+ * Run a phase group (best-effort, order preserved). Pass `budgetTokens` to make
+ * the run cost-aware: steps are prioritized by weighted earliest-deadline and
+ * the overflow is dropped instead of run, so the phase stays inside a token cap.
+ */
+export async function runPhase(phase: DayPhase, budgetTokens?: number): Promise<PhaseRunResult> {
   const steps = DAY_FLOW.filter((s) => s.phase === phase);
   const executed: string[] = [];
   const errors: string[] = [];
+
+  let runSteps = steps;
+  const dropped: string[] = [];
+  if (budgetTokens !== undefined && budgetTokens > 0) {
+    const ordered = costAwareOrder(
+      steps.map((s) => ({
+        id: s.id,
+        tokens: estimateStepTokens(s),
+        costPerToken: 1,
+        deadline: stepDeadline(s),
+        weight: PHASE_WEIGHT[s.phase],
+      })),
+      budgetTokens,
+    );
+    runSteps = ordered.scheduled
+      .map((r) => steps.find((s) => s.id === r.id))
+      .filter((s): s is OrchestrationStep => Boolean(s));
+    dropped.push(...ordered.dropped);
+  }
 
   const handlers: Record<string, () => Promise<unknown>> = {
     ingest_news: async () => (await import('./news')).ingestNews(),
@@ -118,15 +175,20 @@ export async function runPhase(phase: DayPhase): Promise<PhaseRunResult> {
     },
     scan_book_library: async () => (await import('../bookbridge')).scanBookLibrary(),
     wiki_sync: async () => {
-      // Fail-soft: without Supabase env vars the sync script exits non-zero.
-      // In ephemeral/test environments (or a read-only runtime) skip cleanly so
+      // Fail-soft: the sync script exits non-zero if data/draymond.db is
+      // missing (e.g. a read-only runtime or a fresh install). Skip cleanly so
       // the night phase doesn't collect a spurious wiki error.
-      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        return { skipped: 'wiki sync requires NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY' };
+      const fs = await import('node:fs');
+      const pathMod = await import('node:path');
+      const dbFile =
+        process.env.DRAYMOND_DB_PATH ??
+        pathMod.default.join(process.cwd(), 'data', 'draymond.db');
+      if (!fs.default.existsSync(dbFile)) {
+        return { skipped: 'wiki sync requires the local database (start the app once)' };
       }
       const { execFile } = await import('node:child_process');
       const { promisify } = await import('node:util');
-      return promisify(execFile)('node', ['scripts/sync-wiki-to-supabase.mjs'], { timeout: 120_000 });
+      return promisify(execFile)('node', ['scripts/sync-wiki-to-sqlite.mjs'], { timeout: 120_000 });
     },
     fleet_duty_sync: async () => (await import('./fleet-duty')).computeFleetDuty(),
     generate_agent_avatars: async () => {
@@ -136,7 +198,7 @@ export async function runPhase(phase: DayPhase): Promise<PhaseRunResult> {
     },
   };
 
-  for (const step of steps) {
+  for (const step of runSteps) {
     const fn = handlers[step.job];
     if (!fn) {
       executed.push(`${step.id} (cron-driven: ${step.job})`);
@@ -149,5 +211,10 @@ export async function runPhase(phase: DayPhase): Promise<PhaseRunResult> {
       errors.push(`${step.id}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
-  return { phase, executed, errors };
+  const result: PhaseRunResult = { phase, executed, errors };
+  if (budgetTokens !== undefined) {
+    result.dropped = dropped;
+    result.estimated_tokens = runSteps.reduce((a, s) => a + estimateStepTokens(s), 0);
+  }
+  return result;
 }

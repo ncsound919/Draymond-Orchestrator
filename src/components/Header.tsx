@@ -1,8 +1,9 @@
 'use client';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 const navItems = [
+  { name: 'Chat', href: '/chat' },
   { name: 'Operations', href: '/operations' },
   { name: 'Agents', href: '/agents' },
   { name: 'Workflows', href: '/workflows' },
@@ -14,6 +15,16 @@ const navItems = [
 
 export default function Header() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function logout() {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } finally {
+      router.push('/login');
+      router.refresh();
+    }
+  }
 
   return (
     <header className="glass-header sticky top-0 z-50">
@@ -49,10 +60,18 @@ export default function Header() {
             })}
           </nav>
 
-          {/* Status indicator */}
-          <div className="flex items-center gap-2">
+          {/* Status indicator + logout */}
+          <div className="flex items-center gap-3">
             <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
             <span className="text-xs text-white/40 hidden sm:block">System Online</span>
+            {pathname !== '/login' && (
+              <button
+                onClick={logout}
+                className="text-xs font-medium text-white/50 hover:text-white transition-colors"
+              >
+                Sign out
+              </button>
+            )}
           </div>
         </div>
       </div>

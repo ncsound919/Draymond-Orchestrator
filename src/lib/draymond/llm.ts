@@ -8,6 +8,8 @@
 // Messages API; Gemini uses the Google Generative Language format.
 // ============================================================================
 
+import { truncateToTokens, maxTokensForMode } from '../mathx';
+
 export type LLMProvider =
   | 'opencode-free'
   | 'opencode'
@@ -26,8 +28,15 @@ export interface LLMCallOptions {
   system: string;
   userMessage: string;
   maxTokens?: number;
+  /** Math X mode — when set and no maxTokens, uses the mode's token budget. */
+  mode?: string;
+  /** Truncate the user message to fit the token budget (opt-in). */
+  truncate?: boolean;
   temperature?: number;
   timeoutMs?: number;
+  /** Request structured JSON output (OpenAI-compatible `response_format` /
+   *  Gemini `responseMimeType: application/json`). */
+  responseFormat?: { type: 'json_object' };
 }
 
 const PROVIDER_URLS: Record<LLMProvider, string> = {
@@ -38,7 +47,7 @@ const PROVIDER_URLS: Record<LLMProvider, string> = {
   openai: 'https://api.openai.com/v1/chat/completions',
   anthropic: 'https://api.anthropic.com/v1/messages',
   qwen: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions',
-  litellm: 'http://localhost:4000/v1/chat/completions',
+  litellm: 'http://localhost:4100/v1/chat/completions',
 };
 
 const PROVIDER_ENV: Record<LLMProvider, string> = {
@@ -123,6 +132,9 @@ async function callGemini(options: LLMCallOptions): Promise<string> {
     generationConfig: { maxOutputTokens: maxTokens, temperature },
   };
   if (options.system) body.systemInstruction = { parts: [{ text: options.system }] };
+  if (options.responseFormat) {
+    (body.generationConfig as Record<string, unknown>).responseMimeType = 'application/json';
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -213,6 +225,7 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
             { role: 'system', content: options.system },
             { role: 'user', content: options.userMessage },
           ],
+          ...(options.responseFormat ? { response_format: options.responseFormat } : {}),
         }),
         signal: controller.signal,
       });
@@ -246,6 +259,15 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
  * fallback order. Throws only when all providers fail.
  */
 export async function callLLM(options: LLMCallOptions): Promise<string> {
+  // Normalize the token budget: explicit maxTokens wins, else the mode's budget
+  // (mathx MODE_MAX_TOKENS), else the 1024 default. Opt-in truncation keeps
+  // oversized context within budget before any provider is hit.
+  const budget = options.maxTokens ?? (options.mode ? maxTokensForMode(options.mode) : 1024);
+  const effective: LLMCallOptions = { ...options, maxTokens: budget };
+  if (options.truncate && options.userMessage) {
+    effective.userMessage = truncateToTokens(options.userMessage, budget, 'prose');
+  }
+
   const order = buildProviderOrder(options.provider);
   if (order.length === 0) {
     throw new Error(
@@ -265,8 +287,8 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
         console.warn(`[llm] ${gate.reason}. Trying next.`);
         continue;
       }
-      const text = await callProvider(provider, options);
-      consumeTokens(provider, (options.maxTokens ?? 1024) + 512); // approximate cost
+      const text = await callProvider(provider, effective);
+      consumeTokens(provider, budget + 512); // approximate cost
       return text;
     } catch (err) {
       lastErr = err;

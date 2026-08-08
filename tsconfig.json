@@ -30,5 +30,11 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "agents"]
+  "exclude": [
+    "node_modules",
+    "agents",
+    "docs/mathx-source-reference",
+    "scripts/local-grader.ts",
+    "scripts/local-reporank.ts"
+  ]
 }

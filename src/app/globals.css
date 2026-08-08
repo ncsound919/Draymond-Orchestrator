@@ -116,3 +116,72 @@ html {
 ::-webkit-scrollbar-thumb:hover {
   background: #444444;
 }
+
+/* ── Chat interface animations ──────────────────────────────────────────── */
+
+@keyframes chat-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-chat-fade-up {
+  animation: chat-fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes chat-orb-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 24px rgba(34, 197, 94, 0.22), 0 0 64px rgba(34, 197, 94, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(34, 197, 94, 0.42), 0 0 100px rgba(34, 197, 94, 0.16);
+  }
+}
+
+.animate-chat-orb {
+  animation: chat-orb-pulse 3.2s ease-in-out infinite;
+}
+
+@keyframes chat-cursor-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.animate-chat-cursor {
+  animation: chat-cursor-blink 1s steps(2, start) infinite;
+}
+
+@keyframes chat-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.text-chat-shimmer {
+  background: linear-gradient(
+    110deg,
+    #ffffff 20%,
+    rgba(74, 222, 128, 0.9) 40%,
+    rgba(34, 197, 94, 0.6) 50%,
+    #ffffff 70%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: chat-shimmer 6s linear infinite;
+}

@@ -34,9 +34,10 @@ jobs:
       - name: Build web bundle
         run: npm run build
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
           NEXT_PUBLIC_APP_URL: https://theupliftlab.com
+          DRAYMOND_DB_PATH: ./data/draymond.db
+          DRAYMOND_ADMIN_EMAIL: ci@localhost
+          DRAYMOND_ADMIN_PASSWORD: ci-build-only
 
       - name: Build Electron app
         run: npx electron-builder --publish never

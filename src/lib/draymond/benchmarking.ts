@@ -7,7 +7,7 @@
 // ============================================================================
 
 import { createDraymondAdminClient } from './client';
-import type { BenchmarkMetric, ComponentClass } from './types';
+import type { BenchmarkMetric, ComponentClass, DeepScoreResult } from './types';
 
 // ── Run id ──────────────────────────────────────────────────────────────────
 
@@ -179,6 +179,34 @@ export async function recordRun(
   const { error } = await supabase.from('draymond_benchmarks').insert(rows).select();
   if (error) throw new Error(`Failed to record benchmarks: ${error.message}`);
   return { run_id: runId, recorded: rows.length };
+}
+
+/**
+ * Persist RepoRank / Grader / Vibe-Reality deep scores onto the benchmark rows
+ * of a just-completed run. Deep scores are attached after recording because the
+ * deep-scorers only run on the weakest N components (opt-in per cycle).
+ * Keyed by component_slug; rows without a score are left untouched.
+ */
+export async function recordDeepScores(
+  runId: string,
+  componentClass: ComponentClass,
+  deepScores: Record<string, Record<string, DeepScoreResult>>
+): Promise<number> {
+  const entries = Object.entries(deepScores);
+  if (entries.length === 0) return 0;
+  const supabase = createDraymondAdminClient();
+  let updated = 0;
+  for (const [slug, results] of entries) {
+    const { error } = await supabase
+      .from('draymond_benchmarks')
+      .update({ deep_scores: results })
+      .eq('run_id', runId)
+      .eq('component_class', componentClass)
+      .eq('component_slug', slug);
+    if (error) throw new Error(`Failed to record deep scores for ${slug}: ${error.message}`);
+    updated++;
+  }
+  return updated;
 }
 
 // ── Trend ───────────────────────────────────────────────────────────────────

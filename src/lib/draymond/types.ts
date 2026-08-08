@@ -637,6 +637,7 @@ export type RouterIntent =
   | 'query_status'
   | 'manage_memory'
   | 'decompose_goal'
+  | 'web_search'
   | 'unknown';
 
 export type RouteResult = {

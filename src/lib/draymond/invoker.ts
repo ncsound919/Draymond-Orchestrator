@@ -89,7 +89,7 @@ export async function invokeEntity(
     case 'mcp_tool':
       return invokeMcpTool(entity, input, options);
     case 'mcp_stdio':
-      return invokeMcpStdio(entity, input, options);
+      return invokeMcpStdio(entity, action, input, options);
     default:
       throw new Error(
         `Unsupported invocation method "${method}" for entity "${entity.name}" (${entity.slug}). ` +
@@ -254,7 +254,41 @@ async function invokeHttpApi(
 ): Promise<InvocationResult> {
   const start = Date.now();
   const config = entity.invocation_config;
-  const url = config.url as string | undefined;
+
+  // Multi-endpoint support: `endpoints` maps an action → { path, method? }.
+  // `:param` tokens in the path are substituted from `input` (and removed from
+  // the request body). Falls back to the base `url` when no endpoint matches.
+  const endpoints = (config.endpoints ?? null) as Record<
+    string,
+    { path?: string; method?: string } | undefined
+  > | null;
+  const endpoint = endpoints && action ? endpoints[action] : undefined;
+
+  let url = config.url as string | undefined;
+  let method = ((config.method as string) || 'POST').toUpperCase();
+  const payload: Record<string, unknown> = { ...input };
+
+  if (endpoint?.path) {
+    let path = endpoint.path;
+    path = path.replace(/:([a-zA-Z0-9_]+)/g, (_match, key: string) => {
+      const value = payload[key];
+      delete payload[key];
+      return value === undefined || value === null ? _match : encodeURIComponent(String(value));
+    });
+    method = (endpoint.method ?? 'POST').toUpperCase();
+    url = `${(url ?? '').replace(/\/+$/, '')}${path}`;
+  }
+
+  // GET endpoints: carry any remaining input as query parameters.
+  if (method === 'GET' && Object.keys(payload).length > 0) {
+    const query = new URLSearchParams();
+    for (const [k, v] of Object.entries(payload)) {
+      if (v === undefined || v === null) continue;
+      query.set(k, typeof v === 'string' ? v : JSON.stringify(v));
+    }
+    const qs = query.toString();
+    if (qs) url = `${url}${url?.includes('?') ? '&' : '?'}${qs}`;
+  }
 
   if (!url) {
     return failResult('invocation_config.url is required for http_api', Date.now() - start);
@@ -266,7 +300,6 @@ async function invokeHttpApi(
     return failResult(`SSRF blocked: ${urlCheck.error}`, Date.now() - start);
   }
 
-  const method = ((config.method as string) || 'POST').toUpperCase();
   const configHeaders = (config.headers ?? {}) as Record<string, string>;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -291,7 +324,7 @@ async function invokeHttpApi(
 
     // GET requests should not have a body
     if (method !== 'GET') {
-      fetchOptions.body = JSON.stringify({ action, ...input });
+      fetchOptions.body = JSON.stringify({ action, ...payload });
     }
 
     const response = await fetch(url, fetchOptions);
@@ -866,32 +899,35 @@ async function invokeMcpTool(
 // ============================================================================
 
 /**
- * Invokes an MCP tool via a JSON-RPC request over stdin/stdout. Spawns the
- * MCP server as a child process, writes a JSON-RPC `tools/call` request to
- * stdin, and reads the JSON-RPC response from stdout.
+ * Invokes an MCP tool via JSON-RPC over stdin/stdout. Spawns the MCP server as
+ * a child process, performs the standard MCP initialize handshake, then sends a
+ * `tools/call` request. Reads the JSON-RPC response from stdout.
  *
  * Expects `invocation_config` to have:
  * ```
- * { command: string, args?: string[], tool_name: string }
+ * { command: string, args?: string[], tool_name?: string, cwd?: string }
  * ```
+ * When `tool_name` is omitted, the invocation `action` is used as the MCP tool
+ * name (so one entity can drive every tool on an MCP server).
  *
  * The command is validated against the `ALLOWED_CLI_COMMANDS` allowlist.
  */
 async function invokeMcpStdio(
   entity: EntityForInvocation,
+  action: string,
   input: Record<string, unknown>,
   options?: InvocationOptions,
 ): Promise<InvocationResult> {
   const start = Date.now();
   const config = entity.invocation_config;
   const command = config.command as string | undefined;
-  const toolName = config.tool_name as string | undefined;
+  const toolName = (config.tool_name as string | undefined) ?? action;
 
   if (!command) {
     return failResult('invocation_config.command is required for mcp_stdio', Date.now() - start);
   }
   if (!toolName) {
-    return failResult('invocation_config.tool_name is required for mcp_stdio', Date.now() - start);
+    return failResult('invocation_config.tool_name or an action is required for mcp_stdio', Date.now() - start);
   }
 
   // Validate command against allowlist
@@ -911,26 +947,48 @@ async function invokeMcpStdio(
   const args = argsValidation.sanitized;
   const timeoutMs = resolveTimeoutMs(entity, options);
 
-  // Build JSON-RPC request per MCP protocol
-  const jsonRpcRequest = JSON.stringify({
-    jsonrpc: '2.0',
-    id: 1,
-    method: 'tools/call',
-    params: {
-      name: toolName,
-      arguments: input,
-    },
-  });
+  // Standard MCP handshake + the tool call, batched on stdin. Servers that
+  // skip the handshake still respond to tools/call, so the response is matched
+  // by request id (1) with a fallback to the last JSON-RPC message.
+  const protocolVersion = (config.protocol_version as string) ?? '2024-11-05';
+  const jsonRpcRequest = [
+    JSON.stringify({
+      jsonrpc: '2.0',
+      id: 0,
+      method: 'initialize',
+      params: {
+        protocolVersion,
+        capabilities: {},
+        clientInfo: { name: 'draymond-invoker', version: '1.0.0' },
+      },
+    }),
+    JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }),
+    JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: {
+        name: toolName,
+        arguments: input,
+      },
+    }),
+  ].join('\n') + '\n';
+
+  const execOptions: import('node:child_process').ExecFileOptions = {
+    timeout: timeoutMs,
+    maxBuffer: 10 * 1024 * 1024, // 10 MB
+    encoding: 'utf8',
+    env: { ...process.env },
+  };
+  if (typeof config.cwd === 'string' && config.cwd) {
+    execOptions.cwd = config.cwd;
+  }
 
   return new Promise<InvocationResult>((resolve) => {
     const child = execFile(
       command,
       args,
-      {
-        timeout: timeoutMs,
-        maxBuffer: 10 * 1024 * 1024, // 10 MB
-        env: { ...process.env },
-      },
+      execOptions,
       (error, stdout, stderr) => {
         const duration_ms = Date.now() - start;
 
@@ -942,8 +1000,11 @@ async function invokeMcpStdio(
           return;
         }
 
+        const stdoutText = typeof stdout === 'string' ? stdout : stdout.toString('utf8');
+        const stderrText = typeof stderr === 'string' ? stderr : stderr.toString('utf8');
+
         // Parse the JSON-RPC response from stdout
-        const trimmedOut = stdout.trim();
+        const trimmedOut = stdoutText.trim();
 
         // Empty stdout means the process produced no output — protocol failure (item 13)
         if (!trimmedOut) {
@@ -951,7 +1012,25 @@ async function invokeMcpStdio(
           return;
         }
 
-        const rpcResponse = safeParseJson(trimmedOut);
+        // The server answers the initialize + tools/call requests (possibly
+        // more). Parse every line and pick the response for the tools/call
+        // request (id 1); fall back to the last JSON-RPC message for servers
+        // that skip the handshake.
+        let rpcResponse: Record<string, unknown> | null = null;
+        let lastMessage: Record<string, unknown> | null = null;
+        for (const line of trimmedOut.split('\n')) {
+          const parsed = safeParseJson(line.trim());
+          if (parsed && parsed.jsonrpc === '2.0') {
+            lastMessage = parsed;
+            if (parsed.id === 1) rpcResponse = parsed;
+          }
+        }
+        rpcResponse = rpcResponse ?? lastMessage;
+
+        if (!rpcResponse) {
+          resolve(failResult('MCP stdio process returned no parseable JSON-RPC response', duration_ms));
+          return;
+        }
 
         // Check for JSON-RPC error
         if (rpcResponse.error) {
@@ -969,8 +1048,8 @@ async function invokeMcpStdio(
           ? { content: result.content }
           : result ?? rpcResponse;
 
-        if (stderr && stderr.trim()) {
-          output._stderr = stderr.trim();
+        if (stderrText.trim()) {
+          output._stderr = stderrText.trim();
         }
 
         resolve({ success: true, output, duration_ms });

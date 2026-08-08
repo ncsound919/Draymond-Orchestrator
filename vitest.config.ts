@@ -13,7 +13,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      include: ['src/lib/draymond/**/*.ts'],
+      include: ['src/lib/draymond/**/*.ts', 'src/lib/mathx/**/*.ts'],
       exclude: [
         'src/lib/draymond/index.ts',
         'src/lib/draymond/types.ts',
@@ -21,6 +21,8 @@ export default defineConfig({
         'src/lib/draymond/seed.ts',
         'src/lib/draymond/business-chains.ts',
         'src/lib/draymond/chains-seed.ts',
+        'src/lib/mathx/types.ts',
+        'src/lib/mathx/index.ts',
       ],
       thresholds: {
         lines: 75,

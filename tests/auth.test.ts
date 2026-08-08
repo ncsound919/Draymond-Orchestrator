@@ -1,64 +1,37 @@
 import { describe, expect, it, vi } from 'vitest';
 
-const { mockGetUser, mockFrom } = vi.hoisted(() => ({
-  mockGetUser: vi.fn(),
-  mockFrom: vi.fn(),
+const { mockGetCurrentUser } = vi.hoisted(() => ({
+  mockGetCurrentUser: vi.fn(),
 }));
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => ({
-    auth: { getUser: mockGetUser },
-    from: mockFrom,
-  })),
+vi.mock('@/lib/db/session', () => ({
+  getCurrentUser: mockGetCurrentUser,
 }));
 
-import { requireDraymondAuth, requireDraymondActionAuth } from '../src/lib/draymond/auth';
-
-function stubProfile(data: unknown) {
-  mockFrom.mockReturnValue({
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    single: vi.fn(() => Promise.resolve({ data })),
-  });
-}
+import { requireDraymondActionAuth, requireDraymondAuth } from '../src/lib/draymond/auth';
 
 describe('requireDraymondAuth', () => {
   it('returns 401 when there is no user', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
-    const result = await requireDraymondAuth();
-    expect(result.error?.status).toBe(401);
-  });
-
-  it('returns 401 when getUser errors', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: null }, error: new Error('x') });
+    mockGetCurrentUser.mockResolvedValue(null);
     const result = await requireDraymondAuth();
     expect(result.error?.status).toBe(401);
   });
 
   it('returns 403 for a non-admin profile', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'u1', email: 'a@b.c' } }, error: null });
-    stubProfile({ role: 'member' });
-    const result = await requireDraymondAuth();
-    expect(result.error?.status).toBe(403);
-  });
-
-  it('returns 403 when no profile exists', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'u1' } }, error: null });
-    stubProfile(null);
+    mockGetCurrentUser.mockResolvedValue({ id: 'u1', email: 'a@b.c', role: 'member' });
     const result = await requireDraymondAuth();
     expect(result.error?.status).toBe(403);
   });
 
   it('returns the admin user on success', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'u1', email: 'admin@b.c' } }, error: null });
-    stubProfile({ role: 'admin' });
+    mockGetCurrentUser.mockResolvedValue({ id: 'u1', email: 'admin@b.c', role: 'admin' });
     const result = await requireDraymondAuth();
     expect(result.user?.id).toBe('u1');
     expect(result.user?.email).toBe('admin@b.c');
   });
 
   it('returns 500 when the flow throws', async () => {
-    mockGetUser.mockRejectedValue(new Error('boom'));
+    mockGetCurrentUser.mockRejectedValue(new Error('boom'));
     const result = await requireDraymondAuth();
     expect(result.error?.status).toBe(500);
   });
@@ -66,13 +39,12 @@ describe('requireDraymondAuth', () => {
 
 describe('requireDraymondActionAuth', () => {
   it('throws when the underlying auth fails', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+    mockGetCurrentUser.mockResolvedValue(null);
     await expect(requireDraymondActionAuth()).rejects.toThrow(/Unauthorized/);
   });
 
   it('returns the user when authorized', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'u1', email: 'admin@b.c' } }, error: null });
-    stubProfile({ role: 'admin' });
+    mockGetCurrentUser.mockResolvedValue({ id: 'u1', email: 'admin@b.c', role: 'admin' });
     const user = await requireDraymondActionAuth();
     expect(user.id).toBe('u1');
   });

@@ -101,8 +101,9 @@ export interface RegisteredAgent {
   /** Visual */
   avatarUrl?: string;       // resolved at import time
   coverUrl?: string;
+  /** Source GitHub repo (for RepoRank/Grader deep-scoring). */
+  sourceUrl?: string;
   theme: AgentTheme;
-
   /** Capabilities */
   specialties: string[];    // e.g. ['TypeScript', 'REST APIs', 'Git']
   capabilities: AgentCapability[];

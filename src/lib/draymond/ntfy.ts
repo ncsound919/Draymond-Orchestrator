@@ -14,6 +14,7 @@
 //     never fail action submission.
 // ============================================================================
 
+import { randomBytes } from 'crypto';
 import type { DraymondAction } from './types';
 
 /** Published message title — kept in one place so consumers can filter on it. */
@@ -27,6 +28,121 @@ const RISK_PRIORITY: Record<string, number> = {
   low: 3,
   safe: 2,
 };
+
+// ============================================================================
+// ISSUE ALERTS — real-time "contact me" pushes to Open-Chat
+// ============================================================================
+// When Draymond detects a failure (agent/job failure, site down) it publishes
+// a high-priority ntfy message to the results topic that Open-Chat subscribes
+// to. The push carries a single-use "Diagnose & Repair" HTTP action that
+// POSTs back through the Cloudflare tunnel so the user can trigger diagnosis
+// (RepoRank + Grader) followed by the repair team from the chat.
+//
+// Security model (mirrors the approval relay):
+//   - The CRON_SECRET is NEVER embedded in the payload. Each action carries a
+//     one-time, time-limited repair token in its HTTP action header, so a
+//     leaked notification cannot be reused to trigger arbitrary repairs.
+//   - Publishing is best-effort: a failure to reach ntfy must never fail the
+//     originating job/monitor check.
+// ============================================================================
+
+export interface IssueRepairRequest {
+  /** 'job' → repairFailedJob; 'monitor' (or anything else) → attemptRepair. */
+  kind: 'job' | 'monitor';
+  /** Failure signal, e.g. "job:error", "monitor:down". */
+  signal: string;
+  /** Human-readable failure detail / error. */
+  detail: string;
+  /** Scheduler job payload for repairFailedJob (kind === 'job'). */
+  job?: { id: string; name: string; job_type: string; job_config: Record<string, unknown> };
+  /** Optional GitHub repo URL for RepoRank + Grader diagnosis. */
+  repoUrl?: string;
+}
+
+const REPAIR_TOKEN_TTL_MS = 30 * 60 * 1000;
+const MAX_REPAIR_TOKENS = 500;
+
+/** Single-use repair tokens: token → { expiresAt, repair }. */
+const repairTokens = new Map<string, { expiresAt: number; repair: IssueRepairRequest }>();
+
+/** Mint a one-time repair token for the "Diagnose & Repair" action. */
+export function issueRepairToken(repair: IssueRepairRequest): { token: string; expiresAt: string } {
+  const token = randomBytes(32).toString('hex');
+  const expiresAt = Date.now() + REPAIR_TOKEN_TTL_MS;
+  repairTokens.set(token, { expiresAt, repair });
+  // Cap the map — evict the oldest entry beyond MAX_REPAIR_TOKENS.
+  if (repairTokens.size > MAX_REPAIR_TOKENS) {
+    const oldest = repairTokens.keys().next().value as string;
+    repairTokens.delete(oldest);
+  }
+  return { token, expiresAt: new Date(expiresAt).toISOString() };
+}
+
+/** Consume a repair token (single-use). Returns null when missing/expired. */
+export function consumeRepairToken(token: string): IssueRepairRequest | null {
+  const entry = repairTokens.get(token);
+  if (!entry) return null;
+  repairTokens.delete(token); // single-use
+  if (Date.now() > entry.expiresAt) return null;
+  return entry.repair;
+}
+
+/**
+ * Publish a real-time issue alert to the Open-Chat results topic.
+ * Best-effort: resolves `true` on 2xx, `false` when unconfigured or on failure.
+ * Never throws.
+ */
+export async function publishIssueNotification(input: {
+  title: string;
+  message: string;
+  priority?: number;
+  tags?: string[];
+  repair?: IssueRepairRequest;
+}): Promise<boolean> {
+  const baseUrl = process.env.NTFY_URL;
+  const topic = process.env.NTFY_TOPIC_RESULTS;
+  if (!baseUrl || !topic) return false;
+
+  const publicUrl = process.env.DRAYMOND_PUBLIC_URL;
+  const actions: Array<Record<string, unknown>> = [];
+  if (publicUrl && input.repair) {
+    const { token } = issueRepairToken(input.repair);
+    actions.push({
+      action: 'http',
+      label: 'Diagnose & Repair',
+      url: `${publicUrl.replace(/\/+$/, '')}/api/ops/repair-triage`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Repair-Token': token },
+      body: JSON.stringify({ signal: input.repair.signal, detail: input.repair.detail }),
+      clear: true,
+    });
+  }
+
+  try {
+    const res = await fetch(baseUrl.replace(/\/+$/, ''), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        topic,
+        title: input.title,
+        message: input.message,
+        priority: input.priority ?? 5,
+        tags: input.tags ?? ['rotating_light'],
+        ...(actions.length ? { actions } : {}),
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!res.ok) {
+      console.warn(`[ntfy] Issue publish returned ${res.status} for "${input.title}"`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn(`[ntfy] Issue publish failed for "${input.title}": ${err instanceof Error ? err.message : err}`);
+    return false;
+  }
+}
 
 /**
  * Build the ntfy publish payload for an action awaiting human review.

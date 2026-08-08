@@ -1,83 +1,30 @@
 // ============================================================================
-// DRAYMOND — Supabase Client Helper
-// Uses untyped Supabase client for Draymond-specific tables
-// (The main Database type covers profiles/posts/etc. Draymond tables
-//  are added via migration 004 and typed separately here.)
+// DRAYMOND — Local Database Client
+// ============================================================================
+// Draymond previously used Supabase (Postgres + RLS). This module now returns
+// a supabase-js-compatible query builder backed by a local SQLite file — no
+// network, no account, no cost, runs 24/7 inside the Draymond process.
+//
+// Both `createDraymondClient` (async) and `createDraymondAdminClient` (sync)
+// return the same local client: on a single-user private instance there is no
+// RLS distinction, so the admin/anon split is a no-op kept for compatibility.
 // ============================================================================
 
-import { createServerClient } from '@supabase/ssr';
-import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
+import { createLocalAdminClient, createLocalClient } from '@/lib/db';
 
 /**
- * Create a Supabase client without the strict Database generic.
- * This allows querying the Draymond tables that aren't in the main Database type.
- * Validates required env vars at call time to provide clear error messages.
- *
- * Uses the anon key + SSR cookie store — subject to Row Level Security.
- * Use `createDraymondAdminClient()` for server-side admin operations.
+ * Create the local DB client. Async variant kept for compatibility with
+ * existing `await createDraymondClient()` call sites.
  */
 export async function createDraymondClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl) {
-    throw new Error('[Draymond] Missing required env var: NEXT_PUBLIC_SUPABASE_URL');
-  }
-  if (!supabaseAnonKey) {
-    throw new Error('[Draymond] Missing required env var: NEXT_PUBLIC_SUPABASE_ANON_KEY');
-  }
-
-  const cookieStore = await cookies();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return createServerClient<any>(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(
-          cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]
-        ) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options as Parameters<typeof cookieStore.set>[2])
-            );
-          } catch {
-            // Server Component - read only
-          }
-        },
-      },
-    }
-  );
+  return createLocalClient();
 }
 
 /**
- * Create a Supabase admin client using the service role key.
- * This client BYPASSES Row Level Security — use only in trusted server-side
- * code (API routes, seed scripts, admin operations).
- *
- * Never expose this client to the browser or use in client components.
+ * Create the local DB client (sync). Bypasses RLS in the same way the old
+ * service-role client did — on a local single-user instance everything is
+ * trusted server-side code.
  */
 export function createDraymondAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl) {
-    throw new Error('[Draymond] Missing required env var: NEXT_PUBLIC_SUPABASE_URL');
-  }
-  if (!serviceRoleKey) {
-    throw new Error('[Draymond] Missing required env var: SUPABASE_SERVICE_ROLE_KEY');
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return createClient<any>(supabaseUrl, serviceRoleKey, {
-    auth: {
-      // Disable auto-refresh and session persistence for server-side admin use
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
+  return createLocalAdminClient();
 }

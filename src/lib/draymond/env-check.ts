@@ -12,9 +12,6 @@ interface EnvVar {
 }
 
 const REQUIRED_VARS: EnvVar[] = [
-  { name: 'NEXT_PUBLIC_SUPABASE_URL', required: true, description: 'Supabase project URL' },
-  { name: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', required: true, description: 'Supabase anonymous key' },
-  { name: 'SUPABASE_SERVICE_ROLE_KEY', required: true, description: 'Supabase service role key (server-only)' },
   { name: 'CRON_SECRET', required: true, description: 'Bearer token for cron/admin API routes' },
 ];
 
@@ -50,6 +47,10 @@ const OPTIONAL_VARS: EnvVar[] = [
   { name: 'SUB_TEAM_DIR', required: false, description: 'Sub Team project directory' },
   { name: 'DRAYMOND_REGISTRY_DIR', required: false, description: 'File-based registry directory' },
   { name: 'AUDIT_LOG_PATH', required: false, description: 'Audit log file path' },
+  { name: 'DRAYMOND_DB_PATH', required: false, description: 'Path to the local SQLite file (default ./data/draymond.db)' },
+  { name: 'DRAYMOND_ADMIN_EMAIL', required: false, description: 'Local admin login email (bootstrap)' },
+  { name: 'DRAYMOND_ADMIN_PASSWORD', required: false, description: 'Local admin login password (bootstrap; generated if unset)' },
+  { name: 'DRAYMOND_RELEASES_DIR', required: false, description: 'Directory served by /api/downloads/* (default ./data/paid-releases)' },
   { name: 'DEEPSEEK_API_KEY', required: false, description: 'DeepSeek API key for the task router' },
   { name: 'AETHERDESK_BASE_URL', required: false, description: 'AetherDesk API base URL (e.g. http://127.0.0.1:8000/api/v1)' },
   { name: 'AETHERDESK_API_KEY', required: false, description: 'AetherDesk INTERNAL_API_KEY for x-api-key auth' },

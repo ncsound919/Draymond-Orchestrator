@@ -11,6 +11,7 @@
 // ============================================================================
 
 import { createDraymondClient } from './client';
+import { percentile } from '../mathx';
 import type {
   EntityLeaderboardEntry,
   ExecutionHeatmapPoint,
@@ -417,11 +418,7 @@ async function getChainRunCount(since: string): Promise<number> {
   return count ?? 0;
 }
 
-function percentile(sorted: number[], p: number): number {
-  if (sorted.length === 0) return 0;
-  const idx = Math.ceil(sorted.length * p) - 1;
-  return sorted[Math.max(0, idx)];
-}
+// percentile(sorted, p) is provided by @/lib/mathx/stats (R type-7 interpolated).
 
 // ── Recent Execution Log Query ───────────────────────────────────────────────
 

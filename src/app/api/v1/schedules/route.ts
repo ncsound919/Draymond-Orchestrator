@@ -46,7 +46,15 @@ export async function GET(request: NextRequest) {
     }
 
     const jobs = await listJobs(filters);
-    return NextResponse.json({ ok: true, schedules: jobs });
+    // Normalise to the shape Open-Chat's DraymondOrchestratorClient expects:
+    // { job_name, name, cron, cron_expression, enabled, is_enabled, ... }
+    const schedules = jobs.map((j) => ({
+      ...j,
+      job_name: j.name,
+      cron: j.cron_expression,
+      enabled: j.is_enabled,
+    }));
+    return NextResponse.json({ ok: true, schedules });
   } catch (err) {
     console.error('[API /api/v1/schedules GET]', err instanceof Error ? err.message : err);
     return NextResponse.json({ ok: false, error: sanitizeError(err) }, { status: 500 });

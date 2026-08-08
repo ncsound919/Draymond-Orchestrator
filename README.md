@@ -28,10 +28,11 @@ npm install
 npm run dev                  # http://localhost:3444
 ```
 
-Prerequisites: **Node.js 20.19+**, a Supabase project (auth + Postgres), and the
-migrations in `supabase/migrations/` applied. The `user_has_access` RPC and the
-`profiles` table are required — the purchase gate in `src/proxy.ts` **fails
-closed** if they are missing.
+Prerequisites: **Node.js 20.19+**. The app uses a local SQLite database (created
+automatically on first boot at `data/draymond.db`) and a local admin login — no
+cloud accounts or hosted services required. On first login the admin account is
+bootstrapped from `DRAYMOND_ADMIN_EMAIL` / `DRAYMOND_ADMIN_PASSWORD` in
+`.env.local` (or a generated password printed to the server console).
 
 Key configuration: `CRON_SECRET` (admin API), `CORS_ORIGIN` (allowed browser
 origins), LLM keys (`DEEPSEEK_API_KEY`, `OPENCODE_API_KEY`, `GEMINI_API_KEY`,
@@ -50,6 +51,68 @@ npm run test:coverage   # Coverage enforced on src/lib/draymond/**
 Coverage thresholds (`vitest.config.ts`): lines 75 / statements 70 / functions 75 /
 branches 55 — measured on `src/lib/draymond/**/*.ts` (the orchestration core:
 chains, scheduler, monitors, invoker, router, registry, confidence, llm).
+
+---
+
+## Local Database & Auth
+
+Draymond stores all state in a single **SQLite** file (`data/draymond.db`) via
+`better-sqlite3`. The `src/lib/db/` module provides a supabase-js-compatible
+query builder, so the ~150 existing `supabase.from('table').select()...` call
+sites work unchanged.
+
+- **Auth:** email + password login against the `local_users` table. Sessions are
+  256-bit random tokens stored in `local_sessions` and carried in an httpOnly
+  cookie. The admin account is bootstrapped on first login from
+  `DRAYMOND_ADMIN_EMAIL` / `DRAYMOND_ADMIN_PASSWORD`.
+- **Login:** `http://localhost:3444/login`. Sign out from the header.
+- **Releases:** release binaries are served from `data/paid-releases/` (or
+  `DRAYMOND_RELEASES_DIR`) by `/api/downloads/*`, gated by the local session +
+  a `purchases` row.
+
+### Migrating existing Supabase data
+
+If you previously hosted Draymond on Supabase, dump once, then import:
+
+```bash
+node scripts/import-from-supabase.mjs dump    # fetch draymond_* rows + release files → ./data/
+node scripts/import-from-supabase.mjs import  # load the dump into the local SQLite DB
+```
+
+The dump reads `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from
+`.env.local` over the PostgREST/Storage REST APIs (no SDK dependency). Start the
+app once before `import` so the schema exists.
+
+### Admin password
+
+Set a known password before the first login:
+
+```bash
+node scripts/create-admin.mjs admin@example.com 'your-strong-password'
+```
+
+### Roster Benchmark (RepoRank + Grader)
+
+The **Roster Benchmark** job (`benchmark_roster`, runs daily at 06:30) deep-scores
+every pictured agent's GitHub repo with **RepoRank** and **Grader** (plus optional
+**Vibe-Reality**), records the stats in `draymond_benchmarks`, and queues the
+weakest agents in `draymond_upgrade_queue`. The self-learning loop and repair
+team then work on those agents in the background.
+
+Configure the scorer servers in `.env.local`:
+
+```bash
+REPORANK_URL=http://localhost:3001
+REPORANK_API_KEY=your-reporank-api-key
+GRADER_URL=http://localhost:3000
+GRADER_API_KEY=your-grader-api-key
+# optional
+VIBE_REALITY_URL=
+VIBE_REALITY_ID_TOKEN=
+```
+
+Agent → repo mapping lives in `src/lib/draymond/roster-repos.ts`. When a scorer
+server is unreachable it fails soft and the benchmark records "no deep scores".
 
 ---
 
@@ -139,7 +202,7 @@ The dashboard renders each registered entity as a character card. Clicking a car
 - **Framework:** [Next.js 16](https://nextjs.org/) (App Router, TypeScript)
 - **Styling:** [Tailwind CSS v4](https://tailwindcss.com/)
 - **Fonts:** Inter (body), Space Grotesk (headings)
-- **Backend:** [Supabase](https://supabase.com/) (PostgreSQL + Auth)
+- **Backend:** Local SQLite (better-sqlite3) + local admin sessions — fully private, zero cost, runs 24/7 inside the app process
 - **Architecture:** Server components for dashboard, SSG for public pages
 
 ### Brand Colors
@@ -167,9 +230,15 @@ Open [http://localhost:3444](http://localhost:3444).
 
 | Variable | Purpose |
 |----------|---------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-side only) |
+| `DRAYMOND_DB_PATH` | Path to the SQLite file (default `./data/draymond.db`) |
+| `DRAYMOND_ADMIN_EMAIL` | Local admin login email (bootstrap) |
+| `DRAYMOND_ADMIN_PASSWORD` | Local admin login password (bootstrap) |
+| `DRAYMOND_RELEASES_DIR` | Directory served by `/api/downloads/*` (default `./data/paid-releases`) |
+| `CRON_SECRET` | Protects `/api/cron`, `/api/seed`, etc. |
+
+The legacy `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` variables are
+kept in `.env.example` only for the one-time data migration
+(`node scripts/import-from-supabase.mjs dump`). See `scripts/` for details.
 
 ---
 
@@ -198,9 +267,9 @@ Open [http://localhost:3444](http://localhost:3444).
 │       │   ├── invoker.ts       # REST / subprocess / SDK dispatch
 │       │   ├── monitors.ts      # Health monitoring
 │       │   └── registry.ts      # Entity registry operations
-│       └── supabase/            # Database client and types
+│       └── db/                  # Local SQLite data layer + auth
 ├── supabase/
-│   └── migrations/              # Database schema and RLS policies
+│   └── migrations/              # Legacy Postgres schema (for reference only)
 ├── Scaffold                     # Full platform architecture blueprint
 └── public/                      # Static assets
 ```

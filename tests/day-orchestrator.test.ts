@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { dayPlan, currentPhase, DAY_FLOW, runPhase } from '../src/lib/draymond/day-orchestrator';
+import {
+  dayPlan,
+  currentPhase,
+  DAY_FLOW,
+  runPhase,
+  estimateStepTokens,
+  dayTokenBudget,
+} from '../src/lib/draymond/day-orchestrator';
 import { financialBrief } from '../src/lib/draymond/data-apis';
 
 describe('day orchestrator', () => {
@@ -37,6 +44,29 @@ describe('day orchestrator', () => {
     // when BookBridge is offline (fail-closed, not a crash).
     expect(result.executed.filter((e) => ['learn', 'rd'].includes(e)).length).toBe(2);
     expect(result.errors.every((e) => e.startsWith('books:'))).toBe(true);
+  }, 30_000);
+
+  it('estimates per-step tokens and the full-day budget', () => {
+    const budget = dayTokenBudget();
+    expect(budget.total).toBeGreaterThan(0);
+    expect(Object.keys(budget.byPhase).sort()).toEqual(['evening', 'midday', 'morning', 'night']);
+    const market = DAY_FLOW.find((s) => s.id === 'market');
+    expect(market).toBeDefined();
+    expect(estimateStepTokens(market!)).toBeGreaterThan(0);
+  });
+
+  it('runPhase with a tiny token budget drops the whole phase without executing', async () => {
+    const result = await runPhase('night', 1);
+    expect(result.dropped?.length).toBe(DAY_FLOW.filter((s) => s.phase === 'night').length);
+    expect(result.executed).toHaveLength(0);
+    expect(result.estimated_tokens).toBe(0);
+  }, 30_000);
+
+  it('runPhase without a budget preserves legacy behavior (no dropped field)', async () => {
+    const result = await runPhase('evening');
+    expect(result.dropped).toBeUndefined();
+    expect(result.estimated_tokens).toBeUndefined();
+    expect(result.executed[0]).toContain('cron-driven');
   }, 30_000);
 });
 
