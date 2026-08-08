@@ -113,7 +113,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
       'Multi-agent stock analysis framework (LangGraph). Runs market analysis, risk assessment, and signal generation. Python library — no built-in HTTP server.',
     invocation_method: 'python_module',
     invocation_config: {
-      module: 'tradingagents',
+      module: 'main',
       function: 'main',
       working_dir: process.env.TRADING_AGENTS_DIR || './agents/TradingAgents-main',
       python_path: process.env.TRADING_AGENTS_PYTHON || 'python',

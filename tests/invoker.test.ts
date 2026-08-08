@@ -270,6 +270,30 @@ describe('invokeEntity webhook / internal / manual / python_module', () => {
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/Invalid Python module name/);
   });
+
+  it('python_module honors working_dir and python_path', async () => {
+    execFileMock.mockImplementation((cmd, args, opts, cb) => {
+      expect(cmd).toBe('python3');
+      expect(opts.cwd).toBe('./agents/TradingAgents-main');
+      cb(null, '{"echo":"hello"}', '');
+      return { stdin: { write: () => {}, end: () => {} } };
+    });
+    const result = await invokeEntity(
+      entity({
+        invocation_method: 'python_module',
+        invocation_config: {
+          module: 'main',
+          function: 'main',
+          working_dir: './agents/TradingAgents-main',
+          python_path: 'python3',
+        },
+      }),
+      'x',
+      { v: 'hello' },
+    );
+    expect(result.success).toBe(true);
+    expect(result.output.echo).toBe('hello');
+  });
 });
 
 describe('invokeEntity mcp_tool / mcp_stdio', () => {
