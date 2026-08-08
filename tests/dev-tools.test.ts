@@ -1,21 +1,32 @@
 import { describe, expect, it } from 'vitest';
 import { SEED_ENTITIES } from '../src/lib/draymond/seed';
 
+const DEV_TOOL_SLUGS = ['vibeserve', 'reporank', 'grader', 'mutly'];
+
 describe('dev tool entities', () => {
-  it('registers VibeServe, RepoRank, Grader, and Mutly as agent entities', () => {
-    const agentNames = SEED_ENTITIES.filter((e) => e.kind === 'agent').map((e) => e.name.toLowerCase());
-    expect(agentNames.some((n) => n.includes('vibeserve'))).toBe(true);
-    expect(agentNames.some((n) => n.includes('reporank'))).toBe(true);
-    expect(agentNames.some((n) => n.includes('grader'))).toBe(true);
-    expect(agentNames.some((n) => n.includes('mutly'))).toBe(true);
+  it('registers VibeServe, RepoRank, Grader, and Mutly in the registry', () => {
+    const slugs = new Set(SEED_ENTITIES.map((e) => e.slug));
+    for (const slug of DEV_TOOL_SLUGS) {
+      expect(slugs.has(slug), `${slug} should be registered`).toBe(true);
+    }
   });
 
-  it('gives the four dev-tool agents a valid invocation method', () => {
-    for (const slug of ['vibeserve', 'reporank', 'grader', 'mutly']) {
-      const agent = SEED_ENTITIES.find((e) => e.slug === slug && e.kind === 'agent');
-      expect(agent, `${slug} should be registered as an agent entity`).toBeDefined();
-      expect(agent!.invocation_method).toBeDefined();
-      expect(agent!.invocation_config).toBeDefined();
+  it('gives every dev-tool entity a valid invocation method and config', () => {
+    for (const slug of DEV_TOOL_SLUGS) {
+      const entity = SEED_ENTITIES.find((e) => e.slug === slug);
+      expect(entity, `${slug} should exist in the seed`).toBeDefined();
+      expect(entity!.invocation_method).toBeDefined();
+      expect(entity!.invocation_config).toBeDefined();
     }
+  });
+
+  it('registers VibeServe as an mcp_stdio tool with the python entrypoint', () => {
+    const vibe = SEED_ENTITIES.find((e) => e.slug === 'vibeserve');
+    expect(vibe).toBeDefined();
+    expect(vibe!.kind).toBe('tool');
+    expect(vibe!.invocation_method).toBe('mcp_stdio');
+    const config = vibe!.invocation_config as { command: string; args: string[] };
+    expect(config.command).toBe('python');
+    expect(config.args).toEqual(['agents/VibeServe-main/vibeserve/__main__.py']);
   });
 });

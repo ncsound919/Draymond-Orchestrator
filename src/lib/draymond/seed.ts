@@ -612,6 +612,29 @@ const tools: DraymondEntityInsert[] = [
     is_integrated: true,
     risk_level_default: 'low',
   },
+  {
+    name: 'VibeServe',
+    slug: 'vibeserve',
+    kind: 'tool',
+    description: 'Agentic IDE/orchestrator/MCP backend for NL→UI generation. Exposes IDE/orchestrator tools over MCP stdio (vibeserve/__main__.py).',
+    version: '1.1.0',
+    tags: ['developer-tooling', 'mcp', 'ide'],
+    category: 'tooling',
+    sector: 'developer',
+    invocation_method: 'mcp_stdio',
+    invocation_config: {
+      command: 'python',
+      args: ['agents/VibeServe-main/vibeserve/__main__.py'],
+      requires_env: ['VIBESERVE_API_SECRET'],
+    },
+    capabilities: ['ui_generation', 'mcp', 'ide', 'orchestration'],
+    source_type: 'local',
+    download_path: 'agents/VibeServe-main',
+    is_integrated: true,
+    is_free: true,
+    is_active: true,
+    risk_level_default: 'low',
+  },
 ];
 
 // ============================================================================
@@ -1516,85 +1539,6 @@ const services: DraymondEntityInsert[] = [
 ];
 
 // ============================================================================
-// DEVELOPER TOOLING AGENTS (VibeServe, RepoRank, Grader, Mutly)
-// ============================================================================
-
-const devTools: DraymondEntityInsert[] = [
-  {
-    name: 'VibeServe',
-    slug: 'vibeserve',
-    kind: 'agent',
-    description: 'Agentic IDE/orchestrator/MCP backend for NL→UI generation',
-    version: '1.1.0',
-    tags: ['developer-tooling', 'mcp', 'ide'],
-    category: 'tooling',
-    sector: 'developer',
-    invocation_method: 'mcp_stdio',
-    invocation_config: { command: 'python', args: ['agents/VibeServe-main/vibeserve/__main__.py'], env: ['VIBESERVE_API_SECRET'] },
-    capabilities: ['ui_generation', 'mcp', 'ide', 'orchestration'],
-    source_type: 'local',
-    download_path: 'agents/VibeServe-main',
-    is_integrated: true,
-    is_free: true,
-    is_active: true,
-  },
-  {
-    name: 'RepoRank',
-    slug: 'reporank',
-    kind: 'agent',
-    description: 'Repository scoring, security scans, benchmarking, fix generation',
-    version: '1.0.0',
-    tags: ['developer-tooling', 'qa'],
-    category: 'tooling',
-    sector: 'developer',
-    invocation_method: 'http_api',
-    invocation_config: { endpoint: process.env.REPORANK_URL ?? 'http://127.0.0.1:3001', health_path: '/health' },
-    capabilities: ['repo_scoring', 'security_scan', 'benchmark', 'fix_generation'],
-    source_type: 'local',
-    download_path: 'agents/reporank',
-    is_integrated: true,
-    is_free: true,
-    is_active: true,
-  },
-  {
-    name: 'Grader',
-    slug: 'grader',
-    kind: 'agent',
-    description: 'Gemini-powered codebase grading (security, quality, valuation)',
-    version: '1.0.0',
-    tags: ['developer-tooling', 'qa'],
-    category: 'tooling',
-    sector: 'developer',
-    invocation_method: 'http_api',
-    invocation_config: { endpoint: process.env.GRADER_URL ?? 'http://127.0.0.1:3000', health_path: '/api/grade' },
-    capabilities: ['code_grade', 'security_audit', 'valuation'],
-    source_type: 'local',
-    download_path: 'agents/Grader-main',
-    is_integrated: true,
-    is_free: true,
-    is_active: true,
-  },
-  {
-    name: 'Mutly',
-    slug: 'mutly',
-    kind: 'agent',
-    description: 'Developer daemon: ReAct loop, vector search, sandboxed tests, block edits',
-    version: '1.0.0',
-    tags: ['developer-tooling', 'daemon'],
-    category: 'tooling',
-    sector: 'developer',
-    invocation_method: 'http_api',
-    invocation_config: { endpoint: process.env.MUTLY_WS_PORT ? `ws://127.0.0.1:${process.env.MUTLY_WS_PORT}` : 'ws://127.0.0.1:8787' },
-    capabilities: ['vector_search', 'sandbox_test', 'block_edit', 'daemon'],
-    source_type: 'local',
-    download_path: 'agents/Mutly-Daemon-Agent',
-    is_integrated: true,
-    is_free: true,
-    is_active: true,
-  },
-];
-
-// ============================================================================
 // EXPORT ALL SEED DATA
 // ============================================================================
 
@@ -1605,7 +1549,6 @@ export const SEED_ENTITIES: DraymondEntityInsert[] = [
   ...extensions,
   ...mcpServers,
   ...services,
-  ...devTools,
 ];
 
 /**
@@ -1619,7 +1562,6 @@ export function getSeedSummary(): Record<string, number> {
     extensions: extensions.length,
     mcp_servers: mcpServers.length,
     services: services.length,
-    dev_tools: devTools.length,
     total: SEED_ENTITIES.length,
   };
 }
