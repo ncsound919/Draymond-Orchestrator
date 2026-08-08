@@ -82,3 +82,14 @@ sessions/
 
 # stray runtime logs
 /cronfix.log
+
+# Local secrets / one-off API tokens (never commit)
+/Kaggle.txt
+
+# Temp opencode debug scaffolding (one-off, machine-specific paths)
+/_oc_*.cjs
+/_oc_runner.cmd
+/scripts/_test-start.ps1
+
+# Generated knowledge-graph output (build artifact)
+/graphify-out/

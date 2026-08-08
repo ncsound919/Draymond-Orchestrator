@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
 beforeEach(async () => {
   tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'draymond-repair-'));
   process.env.DRAYMOND_REGISTRY_DIR = tempDir;
+  vi.clearAllMocks();
 });
 
 afterEach(async () => {
@@ -136,5 +137,58 @@ describe('repairLog', () => {
   it('returns an empty log when none exists', async () => {
     const mod = await loadSelfRepair();
     expect(await mod.repairLog()).toEqual([]);
+  });
+});
+
+describe('failure-loop guard', () => {
+  it('stops re-applying the same repair once the cooldown threshold is hit', async () => {
+    mocks.execFile.mockResolvedValue('ok');
+    process.env.DRAYMOND_REPAIR_COOLDOWN_MS = String(10 * 60 * 60 * 1000); // wide cooldown
+    process.env.DRAYMOND_REPAIR_MAX_IN_COOLDOWN = '3';
+
+    const mod = await loadSelfRepair();
+    await mod.attemptRepair('qa:fail', 'fail 1');
+    await mod.attemptRepair('qa:fail', 'fail 2');
+    await mod.attemptRepair('qa:fail', 'fail 3');
+
+    // 4th attempt inside the cooldown window must escalate, not re-apply.
+    const loop = await mod.attemptRepair('qa:fail', 'fail 4');
+    expect(loop.status).toBe('escalated');
+    expect(loop.detail).toContain('Repair loop detected for "qa:fail"');
+    expect(mocks.execFile).toHaveBeenCalledTimes(3); // not called a 4th time
+
+    // The loop is reported by detectRepairLoops.
+    const loops = await mod.detectRepairLoops();
+    expect(loops).toHaveLength(1);
+    expect(loops[0].signal).toBe('qa:fail');
+    expect(loops[0].attempts).toBe(3);
+  });
+
+  it('applies a repair registered via DRAYMOND_REPAIR_MAP (learned repairs)', async () => {
+    mocks.execFile.mockResolvedValue('ok');
+    process.env.DRAYMOND_REPAIR_MAP = JSON.stringify({
+      'learner:fix': {
+        name: 'learner:fix',
+        service: 'learner',
+        command: ['node', 'scripts/learner-fix.mjs'],
+        safe: true,
+      },
+    });
+
+    const mod = await loadSelfRepair();
+    const attempt = await mod.attemptRepair('learner:fix', 'learned failure');
+
+    expect(attempt.status).toBe('applied');
+    expect(mocks.execFile).toHaveBeenCalledWith('node', ['scripts/learner-fix.mjs'], { timeout: 120_000 });
+  });
+
+  it('records every attempt as a self-learning outcome', async () => {
+    mocks.execFile.mockResolvedValue('ok');
+    const mod = await loadSelfRepair();
+    await mod.attemptRepair('qa:fail', 'tests failing');
+
+    const raw = await fs.readFile(path.join(tempDir, 'learning-outcomes.json'), 'utf-8');
+    const outcomes = JSON.parse(raw) as Array<{ kind: string; agentId: string; success: boolean }>;
+    expect(outcomes.some((o) => o.kind === 'repair' && o.agentId === 'repair:qa:fail' && o.success)).toBe(true);
   });
 });

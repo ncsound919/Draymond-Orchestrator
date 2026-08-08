@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 const { mockAdmin } = vi.hoisted(() => {
   const makeChain = (tables: Map<string, unknown>, table: string) => {
@@ -169,5 +172,27 @@ describe('runDueJobs', () => {
     });
     const results = await runDueJobs();
     expect(results[0].status).toBe('skipped');
+  });
+
+  it('reports a failing job and records a learning outcome', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'draymond-scheduler-'));
+    process.env.DRAYMOND_REGISTRY_DIR = tmpDir;
+    try {
+      const dueJob = job({ id: 'job-fail', name: 'job-fail', job_type: 'chain', job_config: { chain_slug: 'missing' }, run_count: 0, fail_count: 0, notify_on_failure: false });
+      mockAdmin._tables.set('draymond_scheduled_jobs', (op: string) => {
+        if (op === 'select') return { data: [dueJob], error: null };
+        if (op === 'claim') return { data: { id: 'job-fail' }, error: null };
+        return { data: null, error: null };
+      });
+      const results = await runDueJobs();
+      expect(results[0].status).toBe('failed');
+      // The failure was fed to the self-learning loop for nightly distillation.
+      const raw = fs.readFileSync(path.join(tmpDir, 'learning-outcomes.json'), 'utf-8');
+      const outcomes = JSON.parse(raw) as Array<{ agentId: string }>;
+      expect(outcomes.some((o) => o.agentId === 'scheduler:job-fail')).toBe(true);
+    } finally {
+      delete process.env.DRAYMOND_REGISTRY_DIR;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });

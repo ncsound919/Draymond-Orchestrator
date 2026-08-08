@@ -69,4 +69,26 @@ describe('internal tool registrations', () => {
     expect(config.endpoints.status.path).toBe('/brain/status');
     expect(config.endpoints.status.method).toBe('GET');
   });
+
+  it('registers Kaggle as an http_api data provider through Draymond', () => {
+    const k = bySlug('kaggle');
+    expect(k).toBeDefined();
+    expect(k!.kind).toBe('tool');
+    expect(k!.invocation_method).toBe('http_api');
+
+    const config = k!.invocation_config as { url: string; endpoints: Record<string, { path: string; method: string }> };
+    // Kaggle is proxied through Draymond's /api/ops/kaggle (the brain's
+    // /kaggle/* routes were never implemented).
+    expect(config.url).toContain('localhost:3444');
+    expect(config.endpoints.status.path).toBe('/api/ops/kaggle/status');
+    expect(config.endpoints.search.path).toBe('/api/ops/kaggle');
+    expect(config.endpoints.search.method).toBe('POST');
+    expect(config.endpoints.competitions.path).toBe('/api/ops/kaggle');
+  });
+
+  it('registers OmniResearch as depending on Kaggle for research data', () => {
+    const o = bySlug('omni-research');
+    expect(o).toBeDefined();
+    expect(o!.depends_on).toContain('kaggle');
+  });
 });

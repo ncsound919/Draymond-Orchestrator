@@ -3,6 +3,19 @@
 Aligned to the 4 revenue engines + operations. All have **free tiers** — acquire
 the mission-critical ones first, wire into the news/ops layer.
 
+> **Status is live-tracked** by Draymond. `src/lib/draymond/api-keys.ts` maps
+> every API below to its env var(s) and reports configured/missing via
+> `GET /api/ops/api-keys` and the scheduled **Free-API Key Audit** job. Keys
+> live ONLY in `.env.local` (gitignored) — Draymond never logs or stores them.
+> Missing mission-critical keys are surfaced as priorities in the brain-decision
+> cycle so the fleet/ops drive acquisition.
+
+| Status legend | Meaning |
+|---|---|
+| ✅ configured | key present in `.env.local` |
+| 🔑 no key needed | free tier works keyless (wired) |
+| 🔲 to acquire | signup + add key to `.env.local` |
+
 ---
 
 ## E1 · Platform tiers (Health / Wealth / Justice)
@@ -46,11 +59,12 @@ the mission-critical ones first, wire into the news/ops layer.
 | API | Free tier | Use | Status |
 |---|---|---|---|
 | **TheSportsDB** | free | Sports stats/intel (Sports Steve) | 🔲 |
-| **MusicBrainz** | free | Music metadata (music-rights) | 🔲 |
-| **iTunes Search API** | free | Music lookup | 🔲 |
-| **OpenAlex** | free | Research papers (open-notebook) | 🔲 |
-| **PubMed E-utilities** | free | Bio/health research | 🔲 |
-| **Crossref** | free | DOI/citations (BookBridge) | 🔲 |
+| **MusicBrainz** | free | Music metadata (music-rights) | 🔑 no key needed |
+| **iTunes Search API** | free | Music lookup | 🔑 no key needed |
+| **OpenAlex** | free | Research papers (open-notebook) | 🔑 no key needed |
+| **PubMed E-utilities** | free | Bio/health research | 🔑 no key needed |
+| **Crossref** | free | DOI/citations (BookBridge) | 🔑 no key needed |
+| **Kaggle** | free | Datasets/competitions for research + backtesting | ✅ configured (`KAGGLE_API_TOKEN` wired) |
 
 ## Operations / LLM (mission-wide)
 

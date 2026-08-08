@@ -1,0 +1,28 @@
+# LiteLLM proxy config — routes LLM calls to configured providers.
+# Keys come from .env.local (process env). Only providers with keys are usable.
+model_list:
+  - model_name: deepseek
+    litellm_params:
+      model: deepseek/deepseek-chat
+      api_key: os.environ/DEEPSEEK_API_KEY
+  - model_name: deepseek-reasoner
+    litellm_params:
+      model: deepseek/deepseek-reasoner
+      api_key: os.environ/DEEPSEEK_API_KEY
+  - model_name: gemini
+    litellm_params:
+      model: gemini/gemini-1.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: opencode
+    litellm_params:
+      model: opencode/deepseek-v4-flash
+      api_key: os.environ/OPENCODE_API_KEY
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: null
+  drop_params: true
+
+litellm_settings:
+  drop_params: true
+  set_verbose: false

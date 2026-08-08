@@ -29,13 +29,17 @@ export interface Lesson {
   lastSeen: string;
 }
 
-const DIR = process.env.DRAYMOND_REGISTRY_DIR ?? path.join(process.cwd(), ".draymond");
-const OUTCOMES_FILE = path.join(DIR, "learning-outcomes.json");
-const LESSONS_FILE = path.join(DIR, "learning-lessons.json");
+const OUTCOMES_FILE = () => path.join(memoryDir(), "learning-outcomes.json");
+const LESSONS_FILE = () => path.join(memoryDir(), "learning-lessons.json");
+
+/** Resolved lazily so tests (fresh temp dirs per case) and prod both work. */
+function memoryDir(): string {
+  return process.env.DRAYMOND_REGISTRY_DIR ?? path.join(process.cwd(), ".draymond");
+}
 
 async function readOutcomes(): Promise<LearningOutcome[]> {
   try {
-    const raw = await fs.readFile(OUTCOMES_FILE, "utf-8");
+    const raw = await fs.readFile(OUTCOMES_FILE(), "utf-8");
     return JSON.parse(raw) as LearningOutcome[];
   } catch {
     return [];
@@ -44,7 +48,7 @@ async function readOutcomes(): Promise<LearningOutcome[]> {
 
 async function readLessons(): Promise<Lesson[]> {
   try {
-    const raw = await fs.readFile(LESSONS_FILE, "utf-8");
+    const raw = await fs.readFile(LESSONS_FILE(), "utf-8");
     const parsed = JSON.parse(raw) as { lessons?: Lesson[] };
     return Array.isArray(parsed.lessons) ? parsed.lessons : [];
   } catch {
@@ -53,8 +57,8 @@ async function readLessons(): Promise<Lesson[]> {
 }
 
 async function writeLessons(lessons: Lesson[]): Promise<void> {
-  await fs.mkdir(DIR, { recursive: true });
-  await fs.writeFile(LESSONS_FILE, JSON.stringify({ lessons, updatedAt: new Date().toISOString() }, null, 2), "utf-8");
+  await fs.mkdir(memoryDir(), { recursive: true });
+  await fs.writeFile(LESSONS_FILE(), JSON.stringify({ lessons, updatedAt: new Date().toISOString() }, null, 2), "utf-8");
 }
 
 function patternOf(summary: string): string {
@@ -62,12 +66,28 @@ function patternOf(summary: string): string {
   return summary.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter((w) => w.length > 3).slice(0, 4).join(" ");
 }
 
+// ── Serialized outcome writes ────────────────────────────────────────────────
+// recordOutcome is read-modify-write over a shared JSON file; concurrent callers
+// (e.g. Promise.all over benchmark gains) interleave and corrupt the file.
+// Chain the writes per process so only one read-modify-write runs at a time.
+
+let outcomeWriteChain: Promise<unknown> = Promise.resolve();
+
+function enqueueOutcomeWrite(task: () => Promise<unknown>): Promise<unknown> {
+  const next = outcomeWriteChain.then(task, task);
+  outcomeWriteChain = next;
+  return next;
+}
+
 export async function recordOutcome(input: Omit<LearningOutcome, "id" | "createdAt">): Promise<LearningOutcome> {
-  const outcome: LearningOutcome = { ...input, id: `lo_${Date.now()}`, createdAt: new Date().toISOString() };
-  const outcomes = await readOutcomes();
-  outcomes.push(outcome);
-  await fs.writeFile(OUTCOMES_FILE, JSON.stringify(outcomes.slice(-500), null, 2), "utf-8");
-  return outcome;
+  const outcome: LearningOutcome = { ...input, id: `lo_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, createdAt: new Date().toISOString() };
+  return enqueueOutcomeWrite(async () => {
+    const outcomes = await readOutcomes();
+    outcomes.push(outcome);
+    await fs.mkdir(memoryDir(), { recursive: true });
+    await fs.writeFile(OUTCOMES_FILE(), JSON.stringify(outcomes.slice(-500), null, 2), "utf-8");
+    return outcome;
+  }) as Promise<LearningOutcome>;
 }
 
 /**

@@ -590,22 +590,24 @@ const tools: DraymondEntityInsert[] = [
     sector: 'learn',
     invocation_method: 'http_api',
     invocation_config: {
-      // URL set at runtime via env — do not hardcode localhost
-      url: 'http://localhost:3210', // BRAIN_URL
+      // Kaggle is proxied through Draymond's own /api/ops/kaggle (the brain's
+      // /kaggle/* routes were never implemented). Status probe = unauthenticated
+      // /api/ops/kaggle/status; full search = authed /api/ops/kaggle.
+      url: process.env.DRAYMOND_PUBLIC_URL || 'http://localhost:3444',
       method: 'POST',
       timeout_ms: 120000,
       endpoints: {
-        status: { path: '/kaggle/status', method: 'GET' },
-        whoami: { path: '/kaggle/whoami', method: 'GET' },
-        search: { path: '/kaggle/datasets/search', method: 'GET' },
-        files: { path: '/kaggle/datasets/files', method: 'GET' },
-        competitions: { path: '/kaggle/competitions', method: 'GET' },
-        download: { path: '/kaggle/datasets/download', method: 'POST' },
-        snapshots: { path: '/kaggle/snapshots', method: 'GET' },
-        research_feed: { path: '/kaggle/research/feed', method: 'POST' },
-        research_feeds: { path: '/kaggle/research/feeds', method: 'GET' },
+        status: { path: '/api/ops/kaggle/status', method: 'GET' },
+        whoami: { path: '/api/ops/kaggle/status', method: 'GET' },
+        search: { path: '/api/ops/kaggle', method: 'POST' },
+        files: { path: '/api/ops/kaggle', method: 'POST' },
+        competitions: { path: '/api/ops/kaggle', method: 'GET' },
+        download: { path: '/api/ops/kaggle', method: 'POST' },
+        snapshots: { path: '/api/ops/kaggle', method: 'GET' },
+        research_feed: { path: '/api/ops/kaggle', method: 'POST' },
+        research_feeds: { path: '/api/ops/kaggle', method: 'GET' },
       },
-      requires_env: ['BRAIN_URL', 'KAGGLE_USERNAME', 'KAGGLE_KEY'],
+      requires_env: ['KAGGLE_API_TOKEN'],
     },
     capabilities: ['data-provider', 'dataset-search', 'dataset-download', 'competition-listing', 'snapshotting', 'research-feed'],
     depends_on: ['deterministic-brain'],
@@ -1454,9 +1456,9 @@ const services: DraymondEntityInsert[] = [
     sector: 'ventures',
     invocation_method: 'http_api',
     invocation_config: {
-      url: 'http://localhost:3000', // HEMPFORGE_URL at runtime — do not hardcode
+      url: 'http://localhost:3110', // HEMPFORGE_URL at runtime — canonical port 3110 (see ports.ts)
       method: 'POST',
-      health_url: 'http://localhost:3000/api/health',
+      health_url: 'http://localhost:3110/api/health',
       endpoints: {
         literature_search: '/api/literature/search',
         literature_ingest_defaults: '/api/literature/ingest-defaults',

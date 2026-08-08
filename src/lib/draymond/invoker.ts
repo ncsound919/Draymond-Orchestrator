@@ -69,32 +69,44 @@ export async function invokeEntity(
 ): Promise<InvocationResult> {
   const method = entity.invocation_method;
 
-  switch (method) {
-    case 'http_api':
-      return invokeHttpApi(entity, action, input, options);
-    case 'api_call':
-      return invokeApiCall(entity, action, input, options);
-    case 'subprocess':
-      return invokeSubprocess(entity, input, options);
-    case 'cli_command':
-      return invokeCliCommand(entity, input, options);
-    case 'webhook':
-      return invokeWebhook(entity, input, options);
-    case 'internal':
-      return invokeInternal(entity);
-    case 'manual':
-      return invokeManual(entity);
-    case 'python_module':
-      return invokePythonModule(entity, input, options);
-    case 'mcp_tool':
-      return invokeMcpTool(entity, input, options);
-    case 'mcp_stdio':
-      return invokeMcpStdio(entity, action, input, options);
-    default:
-      throw new Error(
-        `Unsupported invocation method "${method}" for entity "${entity.name}" (${entity.slug}). ` +
-        `Supported methods: http_api, api_call, subprocess, cli_command, webhook, internal, manual, python_module, mcp_tool, mcp_stdio.`,
-      );
+  try {
+    switch (method) {
+      case 'http_api':
+        return invokeHttpApi(entity, action, input, options);
+      case 'api_call':
+        return invokeApiCall(entity, action, input, options);
+      case 'subprocess':
+        return invokeSubprocess(entity, input, options);
+      case 'cli_command':
+        return invokeCliCommand(entity, input, options);
+      case 'webhook':
+        return invokeWebhook(entity, input, options);
+      case 'internal':
+        return invokeInternal(entity);
+      case 'manual':
+        return invokeManual(entity);
+      case 'python_module':
+        return invokePythonModule(entity, input, options);
+      case 'mcp_tool':
+        return invokeMcpTool(entity, input, options);
+      case 'mcp_stdio':
+        return invokeMcpStdio(entity, action, input, options);
+      default:
+        throw new Error(
+          `Unsupported invocation method "${method}" for entity "${entity.name}" (${entity.slug}). ` +
+          `Supported methods: http_api, api_call, subprocess, cli_command, webhook, internal, manual, python_module, mcp_tool, mcp_stdio.`,
+        );
+    }
+  } catch (err) {
+    // Report to Sentry for aggregation, then rethrow so the chain engine
+    // records the step failure as usual. Best-effort observability.
+    try {
+      const { captureException } = await import('../sentry');
+      await captureException(err, { tags: { component: 'invoker', entity: entity.slug, action, method } });
+    } catch {
+      /* observability best-effort */
+    }
+    throw err;
   }
 }
 
@@ -255,27 +267,37 @@ async function invokeHttpApi(
   const start = Date.now();
   const config = entity.invocation_config;
 
-  // Multi-endpoint support: `endpoints` maps an action → { path, method? }.
-  // `:param` tokens in the path are substituted from `input` (and removed from
-  // the request body). Falls back to the base `url` when no endpoint matches.
+  // Multi-endpoint support: `endpoints` maps an action → `{ path, method? }`
+  // (or a bare path string). `:param` tokens in the path are substituted from
+  // `input` (and removed from the request body). Falls back to the base `url`
+  // when no endpoint matches.
   const endpoints = (config.endpoints ?? null) as Record<
     string,
-    { path?: string; method?: string } | undefined
+    string | { path?: string; method?: string } | undefined
   > | null;
-  const endpoint = endpoints && action ? endpoints[action] : undefined;
+  const rawEndpoint = endpoints && action ? endpoints[action] : undefined;
+
+  let endpointPath: string | undefined;
+  let endpointMethod: string | undefined;
+  if (typeof rawEndpoint === 'string') {
+    endpointPath = rawEndpoint;
+  } else {
+    endpointPath = rawEndpoint?.path;
+    endpointMethod = rawEndpoint?.method;
+  }
 
   let url = config.url as string | undefined;
   let method = ((config.method as string) || 'POST').toUpperCase();
   const payload: Record<string, unknown> = { ...input };
 
-  if (endpoint?.path) {
-    let path = endpoint.path;
+  if (endpointPath) {
+    let path = endpointPath;
     path = path.replace(/:([a-zA-Z0-9_]+)/g, (_match, key: string) => {
       const value = payload[key];
       delete payload[key];
       return value === undefined || value === null ? _match : encodeURIComponent(String(value));
     });
-    method = (endpoint.method ?? 'POST').toUpperCase();
+    method = (endpointMethod ?? 'POST').toUpperCase();
     url = `${(url ?? '').replace(/\/+$/, '')}${path}`;
   }
 
@@ -760,15 +782,25 @@ async function invokePythonModule(
     `from ${moduleName} import ${functionName}; ` +
     `print(json.dumps(${functionName}(json.loads(sys.stdin.read()))))`;
 
+  const pythonPath = (config.python_path as string | undefined) ?? 'python';
+  const execOptions: import('node:child_process').ExecFileOptions = {
+    timeout: timeoutMs,
+    maxBuffer: 10 * 1024 * 1024,
+    encoding: 'utf8',
+    env: { ...process.env },
+  };
+  const workingDir =
+    (config.working_dir as string | undefined) ??
+    (config.cwd as string | undefined);
+  if (typeof workingDir === 'string' && workingDir) {
+    execOptions.cwd = workingDir;
+  }
+
   return new Promise<InvocationResult>((resolve) => {
     const child = execFile(
-      'python',
+      pythonPath,
       ['-c', script],
-      {
-        timeout: timeoutMs,
-        maxBuffer: 10 * 1024 * 1024,
-        env: { ...process.env },
-      },
+      execOptions,
       (error, stdout, stderr) => {
         const duration_ms = Date.now() - start;
 
@@ -780,9 +812,12 @@ async function invokePythonModule(
           return;
         }
 
-        const output = safeParseJson(stdout.trim());
-        if (stderr && stderr.trim()) {
-          output._stderr = stderr.trim();
+        const stdoutText = typeof stdout === 'string' ? stdout : stdout.toString('utf8');
+        const stderrText = typeof stderr === 'string' ? stderr : stderr.toString('utf8');
+
+        const output = safeParseJson(stdoutText.trim());
+        if (stderrText && stderrText.trim()) {
+          output._stderr = stderrText.trim();
         }
 
         resolve({ success: true, output, duration_ms });

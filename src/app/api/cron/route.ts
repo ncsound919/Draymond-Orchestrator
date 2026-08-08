@@ -45,13 +45,17 @@ export async function GET(request: NextRequest) {
   }
 
   // ── Deploy the repair team on any failed jobs ──────────────────────────
+  // The dedicated "Repair Team (failed jobs)" scheduler job does the deep
+  // repair loop hourly. Here we only run a lightweight pass for jobs that
+  // JUST failed this tick, so the cron response stays fast (the old inline
+  // loop made /api/cron take 120s+ and time out).
   let repair: { failed: number; fixed: number } | null = null;
   try {
     const { listJobs, updateJob } = await import('@/lib/draymond/scheduler');
     const { repairFailedJob } = await import('@/lib/draymond/repair-team');
     const failed = (await listJobs()).filter((j) => j.last_run_status === 'failed');
     let fixed = 0;
-    for (const j of failed.slice(0, 10)) {
+    for (const j of failed.slice(0, 5)) {
       const report = await repairFailedJob(
         { id: j.id, name: j.name, job_type: j.job_type, job_config: j.job_config ?? {} },
         j.last_error ?? 'unknown error',

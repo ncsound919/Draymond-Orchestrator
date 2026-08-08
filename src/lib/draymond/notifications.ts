@@ -141,8 +141,10 @@ function renderEmailHtml(
   priority: NotificationPriority,
   metadata?: Record<string, unknown>
 ): string {
-  const tpl = TEMPLATE_CONFIG[type];
-  const pri = PRIORITY_LABELS[priority];
+  // Defensive: an unknown/invalid type or priority must never crash the email
+  // renderer (that crash silently turned every subsequent alert into "failed").
+  const tpl = TEMPLATE_CONFIG[type] ?? TEMPLATE_CONFIG.custom;
+  const pri = PRIORITY_LABELS[priority] ?? PRIORITY_LABELS.normal;
 
   const metadataRows = metadata && Object.keys(metadata).length > 0
     ? Object.entries(metadata)
@@ -459,7 +461,7 @@ export async function sendNotification(
     await transporter.sendMail({
       from: `Draymond Orchestrator <${process.env.GMAIL_USER}>`,
       to: payload.recipient,
-      subject: `${TEMPLATE_CONFIG[payload.type].icon} [${TEMPLATE_CONFIG[payload.type].prefix}] ${payload.subject}`,
+      subject: `${(TEMPLATE_CONFIG[payload.type] ?? TEMPLATE_CONFIG.custom).icon} [${(TEMPLATE_CONFIG[payload.type] ?? TEMPLATE_CONFIG.custom).prefix}] ${payload.subject}`,
       html,
     });
 

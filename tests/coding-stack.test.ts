@@ -16,9 +16,9 @@ describe('master coding stack', () => {
     }
   });
 
-  it('codegen primary is the deepest coding agent', () => {
-    expect(getCodingLayer('codegen')?.primary).toBe('uplift-agent');
-    expect(getCodingLayer('codegen')?.fallback).toBe('megacode');
+  it('codegen primary is opencode, uplift-agent is the fallback', () => {
+    expect(getCodingLayer('codegen')?.primary).toBe('opencode');
+    expect(getCodingLayer('codegen')?.fallback).toBe('uplift-agent');
   });
 
   it('review primary is reporank, grader is the fallback', () => {
@@ -36,6 +36,7 @@ describe('master coding stack', () => {
 
   it('resolveCodingTools orders primary first with no dupes', () => {
     expect(resolveCodingTools('codegen')).toEqual([
+      'opencode',
       'uplift-agent',
       'megacode',
       'everything-claude-code',

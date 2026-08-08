@@ -64,6 +64,25 @@ export function authorizeRequest(request: NextRequest | Request): NextResponse |
 }
 
 /**
+ * Authorize a Prometheus scrape for /api/ops/metrics.
+ * Accepts a dedicated METRICS_TOKEN when set, otherwise falls back to the
+ * CRON_SECRET. Returns `null` when authorized, else a NextResponse error.
+ */
+export function authorizeMetricsRequest(request: NextRequest | Request): NextResponse | null {
+  const token = process.env.METRICS_TOKEN || process.env.CRON_SECRET;
+  if (!token) {
+    console.error('[API Auth] METRICS_TOKEN / CRON_SECRET env var is not set');
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+  const authHeader = request.headers.get('authorization');
+  const bearer = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!bearer || !safeCompare(bearer, token)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  return null; // authorized
+}
+
+/**
  * Safely parse JSON from a request body.
  * Enforces a maximum body size to prevent memory exhaustion.
  * Returns `{ data }` on success or `{ error: NextResponse }` on failure.

@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const securityHeaders = [
   {
@@ -98,4 +99,16 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Sentry (OSS error reporting) activates only when SENTRY_DSN is set — the
+// build stays byte-for-byte unchanged for dev/CI without a DSN. Source-map
+// upload additionally needs SENTRY_ORG / SENTRY_PROJECT / SENTRY_AUTH_TOKEN.
+export default process.env.SENTRY_DSN
+  ? withSentryConfig(nextConfig, {
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      silent: true,
+      telemetry: false,
+      widenClientFileUpload: true,
+    })
+  : nextConfig;

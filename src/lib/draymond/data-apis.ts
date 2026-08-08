@@ -84,8 +84,7 @@ export async function caselawCases(query: string, pageSize = 5): Promise<{ ok: b
 
 // ── Key-gated sources ──────────────────────────────────────────────────────
 
-export async function finnhubQuote(symbol: string): Promise<{ ok: boolean; price?: number; change_pct?: number; detail?: string }> {
-  const key = apiKey("FINNHUB_API_KEY");
+export async function finnhubQuote(symbol: string): Promise<{ ok: boolean; price?: number; change_pct?: number; detail?: string }> {  const key = apiKey("FINNHUB_API_KEY");
   if (!key) return { ok: false, detail: "FINNHUB_API_KEY not configured" };
   try {
     const data = (await getJson(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${key}`)) as { c?: number; dp?: number };
@@ -141,6 +140,87 @@ export async function virusTotalUrlReport(url: string): Promise<{ ok: boolean; m
       `https://www.virustotal.com/api/v3/urls/${Buffer.from(url).toString("base64url")}`, { "x-apikey": key }
     )) as { data?: { attributes?: { last_analysis_stats?: { malicious?: number } } } };
     return { ok: true, malicious: data.data?.attributes?.last_analysis_stats?.malicious ?? 0 };
+  } catch (err) {
+    return { ok: false, detail: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// ── Kaggle data provider (new-style KGAT_ access token) ─────────────────────
+// Kaggle's v1 REST API authenticates with a bearer access token. Two credential
+// styles are accepted:
+//   - KAGGLE_API_TOKEN (new KGAT_… token) → Authorization: Bearer <token>
+//   - KAGGLE_USERNAME + KAGGLE_KEY (legacy) → Basic base64(username:key)
+// Both come from .env.local. Deterministic + fail-soft: every call returns an
+// explicit { ok:false, detail } instead of throwing when unconfigured/offline.
+
+const KAGGLE_BASE = "https://www.kaggle.com/api/v1";
+
+function kaggleHeaders(): Record<string, string> {
+  const token = apiKey("KAGGLE_API_TOKEN");
+  if (token) return { Authorization: `Bearer ${token}` };
+  const user = apiKey("KAGGLE_USERNAME");
+  const key = apiKey("KAGGLE_KEY");
+  if (user && key) {
+    const basic = Buffer.from(`${user}:${key}`).toString("base64");
+    return { Authorization: `Basic ${basic}` };
+  }
+  return {};
+}
+
+export function isKaggleConfigured(): boolean {
+  return Boolean(apiKey("KAGGLE_API_TOKEN") || (apiKey("KAGGLE_USERNAME") && apiKey("KAGGLE_KEY")));
+}
+
+/** Verify the Kaggle credential — /api/v1/competitions/list is the reliable
+ * auth probe (200 with a valid token, 401 without; /me is not exposed on the
+ * current API). Returns the env username (never the token). */
+export async function kaggleStatus(): Promise<{ ok: boolean; username?: string; detail: string }> {
+  if (!isKaggleConfigured()) return { ok: false, detail: "Kaggle not configured (KAGGLE_API_TOKEN or KAGGLE_USERNAME+KAGGLE_KEY)" };
+  try {
+    const headers = { "user-agent": UA, ...kaggleHeaders() };
+    const res = await fetch(`${KAGGLE_BASE}/competitions/list`, { headers, signal: AbortSignal.timeout(15_000) });
+    if (!res.ok) return { ok: false, detail: `Kaggle auth probe failed: HTTP ${res.status} (invalid or expired token?)` };
+    const username = apiKey("KAGGLE_USERNAME");
+    return { ok: true, username: username || "kaggle", detail: `Kaggle authenticated${username ? ` as ${username}` : ""}` };
+  } catch (err) {
+    return { ok: false, detail: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** Search Kaggle public datasets. */
+export async function kaggleSearchDatasets(
+  query: string,
+  pageSize = 5,
+): Promise<{ ok: boolean; datasets?: Array<{ ref: string; title: string; lastUpdated?: string }>; detail?: string }> {
+  if (!isKaggleConfigured()) return { ok: false, detail: "Kaggle not configured (KAGGLE_API_TOKEN or KAGGLE_USERNAME+KAGGLE_KEY)" };
+  try {
+    const headers = { "user-agent": UA, ...kaggleHeaders() };
+    const res = await fetch(
+      `${KAGGLE_BASE}/datasets/list?search=${encodeURIComponent(query)}&page=1&max_size=${pageSize}`,
+      { headers, signal: AbortSignal.timeout(15_000) },
+    );
+    if (!res.ok) return { ok: false, detail: `Kaggle /datasets/list failed: HTTP ${res.status}` };
+    const data = (await res.json()) as Array<{ ref?: string; title?: string; lastUpdated?: string }>;
+    return {
+      ok: true,
+      datasets: (data ?? []).slice(0, pageSize).map((d) => ({
+        ref: d.ref ?? "", title: d.title ?? "", lastUpdated: d.lastUpdated,
+      })),
+    };
+  } catch (err) {
+    return { ok: false, detail: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** List the user's Kaggle competitions (membership check). */
+export async function kaggleCompetitions(): Promise<{ ok: boolean; competitions?: Array<{ title: string }>; detail?: string }> {
+  if (!isKaggleConfigured()) return { ok: false, detail: "Kaggle not configured" };
+  try {
+    const headers = { "user-agent": UA, ...kaggleHeaders() };
+    const res = await fetch(`${KAGGLE_BASE}/competitions/list`, { headers, signal: AbortSignal.timeout(15_000) });
+    if (!res.ok) return { ok: false, detail: `Kaggle /competitions/list failed: HTTP ${res.status}` };
+    const data = (await res.json()) as Array<{ title?: string }>;
+    return { ok: true, competitions: (data ?? []).slice(0, 20).map((c) => ({ title: c.title ?? "" })) };
   } catch (err) {
     return { ok: false, detail: err instanceof Error ? err.message : String(err) };
   }

@@ -26,6 +26,7 @@ import { callLLM } from './llm';
 import { submitAction } from './index';
 import { getSystemIntel, formatSystemIntel } from './system-intel';
 import { ingestTraceAsync } from './trace';
+import { createIdeSession, startIdeSession } from '@/lib/ide';
 import {
   AETHERDESK_OPERATIONS,
   executeAetherDeskOperation,
@@ -68,6 +69,51 @@ export interface ChatTurnResult {
 
 const UPLIFT_TIMEOUT_MS = 60_000;
 const CONVERSATION_CONTEXT_LIMIT = 8;
+
+// ── Coding-team dispatch ─────────────────────────────────────────────────────
+
+/** Loose signal that a task is code work rather than an entity/chain/query. */
+const CODING_REQUEST_RE =
+  /(fix|repair|debug|refactor|rewrite|implement|build|create|write|add|generate|restructure|clean up|compile|typecheck|upgrade|migrate|regression)\b[\s\S]{0,80}\b(code|app|api|service|function|module|component|endpoint|script|config|repo|project|feature|bug|error|crash|timeout|issue|tests?|build)/i;
+
+function isCodingRequest(task: string): boolean {
+  return CODING_REQUEST_RE.test(task);
+}
+
+/**
+ * Spin up an IDE coding session from the chat and stream its plan + live link.
+ * The session runs in the background; the user can watch and interject at /ide.
+ */
+async function handleCodingTask(
+  task: string,
+  metadata: Record<string, unknown>,
+  onChunk: ChatTurnOptions['onChunk'],
+): Promise<string> {
+  await emit(onChunk, '\nDispatching the coding team…\n\n');
+
+  const session = await createIdeSession({
+    goal: task.slice(0, 2000),
+    createdBy: typeof metadata.user_id === 'string' ? metadata.user_id : 'chat',
+    workspace: typeof metadata.workspace === 'string' ? metadata.workspace : undefined,
+    repoUrl: typeof metadata.repo_url === 'string' ? metadata.repo_url : undefined,
+    context: metadata,
+  });
+
+  void startIdeSession(session.id).catch(() => {});
+
+  const lines = [
+    `**Coding team assembled** — lead: ${session.crew.lead}`,
+    `Members: ${session.crew.members.join(', ')}`,
+    '',
+    'Plan:',
+    ...session.steps.map((s, i) => `${i + 1}. **${s.title}** (${s.agent}/${s.kind})`),
+    '',
+    `Watch them work live and interject: **/ide/${session.id}**`,
+  ];
+  const text = lines.join('\n');
+  await streamText(text, onChunk);
+  return text;
+}
 
 // ---------------------------------------------------------------------------
 // Streaming helpers
@@ -308,7 +354,7 @@ async function querySystemStatus(
     const answer = await callLLM({
       system: SYSTEM_INTEL_SYSTEM_PROMPT,
       userMessage: `Question: ${task}\n\n<system_snapshot>\n${snapshot}\n</system_snapshot>`,
-      maxTokens: 900,
+      maxTokens: 2000,
       temperature: 0.2,
     });
     await streamText(answer, onChunk);
@@ -446,6 +492,11 @@ export async function orchestrateChatTurn(
     resultText = await querySystemStatus(task, onChunk);
   } else if (route.intent === 'web_search') {
     resultText = await handleWebSearch(task, route.input?.query as string | undefined, onChunk);
+  } else if (isCodingRequest(task)) {
+    // Code / repair work → the agent-based IDE coding team (chat stays the
+    // command surface; /ide is where the team works visibly). Checked BEFORE
+    // needs_confirmation so code work always spawns a team.
+    resultText = await handleCodingTask(task, metadata, onChunk);
   } else if (routeResult.needs_confirmation) {
     status = 'needs_confirmation';
     resultText =

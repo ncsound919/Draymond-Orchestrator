@@ -599,6 +599,14 @@ function getAgentMonitorDefs(): AgentMonitorDef[] {
       timeout_ms: 10000,
       metadata: { slug: 'overlay-chain', category: 'supply-chain' },
     },
+    {
+      name: 'Kaggle Integration',
+      url: `${process.env.DRAYMOND_PUBLIC_URL || 'http://localhost:3444'}/api/ops/kaggle/status`,
+      check_interval_seconds: 300,
+      expected_status_code: 200,
+      timeout_ms: 15000,
+      metadata: { slug: 'kaggle', category: 'data' },
+    },
   ];
 }
 

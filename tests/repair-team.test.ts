@@ -12,7 +12,7 @@ describe('repair team', () => {
 
   it('assembles a coding crew for config failures', () => {
     const crew = assembleCrew('chain_config');
-    expect(crew.lead).toBe('uplift-agent');
+    expect(crew.lead).toBe('opencode');
     expect(crew.members).toContain('megacode');
     expect(crew.members).toContain('big-homie');
     expect(crew.members).toContain('reporank');
@@ -49,5 +49,15 @@ describe('repair team', () => {
     );
     expect(report.action).toBe('escalated');
     expect(report.failureKind).toBe('missing_env');
+  });
+
+  it('carries distilled lesson hints into the repair report', async () => {
+    const report = await repairFailedJob(
+      { id: 'j4', name: 'Evening Marketing Prep', job_type: 'chain', job_config: { chain: 'marketing-pulse' } },
+      'chain job missing job_config.chain_slug',
+      { updateJobConfig: async () => {} },
+      ['Repeated failure: "Evening Marketing Prep" (3/3).'],
+    );
+    expect(report.lessonHints).toEqual(['Repeated failure: "Evening Marketing Prep" (3/3).']);
   });
 });

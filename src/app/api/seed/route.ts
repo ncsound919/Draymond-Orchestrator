@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { seedBusinessAutomation } from '@/lib/draymond/business-chains';
 import { seedAgentMonitors } from '@/lib/draymond/monitors';
 import { seedSkillPacks } from '@/lib/draymond/skill-packs';
+import { interconnectSystem } from '@/lib/draymond/systemic';
 import { authorizeRequest } from '@/lib/draymond/api-auth';
 
 export const dynamic = 'force-dynamic';
@@ -29,6 +30,7 @@ export async function POST(request: NextRequest) {
     const result = await seedBusinessAutomation();
     const monitorResult = await seedAgentMonitors();
     const skillPackResult = await seedSkillPacks();
+    const systemic = await interconnectSystem();
     const durationMs = Date.now() - startTime;
 
     const allErrors = [
@@ -52,6 +54,11 @@ export async function POST(request: NextRequest) {
       skill_packs: {
         seeded: skillPackResult.seeded,
         names: skillPackResult.names,
+      },
+      systemic: {
+        agenda: systemic.agenda,
+        graph: systemic.graph,
+        consolidation: systemic.consolidation,
       },
       errors: allErrors.length > 0 ? allErrors : undefined,
     });

@@ -44,6 +44,24 @@ function getReactiveHandler() {
   return _onBridgeEvent!;
 }
 
+// Lazy-import systemic interconnection (memory + self-learning + knowledge
+// graph + agenda). Every emit() feeds all persistent stores automatically —
+// no per-tool integration required.
+let _onSystemicEvent: ((type: string, data: Record<string, unknown>) => Promise<void>) | null = null;
+
+function getSystemicHandler() {
+  if (!_onSystemicEvent) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const mod = require('./systemic');
+      _onSystemicEvent = mod.ingestEvent;
+    } catch {
+      _onSystemicEvent = async () => {};
+    }
+  }
+  return _onSystemicEvent!;
+}
+
 function emit(type: string, data: Record<string, unknown>): void {
   try {
     // Push to SSE clients (Open Chat)
@@ -51,6 +69,9 @@ function emit(type: string, data: Record<string, unknown>): void {
 
     // Feed into reactive event system (fire-and-forget)
     getReactiveHandler()(type, data).catch(() => {});
+
+    // Feed into systemic stores: memory + self-learning + knowledge graph
+    getSystemicHandler()(type, data).catch(() => {});
   } catch {
     // Non-fatal: SSE push is best-effort
   }
