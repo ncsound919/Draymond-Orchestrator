@@ -216,6 +216,61 @@ const tools: DraymondEntityInsert[] = [
     risk_level_default: 'low',
   },
   {
+    name: 'opencode',
+    slug: 'opencode',
+    kind: 'agent',
+    description: 'Headless codegen engine (deepseek-v4-flash 0731). Runs `opencode serve --port 4096`; codegen steps dispatch via `opencode run --attach`. Primary codegen layer in the master coding stack. Exposed as a VibeServe MCP tool (opencode_run / opencode_status).',
+    version: '1.14.23',
+    tags: ['coding', 'codegen', 'agent', 'mcp', 'headless'],
+    category: 'dev-tools',
+    sector: 'community',
+    invocation_method: 'http_api',
+    invocation_config: {
+      // URL set at runtime via env — do not hardcode localhost
+      url: 'http://localhost:4096', // OPENCODE_SERVE_PORT
+      method: 'POST',
+      timeout_ms: 180000,
+      endpoints: {
+        health: { path: '/', method: 'GET' },
+      },
+      requires_env: ['OPENCODE_SERVE_PORT'],
+    },
+    capabilities: ['code_completion', 'codegen', 'editing', 'multi-tool-agent'],
+    download_path: 'C:/Users/User/AppData/Roaming/npm/node_modules/opencode-ai',
+    is_integrated: true,
+    risk_level_default: 'low',
+  },
+  {
+    name: 'Codegang',
+    slug: 'codegang',
+    kind: 'tool',
+    description: 'Local deep-analysis + agent pipeline — 6 scanners (security, bugs, prompt-injection, edge-cases, dependencies, deep) + 6 innovation engines (risk, impact, temporal, knowledge, adversarial, self-healing). Produces 0-100 scores (qualityScore/securityScore/riskScore/healthScore) and findings without needing a GitHub repo. Powers the review gate\'s local scorer and can push scores into RepoRank. Runs on localhost:3204 (canonical port — see ports.ts).',
+    version: '0.2.0',
+    tags: ['review', 'analysis', 'scoring', 'agents', 'pipeline', 'deep-scan'],
+    category: 'engineering',
+    sector: 'community',
+    invocation_method: 'http_api',
+    invocation_config: {
+      // URL set at runtime via env — do not hardcode localhost
+      url: 'http://localhost:3204', // CODEGANG_URL
+      method: 'POST',
+      timeout_ms: 120000,
+      endpoints: {
+        health: { path: '/api', method: 'GET' },
+        analyze: { path: '/api/analyze-comprehensive', method: 'POST' },
+        review: { path: '/api/review', method: 'POST' },
+        plan: { path: '/api/plan', method: 'POST' },
+        execute: { path: '/api/execute', method: 'POST' },
+        agent: { path: '/api/agent', method: 'POST' },
+      },
+      requires_env: ['CODEGANG_URL', 'CODEGANG_API_KEY'],
+    },
+    capabilities: ['deep-analysis', 'local-scoring', 'security-scanning', 'bug-detection', 'multi-agent-pipeline', 'code-review'],
+    download_path: 'agents/Codegang',
+    is_integrated: true,
+    risk_level_default: 'low',
+  },
+  {
     name: 'AgentBrowser',
     slug: 'agent-browser',
     kind: 'tool',
@@ -417,6 +472,7 @@ const tools: DraymondEntityInsert[] = [
       cwd: 'downloads/OmniResearch-Pro-main',
     },
     capabilities: ['rag-research', 'document-synthesis', 'intelligence-reports', 'web-search', 'search', 'analysis', 'generation'],
+    depends_on: ['kaggle'],
     source_type: 'github',
     download_path: 'downloads/OmniResearch-Pro-main',
     is_integrated: true,
@@ -522,6 +578,39 @@ const tools: DraymondEntityInsert[] = [
     sector: 'learn',
     invocation_method: 'manual',
     capabilities: ['gamification', 'tracking'],
+  },
+  {
+    name: 'Kaggle',
+    slug: 'kaggle',
+    kind: 'tool',
+    description: 'Data provider — Kaggle datasets and competitions. Search public datasets, list competitions, download datasets as deterministic content-hashed snapshots, and feed them into the knowledge bank for research through the deterministic brain (REST /kaggle/* routes on localhost:3210). Feeds real-world data to OmniResearch, backtesting (sports/finance), blackmind_lab, and the retrieval/knowledge layer.',
+    version: '1.0.0',
+    tags: ['data', 'datasets', 'competitions', 'ml', 'snapshots', 'research'],
+    category: 'knowledge',
+    sector: 'learn',
+    invocation_method: 'http_api',
+    invocation_config: {
+      // URL set at runtime via env — do not hardcode localhost
+      url: 'http://localhost:3210', // BRAIN_URL
+      method: 'POST',
+      timeout_ms: 120000,
+      endpoints: {
+        status: { path: '/kaggle/status', method: 'GET' },
+        whoami: { path: '/kaggle/whoami', method: 'GET' },
+        search: { path: '/kaggle/datasets/search', method: 'GET' },
+        files: { path: '/kaggle/datasets/files', method: 'GET' },
+        competitions: { path: '/kaggle/competitions', method: 'GET' },
+        download: { path: '/kaggle/datasets/download', method: 'POST' },
+        snapshots: { path: '/kaggle/snapshots', method: 'GET' },
+        research_feed: { path: '/kaggle/research/feed', method: 'POST' },
+        research_feeds: { path: '/kaggle/research/feeds', method: 'GET' },
+      },
+      requires_env: ['BRAIN_URL', 'KAGGLE_USERNAME', 'KAGGLE_KEY'],
+    },
+    capabilities: ['data-provider', 'dataset-search', 'dataset-download', 'competition-listing', 'snapshotting', 'research-feed'],
+    depends_on: ['deterministic-brain'],
+    is_integrated: true,
+    risk_level_default: 'low',
   },
 ];
 
@@ -1427,6 +1516,85 @@ const services: DraymondEntityInsert[] = [
 ];
 
 // ============================================================================
+// DEVELOPER TOOLING AGENTS (VibeServe, RepoRank, Grader, Mutly)
+// ============================================================================
+
+const devTools: DraymondEntityInsert[] = [
+  {
+    name: 'VibeServe',
+    slug: 'vibeserve',
+    kind: 'agent',
+    description: 'Agentic IDE/orchestrator/MCP backend for NL→UI generation',
+    version: '1.1.0',
+    tags: ['developer-tooling', 'mcp', 'ide'],
+    category: 'tooling',
+    sector: 'developer',
+    invocation_method: 'mcp_stdio',
+    invocation_config: { command: 'python', args: ['agents/VibeServe-main/vibeserve/__main__.py'], env: ['VIBESERVE_API_SECRET'] },
+    capabilities: ['ui_generation', 'mcp', 'ide', 'orchestration'],
+    source_type: 'local',
+    download_path: 'agents/VibeServe-main',
+    is_integrated: true,
+    is_free: true,
+    is_active: true,
+  },
+  {
+    name: 'RepoRank',
+    slug: 'reporank',
+    kind: 'agent',
+    description: 'Repository scoring, security scans, benchmarking, fix generation',
+    version: '1.0.0',
+    tags: ['developer-tooling', 'qa'],
+    category: 'tooling',
+    sector: 'developer',
+    invocation_method: 'http_api',
+    invocation_config: { endpoint: process.env.REPORANK_URL ?? 'http://127.0.0.1:3001', health_path: '/health' },
+    capabilities: ['repo_scoring', 'security_scan', 'benchmark', 'fix_generation'],
+    source_type: 'local',
+    download_path: 'agents/reporank',
+    is_integrated: true,
+    is_free: true,
+    is_active: true,
+  },
+  {
+    name: 'Grader',
+    slug: 'grader',
+    kind: 'agent',
+    description: 'Gemini-powered codebase grading (security, quality, valuation)',
+    version: '1.0.0',
+    tags: ['developer-tooling', 'qa'],
+    category: 'tooling',
+    sector: 'developer',
+    invocation_method: 'http_api',
+    invocation_config: { endpoint: process.env.GRADER_URL ?? 'http://127.0.0.1:3000', health_path: '/api/grade' },
+    capabilities: ['code_grade', 'security_audit', 'valuation'],
+    source_type: 'local',
+    download_path: 'agents/Grader-main',
+    is_integrated: true,
+    is_free: true,
+    is_active: true,
+  },
+  {
+    name: 'Mutly',
+    slug: 'mutly',
+    kind: 'agent',
+    description: 'Developer daemon: ReAct loop, vector search, sandboxed tests, block edits',
+    version: '1.0.0',
+    tags: ['developer-tooling', 'daemon'],
+    category: 'tooling',
+    sector: 'developer',
+    invocation_method: 'http_api',
+    invocation_config: { endpoint: process.env.MUTLY_WS_PORT ? `ws://127.0.0.1:${process.env.MUTLY_WS_PORT}` : 'ws://127.0.0.1:8787' },
+    capabilities: ['vector_search', 'sandbox_test', 'block_edit', 'daemon'],
+    source_type: 'local',
+    download_path: 'agents/Mutly-Daemon-Agent',
+    is_integrated: true,
+    is_free: true,
+    is_active: true,
+  },
+];
+
+// ============================================================================
 // EXPORT ALL SEED DATA
 // ============================================================================
 
@@ -1437,6 +1605,7 @@ export const SEED_ENTITIES: DraymondEntityInsert[] = [
   ...extensions,
   ...mcpServers,
   ...services,
+  ...devTools,
 ];
 
 /**
@@ -1450,6 +1619,7 @@ export function getSeedSummary(): Record<string, number> {
     extensions: extensions.length,
     mcp_servers: mcpServers.length,
     services: services.length,
+    dev_tools: devTools.length,
     total: SEED_ENTITIES.length,
   };
 }
