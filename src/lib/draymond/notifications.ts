@@ -722,6 +722,47 @@ export async function sendHealthDigest(
 }
 
 // ============================================================================
+// INGEST: ingestWorkerReportEmail
+// ============================================================================
+
+/**
+ * Ingest a worker report delivered by email (the durable file-delivery loop
+ * Open Chat uses instead of, or in addition to, the API). The subject must
+ * carry the task id in `[OpenChat: <task_id>]`; the body becomes the result
+ * summary and the attachment URLs become artifact refs.
+ *
+ * Only tasks currently `claimed` or `in_progress` are updated, so a
+ * re-delivered email can never overwrite an already-completed task.
+ *
+ * @returns `{ ok: true, task_id }` on success, or `{ ok: false, error }`.
+ */
+export async function ingestWorkerReportEmail(
+  subject: string,
+  body: string,
+  artifactRefs: string[] = [],
+): Promise<{ ok: boolean; task_id?: string; error?: string }> {
+  const m = /\[OpenChat:\s*([A-Za-z0-9_-]+)\]/.exec(subject ?? '');
+  if (!m) return { ok: false, error: 'no task id in subject' };
+  const taskId = m[1];
+  const db = createDraymondAdminClient();
+  const { data, error } = await db
+    .from('draymond_worker_tasks')
+    .update({
+      status: 'completed',
+      result: { summary: body.slice(0, 2000) },
+      artifact_refs: artifactRefs,
+      completed_at: new Date().toISOString(),
+    })
+    .eq('id', taskId)
+    .in('status', ['claimed', 'in_progress'])
+    .select();
+  if (error) {
+    throw new Error(`Failed to ingest worker report email: ${error.message}`);
+  }
+  return data?.length ? { ok: true, task_id: taskId } : { ok: false, error: 'task not found or not active' };
+}
+
+// ============================================================================
 // QUERY: getNotificationHistory
 // ============================================================================
 
