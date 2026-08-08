@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { seedBusinessAutomation } from '@/lib/draymond/business-chains';
 import { seedAgentMonitors } from '@/lib/draymond/monitors';
+import { seedSkillPacks } from '@/lib/draymond/skill-packs';
 import { authorizeRequest } from '@/lib/draymond/api-auth';
 
 export const dynamic = 'force-dynamic';
@@ -27,11 +28,25 @@ export async function POST(request: NextRequest) {
   try {
     const result = await seedBusinessAutomation();
     const monitorResult = await seedAgentMonitors();
+
+    // Skill packs upsert idempotently — a duplicate run just re-upserts.
+    // Never let a pack failure take down the whole seed.
+    let skillPacksSeeded = 0;
+    const skillPackErrors: string[] = [];
+    try {
+      skillPacksSeeded = await seedSkillPacks();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      skillPackErrors.push(`[skill-packs] ${message}`);
+      console.error('[Seed] skill packs failed:', message);
+    }
+
     const durationMs = Date.now() - startTime;
 
     const allErrors = [
       ...result.errors,
       ...monitorResult.errors,
+      ...skillPackErrors,
     ];
 
     return NextResponse.json({
@@ -45,6 +60,9 @@ export async function POST(request: NextRequest) {
         created: monitorResult.created,
         skipped: monitorResult.skipped,
         names: monitorResult.names,
+      },
+      skill_packs: {
+        seeded: skillPacksSeeded,
       },
       errors: allErrors.length > 0 ? allErrors : undefined,
     });

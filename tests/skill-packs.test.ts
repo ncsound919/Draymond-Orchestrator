@@ -98,4 +98,14 @@ describe('skill-packs', () => {
     const changed = await reviewProposal('no-such-proposal', 'approved');
     expect(changed).toBe(false);
   });
+
+  it('seeds the five first skill packs', async () => {
+    const { seedSkillPacks } = await import('@/lib/draymond/skill-packs');
+    await seedSkillPacks();
+    const all = await listSkillPacks();
+    const names = new Set(all.map((p) => p.name));
+    for (const n of ['marketing_draft', 'social_post', 'email_report', 'lead_pulse', 'vibe_ui_gen']) {
+      expect(names.has(n)).toBe(true);
+    }
+  });
 });
