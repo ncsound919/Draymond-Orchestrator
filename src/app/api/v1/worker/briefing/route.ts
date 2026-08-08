@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
 
-    const workerId = url.searchParams.get('worker_id') ?? 'default';
+    const workerId = url.searchParams.get('worker_id')?.trim() || 'default';
 
     const supabase = createDraymondAdminClient();
     const { data, error } = await supabase

@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
 
-    const workerId = url.searchParams.get('worker_id') ?? 'default';
+    const workerId = url.searchParams.get('worker_id')?.trim() || 'default';
 
     // Cap limit to prevent abuse
     const limitRaw = url.searchParams.get('limit');

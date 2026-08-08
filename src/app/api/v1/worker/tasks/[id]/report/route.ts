@@ -34,12 +34,14 @@ export async function POST(
   if (parseError) return parseError;
 
   try {
+    const workerId = body.worker_id?.trim() || undefined;
+
     const reported = await reportTask(
       id,
       body.result ?? {},
       body.artifact_refs ?? [],
       body.error,
-      body.worker_id,
+      workerId,
     );
 
     if (!reported) {
@@ -51,7 +53,7 @@ export async function POST(
 
     if (!body.error) {
       recordOutcome({
-        agentId: body.worker_id ?? 'open-chat',
+        agentId: workerId ?? 'open-chat',
         kind: 'job',
         summary: `worker task ${id}`,
         success: true,

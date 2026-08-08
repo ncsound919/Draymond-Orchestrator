@@ -28,7 +28,7 @@ export async function POST(
   if (parseError) return parseError;
 
   try {
-    const claimed = await claimTask(id, body.worker_id ?? 'default');
+    const claimed = await claimTask(id, body.worker_id?.trim() || 'default');
 
     if (!claimed) {
       return NextResponse.json(

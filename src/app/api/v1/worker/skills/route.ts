@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await proposeSkillPack(body.worker_id ?? 'default', body.pack);
+    await proposeSkillPack(body.worker_id?.trim() || 'default', body.pack);
 
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (err) {
