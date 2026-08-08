@@ -619,8 +619,8 @@ const tools: DraymondEntityInsert[] = [
     description: 'Agentic IDE/orchestrator/MCP backend for NL→UI generation. Exposes IDE/orchestrator tools over MCP stdio (vibeserve/__main__.py).',
     version: '1.1.0',
     tags: ['developer-tooling', 'mcp', 'ide'],
-    category: 'tooling',
-    sector: 'developer',
+    category: 'engineering',
+    sector: 'community',
     invocation_method: 'mcp_stdio',
     invocation_config: {
       command: 'python',
