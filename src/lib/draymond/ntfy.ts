@@ -113,6 +113,71 @@ export async function publishApprovalNotification(action: DraymondAction): Promi
 }
 
 /**
+ * Publish an approval notification for a gated VENTURE (money-gate).
+ * Unlike the generic action approval, the Approve/Reject buttons POST to
+ * /api/ventures/:id/review so the venture record + chain are updated.
+ * Best-effort; never throws.
+ */
+export async function publishVentureApprovalNotification(input: {
+  ventureId: string;
+  title: string;
+  message: string;
+  reviewToken: string;
+}): Promise<boolean> {
+  const baseUrl = process.env.NTFY_URL;
+  const topic = process.env.NTFY_TOPIC;
+  const publicUrl = process.env.DRAYMOND_PUBLIC_URL;
+  if (!baseUrl || !topic || !publicUrl) return false;
+
+  const reviewPath = `/api/ventures/${encodeURIComponent(input.ventureId)}/review`;
+  const approveHeaders: Record<string, string> = { 'Content-Type': 'application/json', 'X-Review-Token': input.reviewToken };
+  const rejectHeaders: Record<string, string> = { 'Content-Type': 'application/json', 'X-Review-Token': input.reviewToken };
+
+  try {
+    const res = await fetch(baseUrl.replace(/\/+$/, ''), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        topic,
+        title: input.title,
+        message: input.message,
+        priority: 5,
+        tags: ['warning'],
+        actions: [
+          {
+            action: 'http',
+            label: 'Approve',
+            url: `${publicUrl.replace(/\/+$/, '')}${reviewPath}`,
+            method: 'POST',
+            headers: approveHeaders,
+            body: JSON.stringify({ approved: true }),
+            clear: true,
+          },
+          {
+            action: 'http',
+            label: 'Reject',
+            url: `${publicUrl.replace(/\/+$/, '')}${reviewPath}`,
+            method: 'POST',
+            headers: rejectHeaders,
+            body: JSON.stringify({ approved: false }),
+            clear: true,
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) {
+      console.warn(`[ntfy] Venture approval publish returned ${res.status} for ${input.ventureId}`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn(`[ntfy] Venture approval publish failed for ${input.ventureId}: ${err instanceof Error ? err.message : err}`);
+    return false;
+  }
+}
+
+/**
  * Publish an informational result notification (e.g. after an approved
  * AetherDesk action executes) to a SEPARATE topic from approvals
  * (NTFY_TOPIC_RESULTS). Best-effort; never throws.

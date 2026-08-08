@@ -73,6 +73,7 @@ vi.mock('../src/lib/draymond/self-learning', async (importOriginal) => {
 });
 
 import { reviewVenture } from '../src/lib/draymond/ventures';
+import { publishVentureApprovalNotification } from '../src/lib/draymond/ntfy';
 
 const RECORDS_FILE = () => path.join(TEST_DIR, 'ventures.json');
 
@@ -249,5 +250,88 @@ describe('POST /api/ventures/[id]/review status mapping', () => {
       { params: Promise.resolve({ id: 'vn_1' }) },
     );
     expect(res.status).toBe(200);
+  });
+});
+
+describe('publishVentureApprovalNotification', () => {
+  afterEach(() => {
+    delete process.env.NTFY_URL;
+    delete process.env.NTFY_TOPIC;
+    delete process.env.DRAYMOND_PUBLIC_URL;
+    vi.unstubAllGlobals();
+  });
+
+  it('posts approve/reject actions to the venture review endpoint', async () => {
+    process.env.NTFY_URL = 'https://ntfy.example.com';
+    process.env.NTFY_TOPIC = 'approvals';
+    process.env.DRAYMOND_PUBLIC_URL = 'https://draymond.example.com';
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const ok = await publishVentureApprovalNotification({
+      ventureId: 'vn_1',
+      title: 'Venture approval',
+      message: 'Run venture X',
+      reviewToken: 'tok',
+    });
+    expect(ok).toBe(true);
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body.topic).toBe('approvals');
+    expect(body.actions).toHaveLength(2);
+    expect(body.actions[0].label).toBe('Approve');
+    expect(body.actions[0].url).toContain('/api/ventures/vn_1/review');
+    expect(body.actions[0].headers['X-Review-Token']).toBe('tok');
+    expect(JSON.parse(body.actions[0].body)).toEqual({ approved: true });
+    expect(body.actions[1].label).toBe('Reject');
+    expect(body.actions[1].url).toContain('/api/ventures/vn_1/review');
+    expect(body.actions[1].headers['X-Review-Token']).toBe('tok');
+    expect(JSON.parse(body.actions[1].body)).toEqual({ approved: false });
+  });
+
+  it('returns false when ntfy is not configured', async () => {
+    delete process.env.NTFY_URL;
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const ok = await publishVentureApprovalNotification({
+      ventureId: 'vn_1',
+      title: 'Venture approval',
+      message: 'Run venture X',
+      reviewToken: 'tok',
+    });
+    expect(ok).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('returns false on a non-2xx response', async () => {
+    process.env.NTFY_URL = 'https://ntfy.example.com';
+    process.env.NTFY_TOPIC = 'approvals';
+    process.env.DRAYMOND_PUBLIC_URL = 'https://draymond.example.com';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 500 })));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const ok = await publishVentureApprovalNotification({
+      ventureId: 'vn_1',
+      title: 'Venture approval',
+      message: 'Run venture X',
+      reviewToken: 'tok',
+    });
+    expect(ok).toBe(false);
+    expect(warn).toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
+  it('returns false when fetch rejects', async () => {
+    process.env.NTFY_URL = 'https://ntfy.example.com';
+    process.env.NTFY_TOPIC = 'approvals';
+    process.env.DRAYMOND_PUBLIC_URL = 'https://draymond.example.com';
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const ok = await publishVentureApprovalNotification({
+      ventureId: 'vn_1',
+      title: 'Venture approval',
+      message: 'Run venture X',
+      reviewToken: 'tok',
+    });
+    expect(ok).toBe(false);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('network down'));
+    vi.restoreAllMocks();
   });
 });

@@ -15,8 +15,7 @@ import { createDraymondAdminClient } from './client';
 import { getEntity } from './registry';
 import { createChain, addSteps, instantiateChain, executeChain } from './chains';
 import type { ActionRiskLevel, DraymondChain, DraymondChainStepInsert } from './types';
-import { publishApprovalNotification } from './ntfy';
-import type { DraymondAction } from './types';
+import { publishVentureApprovalNotification } from './ntfy';
 
 export interface VentureStepInput {
   entity_slug: string;
@@ -197,8 +196,12 @@ export async function submitVenture(input: VentureSubmitInput): Promise<VentureR
     record.status = 'pending_review';
     await writeRecords(await readRecords().then((r) => [...r, record]));
 
-    const action = { ...(actionRecord as DraymondAction), review_token: reviewToken };
-    publishApprovalNotification(action);
+    publishVentureApprovalNotification({
+      ventureId: record.id,
+      title: `Draymond · Venture approval: ${input.name}`,
+      message: `Run venture "${input.name}" (${risk}) — ${input.revenue_lane} lane. ${input.revenue_note ?? ''}`,
+      reviewToken,
+    });
     return { ...record, action_id: actionRecord.id };
   }
 
