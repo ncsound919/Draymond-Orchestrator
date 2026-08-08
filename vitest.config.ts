@@ -23,6 +23,7 @@ export default defineConfig({
         'src/lib/draymond/chains-seed.ts',
         'src/lib/mathx/types.ts',
         'src/lib/mathx/index.ts',
+        'src/lib/mathx/route-helpers.ts',
       ],
       thresholds: {
         lines: 75,

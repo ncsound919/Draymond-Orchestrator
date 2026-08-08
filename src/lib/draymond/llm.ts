@@ -32,6 +32,8 @@ export interface LLMCallOptions {
   mode?: string;
   /** Truncate the user message to fit the token budget (opt-in). */
   truncate?: boolean;
+  /** Image inputs for vision-capable providers (OCR). Base64, no data-uri prefix. */
+  images?: Array<{ dataB64: string; mediaType: string }>;
   temperature?: number;
   timeoutMs?: number;
   /** Request structured JSON output (OpenAI-compatible `response_format` /
@@ -126,7 +128,15 @@ async function callGemini(options: LLMCallOptions): Promise<string> {
   const temperature = options.temperature ?? 0.2;
   const timeoutMs = options.timeoutMs ?? 15_000;
 
-  const contents = [{ role: 'user', parts: [{ text: options.userMessage }] }];
+  const contents = [
+    {
+      role: 'user',
+      parts: [
+        { text: options.userMessage },
+        ...(options.images?.length ? buildImageParts(options.images, 'gemini') : []),
+      ],
+    },
+  ];
   const body: Record<string, unknown> = {
     contents,
     generationConfig: { maxOutputTokens: maxTokens, temperature },
@@ -176,6 +186,26 @@ async function callGemini(options: LLMCallOptions): Promise<string> {
   }
 }
 
+/** Serialize image inputs for a provider's message format. */
+function buildImageParts(images: NonNullable<LLMCallOptions['images']>, provider: LLMProvider): unknown[] {
+  if (provider === 'anthropic') {
+    return images.map((i) => ({
+      type: 'image',
+      source: { type: 'base64', media_type: i.mediaType, data: i.dataB64 },
+    }));
+  }
+  if (provider === 'gemini') {
+    return images.map((i) => ({
+      inlineData: { mimeType: i.mediaType, data: i.dataB64 },
+    }));
+  }
+  // OpenAI-compatible providers (opencode, deepseek, openai, qwen, litellm).
+  return images.map((i) => ({
+    type: 'image_url',
+    image_url: { url: `data:${i.mediaType};base64,${i.dataB64}` },
+  }));
+}
+
 /** Single-provider request. Throws on any non-success so the chain can retry. */
 async function callProvider(provider: LLMProvider, options: LLMCallOptions): Promise<string> {
   if (provider === 'gemini') return callGemini(options);
@@ -194,6 +224,9 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
     let response: Response;
 
     if (provider === 'anthropic') {
+      const content: string | unknown[] = options.images?.length
+        ? [{ type: 'text', text: options.userMessage }, ...buildImageParts(options.images, provider)]
+        : options.userMessage;
       response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -206,11 +239,17 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
           max_tokens: maxTokens,
           temperature,
           system: options.system,
-          messages: [{ role: 'user', content: options.userMessage }],
+          messages: [{ role: 'user', content }],
         }),
         signal: controller.signal,
       });
     } else {
+      const content: unknown = options.images?.length
+        ? [
+            { type: 'text', text: options.userMessage },
+            ...buildImageParts(options.images, provider),
+          ]
+        : options.userMessage;
       response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -223,7 +262,7 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
           temperature,
           messages: [
             { role: 'system', content: options.system },
-            { role: 'user', content: options.userMessage },
+            { role: 'user', content },
           ],
           ...(options.responseFormat ? { response_format: options.responseFormat } : {}),
         }),
@@ -268,7 +307,13 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
     effective.userMessage = truncateToTokens(options.userMessage, budget, 'prose');
   }
 
-  const order = buildProviderOrder(options.provider);
+  // Vision inputs can only be served by image-capable providers — put them
+  // first so OCR-style calls don't waste budget on text-only endpoints.
+  const VISION_FIRST: LLMProvider[] = ['anthropic', 'gemini', 'openai'];
+  const order = options.images?.length
+    ? VISION_FIRST.filter(hasKey).concat(buildProviderOrder(options.provider))
+    : buildProviderOrder(options.provider);
+  const deduped = [...new Set(order)];
   if (order.length === 0) {
     throw new Error(
       'No LLM API key configured. Set OPENCODE_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, or QWEN_API_KEY.'
@@ -276,7 +321,7 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
   }
 
   let lastErr: unknown;
-  for (const provider of order) {
+  for (const provider of deduped) {
     try {
       // Budget gate: skip a provider whose daily token budget is exhausted or
       // whose rolling rate window is full — don't over-hit the API feeds.

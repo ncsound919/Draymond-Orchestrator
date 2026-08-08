@@ -1,6 +1,6 @@
 # Math X → Draymond: Full Embedding Plan
 
-**Status:** Phases 0–1 complete; approved for Phases 2–5
+**Status:** Phases 0–3 complete; approved for Phases 4–5
 **Branch:** work from `feat/venture-scout` → new branch `feat/mathx-embed`
 **Source:** `ncsound919/math-x` (cloned to `C:\Users\User\AppData\Local\Temp\opencode\math-x`)
 **Target:** `Draymond-Orchestrator` (Next.js 16, React 19, TS, SQLite/better-sqlite3, Vitest)
@@ -291,7 +291,13 @@ Auth: guard with `requireDraymondAuth` (session) for browser calls + `authorizeR
 (`CRON_SECRET`) where cron hits them.
 
 **Accept:** every route exercised via unit tests (mock `callLLM`) + a curl smoke script
-`scripts/mathx-smoke.mjs`.
+`scripts/mathx-smoke.mjs`. ✅ **DONE** — all 16 routes implemented under
+`src/app/api/math/*` over a shared `src/lib/mathx/services.ts` + `route-helpers.ts`;
+`llm.ts` gained vision (`images`) support; 12 service tests; `scripts/mathx-smoke.ts`
+green; full gates pass (686 TS tests, lint clean, coverage above thresholds). Known
+math-x bugs fixed on port (OCR `data` contract, `/literature/search` path, export
+formats, sanitized errors). Refinement (`hypothesis/refine`) is JSON not SSE (callLLM
+is request/response — SSE streaming deferred to a later pass).
 
 ---
 
@@ -314,7 +320,15 @@ Auth: guard with `requireDraymondAuth` (session) for browser calls + `authorizeR
 
 **Accept:** `/math` page runs a real Probability Lab (numpy via WASM) end-to-end; `/chat`
 handles an OCR image and renders a chart; everything lazy-loads without breaking the
-Operations page.
+Operations page. ✅ **DONE** — workers ported to `src/workers/`
+(`PyodideWorkerManager` blob worker, `usePyodide`, `useDuckDB`, `useSymPyVerifier`),
+renderers under `src/components/mathx/` (`MathRenderer` KaTeX+DOMPurify, `ChartView`
+ECharts lazy, `ParameterSliders`, `PyodideErrorBoundary`, `MathResults`), a full `/math`
+Math Lab page (8-mode rail, OCR image→LaTeX, plan→codegen→compute→narrative pipeline,
+chart/table/param-slider output), and a `Math` nav entry. Added `/api/math/chat`
+(Math X narrative, non-streaming) + `mathChat` service. Production build passes with all
+17 math routes + `/math`. OCR/charts/proof-verify are fused in the Math Lab; the existing
+`/chat` remains Draymond's orchestration chat (math chat integration there is optional).
 
 ---
 
