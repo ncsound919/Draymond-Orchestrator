@@ -1,6 +1,6 @@
 # Math X → Draymond: Full Embedding Plan
 
-**Status:** Phases 0–3 complete; approved for Phases 4–5
+**Status:** Phases 0–4 complete; approved for Phase 5
 **Branch:** work from `feat/venture-scout` → new branch `feat/mathx-embed`
 **Source:** `ncsound919/math-x` (cloned to `C:\Users\User\AppData\Local\Temp\opencode\math-x`)
 **Target:** `Draymond-Orchestrator` (Next.js 16, React 19, TS, SQLite/better-sqlite3, Vitest)
@@ -346,7 +346,14 @@ Lift the orphaned-but-real features:
   chunks into `orchestrateChatTurn` alongside `system-intel`.
 
 **Accept:** literature RAG and bio analysis work end-to-end in the Math Lab; chat can
-consume retrieved + bio context; all optional viewers guarded by feature flags.
+consume retrieved + bio context; all optional viewers guarded by feature flags. ✅ **DONE**
+— `LiteraturePanel` (PubMed/arXiv search → inject papers as chat context) and `BioPanel`
+(NCBI/UniProt lookup → inject) as a RAG drawer in the Math Lab; `useMathMemory`
+(IndexedDB TF-IDF recall + store) feeds auto-context; `/api/math/export` session export
+button; `src/lib/mathx/share.ts` (CompressionStream share links, chunked base64 — avoids
+the call-stack arg limit); shared-session restore from the URL hash. **Deferred (off by
+design, heavy deps):** ProofTree (reactflow), GenomeBrowser/MoleculeViewer (IGV/NGL),
+PlotView/MafsPlot, bio file parsing (biopython), ExampleGallery, WorkflowTemplates.
 
 ---
 
