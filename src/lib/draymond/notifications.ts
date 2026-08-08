@@ -741,7 +741,7 @@ export async function ingestWorkerReportEmail(
   body: string,
   artifactRefs: string[] = [],
 ): Promise<{ ok: boolean; task_id?: string; error?: string }> {
-  const m = /\[OpenChat:\s*([A-Za-z0-9_-]+)\]/.exec(subject ?? '');
+  const m = /\[OpenChat:\s*([A-Za-z0-9_-]+)\]/i.exec(subject ?? '');
   if (!m) return { ok: false, error: 'no task id in subject' };
   const taskId = m[1];
   const db = createDraymondAdminClient();
@@ -749,7 +749,7 @@ export async function ingestWorkerReportEmail(
     .from('draymond_worker_tasks')
     .update({
       status: 'completed',
-      result: { summary: body.slice(0, 2000) },
+      result: { summary: String(body ?? '').slice(0, 2000) },
       artifact_refs: artifactRefs,
       completed_at: new Date().toISOString(),
     })
