@@ -498,17 +498,22 @@ export async function instantiateChain(
       }))
     );
 
-    // Build ID remapping: template step ID → new instance step ID
-    // Steps are returned in insertion order, matching templateSteps order
+    // Build ID remapping: template step ID → new instance step ID.
+    // Align by step_order (unique per chain), NOT array index — the rows
+    // returned by `.insert().select()` are not guaranteed to match the
+    // insertion order of templateSteps (item: dependency remap off-by-one).
     const idMap = new Map<string, string>();
-    for (let i = 0; i < templateSteps.length; i++) {
-      idMap.set(templateSteps[i].id, newSteps[i].id);
+    const newStepsByOrder = new Map<number, DraymondChainStep>();
+    for (const s of newSteps) newStepsByOrder.set(s.step_order, s);
+    for (const t of templateSteps) {
+      const match = newStepsByOrder.get(t.step_order);
+      if (match) idMap.set(t.id, match.id);
     }
 
     // Remap depends_on_steps from template IDs to instance IDs
     const stepsNeedingUpdate: Array<{ id: string; depends_on_steps: string[] }> = [];
-    for (let i = 0; i < templateSteps.length; i++) {
-      const originalDeps = templateSteps[i].depends_on_steps;
+    for (const t of templateSteps) {
+      const originalDeps = t.depends_on_steps;
       if (originalDeps.length > 0) {
         const remappedDeps = originalDeps
           .map((depId) => idMap.get(depId))
@@ -516,12 +521,15 @@ export async function instantiateChain(
         
         if (remappedDeps.length !== originalDeps.length) {
           console.warn(
-            `[Draymond Chains] Some dependency IDs could not be remapped for step "${templateSteps[i].name}" — ` +
+            `[Draymond Chains] Some dependency IDs could not be remapped for step "${t.name}" — ` +
             `original: [${originalDeps.join(', ')}], remapped: [${remappedDeps.join(', ')}]`
           );
         }
 
-        stepsNeedingUpdate.push({ id: newSteps[i].id, depends_on_steps: remappedDeps });
+        const target = newStepsByOrder.get(t.step_order);
+        if (target) {
+          stepsNeedingUpdate.push({ id: target.id, depends_on_steps: remappedDeps });
+        }
       }
     }
 
