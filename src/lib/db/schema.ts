@@ -724,7 +724,9 @@ CREATE TABLE IF NOT EXISTS draymond_skill_packs (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_skill_packs_name ON draymond_skill_packs(name);
+-- Unique per (name, version) so concurrent upserts resolve atomically.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_skill_packs_name_version
+  ON draymond_skill_packs(name, version);
 
 CREATE TABLE IF NOT EXISTS draymond_worker_tasks (
   id TEXT PRIMARY KEY,

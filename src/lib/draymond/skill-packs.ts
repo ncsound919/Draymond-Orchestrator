@@ -4,7 +4,6 @@
 // a review queue here.
 // ============================================================================
 
-import { randomUUID } from 'crypto';
 import { createDraymondAdminClient } from './client';
 
 export interface SkillPack {
@@ -42,49 +41,46 @@ export interface Proposal {
   pack: Record<string, unknown>;
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
+  reviewed_at: string | null;
 }
 
 export async function upsertSkillPack(input: SkillPackInput): Promise<SkillPack> {
   const db = createDraymondAdminClient();
   const version = input.version ?? '1.0.0';
-  const { data: existing } = await db
+  // Atomic create-or-update keyed on the UNIQUE (name, version) constraint —
+  // no read-then-write, so concurrent upserts for the same pack can't race.
+  const { data, error } = await db
     .from('draymond_skill_packs')
-    .select('id')
-    .eq('name', input.name)
-    .eq('version', version)
-    .maybeSingle();
-  const now = new Date().toISOString();
-  const row = {
-    id: (existing as { id: string } | null)?.id ?? randomUUID(),
-    name: input.name,
-    version,
-    purpose: input.purpose ?? '',
-    triggers: input.triggers ?? [],
-    instructions: input.instructions ?? '',
-    tools: input.tools ?? [],
-    platforms: input.platforms ?? [],
-    outputs: input.outputs ?? [],
-    review_status: input.review_status ?? 'approved',
-    source: input.source ?? 'draymond',
-    created_at: existing ? undefined : now,
-    updated_at: now,
-  };
-  const { error } = await db
-    .from('draymond_skill_packs')
-    .upsert(row, { onConflict: 'id' })
+    .upsert(
+      {
+        name: input.name,
+        version,
+        purpose: input.purpose ?? '',
+        triggers: input.triggers ?? [],
+        instructions: input.instructions ?? '',
+        tools: input.tools ?? [],
+        platforms: input.platforms ?? [],
+        outputs: input.outputs ?? [],
+        review_status: input.review_status ?? 'approved',
+        source: input.source ?? 'draymond',
+      },
+      { onConflict: 'name,version' }
+    )
     .select()
     .single();
   if (error) {
     throw new Error(`Failed to upsert skill pack: ${error.message}`);
   }
-  const pack = await getSkillPack(input.name, version);
-  if (!pack) throw new Error('Failed to upsert skill pack');
-  return pack;
+  return data as SkillPack;
 }
 
 export async function listSkillPacks(status?: SkillPack['review_status']): Promise<SkillPack[]> {
   const db = createDraymondAdminClient();
-  let query = db.from('draymond_skill_packs').select('*').order('name');
+  let query = db
+    .from('draymond_skill_packs')
+    .select('*')
+    .order('name')
+    .order('version', { ascending: false });
   if (status) query = query.eq('review_status', status);
   const { data, error } = await query;
   if (error) {
@@ -129,13 +125,15 @@ export async function listProposals(): Promise<Proposal[]> {
   return (data ?? []) as Proposal[];
 }
 
-export async function reviewProposal(id: string, status: 'approved' | 'rejected'): Promise<void> {
+export async function reviewProposal(id: string, status: 'approved' | 'rejected'): Promise<boolean> {
   const db = createDraymondAdminClient();
-  const { error } = await db
+  const { data, error } = await db
     .from('draymond_worker_proposals')
     .update({ status, reviewed_at: new Date().toISOString() })
-    .eq('id', id);
+    .eq('id', id)
+    .select();
   if (error) {
     throw new Error(`Failed to review proposal: ${error.message}`);
   }
+  return (data?.length ?? 0) > 0;
 }
