@@ -24,7 +24,7 @@ export async function buildEditorialArticles(): Promise<EditorialArticle[]> {
     const matchup = `${game.home_team} vs ${game.away_team}`;
     articles.push({
       title: matchup,
-      body: `${matchup} — ${game.spread_movement ?? 'steady'} spread, ${game.totals_movement ?? 'steady'} totals.`,
+      body: `${matchup} — check current spread and totals before tip-off.`,
       landscape: `Monitor the spread; shop three books; re-check availability before tip.`,
       tags: ['editorial', 'odds'],
       is_featured: articles.length === 0,
