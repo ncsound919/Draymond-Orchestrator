@@ -146,9 +146,25 @@ export interface DispatchWorkerTasksConfig {
 }
 
 export async function dispatchWorkerTasks(config: DispatchWorkerTasksConfig): Promise<{ enqueued: number }> {
-  const tasks = config.tasks ?? [];
-  for (const t of tasks) {
-    await enqueueWorkerTask({ skill_pack_id: t.skill_pack_id, payload: t.payload, due_at: t.due_at });
+  if (config.tasks !== undefined && !Array.isArray(config.tasks)) {
+    throw new Error('[worker-tasks] dispatchWorkerTasks: config.tasks must be an array');
   }
-  return { enqueued: tasks.length };
+  const tasks = config.tasks ?? [];
+  if (tasks.length === 0) return { enqueued: 0 };
+  // Batch insert in a single transaction (the builder wraps multi-row inserts
+  // in a better-sqlite3 transaction) so enqueue is all-or-nothing — a retry
+  // never re-enqueues a half-written batch.
+  const db = createDraymondAdminClient();
+  const rows = tasks.map((t) => ({
+    worker_id: null,
+    skill_pack_id: t.skill_pack_id ?? null,
+    payload: t.payload ?? {},
+    status: 'queued',
+    due_at: t.due_at ?? null,
+  }));
+  const { error } = await db.from('draymond_worker_tasks').insert(rows);
+  if (error) {
+    throw new Error(`Failed to enqueue worker tasks: ${error.message}`);
+  }
+  return { enqueued: rows.length };
 }

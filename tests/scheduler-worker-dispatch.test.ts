@@ -30,4 +30,11 @@ describe('dispatchWorkerTasks', () => {
     const result = await dispatchWorkerTasks({});
     expect(result.enqueued).toBe(0);
   });
+
+  it('rejects a non-array config.tasks', async () => {
+    await expect(dispatchWorkerTasks({ tasks: 'x' as never })).rejects.toThrow(/array/);
+    const db = getDb();
+    const count = db.prepare('SELECT COUNT(*) as n FROM draymond_worker_tasks').get() as { n: number };
+    expect(count.n).toBe(0);
+  });
 });
