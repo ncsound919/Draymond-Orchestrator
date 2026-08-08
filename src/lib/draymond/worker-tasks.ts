@@ -1,6 +1,6 @@
 // ============================================================================
 // Worker Task Queue — tasks the boss assigns to remote workers (Open Chat).
-// Status flow: queued → claimed → in_progress → completed | failed
+// Status flow: queued → claimed → completed | failed
 // ============================================================================
 
 import { createDraymondAdminClient } from './client';
@@ -49,21 +49,36 @@ export async function enqueueWorkerTask(input: EnqueueInput): Promise<string> {
 
 export async function pullDueTasks(workerId: string, limit = 10): Promise<WorkerTask[]> {
   const db = createDraymondAdminClient();
-  const { data, error } = await db
+  // A worker pulls queued tasks that are unassigned (worker_id IS NULL) OR
+  // assigned to them. The query builder's `.or()` cannot express an `IS NULL`
+  // clause, so each scope is selected separately and merged below.
+  const { data: unassigned, error: errUnassigned } = await db
     .from('draymond_worker_tasks')
     .select('*')
     .eq('status', 'queued')
-    .order('created_at', { ascending: true });
-  if (error) {
-    throw new Error(`Failed to pull worker tasks: ${error.message}`);
+    .is('worker_id', null);
+  if (errUnassigned) {
+    throw new Error(`Failed to pull worker tasks: ${errUnassigned.message}`);
   }
-  // due_at is NULL (no deadline) or already due. The query builder's `.or()`
-  // cannot express an `IS NULL` clause, so the OR is applied in JS.
+  const { data: mine, error: errMine } = await db
+    .from('draymond_worker_tasks')
+    .select('*')
+    .eq('status', 'queued')
+    .eq('worker_id', workerId);
+  if (errMine) {
+    throw new Error(`Failed to pull worker tasks: ${errMine.message}`);
+  }
+
   const now = new Date().toISOString();
-  const due = (data ?? []).filter(
+  // due_at is NULL (no deadline) or already due; merged rows deduped by id.
+  const due = [...(unassigned ?? []), ...(mine ?? [])].filter(
     (t: WorkerTask) => t.due_at == null || t.due_at <= now
   );
-  return due.slice(0, limit);
+  const byId = new Map<string, WorkerTask>();
+  for (const t of due) byId.set(t.id, t);
+  return [...byId.values()]
+    .sort((a, b) => a.created_at.localeCompare(b.created_at))
+    .slice(0, limit);
 }
 
 export async function claimTask(id: string, workerId: string): Promise<boolean> {
@@ -88,10 +103,13 @@ export async function reportTask(
   id: string,
   result: Record<string, unknown>,
   artifactRefs?: string[],
-  error?: string
+  error?: string,
+  workerId?: string
 ): Promise<boolean> {
   const db = createDraymondAdminClient();
-  const { data, error: err } = await db
+  // Only a claimed or in-progress task can be reported, and only by its
+  // assigned worker when one is supplied.
+  let query = db
     .from('draymond_worker_tasks')
     .update({
       status: error ? 'failed' : 'completed',
@@ -101,7 +119,9 @@ export async function reportTask(
       completed_at: new Date().toISOString(),
     })
     .eq('id', id)
-    .select();
+    .in('status', ['claimed', 'in_progress']);
+  if (workerId) query = query.eq('worker_id', workerId);
+  const { data, error: err } = await query.select();
   if (err) {
     throw new Error(`Failed to report worker task: ${err.message}`);
   }
