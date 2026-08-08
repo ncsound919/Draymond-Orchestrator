@@ -104,7 +104,7 @@ export function LiteraturePanel({ onSelect, accent }: LiteraturePanelProps) {
       <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: '0.68rem', color: 'var(--text-muted)' }}>
         {(['pubmed', 'arxiv'] as const).map((s) => (
           <label key={s} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-            <input type="checkbox" checked={sources[s]} onChange={(e) => setSources((p) => ({ ...p, [s]: e.target.checked }))} />
+            <input type="checkbox" name={`lit-source-${s}`} checked={sources[s]} onChange={(e) => setSources((p) => ({ ...p, [s]: e.target.checked }))} />
             {s}
           </label>
         ))}

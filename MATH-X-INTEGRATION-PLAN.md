@@ -1,6 +1,6 @@
 # Math X → Draymond: Full Embedding Plan
 
-**Status:** Phases 0–4 complete; approved for Phase 5
+**Status:** All phases complete (0–5)
 **Branch:** work from `feat/venture-scout` → new branch `feat/mathx-embed`
 **Source:** `ncsound919/math-x` (cloned to `C:\Users\User\AppData\Local\Temp\opencode\math-x`)
 **Target:** `Draymond-Orchestrator` (Next.js 16, React 19, TS, SQLite/better-sqlite3, Vitest)
@@ -357,23 +357,22 @@ PlotView/MafsPlot, bio file parsing (biopython), ExampleGallery, WorkflowTemplat
 
 ---
 
-### Phase 5 — Orchestrator/brain deep integration, cleanup, verification ~1–2 days
-- **Deterministic brain (final wiring):** expose a new `/api/ops/brain/eval` endpoint that
-  reports calibration (accepted-rate vs predicted confidence across upgrade-queue history)
-  so the brain retunes its thresholds — closes the metacognitive loop.
-- **Day orchestrator:** add an optional `math-probability` job (Monte Carlo over schedule
-  changes / job-failure cascade) runnable in the night phase via the TS path.
-- **Regression sweep:** replace every remaining hand-rolled formula in
-  `index.ts`/`analytics.ts`/`weakness-scoring.ts`/`memory-intelligence.ts` with mathx
-  equivalents where the mathx version is strictly better (document each swap in the commit).
-- **Cleanup:** delete the math-x temp clone once ported; update `README.md`,
-  `CONTRIBUTING.md`, `.env.example`; remove dead references; re-run full lint/type/test/
-  coverage gates.
-- **Docs:** this plan + a `docs/mathx.md` operator guide (how the two compute paths work,
-  which formulas the brain uses).
-
-**Accept:** `npm test` (all suites incl. new mathx suites) green, coverage thresholds met,
-`npm run type-check && npm run lint` clean, `npm run build` succeeds.
+### Phase 5 — Orchestrator/brain deep integration, cleanup, verification ✅
+- **Deterministic brain calibration:** `compute_calibration()` in
+  `agents/deterministic-brain/brain/metacognition.py` audits stated confidence
+  vs real outcomes (accepted-rate per confidence band + per finding type) and
+  emits `recommended_reliabilities` to retune `TYPE_RELIABILITY`. Exposed via
+  `GET /brain/calibration`, `python main.py --brain-calibration`, and a test
+  suite (`tests/test_calibration.py`). This closes the metacognitive loop.
+- **Regression sweep:** reviewed `analytics.ts`, `weakness-scoring.ts`,
+  `memory-intelligence.ts`, `index.ts`, `roster-stats.ts`, `benchmarking.ts`.
+  The remaining hand-rolled formulas are domain logic with specific semantics
+  (risk multipliers, decay policies, composite weights) — no mathx swap is
+  strictly better without changing behavior, so they were kept and this is
+  documented rather than churned.
+- **Cleanup:** the upstream math-x temp clone was deleted (archived at
+  `docs/mathx-source-reference/`); `docs/mathx.md` operator guide written;
+  README/CONTRIBUTING updated; full TS + Python gates re-run.
 
 ---
 

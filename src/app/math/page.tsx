@@ -398,6 +398,7 @@ export default function MathLabPage() {
               />
               <textarea
                 ref={inputRef}
+                name="math-lab-input"
                 rows={2}
                 placeholder={`Ask in ${mode.label} mode…  (e.g. "estimate P(flood > 2m) with a Monte Carlo")`}
                 style={{

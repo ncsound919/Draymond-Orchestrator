@@ -108,6 +108,7 @@ export function BioPanel({ onSelect, accent }: BioPanelProps) {
       <div style={{ display: 'flex', gap: 6 }}>
         {tab === 'ncbi' && (
           <select
+            name="bio-db"
             value={db}
             onChange={(e) => setDb(e.target.value)}
             style={{ background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: 5, fontSize: '0.72rem', padding: '0 6px' }}
@@ -116,6 +117,7 @@ export function BioPanel({ onSelect, accent }: BioPanelProps) {
           </select>
         )}
         <input
+          name="bio-query"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void search()}

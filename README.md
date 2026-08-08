@@ -181,6 +181,26 @@ Continuous health checking for all registered agents. The dashboard displays rea
 
 ---
 
+## Math Lab
+
+An embedded cross-domain mathematics workspace (ported from **Math X**) at
+`/math`: Probability Lab, Formula Lab, Hypothesis, Deep Solve, Synergy, and
+Domain Expert modes with local **Pyodide/WASM** (NumPy/SciPy/SymPy), DuckDB
+analytics, OCR image → LaTeX, literature RAG (PubMed/arXiv), bio lookup
+(NCBI/UniProt), proof verification, and session export/share.
+
+- **API:** `src/app/api/math/*` — 17 session-authed routes (plan, codegen,
+  verify, hypothesis, analogies, domain, export, ocr, literature, bio, models,
+  chat). All LLM calls flow through Draymond's `callLLM` fallback chain with
+  per-mode token budgets.
+- **Math core:** `src/lib/mathx/` — pure-TS stats (Bayesian posterior, EWMA,
+  CUSUM, EV ranking) shared by the orchestrator, the deterministic brain, and
+  the Math Lab. Python mirror in `agents/deterministic-brain/brain/mathx.py`.
+- See `docs/mathx.md` for the operator guide and `MATH-X-INTEGRATION-PLAN.md`
+  for the full integration spec.
+
+---
+
 ## How It Works
 
 ```
