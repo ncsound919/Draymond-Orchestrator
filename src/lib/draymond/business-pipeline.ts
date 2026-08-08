@@ -9,7 +9,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-export type OpportunityStage = "lead" | "proposal" | "negotiation" | "won" | "lost";
+export type OpportunityStage = "lead" | "proposal" | "negotiation" | "won" | "delivering" | "invoiced" | "paid" | "lost";
 export type RevenueEngine = "E1-platform" | "E2-b2b" | "E3-tooling" | "E4-vertical";
 
 export interface Opportunity {
@@ -19,6 +19,10 @@ export interface Opportunity {
   stage: OpportunityStage;
   /** Expected monthly value in USD once won. */
   monthlyValue: number;
+  /** Mission service line this opportunity belongs to (aetherdesk|maas|audit|research). */
+  serviceId?: string;
+  /** Selected pricing tier id from the service catalog. */
+  tierId?: string;
   owner: string; // the agent/product delivering it
   nextAction: string;
   createdAt: string;
@@ -39,12 +43,17 @@ export const ENGINE_TARGETS: EngineTarget[] = [
 
 export const MONTHLY_TARGET = ENGINE_TARGETS.reduce((s, e) => s + e.monthlyTarget, 0); // 33,000
 
-const DIR = process.env.DRAYMOND_REGISTRY_DIR ?? path.join(process.cwd(), ".draymond");
-const FILE = path.join(DIR, "business-pipeline.json");
+/** Resolved lazily so tests (fresh temp dirs per case) and prod both work. */
+function registryDir(): string {
+  return process.env.DRAYMOND_REGISTRY_DIR ?? path.join(process.cwd(), ".draymond");
+}
+function FILE(): string {
+  return path.join(registryDir(), "business-pipeline.json");
+}
 
 async function readOpportunities(): Promise<Opportunity[]> {
   try {
-    const raw = await fs.readFile(FILE, "utf-8");
+    const raw = await fs.readFile(FILE(), "utf-8");
     const parsed = JSON.parse(raw) as { opportunities?: Opportunity[] };
     return Array.isArray(parsed.opportunities) ? parsed.opportunities : [];
   } catch {
@@ -53,8 +62,8 @@ async function readOpportunities(): Promise<Opportunity[]> {
 }
 
 async function writeOpportunities(ops: Opportunity[]): Promise<void> {
-  await fs.mkdir(DIR, { recursive: true });
-  await fs.writeFile(FILE, JSON.stringify({ opportunities: ops, updatedAt: new Date().toISOString() }, null, 2), "utf-8");
+  await fs.mkdir(registryDir(), { recursive: true });
+  await fs.writeFile(FILE(), JSON.stringify({ opportunities: ops, updatedAt: new Date().toISOString() }, null, 2), "utf-8");
 }
 
 export async function listOpportunities(): Promise<Opportunity[]> {
@@ -97,7 +106,7 @@ export interface PipelineSummary {
 
 export async function pipelineSummary(revenueToDate = 0): Promise<PipelineSummary> {
   const ops = await readOpportunities();
-  const byStage: Record<OpportunityStage, number> = { lead: 0, proposal: 0, negotiation: 0, won: 0, lost: 0 };
+  const byStage: Record<OpportunityStage, number> = { lead: 0, proposal: 0, negotiation: 0, won: 0, delivering: 0, invoiced: 0, paid: 0, lost: 0 };
   const byEngine: Record<RevenueEngine, { target: number; active: number; won: number }> = {
     "E1-platform": { target: 10_000, active: 0, won: 0 },
     "E2-b2b": { target: 12_000, active: 0, won: 0 },
@@ -110,7 +119,7 @@ export async function pipelineSummary(revenueToDate = 0): Promise<PipelineSummar
   for (const o of ops) {
     byStage[o.stage] += 1;
     const engine = byEngine[o.engine];
-    if (o.stage === "won") {
+    if (o.stage === "won" || o.stage === "delivering" || o.stage === "invoiced" || o.stage === "paid") {
       wonMonthlyValue += o.monthlyValue;
       engine.won += o.monthlyValue;
     } else if (o.stage !== "lost") {

@@ -4,7 +4,7 @@ import { listOpportunities, addOpportunity, updateOpportunityStage } from '@/lib
 
 export const dynamic = 'force-dynamic';
 
-const STAGES = ['lead', 'proposal', 'negotiation', 'won', 'lost'];
+const STAGES = ['lead', 'proposal', 'negotiation', 'won', 'delivering', 'invoiced', 'paid', 'lost'];
 const ENGINES = ['E1-platform', 'E2-b2b', 'E3-tooling', 'E4-vertical'];
 
 export async function GET() {
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-  const { name, engine, stage, monthlyValue, owner, nextAction } = body;
+  const { name, engine, stage, monthlyValue, owner, nextAction, serviceId, tierId } = body;
   if (typeof name !== 'string' || !name.trim()) {
     return NextResponse.json({ error: 'name is required' }, { status: 400 });
   }
@@ -40,6 +40,8 @@ export async function POST(request: NextRequest) {
     monthlyValue: value,
     owner: typeof owner === 'string' ? owner : 'draymond',
     nextAction: typeof nextAction === 'string' ? nextAction : '',
+    serviceId: typeof serviceId === 'string' ? serviceId : undefined,
+    tierId: typeof tierId === 'string' ? tierId : undefined,
   });
   return NextResponse.json(opp, { status: 201 });
 }
