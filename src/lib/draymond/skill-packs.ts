@@ -74,12 +74,22 @@ export async function upsertSkillPack(input: SkillPackInput): Promise<SkillPack>
   return data as SkillPack;
 }
 
+export interface SeedSkillPacksResult {
+  seeded: number;
+  errors: string[];
+  names: string[];
+}
+
 /**
  * Seed the first skill packs into the catalog. Idempotent — each pack is
  * upserted on the UNIQUE (name, version) constraint, so repeated seed runs
  * update in place instead of duplicating. Invoked from POST /api/seed.
+ *
+ * Each pack is isolated: a failure on one pack is recorded in `errors` and
+ * seeding continues with the next pack, mirroring the sibling seed routines
+ * (seedBusinessAutomation / seedAgentMonitors).
  */
-export async function seedSkillPacks(): Promise<number> {
+export async function seedSkillPacks(): Promise<SeedSkillPacksResult> {
   const packs: SkillPackInput[] = [
     {
       name: 'marketing_draft',
@@ -142,10 +152,23 @@ export async function seedSkillPacks(): Promise<number> {
       outputs: ['code', 'email'],
     },
   ];
+  const result: SeedSkillPacksResult = {
+    seeded: 0,
+    errors: [],
+    names: [],
+  };
   for (const p of packs) {
-    await upsertSkillPack(p);
+    try {
+      await upsertSkillPack(p);
+      result.seeded += 1;
+      result.names.push(p.name);
+    } catch (err) {
+      result.errors.push(
+        `[skill-pack:${p.name}] ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
   }
-  return packs.length;
+  return result;
 }
 
 export async function listSkillPacks(status?: SkillPack['review_status']): Promise<SkillPack[]> {

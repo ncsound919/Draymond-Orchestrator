@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 process.env.DRAYMOND_DB_PATH = ':memory:';
 
 import { getDb } from '@/lib/db/connection';
-import { upsertSkillPack, listSkillPacks, getSkillPack, proposeSkillPack, listProposals, reviewProposal } from '@/lib/draymond/skill-packs';
+import { upsertSkillPack, listSkillPacks, getSkillPack, proposeSkillPack, listProposals, reviewProposal, seedSkillPacks } from '@/lib/draymond/skill-packs';
 
 describe('skill-packs', () => {
   beforeEach(() => {
@@ -100,12 +100,30 @@ describe('skill-packs', () => {
   });
 
   it('seeds the five first skill packs', async () => {
-    const { seedSkillPacks } = await import('@/lib/draymond/skill-packs');
-    await seedSkillPacks();
+    const result = await seedSkillPacks();
+    expect(result.seeded).toBe(5);
+    expect(result.errors).toEqual([]);
+    expect(result.names).toEqual(['marketing_draft', 'social_post', 'email_report', 'lead_pulse', 'vibe_ui_gen']);
     const all = await listSkillPacks();
     const names = new Set(all.map((p) => p.name));
     for (const n of ['marketing_draft', 'social_post', 'email_report', 'lead_pulse', 'vibe_ui_gen']) {
       expect(names.has(n)).toBe(true);
+    }
+  });
+
+  it('seeds idempotently — a second run still yields 5 packs', async () => {
+    await seedSkillPacks();
+    await seedSkillPacks();
+    const all = await listSkillPacks();
+    expect(all).toHaveLength(5);
+  });
+
+  it('seeds packs as approved', async () => {
+    await seedSkillPacks();
+    const all = await listSkillPacks();
+    expect(all).toHaveLength(5);
+    for (const pack of all) {
+      expect(pack.review_status).toBe('approved');
     }
   });
 });

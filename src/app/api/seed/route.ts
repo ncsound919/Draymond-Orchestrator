@@ -28,25 +28,13 @@ export async function POST(request: NextRequest) {
   try {
     const result = await seedBusinessAutomation();
     const monitorResult = await seedAgentMonitors();
-
-    // Skill packs upsert idempotently — a duplicate run just re-upserts.
-    // Never let a pack failure take down the whole seed.
-    let skillPacksSeeded = 0;
-    const skillPackErrors: string[] = [];
-    try {
-      skillPacksSeeded = await seedSkillPacks();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      skillPackErrors.push(`[skill-packs] ${message}`);
-      console.error('[Seed] skill packs failed:', message);
-    }
-
+    const skillPackResult = await seedSkillPacks();
     const durationMs = Date.now() - startTime;
 
     const allErrors = [
       ...result.errors,
       ...monitorResult.errors,
-      ...skillPackErrors,
+      ...skillPackResult.errors,
     ];
 
     return NextResponse.json({
@@ -62,7 +50,8 @@ export async function POST(request: NextRequest) {
         names: monitorResult.names,
       },
       skill_packs: {
-        seeded: skillPacksSeeded,
+        seeded: skillPackResult.seeded,
+        names: skillPackResult.names,
       },
       errors: allErrors.length > 0 ? allErrors : undefined,
     });
