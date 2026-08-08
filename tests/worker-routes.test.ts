@@ -1,8 +1,16 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import type { NextRequest } from 'next/server';
 
 // Force the local DB to in-memory for these tests (read lazily by getDb).
 process.env.DRAYMOND_DB_PATH = ':memory:';
+
+// Isolate the self-learning file store to a temp dir so the report route's
+// recordOutcome never touches the real .draymond/ registry.
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'draymond-worker-routes-'));
+process.env.DRAYMOND_REGISTRY_DIR = tmp;
 
 import { getDb } from '@/lib/db/connection';
 import { upsertSkillPack } from '@/lib/draymond/skill-packs';
@@ -27,6 +35,10 @@ function req(body: unknown, path = 'http://localhost/api/v1/worker/tasks') {
 }
 
 describe('worker routes', () => {
+  afterEach(() => {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
   beforeEach(() => {
     process.env.CRON_SECRET = 'test-secret';
     resetHeartbeatWorkers();
