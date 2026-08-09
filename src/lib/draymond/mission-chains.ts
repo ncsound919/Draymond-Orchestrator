@@ -61,7 +61,8 @@ export const MISSION_CHAIN_DEFS: MissionChainDef[] = [
     steps: [
       { name: "Deep Research", entitySlug: "omni-research", action: "research_news", input_mapping: { query: "$.input.topic" }, output_key: "research", step_order: 1, depends_on: [] },
       { name: "Data Feed", entitySlug: "kaggle", action: "research_feed", input_mapping: { dataset: "$.input.dataset", tags: "$.input.tags", force: "$.input.force" }, output_key: "feed", step_order: 1, parallel_group: "research_gather", depends_on: [] },
-      { name: "Synthesize Brief", entitySlug: "uplift-agent", action: "batch", input_mapping: { task: "compile_research_brief", topic: "$.input.topic", research: "$.steps.research.output", feed: "$.steps.feed.output" }, output_key: "brief", step_order: 2, depends_on: ["Deep Research", "Data Feed"] },
+      { name: "Quality Check", entitySlug: "mutly", action: "analyze", input_mapping: { research: "$.steps.research.output", feed: "$.steps.feed.output" }, output_key: "qa", step_order: 2, depends_on: ["Deep Research", "Data Feed"] },
+      { name: "Synthesize Brief", entitySlug: "uplift-agent", action: "batch", input_mapping: { task: "compile_research_brief", topic: "$.input.topic", research: "$.steps.research.output", feed: "$.steps.feed.output", qa: "$.steps.qa.output" }, output_key: "brief", step_order: 3, depends_on: ["Quality Check"] },
     ],
   },
 ];

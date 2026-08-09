@@ -9,7 +9,9 @@ import { markDelivered } from "./mission-pipeline";
 import { getService, readStrategy, type ServiceId } from "./mission-strategy";
 
 const SERVICE_CHAIN: Record<ServiceId, string> = {
-  aetherdesk: "audit-delivery", // placeholder: aetherdesk uses its own platform webhook
+  // aetherdesk activates rentals/top-ups via its own Stripe webhook — it is
+  // NOT dispatched through a chain. Aetherdesk opportunities should reach
+  // 'paid' via attributeSettledCharge when the webhook settles a charge.
   maas: "maas-monthly-cycle",
   audit: "audit-delivery",
   research: "research-brief-delivery",
@@ -39,6 +41,12 @@ export async function dispatchDelivery(opportunityId: string): Promise<DeliveryR
   if (!svc) return { opportunityId, ok: false, stage: opp.stage, error: `service ${serviceId} not in strategy` };
 
   const chainSlug = SERVICE_CHAIN[serviceId];
+  if (!chainSlug) {
+    return {
+      opportunityId, ok: false, stage: opp.stage,
+      error: `service ${serviceId} is webhook-driven (Aetherdesk) — not chain-dispatched; attribute settled charges via the Stripe webhook`,
+    };
+  }
   const input: Record<string, unknown> = {
     ...opp,
     niche: opp.name,

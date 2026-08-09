@@ -4,8 +4,8 @@ import { readStrategy, totalMonthlyTarget, unitEconomics } from '@/lib/draymond/
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
-  const authError = authorizeRequest(new NextRequest('http://localhost'));
+export async function GET(request: NextRequest) {
+  const authError = authorizeRequest(request);
   if (authError) return authError;
   const strategy = await readStrategy();
   return NextResponse.json({

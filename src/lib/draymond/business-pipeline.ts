@@ -100,12 +100,26 @@ export interface PipelineSummary {
   byEngine: Record<RevenueEngine, { target: number; active: number; won: number }>;
   /** Revenue-to-date (USD) — must come from the Treasurer, never estimated. */
   revenueToDate: number;
+  /** Mission strategy monthly target ($5k by day 90) when configured; falls back to MONTHLY_TARGET. */
+  missionMonthlyTarget: number;
   /** Required daily run-rate to hit the target by day 90. */
   requiredDaily: number;
 }
 
 export async function pipelineSummary(revenueToDate = 0): Promise<PipelineSummary> {
   const ops = await readOpportunities();
+  // Mission strategy-driven target (replaces the hardcoded $33k fiction when
+  // the mission config exists); falls back to engine targets otherwise.
+  let missionMonthlyTarget = MONTHLY_TARGET;
+  try {
+    const { readStrategy, totalMonthlyTarget } = await import("./mission-strategy");
+    const strategy = await readStrategy();
+    if (Array.isArray(strategy.services) && strategy.services.length > 0) {
+      missionMonthlyTarget = totalMonthlyTarget(strategy);
+    }
+  } catch {
+    /* strategy unavailable — keep engine targets */
+  }
   const byStage: Record<OpportunityStage, number> = { lead: 0, proposal: 0, negotiation: 0, won: 0, delivering: 0, invoiced: 0, paid: 0, lost: 0 };
   const byEngine: Record<RevenueEngine, { target: number; active: number; won: number }> = {
     "E1-platform": { target: 10_000, active: 0, won: 0 },
@@ -138,6 +152,7 @@ export async function pipelineSummary(revenueToDate = 0): Promise<PipelineSummar
     },
     byEngine,
     revenueToDate,
-    requiredDaily: Math.round(((MONTHLY_TARGET * 3) - revenueToDate) / Math.max(1, 90)),
+    missionMonthlyTarget,
+    requiredDaily: Math.round(((missionMonthlyTarget * 3) - revenueToDate) / Math.max(1, 90)),
   };
 }

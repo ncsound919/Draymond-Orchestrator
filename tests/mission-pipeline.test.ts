@@ -11,6 +11,7 @@ import {
   listInvoices,
   markInvoiceSettled,
   markDelivered,
+  attributeSettledCharge,
   missionDashboard,
 } from '../src/lib/draymond/mission-pipeline';
 import { addOpportunity, updateOpportunityStage } from '../src/lib/draymond/business-pipeline';
@@ -74,5 +75,24 @@ describe('mission pipeline', () => {
     expect(dash.revenueUsd).toBe(500);
     expect(dash.byService.audit.won).toBe(500);
     expect(dash.byService.audit.paid).toBe(500);
+  });
+
+  it('attributeSettledCharge attributes a webhook charge to a service and advances the opportunity to paid', async () => {
+    const opp = await addOpportunity({
+      name: 'Aetherdesk - Rental', engine: 'E2-b2b', stage: 'invoiced', monthlyValue: 239,
+      owner: 'mission', nextAction: '', serviceId: 'aetherdesk', tierId: 'month',
+    });
+    await attributeSettledCharge({ stripeChargeId: 'ch_aether_1', amountCents: 23900, serviceId: 'aetherdesk', opportunityId: opp.id });
+    const updated = await updateOpportunityStage(opp.id, 'paid');
+    expect(updated?.stage).toBe('paid');
+    const dash = await missionDashboard();
+    expect(dash.byService.aetherdesk.paid).toBe(239);
+  });
+
+  it('attributeSettledCharge is idempotent per stripe charge id', async () => {
+    await attributeSettledCharge({ stripeChargeId: 'ch_dup_1', amountCents: 1000, serviceId: 'audit' });
+    await attributeSettledCharge({ stripeChargeId: 'ch_dup_1', amountCents: 1000, serviceId: 'audit' });
+    const invoices = await listInvoices();
+    expect(invoices.filter((i) => i.stripeChargeId === 'ch_dup_1').length).toBe(1);
   });
 });

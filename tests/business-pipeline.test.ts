@@ -1,4 +1,7 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeAll, beforeEach, afterAll } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
   addOpportunity,
   listOpportunities,
@@ -7,25 +10,26 @@ import {
   MONTHLY_TARGET,
 } from '../src/lib/draymond/business-pipeline';
 
-const FILES = ['business-pipeline.json'];
+// Hermetic env: business-pipeline.json lives in the .draymond registry.
+// Use a temp dir so tests never touch (or clobber) the real seeded pipeline.
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'draymond-pipeline-'));
+process.env.DRAYMOND_REGISTRY_DIR = tmp;
+
+beforeAll(() => {
+  process.env.DRAYMOND_REGISTRY_DIR = tmp;
+});
+
+beforeEach(() => {
+  const f = path.join(tmp, 'business-pipeline.json');
+  if (fs.existsSync(f)) fs.rmSync(f, { force: true });
+});
+
+afterAll(() => {
+  delete process.env.DRAYMOND_REGISTRY_DIR;
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
 
 describe('business pipeline (mission control)', () => {
-  beforeEach(async () => {
-    const fs = await import('node:fs/promises');
-    const path = await import('node:path');
-    for (const f of FILES) {
-      await fs.rm(path.join('.draymond', f), { force: true });
-    }
-  });
-
-  afterEach(async () => {
-    const fs = await import('node:fs/promises');
-    const path = await import('node:path');
-    for (const f of FILES) {
-      await fs.rm(path.join('.draymond', f), { force: true });
-    }
-  });
-
   it('targets $33k/month across four engines', () => {
     expect(MONTHLY_TARGET).toBe(33_000);
   });
@@ -46,7 +50,9 @@ describe('business pipeline (mission control)', () => {
     expect(summary.byEngine['E2-b2b'].active).toBe(250);
     expect(summary.byEngine['E3-tooling'].won).toBe(300);
     expect(summary.revenueToDate).toBe(5_000);
-    expect(summary.requiredDaily).toBe(Math.round((99_000 - 5_000) / 90));
+    // Mission strategy (DEFAULT_STRATEGY) drives the target: $5k/mo × 3 = $15k over 90 days.
+    expect(summary.missionMonthlyTarget).toBe(5_000);
+    expect(summary.requiredDaily).toBe(Math.round((15_000 - 5_000) / 90));
   });
 
   it('moves an opportunity to won via stage update', async () => {

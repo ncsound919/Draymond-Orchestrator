@@ -95,11 +95,50 @@ export async function markInvoiceSettled(invoiceId: string, stripeChargeId: stri
 
 export async function markDelivered(opportunityId: string): Promise<{ invoice: Invoice; opportunity: Opportunity | null }> {
   await updateOpportunityStage(opportunityId, "delivering");
-  const invoice = await createInvoice(opportunityId);
+  // Idempotent: reuse an existing open invoice for this opportunity.
+  let invoice = (await readInvoices()).find((i) => i.opportunityId === opportunityId && i.status === "open");
+  if (!invoice) invoice = await createInvoice(opportunityId);
   await updateOpportunityStage(opportunityId, "invoiced");
   const ops = await listOpportunities();
   const opportunity = ops.find((o) => o.id === opportunityId) ?? null;
   return { invoice, opportunity };
+}
+
+/**
+ * Attribute a settled Stripe charge to a service line — the webhook-driven
+ * path (Aetherdesk rentals/top-ups, and any charge carrying metadata.service).
+ * Creates a paid invoice record (deduped by stripeChargeId) so the dashboard's
+ * per-service `paid` reflects REAL settled money. Optionally advances a linked
+ * opportunity to 'paid' when metadata.opportunityId is present.
+ */
+export async function attributeSettledCharge(input: {
+  stripeChargeId: string;
+  amountCents: number;
+  serviceId: ServiceId;
+  opportunityId?: string;
+}): Promise<Invoice> {
+  const invoices = await readInvoices();
+  const existing = invoices.find((i) => i.stripeChargeId === input.stripeChargeId);
+  if (existing) return existing;
+
+  const invoice: Invoice = {
+    id: `inv_${Date.now()}`,
+    opportunityId: input.opportunityId ?? "",
+    serviceId: input.serviceId,
+    tierId: "settled-charge",
+    amountCents: input.amountCents,
+    status: "paid",
+    stripeChargeId: input.stripeChargeId,
+    createdAt: new Date().toISOString(),
+    paidAt: new Date().toISOString(),
+  };
+  invoices.push(invoice);
+  await writeInvoices(invoices);
+
+  if (input.opportunityId) {
+    await updateOpportunityStage(input.opportunityId, "paid").catch(() => {});
+  }
+  return invoice;
 }
 
 export interface MissionDashboard {
