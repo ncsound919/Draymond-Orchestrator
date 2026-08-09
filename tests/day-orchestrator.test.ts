@@ -68,6 +68,23 @@ describe('day orchestrator', () => {
     expect(result.estimated_tokens).toBeUndefined();
     expect(result.executed[0]).toContain('cron-driven');
   }, 30_000);
+
+  it('night phase includes the cognition steps (dream + ultraplan)', () => {
+    const night = DAY_FLOW.filter((s) => s.phase === 'night').map((s) => s.job);
+    expect(night).toContain('dream_cycle');
+    expect(night).toContain('ultraplan_process');
+    const dream = DAY_FLOW.find((s) => s.id === 'dream');
+    expect(dream?.time).toBe('02:00');
+    const ultraplan = DAY_FLOW.find((s) => s.id === 'ultraplan');
+    expect(ultraplan?.time).toBe('02:30');
+  });
+
+  it('runPhase night keeps the fail-soft contract with the cognition steps', async () => {
+    const result = await runPhase('night');
+    // dream/ultraplan handlers never reject (fail-soft by contract) — the only
+    // allowed errors are the BookBridge scan failures.
+    expect(result.errors.every((e) => e.startsWith('books:'))).toBe(true);
+  }, 30_000);
 });
 
 describe('financial brief', () => {

@@ -28,7 +28,7 @@ export const DAY_FLOW: OrchestrationStep[] = [
   { id: 'news', phase: 'morning', time: '06:00', job: 'ingest_news', purpose: 'Current events into the fleet', feedsTo: ['overlay-strategist', 'omniresearch-pro'] },
   { id: 'market', phase: 'morning', time: '07:00', job: 'fetch_market_data', purpose: 'Crypto + papers snapshot', feedsTo: ['overlay-treasurer', 'trading-agents', 'ghostfolio-engine', 'sports-steve'] },
   { id: 'qa', phase: 'morning', time: '07:00', job: 'run_overlay_qa', purpose: 'Site integrity pass', feedsTo: ['overlay-auditor'] },
-  { id: 'treasury', phase: 'morning', time: '08:00', job: 'overlay-treasurer', purpose: 'Cash pulse with market context', feedsTo: ['mission-pipeline'] },
+  { id: 'treasury', phase: 'morning', time: '08:00', job: 'treasury_pulse', purpose: 'Cash pulse with market context', feedsTo: ['mission-pipeline'] },
   { id: 'mission', phase: 'morning', time: '09:30', job: 'wf-mission-sync', purpose: 'Pipeline + revenue vs target' },
   // ── Midday — steady state ───────────────────────────────────────────────
   { id: 'duty', phase: 'midday', time: 'hourly', job: 'fleet_duty_sync', purpose: 'On-duty roster check' },
@@ -40,6 +40,8 @@ export const DAY_FLOW: OrchestrationStep[] = [
   // ── Night — learn + build while idle ────────────────────────────────────
   { id: 'learn', phase: 'night', time: '00:30', job: 'self_learning_loop', purpose: 'Distill lessons from the day' },
   { id: 'rd', phase: 'night', time: '01:00', job: 'rd_night', purpose: 'Overnight research + dev plan' },
+  { id: 'dream', phase: 'night', time: '02:00', job: 'dream_cycle', purpose: 'AutoDream memory consolidation (gated)', feedsTo: ['memory-intelligence'] },
+  { id: 'ultraplan', phase: 'night', time: '02:30', job: 'ultraplan_process', purpose: 'Deep-plan queue drain' },
   { id: 'books', phase: 'night', time: '03:00', job: 'scan_book_library', purpose: 'Ingest new books' },
   { id: 'wiki', phase: 'night', time: '03:30', job: 'wiki_sync', purpose: 'Sync brain wiki to Supabase cache', feedsTo: ['deterministic-brain'] },
   { id: 'avatars', phase: 'night', time: '04:00', job: 'generate_agent_avatars', purpose: 'Refresh agent photos (weekly)' },
@@ -173,6 +175,8 @@ export async function runPhase(phase: DayPhase, budgetTokens?: number): Promise<
       const digest = await n.newsDigest();
       return r.buildNightPlan(digest.items.slice(0, 5).map((i) => i.title));
     },
+    dream_cycle: async () => (await import('./dream-cycle')).runDreamCycle(),
+    ultraplan_process: async () => (await import('./ultraplan')).processNextUltraplan(),
     scan_book_library: async () => (await import('../bookbridge')).scanBookLibrary(),
     wiki_sync: async () => {
       // Fail-soft: the sync script exits non-zero if data/draymond.db is
@@ -191,6 +195,11 @@ export async function runPhase(phase: DayPhase, budgetTokens?: number): Promise<
       return promisify(execFile)('node', ['scripts/sync-wiki-to-sqlite.mjs'], { timeout: 120_000 });
     },
     fleet_duty_sync: async () => (await import('./fleet-duty')).computeFleetDuty(),
+    treasury_pulse: async () => {
+      const { runTreasuryPulse } = await import('./treasury');
+      const lookbackDays = Number(process.env.TREASURY_LOOKBACK_DAYS ?? 30);
+      return runTreasuryPulse(Number.isFinite(lookbackDays) ? lookbackDays : 30);
+    },
     generate_agent_avatars: async () => {
       const { execFile } = await import('node:child_process');
       const { promisify } = await import('node:util');
