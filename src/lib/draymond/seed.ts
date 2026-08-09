@@ -444,7 +444,19 @@ const tools: DraymondEntityInsert[] = [
     tags: ['social-media', 'b2b', 'analytics', 'engagement'],
     category: 'marketing',
     sector: 'ventures',
-    invocation_method: 'api_call',
+    invocation_method: 'http_api',
+    invocation_config: {
+      url: process.env.SOCIAL_MEDIA_URL || 'http://localhost:8030',
+      method: 'POST',
+      timeout_ms: 120000,
+      endpoints: {
+        generate_text: { path: '/api/ai/generate-text', method: 'POST' },
+        generate_image: { path: '/api/ai/generate-image', method: 'POST' },
+        generate_video: { path: '/api/ai/generate-video', method: 'POST' },
+        schedule_posts: { path: '/api/ai/schedule', method: 'POST' },
+      },
+      requires_env: ['SOCIAL_MEDIA_URL'],
+    },
     capabilities: ['analytics', 'engagement', 'scheduling', 'reporting'],
     source_type: 'github',
     download_path: 'downloads/Social-Media-Dashboard--main',
@@ -464,12 +476,15 @@ const tools: DraymondEntityInsert[] = [
     sector: 'learn',
     invocation_method: 'http_api',
     invocation_config: {
-      // URL set at runtime; starts with `npm run dev` or production deploy
-      // Requires: GEMINI_API_KEY env var
-      // Optional: OLLAMA_BASE_URL, OLLAMA_MODEL, SEARXNG_BASE_URL
+      url: process.env.OMNI_RESEARCH_URL || 'http://localhost:3010',
+      method: 'POST',
+      timeout_ms: 120000,
+      endpoints: {
+        trending_topics: { path: '/api/trending-topics', method: 'POST' },
+        research_news: { path: '/api/research', method: 'POST' },
+        web_search: { path: '/api/web-search', method: 'POST' },
+      },
       requires_env: ['GEMINI_API_KEY'],
-      start_command: 'npm run dev',
-      cwd: 'downloads/OmniResearch-Pro-main',
     },
     capabilities: ['rag-research', 'document-synthesis', 'intelligence-reports', 'web-search', 'search', 'analysis', 'generation'],
     depends_on: ['kaggle'],
