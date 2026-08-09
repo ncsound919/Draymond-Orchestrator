@@ -346,6 +346,7 @@ export async function routeTask(
       temperature: _config.temperature,
       timeoutMs: _config.timeout_ms,
       responseFormat: { type: 'json_object' },
+      toonify: true,
     });
     const latencyMs = Date.now() - startMs;
     const result = parseRouterResponse(raw, snapshot, latencyMs);

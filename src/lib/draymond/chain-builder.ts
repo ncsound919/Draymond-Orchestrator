@@ -185,6 +185,7 @@ async function generateBlueprint(
     maxTokens: 1500,
     temperature: 0.2,
     timeoutMs: BUILDER_TIMEOUT_MS,
+    toonify: true,
   });
 
   return parseBlueprintResponse(content, catalog);

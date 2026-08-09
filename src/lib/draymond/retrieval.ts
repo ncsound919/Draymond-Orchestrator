@@ -19,10 +19,41 @@ const MAX_LESSONS = 6;
 const MAX_MEMORY = 8;
 
 /**
+ * Best-effort LLMLingua-2 compression of a context block via the local
+ * compressor service. Returns the original block if the service is down or
+ * the compression fails — never throws.
+ */
+export async function compressContextBlock(block: string): Promise<string> {
+  if (!block || process.env.LLMLINGUA_DISABLE === '1') return block;
+  const url = process.env.LLMLINGUA_URL ?? 'http://127.0.0.1:3212';
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(`${url}/compress`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: block, rate: 0.5 }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) return block;
+    const data = (await res.json()) as { compressed_prompt?: string };
+    const out = data.compressed_prompt?.trim();
+    return out && out.length > 0 ? out : block;
+  } catch {
+    return block;
+  }
+}
+
+/**
  * Build a compact RAG context block for a local-model call.
  * @param query - the task/question (used for a naive keyword filter)
+ * @param compress - optionally run LLMLingua-2 over the block (best-effort)
  */
-export async function retrieveContext(query?: string): Promise<RetrievedContext> {
+export async function retrieveContext(
+  query?: string,
+  compress = false,
+): Promise<RetrievedContext> {
   const sources: RetrievedContext['sources'] = [];
 
   // 1. Distilled lessons (JSON file store) — most evidence wins.
@@ -73,8 +104,14 @@ export async function retrieveContext(query?: string): Promise<RetrievedContext>
   if (lessonLines.length) parts.push(`<known_lessons>\n${lessonLines.join('\n')}\n</known_lessons>`);
   if (memoryLines.length) parts.push(`<system_memory>\n${memoryLines.join('\n')}\n</system_memory>`);
 
+  let block = parts.join('\n\n');
+  if (compress && block) {
+    const compressed = await compressContextBlock(block);
+    if (compressed !== block) block = compressed;
+  }
+
   return {
-    block: parts.join('\n\n'),
+    block,
     sources,
   };
 }

@@ -143,8 +143,78 @@ describe('shared llm helper', () => {
     delete process.env.LITELLM_API_KEY;
   });
 
-  it('uses deepseek-reasoner and omits temperature when reasoning with deepseek', async () => {
+  it('compresses embedded JSON to TOON before sending when toonify is enabled', async () => {
     process.env.DEEPSEEK_API_KEY = 'test-key';
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({ choices: [{ message: { content: 'ok' } }] }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const userMessage =
+      '<user_task>route me</user_task>\n<context>' +
+      JSON.stringify({
+        user_id: 'u1',
+        plan: 'pro',
+        entities: [
+          { slug: 'billing', name: 'Billing Agent', kind: 'agent' },
+          { slug: 'crm', name: 'CRM Sync', kind: 'chain' },
+        ],
+      }) +
+      '</context>';
+
+    await callLLM({
+      provider: 'deepseek',
+      system: 'sys',
+      userMessage,
+      maxTokens: 128,
+      toonify: true,
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body.messages[1].content).toContain('```toon');
+    expect(body.messages[1].content).not.toContain('{"user_id');
+    // Plain-text instruction stays intact around the compressed block.
+    expect(body.messages[1].content).toContain('<user_task>route me</user_task>');
+  });
+
+  it('leaves messages untouched when toonify is not requested', async () => {
+    process.env.DEEPSEEK_API_KEY = 'test-key';
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({ choices: [{ message: { content: 'ok' } }] }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const userMessage =
+      '<context>' +
+      JSON.stringify({
+        user_id: 'u1',
+        plan: 'pro',
+        entities: [
+          { slug: 'billing', name: 'Billing Agent', kind: 'agent' },
+          { slug: 'crm', name: 'CRM Sync', kind: 'chain' },
+        ],
+      }) +
+      '</context>';
+
+    await callLLM({
+      provider: 'deepseek',
+      system: 'sys',
+      userMessage,
+      maxTokens: 128,
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body.messages[1].content).toContain('{"user_id":"u1"');
+    expect(body.messages[1].content).not.toContain('```toon');
+  });
+
+  it('uses deepseek-reasoner and omits temperature when reasoning with deepseek', async () => {    process.env.DEEPSEEK_API_KEY = 'test-key';
     fetchMock.mockResolvedValue(
       new Response(
         JSON.stringify({ choices: [{ message: { content: 'plan' } }] }),
@@ -199,5 +269,142 @@ describe('shared llm helper', () => {
     const body = JSON.parse(init.body as string);
     expect(body.reasoning_effort).toBe('high');
     expect(body.temperature).toBeUndefined();
+  });
+
+  describe('compressContextBlock', () => {
+    it('returns the original block when the compressor service is unreachable', async () => {
+      delete process.env.LLMLINGUA_DISABLE;
+      process.env.LLMLINGUA_URL = 'http://127.0.0.1:1'; // nothing listening
+      fetchMock.mockRejectedValue(new TypeError('fetch failed'));
+      vi.stubGlobal('fetch', fetchMock);
+      const { compressContextBlock } = await import('../src/lib/draymond/retrieval');
+      const block = '<known_lessons>\n- lesson: X\n</known_lessons>';
+      const out = await compressContextBlock(block);
+      expect(out).toBe(block);
+    });
+
+    it('returns the compressed prompt when the service responds', async () => {
+      delete process.env.LLMLINGUA_DISABLE;
+      process.env.LLMLINGUA_URL = 'http://example.com';
+      fetchMock.mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            original_tokens: 20,
+            compressed_tokens: 10,
+            ratio: '2.0x',
+            compressed_prompt: '<compressed>',
+          }),
+          { status: 200 },
+        ),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+
+      const { compressContextBlock } = await import('../src/lib/draymond/retrieval');
+      const out = await compressContextBlock('<known_lessons>LONG</known_lessons>');
+      expect(out).toBe('<compressed>');
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(String(url)).toBe('http://example.com/compress');
+      expect(JSON.parse(init.body as string).text).toContain('<known_lessons>');
+    });
+
+    it('falls back to the original block when the service returns a bad response', async () => {
+      delete process.env.LLMLINGUA_DISABLE;
+      process.env.LLMLINGUA_URL = 'http://example.com';
+      fetchMock.mockResolvedValue(new Response(JSON.stringify({ error: 'x' }), { status: 500 }));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const { compressContextBlock } = await import('../src/lib/draymond/retrieval');
+      const block = '<system_memory>MEM</system_memory>';
+      expect(await compressContextBlock(block)).toBe(block);
+    });
+
+    it('is a no-op when disabled via env', async () => {
+      process.env.LLMLINGUA_DISABLE = '1';
+      const { compressContextBlock } = await import('../src/lib/draymond/retrieval');
+      expect(await compressContextBlock('<x>y</x>')).toBe('<x>y</x>');
+    });
+  });
+
+  describe('retrieveContext compression', () => {
+    it('compresses the block when compress=true and the service is available', async () => {
+      delete process.env.LLMLINGUA_DISABLE;
+      process.env.LLMLINGUA_URL = 'http://example.com';
+      fetchMock.mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            original_tokens: 10,
+            compressed_tokens: 5,
+            ratio: '2.0x',
+            compressed_prompt: '<compressed-ctx>',
+          }),
+          { status: 200 },
+        ),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+
+      const { retrieveContext } = await import('../src/lib/draymond/retrieval');
+      const { block } = await retrieveContext('debug', true);
+      expect(block).toContain('<compressed-ctx>');
+    });
+
+    it('does not compress the block when compress=false', async () => {
+      delete process.env.LLMLINGUA_DISABLE;
+      process.env.LLMLINGUA_URL = 'http://example.com';
+      fetchMock.mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            original_tokens: 10,
+            compressed_tokens: 5,
+            ratio: '2.0x',
+            compressed_prompt: '<compressed-ctx>',
+          }),
+          { status: 200 },
+        ),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+
+      const { retrieveContext } = await import('../src/lib/draymond/retrieval');
+      const { block } = await retrieveContext('debug', false);
+      expect(block).not.toContain('<compressed-ctx>');
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('callLocalModel RAG compression default', () => {
+    it('compresses the RAG block by default (compressRag undefined)', async () => {
+      delete process.env.LLMLINGUA_DISABLE;
+      process.env.LLMLINGUA_URL = 'http://example.com';
+      // First fetch = compressor; every later fetch = ollama (fresh Response each call).
+      fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.startsWith('http://example.com/compress')) {
+          return new Response(
+            JSON.stringify({
+              original_tokens: 10,
+              compressed_tokens: 5,
+              ratio: '2.0x',
+              compressed_prompt: '<compressed-ctx>',
+            }),
+            { status: 200 },
+          );
+        }
+        return new Response(
+          JSON.stringify({ choices: [{ message: { content: 'local-answer' } }] }),
+          { status: 200 },
+        );
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const { callLocalModel } = await import('../src/lib/draymond/llm');
+      const out = await callLocalModel({
+        system: 'sys',
+        userMessage: 'status of morning-briefing',
+        noRag: false,
+        maxTokens: 32,
+      });
+      expect(out).toBe('local-answer');
+      // First fetch call must be to the compressor (compression on by default).
+      expect(String(fetchMock.mock.calls[0][0])).toBe('http://example.com/compress');
+    });
   });
 });

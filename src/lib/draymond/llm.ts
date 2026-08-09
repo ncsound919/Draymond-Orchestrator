@@ -47,6 +47,10 @@ export interface LLMCallOptions {
    *  templated string instead of throwing, so pipelines never stall on a
    *  total LLM outage. Unset = keep the current throw behaviour. */
   deterministicFallback?: string;
+  /** Re-encode structured JSON blocks (```json fences, <context>) in the
+   *  system/user messages as TOON when that measurably shrinks the payload.
+   *  Lossless and length-gated — never corrupts a prompt. */
+  toonify?: boolean;
 }
 
 const PROVIDER_URLS: Record<LLMProvider, string> = {
@@ -366,9 +370,20 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
   // (mathx MODE_MAX_TOKENS), else the 1024 default. Opt-in truncation keeps
   // oversized context within budget before any provider is hit.
   const budget = options.maxTokens ?? (options.mode ? maxTokensForMode(options.mode) : 1024);
-  const effective: LLMCallOptions = { ...options, maxTokens: budget };
-  if (options.truncate && options.userMessage) {
-    effective.userMessage = truncateToTokens(options.userMessage, budget, 'prose');
+
+  // TOON-compress structured JSON blocks in the messages when opted in. Applied
+  // BEFORE truncation so the saved tokens extend the effective context budget.
+  const { prepareLLMMessages } = await import('./toonify');
+  const prepared = prepareLLMMessages(options);
+
+  const effective: LLMCallOptions = {
+    ...options,
+    system: prepared.system,
+    userMessage: prepared.userMessage,
+    maxTokens: budget,
+  };
+  if (options.truncate && prepared.userMessage) {
+    effective.userMessage = truncateToTokens(prepared.userMessage, budget, 'prose');
   }
 
   // Vision inputs can only be served by image-capable providers — put them
@@ -436,6 +451,11 @@ export async function callLocalModel(options: {
   responseFormat?: { type: 'json_object' };
   /** Disable RAG context injection (for hot loops that don't need it). */
   noRag?: boolean;
+  /**
+   * Compress the RAG context block with LLMLingua-2 (best-effort, ~1s).
+   * Defaults to ON when the compressor service is reachable; set false to skip.
+   */
+  compressRag?: boolean;
   /** Deterministic fallback when even the paid chain is unavailable. */
   deterministicFallback?: string;
 }): Promise<string> {
@@ -445,7 +465,10 @@ export async function callLocalModel(options: {
   if (!options.noRag) {
     try {
       const { retrieveContext, augmentWithContext } = await import('./retrieval');
-      const { block } = await retrieveContext(options.userMessage);
+      const { block } = await retrieveContext(
+        options.userMessage,
+        options.compressRag !== false,
+      );
       system = augmentWithContext(options.system, block);
     } catch {
       // RAG is best-effort; ignore failures.
