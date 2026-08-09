@@ -29,6 +29,47 @@
         "electron:build": "next build && electron-builder --win --mac --linux",
         "test:coverage": "vitest run --coverage"
     },
+    "build": {
+        "appId": "ai.draymond.orchestrator",
+        "productName": "Draymond Orchestrator",
+        "directories": {
+            "output": "release"
+        },
+        "files": [
+            "electron/main.js",
+            ".next/standalone/server.js",
+            ".next/standalone/.next/**/*",
+            ".next/standalone/node_modules/**/*",
+            ".next/standalone/public/**/*",
+            "public/**/*",
+            "next.config.ts",
+            "next-env.d.ts",
+            "package.json"
+        ],
+        "asarUnpack": [
+            "node_modules/better-sqlite3/**/*",
+            "node_modules/sqlite-vec/**/*"
+        ],
+        "win": {
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": [
+                        "x64"
+                    ]
+                }
+            ],
+            "artifactName": "Draymond-Orchestrator-Setup-${version}.${ext}"
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true,
+            "createDesktopShortcut": true,
+            "createStartMenuShortcut": true,
+            "shortcutName": "Draymond Orchestrator"
+        },
+        "npmRebuild": true
+    },
     "dependencies": {
         "@duckdb/duckdb-wasm": "^1.33.1-dev57.0",
         "@sentry/nextjs": "^10.69.0",

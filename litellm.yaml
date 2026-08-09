@@ -17,6 +17,14 @@ model_list:
     litellm_params:
       model: opencode/deepseek-v4-flash
       api_key: os.environ/OPENCODE_API_KEY
+  - model_name: ollama-llama
+    litellm_params:
+      model: ollama/llama3.2:1b
+      api_base: http://localhost:11434
+  - model_name: ollama-qwen
+    litellm_params:
+      model: ollama/qwen3.5:4b
+      api_base: http://localhost:11434
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY

@@ -44,6 +44,11 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
 
+  // Emit a minimal self-contained server for the desktop (Electron) build —
+  // `.next/standalone` + `.next/static`. Keeps the packaged EXE small and lets
+  // Electron spawn the production server without bundling all of node_modules.
+  output: 'standalone',
+
   // better-sqlite3 is a native module — never bundle it into server builds.
   serverExternalPackages: ['better-sqlite3'],
 

@@ -18,7 +18,8 @@ export type LLMProvider =
   | 'openai'
   | 'anthropic'
   | 'qwen'
-  | 'litellm';
+  | 'litellm'
+  | 'ollama';
 
 export interface LLMCallOptions {
   /** Preferred provider. Falls back through the chain when it fails. */
@@ -50,6 +51,7 @@ const PROVIDER_URLS: Record<LLMProvider, string> = {
   anthropic: 'https://api.anthropic.com/v1/messages',
   qwen: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions',
   litellm: 'http://localhost:4100/v1/chat/completions',
+  ollama: 'http://localhost:11434/v1/chat/completions',
 };
 
 const PROVIDER_ENV: Record<LLMProvider, string> = {
@@ -61,6 +63,7 @@ const PROVIDER_ENV: Record<LLMProvider, string> = {
   anthropic: 'ANTHROPIC_API_KEY',
   qwen: 'QWEN_API_KEY',
   litellm: 'LITELLM_API_KEY',
+  ollama: 'OLLAMA_ENABLED',
 };
 
 const DEFAULT_MODELS: Record<LLMProvider, string> = {
@@ -72,6 +75,7 @@ const DEFAULT_MODELS: Record<LLMProvider, string> = {
   anthropic: 'claude-sonnet-4-5',
   qwen: 'qwen-plus',
   litellm: 'gpt-4o-mini',
+  ollama: 'llama3.2:1b',
 };
 
 /** Resolution order when no explicit provider is requested. */
@@ -84,9 +88,12 @@ const FALLBACK_ORDER: LLMProvider[] = [
   'openai',
   'anthropic',
   'qwen',
+  'ollama',
 ];
 
 export function hasKey(provider: LLMProvider): boolean {
+  // ollama is a local model server — no API key needed; enabled when reachable.
+  if (provider === 'ollama') return true;
   return !!process.env[PROVIDER_ENV[provider]];
 }
 
@@ -215,7 +222,8 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
   const model = options.model ?? DEFAULT_MODELS[provider];
   const maxTokens = options.maxTokens ?? 1024;
   const temperature = options.temperature ?? 0.2;
-  const timeoutMs = options.timeoutMs ?? 15_000;
+  // Local Ollama models can take 20-40s to load on first call after idle.
+  const timeoutMs = options.timeoutMs ?? (provider === 'ollama' ? 90_000 : 15_000);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -343,4 +351,29 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
     }
   }
   throw lastErr ?? new Error('All LLM providers failed');
+}
+
+/**
+ * Small, cheap local-model call for tool-calling / quick classification.
+ * Runs llama3.2:1b via Ollama — near-zero cost, no API keys. Falls back to
+ * the normal provider chain when Ollama is unreachable.
+ */
+export async function callLocalModel(options: {
+  system: string;
+  userMessage: string;
+  maxTokens?: number;
+}): Promise<string> {
+  try {
+    return await callLLM({
+      ...options,
+      provider: 'ollama',
+      maxTokens: options.maxTokens ?? 256,
+      temperature: 0.1,
+    });
+  } catch (err) {
+    console.warn(
+      `[llm] local model unavailable (${err instanceof Error ? err.message : String(err)}). Falling back.`
+    );
+    return callLLM({ ...options, maxTokens: options.maxTokens ?? 512 });
+  }
 }
