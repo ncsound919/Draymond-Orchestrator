@@ -91,6 +91,23 @@ describe('toonifyJsonBlocks', () => {
     expect(toonifyJsonBlocks('')).toBe('');
     expect(toonifyJsonBlocks('  ')).toBe('  ');
   });
+
+  it('compresses large uniform context arrays inside <context> tags', () => {
+    const ctx = {
+      company: 'Acme SaaS',
+      customers: Array.from({ length: 50 }, (_, i) => ({
+        id: 'c' + i,
+        name: 'Customer ' + i,
+        plan: i % 3 ? 'pro' : 'free',
+        mrr: (i * 100).toFixed(2),
+      })),
+    };
+    const text = `Goal: launch enterprise tier\n<context>${JSON.stringify(ctx)}</context>`;
+    const out = toonifyJsonBlocks(text);
+    expect(out).toContain('```toon');
+    expect(out).toContain('customers[50]{id,name,plan,mrr}');
+    expect(out).not.toContain('{"company');
+  });
 });
 
 describe('prepareLLMMessages', () => {

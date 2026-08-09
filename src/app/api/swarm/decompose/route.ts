@@ -148,10 +148,11 @@ export async function POST(request: NextRequest) {
       content = await callLLM({
         provider: 'opencode-free',
         system: systemPrompt,
-        userMessage: `Goal: ${goal}\nContext: ${JSON.stringify(context)}`,
+        userMessage: `Goal: ${goal}\n<context>${JSON.stringify(context)}</context>`,
         maxTokens: 800,
         temperature: 0.2,
         timeoutMs: LLM_TIMEOUT_MS,
+        toonify: true,
       });
     } catch (err) {
       if ((err as Error)?.name === 'AbortError')
