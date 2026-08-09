@@ -5,6 +5,7 @@ import { readStrategy, unitEconomics } from '@/lib/draymond/mission-strategy';
 import { missionDashboard } from '@/lib/draymond/mission-pipeline';
 import { listOpportunities } from '@/lib/draymond/business-pipeline';
 import { settledRevenueUsd } from '@/lib/draymond/treasury-state';
+import ServiceCheckoutButtons from '@/components/mission/ServiceCheckoutButtons';
 
 export const metadata: Metadata = {
   title: 'Mission Control | Draymond Orchestrator',
@@ -21,10 +22,6 @@ const STAGE_COLORS: Record<string, string> = {
   paid: 'bg-emerald-500/20 text-emerald-400',
   lost: 'bg-red-500/20 text-red-400',
 };
-
-function money(cents: number): string {
-  return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-}
 
 function usd(n: number): string {
   return `$${n.toLocaleString('en-US')}`;
@@ -196,6 +193,33 @@ export default async function MissionPage() {
               </table>
             </div>
           )}
+        </section>
+
+        {/* ── Buy / Invoice ───────────────────────────────────────────── */}
+        <section>
+          <h2 className="text-xl font-semibold text-white mb-1">Buy / Invoice</h2>
+          <p className="text-xs text-gray-500 mb-4">
+            One click per tier opens a Stripe Checkout session. Settled payments are attributed to the service line and counted toward the target.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {strategy.services.map((svc) => (
+              <div key={svc.id} className="rounded-xl border border-white/[0.06] bg-gray-900/60 p-4">
+                <h3 className="text-sm font-semibold text-white truncate">{svc.name}</h3>
+                <p className="mt-0.5 text-[11px] text-gray-500 font-mono">{svc.id}</p>
+                <div className="mt-3">
+                  <ServiceCheckoutButtons
+                    serviceId={svc.id}
+                    tiers={svc.tiers.map((t) => ({
+                      id: t.id,
+                      name: t.name,
+                      priceCents: t.priceCents,
+                      billing: t.billing,
+                    }))}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
 
         {/* ── Footer ───────────────────────────────────────────────────── */}
