@@ -1,19 +1,10 @@
-import { describe, expect, it, beforeEach, afterAll, vi } from 'vitest';
+import { describe, expect, it, beforeEach, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'draymond-mission-pipeline-'));
 process.env.DRAYMOND_REGISTRY_DIR = tmp;
-
-// Mock the delivery chain runner so tests never hit the DB.
-vi.mock('../src/lib/draymond/mission-delivery', () => ({
-  runDeliveryChain: vi.fn(async (serviceId: string, input: Record<string, unknown>) => ({
-    ok: true,
-    chainSlug: `${serviceId}-delivery`,
-    stepStatuses: { report: 'completed' },
-  })),
-}));
 
 import {
   createInvoice,

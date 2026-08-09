@@ -8,10 +8,17 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
-import { readStrategy, getService, type ServiceId } from "./mission-strategy";
+import { readStrategy, getService, serviceTargets, totalMonthlyTarget, type ServiceId } from "./mission-strategy";
 import { listOpportunities, updateOpportunityStage, type Opportunity } from "./business-pipeline";
 
 export type InvoiceStatus = "open" | "paid";
+
+const DEFAULT_SERVICE: ServiceId = "audit";
+const WON_STAGES = new Set<string>(["won", "delivering", "invoiced", "paid"]);
+
+function isServiceId(v: unknown): v is ServiceId {
+  return v === "aetherdesk" || v === "maas" || v === "audit" || v === "research";
+}
 
 export interface Invoice {
   id: string;
@@ -55,7 +62,7 @@ export async function createInvoice(opportunityId: string): Promise<Invoice> {
   const [ops, strategy] = await Promise.all([listOpportunities(), readStrategy()]);
   const opp = ops.find((o) => o.id === opportunityId);
   if (!opp) throw new Error(`Opportunity ${opportunityId} not found`);
-  const serviceId = (opp.serviceId ?? "audit") as ServiceId;
+  const serviceId = isServiceId(opp.serviceId) ? opp.serviceId : DEFAULT_SERVICE;
   const svc = getService(strategy, serviceId);
   if (!svc) throw new Error(`Service ${serviceId} not in strategy`);
   const tier = svc.tiers.find((t) => t.id === opp.tierId) ?? svc.tiers[0]!;
@@ -105,19 +112,19 @@ export interface MissionDashboard {
 
 export async function missionDashboard(): Promise<MissionDashboard> {
   const [ops, invoices, strategy] = await Promise.all([listOpportunities(), readInvoices(), readStrategy()]);
+  const targets = serviceTargets(strategy);
   const byService: Record<ServiceId, { target: number; won: number; paid: number }> = {
-    aetherdesk: { target: 0, won: 0, paid: 0 },
-    maas: { target: 0, won: 0, paid: 0 },
-    audit: { target: 0, won: 0, paid: 0 },
-    research: { target: 0, won: 0, paid: 0 },
+    aetherdesk: { target: targets.aetherdesk, won: 0, paid: 0 },
+    maas: { target: targets.maas, won: 0, paid: 0 },
+    audit: { target: targets.audit, won: 0, paid: 0 },
+    research: { target: targets.research, won: 0, paid: 0 },
   };
-  for (const svc of strategy.services) byService[svc.id] = { target: svc.targetMonthly, won: 0, paid: 0 };
 
   const byStage: Record<string, number> = {};
   for (const o of ops) {
     byStage[o.stage] = (byStage[o.stage] ?? 0) + 1;
-    const sid = (o.serviceId ?? "audit") as ServiceId;
-    if (o.stage === "won" || o.stage === "delivering" || o.stage === "invoiced" || o.stage === "paid") {
+    const sid = isServiceId(o.serviceId) ? o.serviceId : DEFAULT_SERVICE;
+    if (WON_STAGES.has(o.stage)) {
       byService[sid].won += o.monthlyValue;
     }
   }
@@ -132,7 +139,7 @@ export async function missionDashboard(): Promise<MissionDashboard> {
 
   return {
     revenueUsd,
-    totalMonthlyTarget: strategy.services.reduce((s, x) => s + x.targetMonthly, 0),
+    totalMonthlyTarget: totalMonthlyTarget(strategy),
     byService,
     opportunities: { total: ops.length, byStage },
     velocity: {
