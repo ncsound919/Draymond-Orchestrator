@@ -285,7 +285,12 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
             { role: 'system', content: options.system },
             { role: 'user', content },
           ],
-          ...(options.responseFormat ? { response_format: options.responseFormat } : {}),
+          // Ollama uses `format: "json"` (not OpenAI `response_format`).
+          ...(options.responseFormat && provider === 'ollama'
+            ? { format: 'json' }
+            : options.responseFormat
+              ? { response_format: options.responseFormat }
+              : {}),
           ...(options.reasoning ? { reasoning_effort: 'high' } : {}),
         }),
         signal: controller.signal,
@@ -326,7 +331,11 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
             { role: 'system', content: options.system },
             { role: 'user', content: options.userMessage },
           ],
-          ...(options.responseFormat ? { response_format: options.responseFormat } : {}),
+          ...(options.responseFormat && provider === 'ollama'
+            ? { format: 'json' }
+            : options.responseFormat
+              ? { response_format: options.responseFormat }
+              : {}),
         }),
         signal: controller.signal,
       });
@@ -383,7 +392,14 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
         console.warn(`[llm] ${gate.reason}. Trying next.`);
         continue;
       }
-      const text = await callProvider(provider, effective);
+      // When falling back to a different provider, drop the preferred provider's
+      // explicit model so each provider uses its own default (e.g. ollama must
+      // not inherit `deepseek-v4-flash`).
+      const perProvider: LLMCallOptions =
+        provider === options.provider
+          ? effective
+          : { ...effective, model: undefined };
+      const text = await callProvider(provider, perProvider);
       consumeTokens(provider, budget + 512); // approximate cost
       return text;
     } catch (err) {
@@ -405,6 +421,7 @@ export async function callLocalModel(options: {
   system: string;
   userMessage: string;
   maxTokens?: number;
+  responseFormat?: { type: 'json_object' };
 }): Promise<string> {
   try {
     return await callLLM({

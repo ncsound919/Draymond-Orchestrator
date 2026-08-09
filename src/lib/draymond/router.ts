@@ -407,7 +407,8 @@ async function tryLocalRoute(
     const raw = await callLocalModel({
       system: buildCompactPrompt(snapshot),
       userMessage,
-      maxTokens: 256,
+      maxTokens: 512,
+      responseFormat: { type: 'json_object' },
     });
     const latencyMs = Date.now() - startMs;
     const result = parseRouterResponse(raw, snapshot, latencyMs);
