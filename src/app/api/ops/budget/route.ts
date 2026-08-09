@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeRequest } from '@/lib/draymond/api-auth';
-import { canCallProvider, laneStatus, laneSnapshot, resetBudget, consumeTokens } from '@/lib/draymond/workflow-budget';
+import { canCallProvider, laneStatus, laneSnapshot, resetBudget } from '@/lib/draymond/workflow-budget';
 
 export const dynamic = 'force-dynamic';
 

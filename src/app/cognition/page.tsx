@@ -53,7 +53,7 @@ export default async function CognitionPage() {
         </section>
         <section>
           <h2 className="text-xl font-semibold text-white mb-4">Dream Report</h2>
-          <DreamReport report={dream.latest} state={dream.state} />
+          <DreamReport report={dream.latest} />
         </section>
         <section>
           <h2 className="text-xl font-semibold text-white mb-4">Ultraplan Queue</h2>

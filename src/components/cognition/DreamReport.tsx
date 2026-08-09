@@ -13,14 +13,9 @@ export interface DreamReportProps {
     gatedBy?: string;
     error?: string;
   } | null;
-  state: {
-    lastDreamAt: string | null;
-    sessionsCounted: number;
-    reports: unknown[];
-  };
 }
 
-export default function DreamReport({ report, state }: DreamReportProps) {
+export default function DreamReport({ report }: DreamReportProps) {
   if (!report) {
     return (
       <p className="text-sm text-gray-500">

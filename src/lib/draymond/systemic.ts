@@ -23,7 +23,6 @@ import { createDraymondAdminClient } from './client';
 import { storeMemory, createGoal, updateGoalProgress } from './index';
 import { createRelation, getEntity, searchEntities } from './registry';
 import { recordOutcome } from './self-learning';
-import { getLessons } from './self-learning';
 import { getChainSteps } from './chains';
 import { listChains } from './chains';
 import type { DraymondEntity } from './types';
@@ -38,22 +37,10 @@ export const SYSTEM_USER_ID = 'system';
 export const SYSTEM_AGENT_ID = 'draymond';
 
 // ============================================================================
-// IN-MEMORY COALESCING
+// PENDING WRITE QUEUE
 // ============================================================================
 
 const _writes = new Map<string, { agent: string; type: string; data: Record<string, unknown>; ts: number }>();
-const _coalesceMs = 5_000;
-let _flushTimer: ReturnType<typeof setTimeout> | null = null;
-
-function coalesced(key: string, agent: string, type: string, data: Record<string, unknown>): void {
-  _writes.set(key, { agent, type, data, ts: Date.now() });
-  if (!_flushTimer) {
-    _flushTimer = setTimeout(() => {
-      _flushTimer = null;
-      flushCoalesced().catch(() => {});
-    }, _coalesceMs);
-  }
-}
 
 /** Flush all pending coalesced writes (best-effort). */
 export async function flushCoalesced(): Promise<void> {
