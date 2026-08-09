@@ -1,4 +1,4 @@
-import { listJobs, seedBasicJobs, type ScheduledJob } from '@/lib/draymond/scheduler';
+import { listJobs, seedBasicJobs, CUSTOM_HANDLERS, type ScheduledJob, type CustomHandlerDef } from '@/lib/draymond/scheduler';
 import { listChains } from '@/lib/draymond/chains';
 import SchedulesDashboard from './SchedulesDashboard';
 
@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 export default async function SchedulesPage() {
   let serializedJobs: ScheduledJob[] = [];
   let chainOptions: { id: string; name: string; slug: string }[] = [];
+  const customHandlers: CustomHandlerDef[] = CUSTOM_HANDLERS;
 
   try {
     // Prepopulate the seeded default jobs (basic tasks) on first run.
@@ -31,7 +32,7 @@ export default async function SchedulesPage() {
 
   return (
     <div className="min-h-screen text-white">
-      <SchedulesDashboard initialJobs={dashboardJobs} chainOptions={chainOptions} />
+      <SchedulesDashboard initialJobs={dashboardJobs} chainOptions={chainOptions} customHandlers={customHandlers} />
     </div>
   );
 }

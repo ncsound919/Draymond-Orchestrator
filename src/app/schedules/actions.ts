@@ -1,7 +1,6 @@
 'use server';
 
-import { createJob, enableJob, disableJob, deleteJob } from '@/lib/draymond/scheduler';
-import type { ScheduledJobInsert } from '@/lib/draymond/scheduler';
+import { createJob, enableJob, disableJob, deleteJob, updateJob, runJobNow, type ScheduledJobInsert, type ScheduledJobUpdate } from '@/lib/draymond/scheduler';
 import { requireDraymondActionAuth } from '@/lib/draymond/auth';
 import { revalidatePath } from 'next/cache';
 
@@ -20,21 +19,7 @@ function isValidCron(expr: string): boolean {
   return parts.every((p) => /^[\d*\/,\-]+$/.test(p));
 }
 
-// ---------------------------------------------------------------------------
-// Server actions
-// ---------------------------------------------------------------------------
-
-export async function createScheduledJob(data: {
-  name: string;
-  description?: string;
-  cron_expression: string;
-  job_type: 'chain' | 'health_check' | 'notification' | 'custom';
-  job_config?: Record<string, unknown>;
-  is_enabled?: boolean;
-}) {
-  await requireDraymondActionAuth();
-
-  // Runtime validation
+function validateJobInput(data: { name?: unknown; cron_expression?: unknown; job_type?: unknown; description?: unknown }) {
   if (!data || typeof data !== 'object') {
     throw new Error('Invalid input');
   }
@@ -51,11 +36,27 @@ export async function createScheduledJob(data: {
     throw new Error('Invalid cron expression format (expected 5 space-separated fields)');
   }
   if (!data.job_type || !VALID_JOB_TYPES.includes(data.job_type as JobType)) {
-    throw new Error(`Invalid job type: ${data.job_type}`);
+    throw new Error(`Invalid job type: ${String(data.job_type)}`);
   }
   if (data.description !== undefined && typeof data.description !== 'string') {
     throw new Error('Description must be a string');
   }
+}
+
+// ---------------------------------------------------------------------------
+// Server actions
+// ---------------------------------------------------------------------------
+
+export async function createScheduledJob(data: {
+  name: string;
+  description?: string;
+  cron_expression: string;
+  job_type: 'chain' | 'health_check' | 'notification' | 'custom';
+  job_config?: Record<string, unknown>;
+  is_enabled?: boolean;
+}) {
+  await requireDraymondActionAuth();
+  validateJobInput(data);
 
   const job = await createJob({
     name: data.name.trim(),
@@ -66,6 +67,48 @@ export async function createScheduledJob(data: {
     is_enabled: data.is_enabled ?? true,
   } as ScheduledJobInsert);
 
+  revalidatePath('/schedules');
+  return job;
+}
+
+export async function updateScheduledJob(id: string, data: {
+  name?: string;
+  description?: string;
+  cron_expression?: string;
+  job_type?: 'chain' | 'health_check' | 'notification' | 'custom';
+  job_config?: Record<string, unknown>;
+  is_enabled?: boolean;
+  max_retries?: number;
+  timeout_seconds?: number;
+  notify_on_failure?: boolean;
+  notify_on_success?: boolean;
+}) {
+  await requireDraymondActionAuth();
+  if (!id || typeof id !== 'string') {
+    throw new Error('Invalid job ID');
+  }
+  if (data.cron_expression !== undefined) {
+    if (typeof data.cron_expression !== 'string' || !isValidCron(data.cron_expression)) {
+      throw new Error('Invalid cron expression format (expected 5 space-separated fields)');
+    }
+  }
+  if (data.job_type !== undefined && !VALID_JOB_TYPES.includes(data.job_type as JobType)) {
+    throw new Error(`Invalid job type: ${data.job_type}`);
+  }
+
+  const updates: ScheduledJobUpdate = {};
+  if (data.name !== undefined) updates.name = data.name.trim();
+  if (data.description !== undefined) updates.description = data.description.trim() || undefined;
+  if (data.cron_expression !== undefined) updates.cron_expression = data.cron_expression.trim();
+  if (data.job_type !== undefined) updates.job_type = data.job_type;
+  if (data.job_config !== undefined) updates.job_config = data.job_config;
+  if (data.is_enabled !== undefined) updates.is_enabled = data.is_enabled;
+  if (data.max_retries !== undefined) updates.max_retries = data.max_retries;
+  if (data.timeout_seconds !== undefined) updates.timeout_seconds = data.timeout_seconds;
+  if (data.notify_on_failure !== undefined) updates.notify_on_failure = data.notify_on_failure;
+  if (data.notify_on_success !== undefined) updates.notify_on_success = data.notify_on_success;
+
+  const job = await updateJob(id, updates);
   revalidatePath('/schedules');
   return job;
 }
@@ -94,3 +137,13 @@ export async function removeJob(id: string) {
   revalidatePath('/schedules');
 }
 
+/** Run a job immediately, bypassing its schedule. Returns the run outcome. */
+export async function runScheduledJob(id: string) {
+  await requireDraymondActionAuth();
+  if (!id || typeof id !== 'string') {
+    throw new Error('Invalid job ID');
+  }
+  const result = await runJobNow(id);
+  revalidatePath('/schedules');
+  return result;
+}

@@ -193,7 +193,7 @@ describe('startService', () => {
     expect(mockSpawn).toHaveBeenCalledTimes(1);
     const [cmd, args, opts] = mockSpawn.mock.calls[0]!;
     expect(cmd).toBe(process.platform === 'win32' ? 'cmd.exe' : 'python');
-    expect(args.join(' ')).toContain('uvicorn');
+    expect(args.join(' ')).toContain('main.py');
     expect(opts).toMatchObject({
       cwd: path.join(tmp, 'agents', 'BookBridge--main'),
       detached: true,

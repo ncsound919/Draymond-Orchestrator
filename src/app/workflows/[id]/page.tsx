@@ -9,6 +9,7 @@ import { notFound } from 'next/navigation';
 import { getChain, getChainSteps } from '@/lib/draymond/chains';
 import RunWorkflowButton from './RunWorkflowButton';
 import DeleteWorkflowButton from './DeleteWorkflowButton';
+import WorkflowControls from './WorkflowControls';
 
 export const dynamic = 'force-dynamic';
 
@@ -157,9 +158,18 @@ export default async function WorkflowDetailPage({
             </div>
 
             {/* Actions */}
-            <div className="flex shrink-0 gap-2">
-              <RunWorkflowButton chainId={chain.id} />
-              <DeleteWorkflowButton chainId={chain.id} chainName={chain.name} />
+            <div className="flex shrink-0 gap-2 flex-col items-end">
+              <WorkflowControls
+                chainId={chain.id}
+                initialStatus={chain.status}
+                initialTrigger={chain.trigger_type}
+                initialName={chain.name}
+                initialDescription={chain.description}
+              />
+              <div className="flex gap-2">
+                <RunWorkflowButton chainId={chain.id} />
+                <DeleteWorkflowButton chainId={chain.id} chainName={chain.name} />
+              </div>
             </div>
           </div>
         </div>

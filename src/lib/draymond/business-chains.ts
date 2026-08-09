@@ -1395,7 +1395,9 @@ const JOB_DEFS: JobSeedDef[] = [
     cron_expression: '0 20 * * *',
     job_type: 'notification',
     job_config: {
-      type: 'health_summary',
+      payload: {
+        type: 'health_summary',
+      },
     },
     notify_on_failure: true,
   },

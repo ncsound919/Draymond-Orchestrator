@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition, useEffect } from 'react';
-import { createScheduledJob, toggleJob, removeJob } from './actions';
+import { createScheduledJob, updateScheduledJob, toggleJob, removeJob, runScheduledJob } from './actions';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -29,10 +29,12 @@ type Job = {
 };
 
 type ChainOption = { id: string; name: string; slug: string };
+type CustomHandler = { handler: string; label: string; description: string };
 
 interface Props {
   initialJobs: Job[];
   chainOptions: ChainOption[];
+  customHandlers: CustomHandler[];
 }
 
 // ---------------------------------------------------------------------------
@@ -123,6 +125,13 @@ function formatCronHuman(cron: string): string {
   return cron;
 }
 
+function handlerLabel(customHandlers: CustomHandler[], cfg: Record<string, unknown>): string {
+  const h = cfg?.handler;
+  if (typeof h !== 'string') return '—';
+  const def = customHandlers.find((d) => d.handler === h);
+  return def ? def.label : h;
+}
+
 // ---------------------------------------------------------------------------
 // Status & type badge styles
 // ---------------------------------------------------------------------------
@@ -148,23 +157,29 @@ const TYPE_STYLES: Record<string, string> = {
 
 const CRON_PRESETS: { label: string; value: string }[] = [
   { label: 'Every 5 min', value: '*/5 * * * *' },
+  { label: 'Every 15 min', value: '*/15 * * * *' },
   { label: 'Every hour', value: '0 * * * *' },
   { label: 'Every 6 hours', value: '0 */6 * * *' },
   { label: 'Daily 8am', value: '0 8 * * *' },
   { label: 'Weekly Monday', value: '0 9 * * 1' },
 ];
 
+type FilterTab = 'all' | 'enabled' | 'disabled' | 'failed';
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export default function SchedulesDashboard({ initialJobs, chainOptions }: Props) {
+export default function SchedulesDashboard({ initialJobs, chainOptions, customHandlers }: Props) {
   const [showForm, setShowForm] = useState(false);
+  const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [isPending, startTransition] = useTransition();
   const [pendingJobId, setPendingJobId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [runResult, setRunResult] = useState<string | null>(null);
   const [jobs, setJobs] = useState<Job[]>(initialJobs);
   const [loadedAt, setLoadedAt] = useState('');
+  const [filter, setFilter] = useState<FilterTab>('all');
 
   // Hydration-safe timestamp — only runs on client
   useEffect(() => {
@@ -181,6 +196,7 @@ export default function SchedulesDashboard({ initialJobs, chainOptions }: Props)
   const [description, setDescription] = useState('');
   const [jobType, setJobType] = useState<JobType>('chain');
   const [chainSlug, setChainSlug] = useState(chainOptions[0]?.slug ?? '');
+  const [customHandler, setCustomHandler] = useState('');
   const [cronExpression, setCronExpression] = useState('0 * * * *');
   const [isEnabled, setIsEnabled] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
@@ -190,9 +206,48 @@ export default function SchedulesDashboard({ initialJobs, chainOptions }: Props)
     setDescription('');
     setJobType('chain');
     setChainSlug(chainOptions[0]?.slug ?? '');
+    setCustomHandler('');
     setCronExpression('0 * * * *');
     setIsEnabled(true);
     setFormError(null);
+    setEditingJob(null);
+  }
+
+  function openCreate() {
+    setEditingJob(null);
+    resetForm();
+    setShowForm(true);
+  }
+
+  function openEdit(job: Job) {
+    setEditingJob(job);
+    setName(job.name);
+    setDescription(job.description ?? '');
+    setJobType(job.job_type);
+    const cfg = job.job_config ?? {};
+    setChainSlug(typeof cfg.chain_slug === 'string' ? cfg.chain_slug : chainOptions[0]?.slug ?? '');
+    setCustomHandler(typeof cfg.handler === 'string' ? cfg.handler : '');
+    setCronExpression(job.cron_expression);
+    setIsEnabled(job.is_enabled);
+    setFormError(null);
+    setShowForm(true);
+  }
+
+  function buildConfig(): Record<string, unknown> {
+    const jobConfig: Record<string, unknown> = {};
+    if (jobType === 'chain' && chainSlug) {
+      jobConfig.chain_slug = chainSlug;
+    }
+    if (jobType === 'custom' && customHandler) {
+      jobConfig.handler = customHandler;
+      // Preserve any extra keys already on the job when editing.
+      if (editingJob?.job_config && typeof editingJob.job_config === 'object') {
+        for (const [k, v] of Object.entries(editingJob.job_config)) {
+          if (k !== 'handler' && k !== 'chain_slug') jobConfig[k] = v;
+        }
+      }
+    }
+    return jobConfig;
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -205,34 +260,44 @@ export default function SchedulesDashboard({ initialJobs, chainOptions }: Props)
       setFormError('Cron expression is required');
       return;
     }
+    if (jobType === 'chain' && !chainSlug) {
+      setFormError('A chain template is required for chain jobs');
+      return;
+    }
 
     setFormError(null);
     startTransition(async () => {
       try {
-        const jobConfig: Record<string, unknown> = {};
-        if (jobType === 'chain' && chainSlug) {
-          jobConfig.chain_slug = chainSlug;
+        if (editingJob) {
+          await updateScheduledJob(editingJob.id, {
+            name: name.trim(),
+            description: description.trim() || undefined,
+            cron_expression: cronExpression.trim(),
+            job_type: jobType,
+            job_config: buildConfig(),
+            is_enabled: isEnabled,
+          });
+        } else {
+          await createScheduledJob({
+            name: name.trim(),
+            description: description.trim() || undefined,
+            cron_expression: cronExpression.trim(),
+            job_type: jobType,
+            job_config: buildConfig(),
+            is_enabled: isEnabled,
+          });
         }
-
-        await createScheduledJob({
-          name: name.trim(),
-          description: description.trim() || undefined,
-          cron_expression: cronExpression.trim(),
-          job_type: jobType,
-          job_config: jobConfig,
-          is_enabled: isEnabled,
-        });
-
         resetForm();
         setShowForm(false);
       } catch (err) {
-        setFormError(err instanceof Error ? err.message : 'Failed to create job');
+        setFormError(err instanceof Error ? err.message : 'Failed to save job');
       }
     });
   }
 
   function handleToggle(id: string, currentEnabled: boolean) {
     setActionError(null);
+    setRunResult(null);
     setPendingJobId(id);
     startTransition(async () => {
       try {
@@ -260,6 +325,43 @@ export default function SchedulesDashboard({ initialJobs, chainOptions }: Props)
     });
   }
 
+  function handleRunNow(id: string, jobName: string) {
+    setActionError(null);
+    setRunResult(null);
+    setPendingJobId(id);
+    startTransition(async () => {
+      try {
+        const result = await runScheduledJob(id);
+        if (result.status === 'success') {
+          setRunResult(`"${jobName}" completed in ${result.duration_ms}ms`);
+        } else {
+          setRunResult(`"${jobName}" FAILED: ${result.error ?? 'unknown error'}`);
+        }
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : 'Failed to run job');
+      } finally {
+        setPendingJobId(null);
+      }
+    });
+  }
+
+  const filteredJobs = jobs.filter((j) => {
+    if (filter === 'enabled') return j.is_enabled;
+    if (filter === 'disabled') return !j.is_enabled;
+    if (filter === 'failed') return j.last_run_status === 'failed';
+    return true;
+  });
+
+  const counts = {
+    all: jobs.length,
+    enabled: jobs.filter((j) => j.is_enabled).length,
+    disabled: jobs.filter((j) => !j.is_enabled).length,
+    failed: jobs.filter((j) => j.last_run_status === 'failed').length,
+  };
+
+  const inputCls =
+    'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#22c55e]/50 focus:border-[#22c55e]/50';
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-10 space-y-8">
       {/* ── Header ──────────────────────────────────────────────────── */}
@@ -267,26 +369,48 @@ export default function SchedulesDashboard({ initialJobs, chainOptions }: Props)
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Schedules</h1>
           <p className="mt-1 text-sm text-white/40">
-            {jobs.length} scheduled job{jobs.length !== 1 ? 's' : ''}
+            {jobs.length} scheduled job{jobs.length !== 1 ? 's' : ''} · ordered by next run
           </p>
         </div>
         <button
           onClick={() => {
-            setShowForm((v) => !v);
-            if (showForm) resetForm();
+            if (showForm && !editingJob) {
+              resetForm();
+              setShowForm(false);
+              return;
+            }
+            openCreate();
           }}
           aria-expanded={showForm}
           className="rounded-lg px-4 py-2 bg-[#22c55e] hover:bg-[#16a34a] text-black text-sm font-semibold transition-colors"
         >
-          {showForm ? 'Cancel' : 'New Job'}
+          {showForm && !editingJob ? 'Cancel' : '+ New Job'}
         </button>
       </div>
 
-      {/* ── New Job Form ────────────────────────────────────────────── */}
+      {/* ── Filter tabs ─────────────────────────────────────────────── */}
+      <div className="flex flex-wrap gap-2">
+        {(['all', 'enabled', 'disabled', 'failed'] as FilterTab[]).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setFilter(tab)}
+            className={`rounded-full px-3.5 py-1.5 text-xs font-semibold capitalize transition-colors ${
+              filter === tab
+                ? 'bg-[#22c55e]/20 text-[#22c55e] border border-[#22c55e]/30'
+                : 'bg-white/5 text-white/50 border border-white/10 hover:bg-white/10 hover:text-white/70'
+            }`}
+          >
+            {tab} ({counts[tab]})
+          </button>
+        ))}
+      </div>
+
+      {/* ── New / Edit Job Form ────────────────────────────────────── */}
       {showForm && (
         <div className="rounded-xl bg-white/5 border border-white/10 p-5">
           <h2 className="text-xs font-bold tracking-widest uppercase text-white/40 mb-3">
-            Create Scheduled Job
+            {editingJob ? `Edit Job — ${editingJob.name}` : 'Create Scheduled Job'}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Row 1: Name + Job Type */}
@@ -301,7 +425,7 @@ export default function SchedulesDashboard({ initialJobs, chainOptions }: Props)
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Daily health check"
                   required
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#22c55e]/50 focus:border-[#22c55e]/50"
+                  className={inputCls}
                 />
               </div>
               <div>
@@ -311,18 +435,18 @@ export default function SchedulesDashboard({ initialJobs, chainOptions }: Props)
                 <select
                   value={jobType}
                   onChange={(e) => setJobType(e.target.value as JobType)}
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#22c55e]/50 focus:border-[#22c55e]/50 [&>option]:bg-[#1a1a2e] [&>option]:text-white"
+                  className={inputCls + ' [&>option]:bg-[#1a1a2e] [&>option]:text-white'}
                 >
-                  <option value="chain">Chain</option>
+                  <option value="chain">Chain (workflow)</option>
+                  <option value="custom">Custom (built-in routine)</option>
                   <option value="health_check">Health Check</option>
                   <option value="notification">Notification</option>
-                  <option value="custom">Custom</option>
                 </select>
               </div>
             </div>
 
             {/* Chain selector (conditional) */}
-            {jobType === 'chain' && chainOptions.length > 0 && (
+            {jobType === 'chain' && (
               <div>
                 <label className="block text-xs font-medium text-white/60 mb-1">
                   Chain Template
@@ -330,14 +454,46 @@ export default function SchedulesDashboard({ initialJobs, chainOptions }: Props)
                 <select
                   value={chainSlug}
                   onChange={(e) => setChainSlug(e.target.value)}
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#22c55e]/50 focus:border-[#22c55e]/50 [&>option]:bg-[#1a1a2e] [&>option]:text-white"
+                  className={inputCls + ' [&>option]:bg-[#1a1a2e] [&>option]:text-white'}
                 >
+                  {chainOptions.length === 0 && <option value="">No chains registered</option>}
                   {chainOptions.map((c) => (
                     <option key={c.id} value={c.slug}>
                       {c.name}
                     </option>
                   ))}
                 </select>
+              </div>
+            )}
+
+            {/* Custom handler picker (conditional) */}
+            {jobType === 'custom' && (
+              <div>
+                <label className="block text-xs font-medium text-white/60 mb-1">
+                  Routine (handler)
+                </label>
+                <select
+                  value={customHandler}
+                  onChange={(e) => setCustomHandler(e.target.value)}
+                  className={inputCls + ' [&>option]:bg-[#1a1a2e] [&>option]:text-white'}
+                >
+                  <option value="">Select a routine...</option>
+                  {customHandlers.map((h) => (
+                    <option key={h.handler} value={h.handler}>
+                      {h.label}
+                    </option>
+                  ))}
+                </select>
+                {customHandler && (
+                  <p className="mt-1 text-xs text-white/40">
+                    {customHandlers.find((h) => h.handler === customHandler)?.description}
+                  </p>
+                )}
+                {customHandler === '' && editingJob && (
+                  <p className="mt-1 text-xs text-white/30">
+                    Existing config handler: {String((editingJob.job_config as Record<string, unknown>)?.handler ?? '—')}
+                  </p>
+                )}
               </div>
             )}
 
@@ -351,7 +507,7 @@ export default function SchedulesDashboard({ initialJobs, chainOptions }: Props)
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Optional description of this scheduled job"
                 rows={2}
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#22c55e]/50 focus:border-[#22c55e]/50 resize-none"
+                className={inputCls + ' resize-none'}
               />
             </div>
 
@@ -366,7 +522,7 @@ export default function SchedulesDashboard({ initialJobs, chainOptions }: Props)
                 onChange={(e) => setCronExpression(e.target.value)}
                 placeholder="0 * * * *"
                 required
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white font-mono placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#22c55e]/50 focus:border-[#22c55e]/50"
+                className={inputCls + ' font-mono'}
               />
               <div className="mt-2 flex flex-wrap gap-2">
                 {CRON_PRESETS.map((preset) => (
@@ -412,13 +568,27 @@ export default function SchedulesDashboard({ initialJobs, chainOptions }: Props)
                 </span>
               </label>
 
-              <button
-                type="submit"
-                disabled={isPending}
-                className="rounded-lg px-4 py-2 bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 disabled:cursor-not-allowed text-black text-sm font-semibold transition-colors"
-              >
-                {isPending ? 'Creating...' : 'Create Job'}
-              </button>
+              <div className="flex gap-2">
+                {editingJob && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetForm();
+                      setShowForm(false);
+                    }}
+                    className="rounded-lg px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm font-semibold transition-colors"
+                  >
+                    Cancel
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="rounded-lg px-4 py-2 bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 disabled:cursor-not-allowed text-black text-sm font-semibold transition-colors"
+                >
+                  {isPending ? 'Saving...' : editingJob ? 'Save Changes' : 'Create Job'}
+                </button>
+              </div>
             </div>
 
             {formError && (
@@ -428,7 +598,7 @@ export default function SchedulesDashboard({ initialJobs, chainOptions }: Props)
         </div>
       )}
 
-      {/* ── Action Error Banner ─────────────────────────────────────── */}
+      {/* ── Action Error / Result Banner ────────────────────────────── */}
       {actionError && (
         <div className="rounded-xl bg-red-500/10 border border-red-500/20 px-5 py-3 flex items-center justify-between">
           <p className="text-sm text-red-400">{actionError}</p>
@@ -441,18 +611,32 @@ export default function SchedulesDashboard({ initialJobs, chainOptions }: Props)
           </button>
         </div>
       )}
+      {runResult && (
+        <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-5 py-3 flex items-center justify-between">
+          <p className="text-sm text-emerald-400 font-mono">{runResult}</p>
+          <button
+            type="button"
+            onClick={() => setRunResult(null)}
+            className="text-emerald-400/60 hover:text-emerald-400 text-xs ml-4"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* ── Job List ────────────────────────────────────────────────── */}
       <section>
         <h2 className="text-xs font-bold tracking-widest uppercase text-white/40 mb-3">
-          All Jobs
+          {filter === 'all' ? 'All Jobs' : `${filter} (${counts[filter]})`}
         </h2>
 
-        {jobs.length === 0 ? (
+        {filteredJobs.length === 0 ? (
           <div className="rounded-xl bg-white/5 border border-white/10 p-10 text-center">
-            <p className="text-white/40 text-sm">No scheduled jobs yet.</p>
+            <p className="text-white/40 text-sm">
+              {jobs.length === 0 ? 'No scheduled jobs yet.' : `No jobs match "${filter}".`}
+            </p>
             <p className="text-white/20 text-xs mt-1">
-              Create one to start automating workflows.
+              {jobs.length === 0 ? 'Create one to start automating workflows.' : 'Try a different filter.'}
             </p>
           </div>
         ) : (
@@ -472,114 +656,147 @@ export default function SchedulesDashboard({ initialJobs, chainOptions }: Props)
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {jobs.map((job) => (
-                  <tr
-                    key={job.id}
-                    className="hover:bg-white/[0.02] transition-colors"
-                  >
-                    {/* Name */}
-                    <td className="px-5 py-3">
-                      <div>
-                        <span className="font-semibold text-white">{job.name}</span>
-                        {job.description && (
-                          <p className="text-xs text-white/30 mt-0.5 max-w-[200px] truncate">
-                            {job.description}
+                {filteredJobs.map((job) => {
+                  const cfg = (job.job_config ?? {}) as Record<string, unknown>;
+                  const handler = typeof cfg.handler === 'string' ? cfg.handler : null;
+                  return (
+                    <tr
+                      key={job.id}
+                      className={`transition-colors ${job.last_run_status === 'failed' ? 'bg-red-500/[0.03]' : 'hover:bg-white/[0.02]'}`}
+                    >
+                      {/* Name */}
+                      <td className="px-5 py-3">
+                        <div>
+                          <span className="font-semibold text-white">{job.name}</span>
+                          {job.description && (
+                            <p className="text-xs text-white/30 mt-0.5 max-w-[200px] truncate">
+                              {job.description}
+                            </p>
+                          )}
+                          {handler && (
+                            <p className="text-xs text-cyan-400/70 mt-0.5 font-mono truncate max-w-[220px]">
+                              {handlerLabel(customHandlers, cfg)}
+                            </p>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Cron */}
+                      <td className="px-5 py-3">
+                        <div>
+                          <code className="font-mono text-xs text-white/40">
+                            {job.cron_expression}
+                          </code>
+                          <p className="text-xs text-white/20 mt-0.5">
+                            {formatCronHuman(job.cron_expression)}
+                          </p>
+                        </div>
+                      </td>
+
+                      {/* Job type */}
+                      <td className="px-5 py-3">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            TYPE_STYLES[job.job_type] ?? TYPE_STYLES.custom
+                          }`}
+                        >
+                          {job.job_type.replace('_', ' ')}
+                        </span>
+                      </td>
+
+                      {/* Last run status */}
+                      <td className="px-5 py-3">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            STATUS_STYLES[job.last_run_status] ?? STATUS_STYLES.never
+                          }`}
+                        >
+                          {job.last_run_status}
+                        </span>
+                        {job.last_run_at && (
+                          <p className="text-xs text-white/20 mt-0.5">
+                            {formatRelativeTime(job.last_run_at)}
                           </p>
                         )}
-                      </div>
-                    </td>
+                        {job.last_run_status === 'failed' && job.last_error && (
+                          <p className="text-xs text-red-400/70 mt-0.5 truncate max-w-[220px]" title={job.last_error}>
+                            {job.last_error}
+                          </p>
+                        )}
+                      </td>
 
-                    {/* Cron */}
-                    <td className="px-5 py-3">
-                      <div>
-                        <code className="font-mono text-xs text-white/40">
-                          {job.cron_expression}
-                        </code>
-                        <p className="text-xs text-white/20 mt-0.5">
-                          {formatCronHuman(job.cron_expression)}
-                        </p>
-                      </div>
-                    </td>
+                      {/* Next run */}
+                      <td className="px-5 py-3 text-xs text-white/50">
+                        {job.is_enabled && job.next_run_at
+                          ? formatRelativeTime(job.next_run_at)
+                          : '--'}
+                      </td>
 
-                    {/* Job type */}
-                    <td className="px-5 py-3">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          TYPE_STYLES[job.job_type] ?? TYPE_STYLES.custom
-                        }`}
-                      >
-                        {job.job_type.replace('_', ' ')}
-                      </span>
-                    </td>
+                      {/* Run count */}
+                      <td className="px-5 py-3 text-right font-mono text-xs text-white/50">
+                        {job.run_count}
+                      </td>
 
-                    {/* Last run status */}
-                    <td className="px-5 py-3">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          STATUS_STYLES[job.last_run_status] ?? STATUS_STYLES.never
-                        }`}
-                      >
-                        {job.last_run_status}
-                      </span>
-                      {job.last_run_at && (
-                        <p className="text-xs text-white/20 mt-0.5">
-                          {formatRelativeTime(job.last_run_at)}
-                        </p>
-                      )}
-                    </td>
+                      {/* Fail count */}
+                      <td className="px-5 py-3 text-right font-mono text-xs">
+                        <span className={job.fail_count > 0 ? 'text-red-400' : 'text-white/30'}>
+                          {job.fail_count}
+                        </span>
+                      </td>
 
-                    {/* Next run */}
-                    <td className="px-5 py-3 text-xs text-white/50">
-                      {job.next_run_at
-                        ? formatRelativeTime(job.next_run_at)
-                        : '--'}
-                    </td>
-
-                    {/* Run count */}
-                    <td className="px-5 py-3 text-right font-mono text-xs text-white/50">
-                      {job.run_count}
-                    </td>
-
-                    {/* Fail count */}
-                    <td className="px-5 py-3 text-right font-mono text-xs">
-                      <span className={job.fail_count > 0 ? 'text-red-400' : 'text-white/30'}>
-                        {job.fail_count}
-                      </span>
-                    </td>
-
-                    {/* Enable toggle */}
-                    <td className="px-5 py-3 text-center">
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={job.is_enabled}
-                        disabled={pendingJobId === job.id}
-                        onClick={() => handleToggle(job.id, job.is_enabled)}
-                        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
-                          job.is_enabled ? 'bg-[#22c55e]' : 'bg-white/20'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                            job.is_enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                      {/* Enable toggle */}
+                      <td className="px-5 py-3 text-center">
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={job.is_enabled}
+                          disabled={pendingJobId === job.id}
+                          onClick={() => handleToggle(job.id, job.is_enabled)}
+                          className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
+                            job.is_enabled ? 'bg-[#22c55e]' : 'bg-white/20'
                           }`}
-                        />
-                      </button>
-                    </td>
+                        >
+                          <span
+                            className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                              job.is_enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                            }`}
+                          />
+                        </button>
+                      </td>
 
-                    {/* Delete */}
-                    <td className="px-5 py-3 text-right">
-                      <button
-                        type="button"
-                        disabled={pendingJobId === job.id}
-                        onClick={() => handleDelete(job.id, job.name)}
-                        className="rounded-md px-2.5 py-1 text-xs font-medium text-red-400/70 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-colors disabled:opacity-50"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      {/* Actions */}
+                      <td className="px-5 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            disabled={pendingJobId === job.id || !job.is_enabled}
+                            onClick={() => handleRunNow(job.id, job.name)}
+                            title={job.is_enabled ? 'Run this job now' : 'Enable the job first'}
+                            className="rounded-md px-2.5 py-1 text-xs font-medium text-emerald-400/80 hover:text-emerald-400 hover:bg-emerald-500/10 border border-transparent hover:border-emerald-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            Run
+                          </button>
+                          <button
+                            type="button"
+                            disabled={pendingJobId === job.id}
+                            onClick={() => openEdit(job)}
+                            className="rounded-md px-2.5 py-1 text-xs font-medium text-white/50 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/20 transition-colors disabled:opacity-40"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            disabled={pendingJobId === job.id}
+                            onClick={() => handleDelete(job.id, job.name)}
+                            className="rounded-md px-2.5 py-1 text-xs font-medium text-red-400/70 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-colors disabled:opacity-40"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

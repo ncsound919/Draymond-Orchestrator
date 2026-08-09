@@ -15,6 +15,16 @@ export async function register() {
     } catch (err) {
       console.warn('[scheduler] in-process tick skipped:', err instanceof Error ? err.message : err);
     }
+    // Bootstrap the ecosystem: seed default jobs and bring up the core fleet
+    // (deterministic brain, agent-browser, bookbridge, scorers, ...) so the
+    // first scheduler tick doesn't spam "fetch failed". Best-effort — a down
+    // service never blocks the orchestrator from booting.
+    try {
+      const { bootstrapEcosystem } = await import('@/lib/draymond/bootstrap');
+      await bootstrapEcosystem();
+    } catch (err) {
+      console.warn('[bootstrap] ecosystem bootstrap skipped:', err instanceof Error ? err.message : err);
+    }
     // Cognition layer: Kairos daemon (5-min tick, catch-up scan on start) +
     // recovery of ultraplans stuck in `planning` from a previous crash.
     try {

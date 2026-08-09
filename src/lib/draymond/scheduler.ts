@@ -76,6 +76,10 @@ export interface JobListFilters {
   job_type?: JobType;
   last_run_status?: JobRunStatus;
   limit?: number;
+  /** Sort column (defaults to next_run_at). */
+  order_by?: 'next_run_at' | 'created_at' | 'name' | 'last_run_at';
+  /** Ascending sort (defaults to true). */
+  ascending?: boolean;
 }
 
 export interface JobRunResult {
@@ -206,15 +210,19 @@ export function getNextRunTime(cronExpr: string, after?: Date): Date {
 // JOB CRUD
 // ============================================================================
 
-/** List scheduled jobs with optional filters. */
+/** List scheduled jobs with optional filters. Defaults to next-run order so the
+ * schedule list reads chronologically (what fires next is at the top) instead
+ * of the old created_at-DESC pile that made schedules look unordered. */
 export async function listJobs(filters?: JobListFilters): Promise<ScheduledJob[]> {
   const supabase = createDraymondAdminClient();
-  const limit = Math.min(Math.max(filters?.limit ?? 50, 1), 200);
+  const limit = Math.min(Math.max(filters?.limit ?? 200, 1), 200);
+  const orderBy = filters?.order_by ?? 'next_run_at';
+  const ascending = filters?.ascending ?? true;
 
   let query = supabase
     .from('draymond_scheduled_jobs')
     .select('*')
-    .order('created_at', { ascending: false })
+    .order(orderBy, { ascending })
     .limit(limit);
 
   if (filters?.is_enabled !== undefined) query = query.eq('is_enabled', filters.is_enabled);
@@ -348,6 +356,71 @@ export async function disableJob(id: string): Promise<ScheduledJob> {
   return data as ScheduledJob;
 }
 
+/**
+ * Run a job NOW regardless of its schedule (the "Run Now" button). Claims the
+ * job atomically, executes its handler, records the run metadata, and returns
+ * the outcome. Does NOT advance next_run_at (the next scheduled slot stays).
+ */
+export async function runJobNow(id: string): Promise<JobRunResult> {
+  const supabase = createDraymondAdminClient();
+
+  const job = await getJob(id);
+  if (!job) throw new Error(`Job ${id} not found`);
+  if (!job.is_enabled) {
+    throw new Error(`Job "${job.name}" is disabled — enable it first (Run Now respects the schedule).`);
+  }
+
+  // Atomic claim so a concurrent tick doesn't double-run.
+  const { data: claimed, error: claimError } = await supabase
+    .from('draymond_scheduled_jobs')
+    .update({ last_run_status: 'running' })
+    .eq('id', job.id)
+    .neq('last_run_status', 'running')
+    .select('id')
+    .maybeSingle();
+  if (claimError) throw new Error(`Failed to claim job "${job.name}": ${claimError.message}`);
+  if (!claimed) {
+    throw new Error(`Job "${job.name}" is already running.`);
+  }
+
+  const startTime = Date.now();
+  const now = new Date();
+  emitJobStarted(job.id, job.name, job.job_type);
+
+  try {
+    const output = await executeJobByType(job);
+    const durationMs = Date.now() - startTime;
+    await supabase
+      .from('draymond_scheduled_jobs')
+      .update({
+        last_run_at: now.toISOString(),
+        last_run_status: 'success',
+        last_run_duration_ms: durationMs,
+        last_error: null,
+        run_count: job.run_count + 1,
+      })
+      .eq('id', job.id);
+    emitJobCompleted(job.id, job.name, job.job_type, durationMs);
+    return { job_id: job.id, job_name: job.name, job_type: job.job_type, status: 'success', duration_ms: durationMs, output };
+  } catch (err) {
+    const durationMs = Date.now() - startTime;
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    await supabase
+      .from('draymond_scheduled_jobs')
+      .update({
+        last_run_at: now.toISOString(),
+        last_run_status: 'failed',
+        last_run_duration_ms: durationMs,
+        last_error: errorMessage,
+        run_count: job.run_count + 1,
+        fail_count: job.fail_count + 1,
+      })
+      .eq('id', job.id);
+    emitJobFailed(job.id, job.name, job.job_type, errorMessage);
+    return { job_id: job.id, job_name: job.name, job_type: job.job_type, status: 'failed', duration_ms: durationMs, error: errorMessage };
+  }
+}
+
 // ============================================================================
 // IN-PROCESS SCHEDULER TICK
 // ============================================================================
@@ -405,6 +478,59 @@ export function isSchedulerTickRunning(): boolean {
 
 const NOTIFICATION_RECIPIENT = process.env.DRAYMOND_ALERT_EMAIL ?? process.env.GMAIL_USER ?? '';
 
+// ============================================================================
+// KNOWN CUSTOM HANDLERS — dropdown registry for the Schedules UI
+// ============================================================================
+// A `custom` job's job_config.handler selects which built-in routine runs.
+// This table is the source of truth the UI renders as a picker, so operators
+// never have to type a raw handler string (and can't typo it). When a handler
+// is missing here it still runs (executeJobByType), but the UI shows it as an
+// "advanced/custom" free-text field.
+// ============================================================================
+
+export interface CustomHandlerDef {
+  handler: string;
+  label: string;
+  description: string;
+}
+
+export const CUSTOM_HANDLERS: CustomHandlerDef[] = [
+  { handler: 'brain_decision_cycle', label: 'Brain Decision Cycle', description: 'Consult the deterministic brain reasoning engine and route hiccups to the repair/coding teams.' },
+  { handler: 'agent_heartbeat_sweep', label: 'Agent Heartbeat Sweep', description: 'Ping every roster service health endpoint and record real liveness.' },
+  { handler: 'service_health_repair', label: 'Service Health Repair', description: 'Probe ecosystem services and auto-start any that are down.' },
+  { handler: 'self_repair_check', label: 'Self-Repair Check', description: 'Failure scan + safe auto-repairs; escalate unknowns to on-call.' },
+  { handler: 'repair_failed_jobs', label: 'Repair Team (failed jobs)', description: 'Scan failed jobs and deploy coding/skill agents to repair them.' },
+  { handler: 'kairos_scan', label: 'Kairos Scan', description: 'Proactive fleet scan: down monitors, failed jobs, stale leads, revenue shortfall.' },
+  { handler: 'treasury_pulse', label: 'Treasurer Cash Pulse', description: 'Pull settled Stripe charges and update revenue to date.' },
+  { handler: 'phase_recap', label: 'Phase Recap (workplace)', description: 'Build + save + send a day-phase recap (email + Open-Chat).' },
+  { handler: 'evening_call_recap', label: 'Evening Call Recap', description: 'Open-Chat calls you with the day summary via ntfy.' },
+  { handler: 'ingest_news', label: 'News Digest Ingest', description: 'Ingest news APIs and cache current items for the fleet.' },
+  { handler: 'self_learning_loop', label: 'Self-Learning Loop', description: 'Distill lessons from outcomes (QA/jobs/incidents).' },
+  { handler: 'rd_night', label: 'Night Mode R&D', description: 'Overnight research + dev planning from news + backlog.' },
+  { handler: 'fetch_market_data', label: 'Market Data Snapshot', description: 'Daily free-API market/research snapshot.' },
+  { handler: 'rotate_tokens', label: 'Token Rotation Check', description: 'Report provider budget/rate health for key rotation.' },
+  { handler: 'api_key_audit', label: 'Free-API Key Audit', description: 'Audit which free-API keys are configured.' },
+  { handler: 'benchmark_roster', label: 'Roster Benchmark', description: 'Deep-score pictured agents repos and queue the weakest.' },
+  { handler: 'benchmark_entities', label: 'Benchmark: Entities', description: 'Run a benchmark cycle over entities.' },
+  { handler: 'benchmark_sites', label: 'Benchmark: Sites', description: 'Run a benchmark cycle over sites.' },
+  { handler: 'benchmark_crons', label: 'Benchmark: Crons', description: 'Run a benchmark cycle over crons.' },
+  { handler: 'benchmark_chains', label: 'Benchmark: Chains', description: 'Run a benchmark cycle over chains.' },
+  { handler: 'run_overlay_qa', label: 'Overlay365 QA', description: 'Playwright QA pass across Overlay365 sites.' },
+  { handler: 'scan_book_library', label: 'Book Library Scan', description: 'Auto-ingest new books from the library folders.' },
+  { handler: 'wiki_sync', label: 'Brain Wiki Sync', description: 'Sync the deterministic-brain wiki into the cache.' },
+  { handler: 'file_share_check', label: 'Overlay File Share Test', description: 'Exercise the file-sharing / browser-fetch surface.' },
+  { handler: 'code_review_check', label: 'Overlay Code Review Scan', description: 'Exercise the local deep-analysis code-review scorer.' },
+  { handler: 'editorial_push', label: 'Editorial Morning Push', description: 'Push morning editorial articles to Sports Steve.' },
+  { handler: 'systemic_consolidate', label: 'Systemic Consolidation', description: 'Consolidate lessons, persist memory, align agenda goals.' },
+  { handler: 'systemic_interconnect', label: 'Systemic Interconnect', description: 'Full one-shot: seed agenda + knowledge graph + consolidate.' },
+  { handler: 'dispatch_worker_tasks', label: 'On-Device Ops Dispatch', description: 'Dispatch marketing/social/email tasks to remote workers.' },
+  { handler: 'mission_pipeline_sync', label: 'Mission Pipeline Sync', description: 'Reconcile opportunity stages, flag stale leads, compute KPIs.' },
+  { handler: 'mission_strategy_review', label: 'Mission Strategy Review', description: 'Pipeline + revenue vs target, emailed memo.' },
+  { handler: 'mission_run_maas_cycle', label: 'MaaS Monthly Cycle', description: 'Run the MaaS delivery chain for each active client.' },
+  { handler: 'dream_cycle', label: 'Dream Cycle', description: 'AutoDream 4-phase memory consolidation (self-gated).' },
+  { handler: 'ultraplan_process', label: 'Ultraplan Process', description: 'Drain the deep-planning queue.' },
+];
+
 /**
  * Get the notification recipient at call time (avoids stale module-level reads in edge runtimes).
  */
@@ -458,7 +584,13 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
     }
 
     case 'notification': {
-      const payload = config.payload as {
+      // Normalise both seed shapes: new nested `payload.type` and the legacy
+      // flat `type` (pre-payload Daily Health Digest rows in live DBs).
+      const rawPayload = (config.payload ?? {}) as Record<string, unknown>;
+      const payload = {
+        ...rawPayload,
+        ...(config.type !== undefined && rawPayload.type === undefined ? { type: config.type as string } : {}),
+      } as {
         channel?: string;
         recipient?: string;
         subject?: string;
@@ -1723,6 +1855,38 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
         },
       ],
     },
+    is_enabled: true,
+  },
+  {
+    name: 'Systemic Interconnect',
+    description: 'Weekly Sunday 5am — full one-shot interconnection: seed agenda + knowledge graph + consolidate.',
+    cron_expression: '0 5 * * 0',
+    job_type: 'custom',
+    job_config: { handler: 'systemic_interconnect' },
+    is_enabled: true,
+  },
+  {
+    name: 'Deep Research Weekly',
+    description: 'Weekly Monday 9:30am — run the deep research brief chain for the week ahead.',
+    cron_expression: '30 9 * * 1',
+    job_type: 'chain',
+    job_config: { chain_slug: 'research-brief-delivery' },
+    is_enabled: true,
+  },
+  {
+    name: 'Weekend Ops Review',
+    description: 'Saturday 8am — full ecosystem audit + upgrade queue review for the weekend.',
+    cron_expression: '0 8 * * 6',
+    job_type: 'custom',
+    job_config: { handler: 'benchmark_upgrade_review' },
+    is_enabled: true,
+  },
+  {
+    name: 'Weekend Self-Repair Deep Dive',
+    description: 'Saturday 9am — deep failure scan + repair of any backlogged failures before Monday.',
+    cron_expression: '0 9 * * 6',
+    job_type: 'custom',
+    job_config: { handler: 'repair_failed_jobs' },
     is_enabled: true,
   },
 ];

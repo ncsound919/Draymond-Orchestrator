@@ -92,6 +92,44 @@ export async function createChain(
 }
 
 /**
+ * Update a chain template's metadata (name, description, status, trigger).
+ * Used by workflow controls (pause/activate, retitle, change trigger).
+ */
+export async function updateChain(
+  chainId: string,
+  updates: {
+    name?: string;
+    description?: string | null;
+    status?: ChainStatus;
+    trigger_type?: string;
+    trigger_config?: Record<string, unknown>;
+    input_data?: Record<string, unknown>;
+    max_retries?: number;
+  }
+): Promise<DraymondChain> {
+  const supabase = createDraymondAdminClient();
+
+  const payload: Record<string, unknown> = {};
+  if (updates.name !== undefined) payload.name = updates.name;
+  if (updates.description !== undefined) payload.description = updates.description;
+  if (updates.status !== undefined) payload.status = updates.status;
+  if (updates.trigger_type !== undefined) payload.trigger_type = updates.trigger_type;
+  if (updates.trigger_config !== undefined) payload.trigger_config = updates.trigger_config;
+  if (updates.input_data !== undefined) payload.input_data = updates.input_data;
+  if (updates.max_retries !== undefined) payload.max_retries = updates.max_retries;
+
+  const { data, error } = await supabase
+    .from('draymond_chains')
+    .update(payload)
+    .eq('id', chainId)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to update chain ${chainId}: ${error.message}`);
+  return data as DraymondChain;
+}
+
+/**
  * Get a chain by slug or ID.
  */
 export async function getChain(

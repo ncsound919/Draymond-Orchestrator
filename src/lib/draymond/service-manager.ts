@@ -43,9 +43,9 @@ const CWD_OVERRIDES: Record<string, string> = {
  * here (e.g. services without a runnable start), service_down repairs for it
  * escalate instead of guessing.
  */
-const START_MAP: Record<string, { command: [string, string[]]; port: number; health: string }> = {
+const START_MAP: Record<string, { command: [string, string[]]; port: number; health: string; env?: Record<string, string> }> = {
   bookbridge: {
-    command: ['python', ['-m', 'uvicorn', 'app:app', '--host', '127.0.0.1', '--port', '8777']],
+    command: ['python', ['main.py']],
     port: 8777,
     health: '/health',
   },
@@ -53,6 +53,10 @@ const START_MAP: Record<string, { command: [string, string[]]; port: number; hea
     command: ['python', ['main.py', '--serve']],
     port: 3210,
     health: '/health',
+    // main.py defaults to API_PORT=8000 (the Uplift Agent's port). The brain
+    // MUST boot on its canonical 3210 or it squats on uplift-agent and every
+    // BRAIN_URL probe fails.
+    env: { API_PORT: '3210', UVICORN_WORKERS: '1' },
   },
   'hemp-os': {
     command: ['python', ['main.py', '--serve']],
@@ -176,10 +180,11 @@ export async function startService(slug: string): Promise<ServiceHealth> {
 
   const [cmd, args] = def.command;
   const { out, err } = logPath(slug);
+  const env = def.env ? { ...process.env, ...def.env } : process.env;
   const child =
     process.platform === 'win32'
-      ? spawn('cmd.exe', ['/d', '/s', '/c', `"${cmd}" ${args.map((a) => (a.includes(' ') ? `"${a}"` : a)).join(' ')}`], { cwd, detached: true, stdio: 'ignore' })
-      : spawn(cmd, args, { cwd, detached: true, stdio: 'ignore' });
+      ? spawn('cmd.exe', ['/d', '/s', '/c', `"${cmd}" ${args.map((a) => (a.includes(' ') ? `"${a}"` : a)).join(' ')}`], { cwd, detached: true, stdio: 'ignore', env })
+      : spawn(cmd, args, { cwd, detached: true, stdio: 'ignore', env });
   child.unref();
   // Redirect to server-logs via the shell wrapper where possible; detached
   // processes with stdio ignore don't write logs, so emit a marker.
