@@ -43,6 +43,10 @@ export interface LLMCallOptions {
   /** Enable a provider's native deep-reasoning mode (Anthropic `thinking`,
    *  DeepSeek `deepseek-reasoner` model, OpenAI `reasoning_effort`). */
   reasoning?: boolean;
+  /** Deterministic fallback: when EVERY provider fails, return this fixed
+   *  templated string instead of throwing, so pipelines never stall on a
+   *  total LLM outage. Unset = keep the current throw behaviour. */
+  deterministicFallback?: string;
 }
 
 const PROVIDER_URLS: Record<LLMProvider, string> = {
@@ -409,6 +413,14 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
       );
     }
   }
+  // Deterministic fallback (opt-in): a total LLM outage returns a fixed
+  // templated value so the pipeline keeps moving instead of getting stuck.
+  if (options.deterministicFallback !== undefined) {
+    console.warn(
+      `[llm] all providers failed — returning deterministic fallback. Last error: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
+    );
+    return options.deterministicFallback;
+  }
   throw lastErr ?? new Error('All LLM providers failed');
 }
 
@@ -422,13 +434,33 @@ export async function callLocalModel(options: {
   userMessage: string;
   maxTokens?: number;
   responseFormat?: { type: 'json_object' };
+  /** Disable RAG context injection (for hot loops that don't need it). */
+  noRag?: boolean;
+  /** Deterministic fallback when even the paid chain is unavailable. */
+  deterministicFallback?: string;
 }): Promise<string> {
+  // Lightweight RAG: pull recent lessons + important memory to augment the
+  // small model's context (it can't recall system history itself).
+  let system = options.system;
+  if (!options.noRag) {
+    try {
+      const { retrieveContext, augmentWithContext } = await import('./retrieval');
+      const { block } = await retrieveContext(options.userMessage);
+      system = augmentWithContext(options.system, block);
+    } catch {
+      // RAG is best-effort; ignore failures.
+    }
+  }
   try {
     return await callLLM({
       ...options,
+      system,
       provider: 'ollama',
       maxTokens: options.maxTokens ?? 256,
       temperature: 0.1,
+      // The ollama attempt must still throw on failure so the paid chain runs;
+      // the deterministic fallback only applies after the whole chain is down.
+      deterministicFallback: undefined,
     });
   } catch (err) {
     console.warn(
@@ -437,8 +469,10 @@ export async function callLocalModel(options: {
     // Fall back to the paid chain, explicitly skipping ollama (which just failed).
     return callLLM({
       ...options,
+      system,
       provider: 'litellm',
       maxTokens: options.maxTokens ?? 512,
+      deterministicFallback: options.deterministicFallback,
     });
   }
 }
