@@ -8,6 +8,7 @@ const navItems = [
   { name: 'Math', href: '/math' },
   { name: 'Operations', href: '/operations' },
   { name: 'Mission', href: '/mission' },
+  { name: 'Cognition', href: '/cognition' },
   { name: 'Agents', href: '/agents' },
   { name: 'Workflows', href: '/workflows' },
   { name: 'Schedules', href: '/schedules' },
