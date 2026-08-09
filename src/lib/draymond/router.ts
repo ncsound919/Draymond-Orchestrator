@@ -13,7 +13,7 @@
 
 import { createDraymondAdminClient } from './client';
 import { logEvent } from './index';
-import { callLLM } from './llm';
+import { callLLM, callLocalModel } from './llm';
 import type {
   RouterIntent,
   RouteResult,
@@ -173,6 +173,39 @@ function buildSystemPrompt(snapshot: RegistrySnapshot): string {
   ].join('\n');
 }
 
+/**
+ * Compact routing prompt for the cheap local-model tier. Lists only slugs +
+ * names (no long descriptions) so a 1B model can classify quickly. Entity and
+ * chain resolution is validated against the snapshot afterwards.
+ */
+function buildCompactPrompt(snapshot: RegistrySnapshot): string {
+  const entityList = snapshot.entities
+    .map((e) => `  - "${e.slug}" (${e.name}, ${e.kind})`)
+    .join('\n');
+  const chainList = snapshot.chains
+    .map((c) => `  - "${c.slug}" (${c.name})`)
+    .join('\n');
+
+  return [
+    'You are Draymond\'s task router. Classify the intent and pick ONE entity or chain slug from the lists.',
+    'Intents: invoke_entity | execute_chain | query_status | manage_memory | decompose_goal | web_search | unknown',
+    'Rules:',
+    '  - "run <x>", "trigger <x>", "execute <x>" where <x> is a workflow/chain -> execute_chain with chain_slug.',
+    '  - "check if <service> is up/online", "is <service> down", "status of <service>" -> query_status (no entity_slug).',
+    '  - asking about system status/health/crons/schedules/chains/repairs/agenda -> query_status.',
+    '  - asking an entity to DO a one-off action (post, analyze, generate, send) -> invoke_entity with entity_slug.',
+    'Available entity slugs:',
+    entityList || '  (none)',
+    'Available chain slugs:',
+    chainList || '  (none)',
+    'Reply with ONLY JSON:',
+    '{',
+    '  "intent": "...", "confidence": 0.0-1.0, "entity_slug": "slug or null", "chain_slug": "slug or null",',
+    '  "action": "action or null", "input": {}, "reasoning": "brief"',
+    '}',
+  ].join('\n');
+}
+
 // ── Response parsing ─────────────────────────────────────────────────────────
 
 const VALID_INTENTS: Set<RouterIntent> = new Set([
@@ -291,6 +324,16 @@ export async function routeTask(
     ? `<user_task>${task}</user_task>\n<context>${JSON.stringify(context)}</context>`
     : `<user_task>${task}</user_task>`;
 
+  // Preferred: paid provider (reliable routing). Try local first only when
+  // configured (use_local_model), since 1B models misclassify. If the paid
+  // provider chain fails entirely (e.g. all keys out of balance), fall back to
+  // the local model so routing still works.
+  let usedLocal = false;
+  if (_config.use_local_model) {
+    const localResult = await tryLocalRoute(task, startMs, snapshot, userMessage);
+    if (localResult) return localResult;
+  }
+
   try {
     const raw = await callLLM({
       provider: _config.provider,
@@ -319,6 +362,7 @@ export async function routeTask(
         chain_slug: result.chain_slug,
         latency_ms: result.latency_ms,
         alternatives_count: result.alternatives.length,
+        model_tier: usedLocal ? 'paid-fallback' : 'paid',
       },
       reasoning: result.reasoning,
     }).catch(() => {});
@@ -326,6 +370,11 @@ export async function routeTask(
     return result;
   } catch (err) {
     const latencyMs = Date.now() - startMs;
+
+    // Paid provider chain failed (e.g. all keys out of balance / auth) — try
+    // the local model as a last resort so routing still functions.
+    const localResult = await tryLocalRoute(task, startMs, snapshot, userMessage);
+    if (localResult) return localResult;
 
     await logEvent({
       agent_id: 'draymond-router',
@@ -345,6 +394,58 @@ export async function routeTask(
       latency_ms: latencyMs,
     };
   }
+}
+
+/** Attempt routing via the local Ollama model; null when rejected/unavailable. */
+async function tryLocalRoute(
+  task: string,
+  startMs: number,
+  snapshot: RegistrySnapshot,
+  userMessage: string,
+): Promise<RouteResult | null> {
+  try {
+    const raw = await callLocalModel({
+      system: buildCompactPrompt(snapshot),
+      userMessage,
+      maxTokens: 256,
+    });
+    const latencyMs = Date.now() - startMs;
+    const result = parseRouterResponse(raw, snapshot, latencyMs);
+
+    const acceptable =
+      result.intent !== 'unknown' &&
+      result.confidence >= _config.fallback_threshold &&
+      (result.entity_slug !== undefined ||
+        result.chain_slug !== undefined ||
+        result.intent === 'query_status');
+
+    if (acceptable) {
+      await logEvent({
+        agent_id: 'draymond-router',
+        category: 'decision',
+        severity: 'info',
+        event_type: 'task_routed',
+        message: `Routed "${task.slice(0, 100)}" → ${result.intent} (local model)`,
+        metadata: {
+          intent: result.intent,
+          confidence: result.confidence,
+          entity_slug: result.entity_slug,
+          chain_slug: result.chain_slug,
+          latency_ms: result.latency_ms,
+          alternatives_count: result.alternatives.length,
+          model_tier: 'local',
+        },
+        reasoning: result.reasoning,
+      }).catch(() => {});
+      return result;
+    }
+    console.warn(
+      `[router] local model route rejected (intent=${result.intent} conf=${result.confidence}).`
+    );
+  } catch (err) {
+    console.warn(`[router] local model failed (${err instanceof Error ? err.message : String(err)}).`);
+  }
+  return null;
 }
 
 /**

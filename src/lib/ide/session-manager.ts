@@ -48,7 +48,7 @@ import { runOpencodeCodegen } from './opencode-client';
 import { TOOL_PORTS } from '../draymond/ports';
 import { resolveCodingTools, codingStackSummary } from '../draymond/coding-stack';
 import { classifyFailure } from '../draymond/repair-team';
-import { callLLM } from '../draymond/llm';
+import { callLLM, callLocalModel } from '../draymond/llm';
 
 const MAX_EVENTS = 400;
 const MAX_CHAT = 120;
@@ -220,9 +220,7 @@ async function decomposeToSteps(goal: string, kind: GoalKind, crew: IdeCrew): Pr
     const seedLines = [...memoryLines, ...lessonLines];
     const memoryBlock = seedLines.length > 0 ? `\n\nPast lessons from similar sessions (do not repeat their failures):\n${seedLines.join('\n')}` : '';
 
-    const content = await callLLM({
-      provider: 'opencode-free',
-      system: [
+    const planSystem = [
         'You are Draymond\'s coding-team planner. Break the goal into an ordered, minimal plan (3-8 steps).',
         'Each step is JSON: {id, title, kind, agent, prompt, dependsOn}.',
         `kind must be one of: ${[...ALLOWED_KINDS].join(', ')}.`,
@@ -239,13 +237,38 @@ async function decomposeToSteps(goal: string, kind: GoalKind, crew: IdeCrew): Pr
         '{type: "command", args: [...], dir} | {type: "restart", service}]. Only emit repair actions that are',
         'deterministic and safe; otherwise emit kind "repair" with a prompt describing the fix for the team.',
         'Reply with ONLY a JSON object: {"steps": [...], "note": "one-line plan summary"}.',
-      ].join('\n'),
-      userMessage: `Goal: ${goal}\nKind: ${kind}\nLead: ${crew.lead}\nMembers: ${crew.members.join(', ')}${memoryBlock}`,
-      maxTokens: 1400,
-      temperature: 0.2,
-      timeoutMs: 30_000,
-      responseFormat: { type: 'json_object' },
-    });
+      ].join('\n');
+    const planUser = `Goal: ${goal}\nKind: ${kind}\nLead: ${crew.lead}\nMembers: ${crew.members.join(', ')}${memoryBlock}`;
+
+    // Try the cheap local model first; only accept it if every step uses a
+    // valid kind + agent (llama3.2:1b can emit non-standard kinds). Otherwise
+    // fall back to the paid provider, then the deterministic plan.
+    let content: string | null = null;
+    try {
+      const local = await callLocalModel({ system: planSystem, userMessage: planUser, maxTokens: 1400 });
+      const localParsed = JSON.parse(local.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()) as {
+        steps?: Array<{ kind?: string; agent?: string }>;
+      };
+      const stepsOk = Array.isArray(localParsed.steps) &&
+        localParsed.steps.length >= 2 &&
+        localParsed.steps.every((s) => ALLOWED_KINDS.has(s.kind as IdeStepKind) && ALLOWED_AGENTS.has(s.agent as IdeStepAgent));
+      if (stepsOk) content = local;
+      else console.warn('[IDE] local plan rejected (invalid kind/agent). Using paid provider.');
+    } catch {
+      console.warn('[IDE] local plan unavailable. Using paid provider.');
+    }
+
+    if (!content) {
+      content = await callLLM({
+        provider: 'opencode-free',
+        system: planSystem,
+        userMessage: planUser,
+        maxTokens: 1400,
+        temperature: 0.2,
+        timeoutMs: 30_000,
+        responseFormat: { type: 'json_object' },
+      });
+    }
 
     const parsed = JSON.parse(content) as {
       steps?: Array<{
@@ -382,15 +405,13 @@ async function generateCommitMessage(goal: string, diff: string): Promise<string
     return `chore(ide): ${goal.slice(0, 80)}`;
   }
   try {
-    const message = await callLLM({
-      provider: 'opencode-free',
+    // Commit messages are a single short line — ideal for the cheap local tier.
+    const message = await callLocalModel({
       system:
         'You are a senior engineer writing a commit message. Given the goal and the diff, return ONLY a single conventional commit message line ' +
         '(e.g. "fix(api): handle null tenant on payouts"). No markdown, no quotes, no body.',
       userMessage: `Goal: ${goal}\n\nDiff:\n${diff.slice(0, 4000)}`,
       maxTokens: 120,
-      temperature: 0.2,
-      timeoutMs: 20_000,
     });
     const clean = message.trim().replace(/^`+|`+$/g, '').replace(/\n+/g, ' ').slice(0, 200);
     return clean || `chore(ide): ${goal.slice(0, 80)}`;

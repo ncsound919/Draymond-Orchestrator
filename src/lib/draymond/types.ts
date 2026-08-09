@@ -673,6 +673,8 @@ export type RouterConfig = {
   max_tokens: number;
   /** Timeout in ms */
   timeout_ms: number;
+  /** Try the cheap local Ollama model first (opt-in; needs a capable model). */
+  use_local_model?: boolean;
 };
 
 // ============================================================================

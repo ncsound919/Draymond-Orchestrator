@@ -88,7 +88,6 @@ const FALLBACK_ORDER: LLMProvider[] = [
   'openai',
   'anthropic',
   'qwen',
-  'ollama',
 ];
 
 export function hasKey(provider: LLMProvider): boolean {
@@ -374,6 +373,11 @@ export async function callLocalModel(options: {
     console.warn(
       `[llm] local model unavailable (${err instanceof Error ? err.message : String(err)}). Falling back.`
     );
-    return callLLM({ ...options, maxTokens: options.maxTokens ?? 512 });
+    // Fall back to the paid chain, explicitly skipping ollama (which just failed).
+    return callLLM({
+      ...options,
+      provider: 'litellm',
+      maxTokens: options.maxTokens ?? 512,
+    });
   }
 }
