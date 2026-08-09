@@ -73,74 +73,87 @@ async function requireEntityBySlug(slug: string): Promise<string> {
   return entity.id;
 }
 
+export interface MissionChainSeedResult {
+  seeded: Array<{ name: string; slug: string; id: string }>;
+  errors: Array<{ name: string; error: string }>;
+}
+
 /**
  * Seed the three mission chain templates (idempotent — skips existing slugs).
- * Returns ids of chains that already exist or were newly created.
+ * Returns ids of chains that already exist or were newly created, plus a
+ * per-chain error report so one failure does not abort the rest.
  */
-export async function seedMissionChains(): Promise<Array<{ name: string; slug: string; id: string }>> {
-  const result: Array<{ name: string; slug: string; id: string }> = [];
+export async function seedMissionChains(): Promise<MissionChainSeedResult> {
+  const seeded: MissionChainSeedResult["seeded"] = [];
+  const errors: MissionChainSeedResult["errors"] = [];
 
   for (const def of MISSION_CHAIN_DEFS) {
-    const existing = await getChain(def.slug);
-    if (existing) {
-      result.push({ name: def.name, slug: def.slug, id: existing.id });
-      continue;
-    }
+    try {
+      const existing = await getChain(def.slug);
+      if (existing) {
+        seeded.push({ name: def.name, slug: def.slug, id: existing.id });
+        continue;
+      }
 
-    const entityIds: Record<string, string> = {};
-    for (const step of def.steps) {
-      if (!entityIds[step.entitySlug]) entityIds[step.entitySlug] = await requireEntityBySlug(step.entitySlug);
-    }
+      const entityIds: Record<string, string> = {};
+      for (const step of def.steps) {
+        if (!entityIds[step.entitySlug]) entityIds[step.entitySlug] = await requireEntityBySlug(step.entitySlug);
+      }
 
-    const chain: DraymondChain = await createChain({
-      name: def.name,
-      slug: def.slug,
-      description: def.description,
-      version: "1.0.0",
-      is_template: true,
-      status: "draft",
-      trigger_type: "manual",
-      input_data: def.input,
-      context: {},
-      max_retries: 2,
-    });
-
-    const created = await addSteps(
-      def.steps.map((s) => ({
-        chain_id: chain.id,
-        step_order: s.step_order,
-        name: s.name,
-        entity_id: entityIds[s.entitySlug],
-        action: s.action,
-        input_mapping: s.input_mapping,
-        output_key: s.output_key,
-        depends_on_steps: [], // remapped below
-        parallel_group: s.parallel_group,
-        risk_level: s.name.includes("QA") ? "medium" : "low",
+      const chain: DraymondChain = await createChain({
+        name: def.name,
+        slug: def.slug,
+        description: def.description,
+        version: "1.0.0",
+        is_template: true,
+        status: "draft",
+        trigger_type: "manual",
+        input_data: def.input,
+        context: {},
         max_retries: 2,
-      }))
-    );
+      });
 
-    const byName = new Map(created.map((st) => [st.name, st]));
-    const depPatches: Array<{ id: string; depends_on_steps: string[] }> = [];
-    for (let i = 0; i < def.steps.length; i++) {
-      const s = def.steps[i]!;
-      const target = byName.get(s.name);
-      if (!target) continue;
-      const deps = s.depends_on.map((d) => byName.get(d)?.id).filter((x): x is string => Boolean(x));
-      depPatches.push({ id: target.id, depends_on_steps: deps });
+      const created = await addSteps(
+        def.steps.map((s) => ({
+          chain_id: chain.id,
+          step_order: s.step_order,
+          name: s.name,
+          entity_id: entityIds[s.entitySlug],
+          action: s.action,
+          input_mapping: s.input_mapping,
+          output_key: s.output_key,
+          depends_on_steps: [], // remapped below
+          parallel_group: s.parallel_group,
+          risk_level: s.name.includes("QA") ? "medium" : "low",
+          max_retries: 2,
+        }))
+      );
+
+      const byName = new Map(created.map((st) => [st.name, st]));
+      const depPatches: Array<{ id: string; depends_on_steps: string[] }> = [];
+      for (let i = 0; i < def.steps.length; i++) {
+        const s = def.steps[i]!;
+        const target = byName.get(s.name);
+        if (!target) continue;
+        const deps = s.depends_on.map((d) => byName.get(d)?.id).filter((x): x is string => Boolean(x));
+        depPatches.push({ id: target.id, depends_on_steps: deps });
+      }
+
+      const { createDraymondClient } = await import("./client");
+      const supabase = await createDraymondClient();
+      for (const patch of depPatches) {
+        const { error } = await supabase.from("draymond_chain_steps").update({ depends_on_steps: patch.depends_on_steps }).eq("id", patch.id);
+        if (error) console.error(`[Mission Chains] dep patch failed for ${patch.id}: ${error.message}`);
+      }
+      await supabase.from("draymond_chains").update({ total_steps: created.length }).eq("id", chain.id);
+
+      seeded.push({ name: def.name, slug: def.slug, id: chain.id });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[Mission Chains] Failed to seed "${def.name}": ${message}`);
+      errors.push({ name: def.name, error: message });
     }
-
-    const { createDraymondClient } = await import("./client");
-    const supabase = await createDraymondClient();
-    for (const patch of depPatches) {
-      const { error } = await supabase.from("draymond_chain_steps").update({ depends_on_steps: patch.depends_on_steps }).eq("id", patch.id);
-      if (error) console.error(`[Mission Chains] dep patch failed for ${patch.id}: ${error.message}`);
-    }
-    await supabase.from("draymond_chains").update({ total_steps: created.length }).eq("id", chain.id);
-
-    result.push({ name: def.name, slug: def.slug, id: chain.id });
   }
 
-  return result;
+  return { seeded, errors };
 }

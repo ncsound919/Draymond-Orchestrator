@@ -14,6 +14,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { seedBusinessAutomation } from '@/lib/draymond/business-chains';
 import { seedAgentMonitors } from '@/lib/draymond/monitors';
 import { seedSkillPacks } from '@/lib/draymond/skill-packs';
+import { registerEntities } from '@/lib/draymond/registry';
+import { SEED_ENTITIES } from '@/lib/draymond/seed';
+import { seedChainTemplates } from '@/lib/draymond/chains-seed';
+import { seedMissionChains } from '@/lib/draymond/mission-chains';
 import { interconnectSystem } from '@/lib/draymond/systemic';
 import { authorizeRequest } from '@/lib/draymond/api-auth';
 
@@ -30,6 +34,9 @@ export async function POST(request: NextRequest) {
     const result = await seedBusinessAutomation();
     const monitorResult = await seedAgentMonitors();
     const skillPackResult = await seedSkillPacks();
+    const entityResult = await registerEntities(SEED_ENTITIES);
+    const chainTemplatesResult = await seedChainTemplates();
+    const missionChainsResult = await seedMissionChains();
     const systemic = await interconnectSystem();
     const durationMs = Date.now() - startTime;
 
@@ -37,6 +44,9 @@ export async function POST(request: NextRequest) {
       ...result.errors,
       ...monitorResult.errors,
       ...skillPackResult.errors,
+      ...entityResult.errors,
+      ...chainTemplatesResult.errors,
+      ...missionChainsResult.errors,
     ];
 
     return NextResponse.json({
@@ -54,6 +64,18 @@ export async function POST(request: NextRequest) {
       skill_packs: {
         seeded: skillPackResult.seeded,
         names: skillPackResult.names,
+      },
+      registry_entities: {
+        registered: entityResult.registered,
+        errors: entityResult.errors,
+      },
+      chain_templates: {
+        seeded: chainTemplatesResult.seeded,
+        errors: chainTemplatesResult.errors,
+      },
+      mission_chains: {
+        seeded: missionChainsResult.seeded,
+        errors: missionChainsResult.errors,
       },
       systemic: {
         agenda: systemic.agenda,
