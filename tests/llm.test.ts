@@ -129,4 +129,62 @@ describe('shared llm helper', () => {
     expect(body.messages[0]).toMatchObject({ role: 'system', content: 'sys' });
     delete process.env.LITELLM_API_KEY;
   });
+
+  it('uses deepseek-reasoner and omits temperature when reasoning with deepseek', async () => {
+    process.env.DEEPSEEK_API_KEY = 'test-key';
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({ choices: [{ message: { content: 'plan' } }] }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const text = await callLLM({
+      provider: 'deepseek',
+      system: 'sys',
+      userMessage: 'plan this',
+      reasoning: true,
+    });
+    expect(text).toBe('plan');
+    const [, init] = fetchMock.mock.calls[0];
+    const body = JSON.parse(init.body as string);
+    expect(body.model).toBe('deepseek-reasoner');
+    expect(body.temperature).toBeUndefined();
+  });
+
+  it('sends the Anthropic thinking block and no temperature when reasoning', async () => {
+    process.env.ANTHROPIC_API_KEY = 'ak';
+    delete process.env.DEEPSEEK_API_KEY;
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({ content: [{ type: 'text', text: 'plan' }] }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await callLLM({ provider: 'anthropic', system: 'sys', userMessage: 'plan', reasoning: true });
+    const [, init] = fetchMock.mock.calls[0];
+    const body = JSON.parse(init.body as string);
+    expect(body.thinking).toEqual({ type: 'enabled', budget_tokens: 4096 });
+    expect(body.temperature).toBeUndefined();
+  });
+
+  it('adds reasoning_effort high and no temperature for openai when reasoning', async () => {
+    process.env.OPENAI_API_KEY = 'ok';
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({ choices: [{ message: { content: 'plan' } }] }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await callLLM({ provider: 'openai', system: 'sys', userMessage: 'plan', reasoning: true });
+    const [, init] = fetchMock.mock.calls[0];
+    const body = JSON.parse(init.body as string);
+    expect(body.reasoning_effort).toBe('high');
+    expect(body.temperature).toBeUndefined();
+  });
 });

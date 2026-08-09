@@ -40,6 +40,9 @@ export interface LLMCallOptions {
   /** Request structured JSON output (OpenAI-compatible `response_format` /
    *  Gemini `responseMimeType: application/json`). */
   responseFormat?: { type: 'json_object' };
+  /** Enable a provider's native deep-reasoning mode (Anthropic `thinking`,
+   *  DeepSeek `deepseek-reasoner` model, OpenAI `reasoning_effort`). */
+  reasoning?: boolean;
 }
 
 const PROVIDER_URLS: Record<LLMProvider, string> = {
@@ -225,11 +228,12 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
 
   const apiKey = getApiKey(provider);
   const apiUrl = PROVIDER_URLS[provider];
-  const model = options.model ?? DEFAULT_MODELS[provider];
+  const model = options.model ?? (options.reasoning && provider === 'deepseek' ? 'deepseek-reasoner' : DEFAULT_MODELS[provider]);
   const maxTokens = options.maxTokens ?? 1024;
   const temperature = options.temperature ?? 0.2;
-  // Local Ollama models can take 20-40s to load on first call after idle.
-  const timeoutMs = options.timeoutMs ?? (provider === 'ollama' ? 90_000 : 15_000);
+  // Reasoning calls get a much longer default timeout; the local Ollama tier
+  // still needs its own generous window for cold-start model loads.
+  const timeoutMs = options.timeoutMs ?? (options.reasoning ? 120_000 : provider === 'ollama' ? 90_000 : 15_000);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -251,7 +255,10 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
         body: JSON.stringify({
           model,
           max_tokens: maxTokens,
-          temperature,
+          // Anthropic rejects `temperature` alongside extended thinking.
+          ...(options.reasoning
+            ? { thinking: { type: 'enabled', budget_tokens: 4096 } }
+            : { temperature }),
           system: options.system,
           messages: [{ role: 'user', content }],
         }),
@@ -273,12 +280,13 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
         body: JSON.stringify({
           model,
           max_tokens: maxTokens,
-          temperature,
+          ...(options.reasoning ? {} : { temperature }),
           messages: [
             { role: 'system', content: options.system },
             { role: 'user', content },
           ],
           ...(options.responseFormat ? { response_format: options.responseFormat } : {}),
+          ...(options.reasoning ? { reasoning_effort: 'high' } : {}),
         }),
         signal: controller.signal,
       });
