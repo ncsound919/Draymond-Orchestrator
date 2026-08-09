@@ -15,6 +15,14 @@ export async function register() {
     } catch (err) {
       console.warn('[scheduler] in-process tick skipped:', err instanceof Error ? err.message : err);
     }
+    // Cognition layer: Kairos daemon (5-min tick, catch-up scan on start) +
+    // recovery of ultraplans stuck in `planning` from a previous crash.
+    try {
+      const { startCognition } = await import('@/lib/draymond/systemic');
+      await startCognition();
+    } catch (err) {
+      console.warn('[cognition] daemon start skipped:', err instanceof Error ? err.message : err);
+    }
     // OSS error reporting (Sentry — gated on SENTRY_DSN) + crash guard that
     // reports unhandled rejections / uncaught exceptions to the audit trail,
     // ntfy, and Sentry instead of dying silently. PM2 restarts on exit.
