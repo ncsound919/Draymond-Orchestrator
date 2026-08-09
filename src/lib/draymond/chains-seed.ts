@@ -334,6 +334,130 @@ async function seedCisContractWorkflow(): Promise<DraymondChain> {
   return { ...chain, total_steps: steps.length };
 }
 
+/**
+ * Seed the Book-to-Skill Chain template.
+ *
+ * Workflow:
+ *   Step 1 — Ground with BookBridge (bookbridge: search + reading_plan)
+ *   Step 2 — Synthesize             (book-synthesis-personal)     [depends on step 1]
+ *   Step 3 — Convert to skill       (book-to-skill)               [depends on step 2]
+ *   Step 4 — Register skill         (book-to-skill-chain)         [depends on step 3]
+ *
+ * Turns a book (or a library topic) into an installable agent skill that
+ * Draymond agents can discover and use.
+ */
+async function seedBookToSkillChain(): Promise<DraymondChain> {
+  const bookbridgeId = await requireEntityBySlug('bookbridge');
+  const synthesisId = await requireEntityBySlug('book-synthesis-personal');
+  const converterId = await requireEntityBySlug('book-to-skill');
+
+  const chain = await createChain({
+    name: 'Book-to-Skill Chain',
+    slug: 'tpl-book-to-skill-chain',
+    description:
+      'Ground a book with BookBridge, synthesize its frameworks, convert it into a reusable agent skill, and register it for Draymond agents. Modes: single book (source path or book_id) or whole library.',
+    version: '1.0.0',
+    is_template: true,
+    status: 'draft',
+    trigger_type: 'manual',
+    input_data: {
+      // Defaults — override at instantiation time
+      source: null,         // path to a book file, a BookBridge book_id, or a directory/glob
+      skill_name: null,     // slug for the generated skill
+      book_type: 'text',    // 'technical' | 'text'
+      mode: 'single',       // 'single' | 'library'
+      topic: null,          // research topic used for BookBridge grounding + reading plan
+    },
+    context: {},
+    max_retries: 2,
+  });
+
+  const steps = await addSteps([
+    {
+      chain_id: chain.id,
+      step_order: 1,
+      name: 'Ground with BookBridge',
+      description: 'Search the library and generate a reading plan for the topic; add/scan the source so it is searchable.',
+      entity_id: bookbridgeId,
+      action: 'bookbridge_ground',
+      input_mapping: {
+        topic: '$.input.topic',
+        source: '$.input.source',
+      },
+      output_key: 'grounding',
+      depends_on_steps: [],
+      risk_level: 'low',
+      max_retries: 2,
+      confidence_threshold: 0.6,
+    },
+    {
+      chain_id: chain.id,
+      step_order: 2,
+      name: 'Synthesize',
+      description: 'Produce a synthesis brief of the author\'s frameworks, principles, techniques, and anti-patterns.',
+      entity_id: synthesisId,
+      action: 'book_synthesize',
+      input_mapping: {
+        source: '$.input.source',
+        topic: '$.input.topic',
+        grounding: '$.steps.grounding.output',
+      },
+      output_key: 'synthesis',
+      depends_on_steps: [], // Remapped to step 1 below
+      risk_level: 'low',
+      max_retries: 2,
+      confidence_threshold: 0.7,
+    },
+    {
+      chain_id: chain.id,
+      step_order: 3,
+      name: 'Convert to Skill',
+      description: 'Run the book-to-skill converter to generate SKILL.md, chapters, glossary, patterns, cheatsheet.',
+      entity_id: converterId,
+      action: 'book_to_skill_convert',
+      input_mapping: {
+        source: '$.input.source',
+        skill_name: '$.input.skill_name',
+        book_type: '$.input.book_type',
+        synthesis: '$.steps.synthesis.output',
+      },
+      output_key: 'generated_skill',
+      depends_on_steps: [], // Remapped to step 2 below
+      risk_level: 'medium',
+      max_retries: 2,
+      confidence_threshold: 0.75,
+    },
+  ]);
+
+  // steps[0]=ground, steps[1]=synthesize, steps[2]=convert
+  const [groundStep, synthesizeStep, convertStep] = steps;
+
+  const { createDraymondClient } = await import('./client');
+  const supabase = await createDraymondClient();
+
+  const depPatches = [
+    { id: synthesizeStep.id, depends_on_steps: [groundStep.id] },
+    { id: convertStep.id,    depends_on_steps: [synthesizeStep.id] },
+  ];
+
+  for (const patch of depPatches) {
+    const { error } = await supabase
+      .from('draymond_chain_steps')
+      .update({ depends_on_steps: patch.depends_on_steps })
+      .eq('id', patch.id);
+    if (error) {
+      console.error(`[Chains Seed] Failed to patch deps for step ${patch.id}: ${error.message}`);
+    }
+  }
+
+  await supabase
+    .from('draymond_chains')
+    .update({ total_steps: steps.length })
+    .eq('id', chain.id);
+
+  return { ...chain, total_steps: steps.length };
+}
+
 // ============================================================================
 // SEED RUNNER
 // ============================================================================
@@ -363,6 +487,11 @@ export async function seedChainTemplates(): Promise<ChainSeedResult> {
       name: 'CIS Contract Workflow',
       slug: 'tpl-cis-contract-workflow',
       fn: seedCisContractWorkflow,
+    },
+    {
+      name: 'Book-to-Skill Chain',
+      slug: 'tpl-book-to-skill-chain',
+      fn: seedBookToSkillChain,
     },
   ];
 

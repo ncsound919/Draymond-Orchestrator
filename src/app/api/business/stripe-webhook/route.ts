@@ -161,6 +161,15 @@ export async function POST(request: NextRequest) {
       } catch {
         /* learning store best-effort */
       }
+
+      // Real-time sale alert: ntfy push + email for any newly-settled charge.
+      // Best-effort — never delays or fails the webhook response.
+      try {
+        const { sendSaleAlerts } = await import('@/lib/draymond/sale-alerts');
+        await sendSaleAlerts();
+      } catch {
+        /* sale alerts best-effort */
+      }
     }
   }
 

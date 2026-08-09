@@ -8,10 +8,9 @@ import { listOpportunities } from "./business-pipeline";
 import { markDelivered } from "./mission-pipeline";
 import { getService, readStrategy, type ServiceId } from "./mission-strategy";
 
-const SERVICE_CHAIN: Record<ServiceId, string> = {
-  // aetherdesk activates rentals/top-ups via its own Stripe webhook — it is
-  // NOT dispatched through a chain. Aetherdesk opportunities should reach
-  // 'paid' via attributeSettledCharge when the webhook settles a charge.
+// aetherdesk activates rentals/top-ups via its own Stripe webhook — it is
+// deliberately absent so `!chainSlug` routes it to the webhook path below.
+const SERVICE_CHAIN: Partial<Record<ServiceId, string>> = {
   maas: "maas-monthly-cycle",
   audit: "audit-delivery",
   research: "research-brief-delivery",

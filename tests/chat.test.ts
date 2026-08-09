@@ -18,9 +18,17 @@ const mocks = vi.hoisted(() => ({
   resolveAetherDeskAgentId: vi.fn(),
   webSearch: vi.fn(),
   callLLM: vi.fn(),
+  searchMemories: vi.fn().mockResolvedValue([]),
+  enqueueWorkerTask: vi.fn().mockResolvedValue('task-abc'),
   getSystemIntel: vi.fn(),
   formatSystemIntel: vi.fn(),
   ingestTraceAsync: vi.fn(),
+  probeAllServices: vi.fn(),
+  auditApiKeys: vi.fn(),
+  missingCriticalKeys: vi.fn(),
+  getLessons: vi.fn(),
+  recordOutcome: vi.fn().mockResolvedValue(undefined),
+  listJobs: vi.fn(),
 }));
 
 vi.mock('../src/lib/draymond/router', () => ({
@@ -71,9 +79,35 @@ vi.mock('../src/lib/draymond/llm', () => ({
   callLLM: mocks.callLLM,
 }));
 
+vi.mock('../src/lib/draymond/memory-intelligence', () => ({
+  searchMemories: mocks.searchMemories,
+}));
+
+vi.mock('../src/lib/draymond/worker-tasks', () => ({
+  enqueueWorkerTask: mocks.enqueueWorkerTask,
+}));
+
 vi.mock('../src/lib/draymond/system-intel', () => ({
   getSystemIntel: mocks.getSystemIntel,
   formatSystemIntel: mocks.formatSystemIntel,
+}));
+
+vi.mock('../src/lib/draymond/service-manager', () => ({
+  probeAllServices: mocks.probeAllServices,
+}));
+
+vi.mock('../src/lib/draymond/api-keys', () => ({
+  auditApiKeys: mocks.auditApiKeys,
+  missingCriticalKeys: mocks.missingCriticalKeys,
+}));
+
+vi.mock('../src/lib/draymond/self-learning', () => ({
+  getLessons: mocks.getLessons,
+  recordOutcome: mocks.recordOutcome,
+}));
+
+vi.mock('../src/lib/draymond/scheduler', () => ({
+  listJobs: mocks.listJobs,
 }));
 
 vi.mock('../src/lib/draymond/trace', () => ({
@@ -117,11 +151,13 @@ function classify(routeResult: Record<string, unknown>, opts: Partial<{ confirm:
 async function collectTurn(
   task: string,
   conversation: Array<{ role: 'user' | 'assistant'; content: string }> = [],
+  metadata?: Record<string, unknown>,
 ) {
   const chunks: string[] = [];
   const result = await orchestrateChatTurn({
     task,
     conversation,
+    metadata,
     onChunk: (c) => {
       chunks.push(c);
     },
@@ -271,10 +307,11 @@ describe('orchestrateChatTurn', () => {
     expect(mocks.invokeEntity).not.toHaveBeenCalled();
   });
 
-  it('falls back to the Uplift agent for unknown/low-confidence tasks', async () => {
+  it('falls back to the Uplift agent when the general chat path is unavailable', async () => {
     mocks.routeAndClassify.mockResolvedValue(
       classify(route({ intent: 'unknown', confidence: 0.1, reasoning: 'no clue' })),
     );
+    mocks.callLLM.mockRejectedValue(new Error('no provider configured'));
     mocks.dispatchTask.mockResolvedValue({ content: 'uplift answered' });
 
     const { result, chunks } = await collectTurn('invent a new idea');
@@ -285,15 +322,21 @@ describe('orchestrateChatTurn', () => {
     expect(chunks).toContain('[unknown');
   });
 
-  it('hands Uplift timeouts back gracefully', async () => {
+  it('hands Uplift timeouts back gracefully with diagnostics', async () => {
     mocks.routeAndClassify.mockResolvedValue(
       classify(route({ intent: 'unknown', confidence: 0.1 })),
     );
     mocks.dispatchTask.mockRejectedValue(new DOMException('Aborted', 'AbortError'));
+    mocks.probeAllServices.mockResolvedValue([]);
+    mocks.auditApiKeys.mockReturnValue({ checkedAt: 'x', configured: 0, missing: 0, noKey: 0, total: 0, items: [], missingNames: [] });
+    mocks.missingCriticalKeys.mockReturnValue([]);
+    mocks.getLessons.mockResolvedValue([]);
+    mocks.listJobs.mockResolvedValue([]);
+    mocks.callLLM.mockRejectedValue(new Error('llm down'));
 
     const { result } = await collectTurn('run something heavy');
 
-    expect(result.result).toContain('timed out');
+    expect(result.result).toContain('not responding');
     expect(mocks.appendAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({ event: 'chat_uplift_error' }),
     );
@@ -414,5 +457,217 @@ describe('orchestrateChatTurn', () => {
 
     expect(result.status).toBe('completed');
     expect(result.result).toContain('Web search unavailable');
+  });
+
+  it('answers small talk conversationally without dispatching an agent', async () => {
+    const { result } = await collectTurn('yo');
+
+    expect(result.status).toBe('completed');
+    expect(mocks.routeAndClassify).not.toHaveBeenCalled();
+    expect(mocks.dispatchTask).not.toHaveBeenCalled();
+    expect(result.result).toMatch(/yo|what'?s up|hey/i);
+  });
+
+  it('routes a failure/downtime report through diagnostics + self-learning', async () => {
+    mocks.routeAndClassify.mockResolvedValue(
+      classify(route({ intent: 'unknown', confidence: 0.1 })),
+    );
+    mocks.probeAllServices.mockResolvedValue([
+      { slug: 'bookbridge', name: 'BookBridge', url: 'http://localhost:8777/health', up: false, detail: 'fetch failed' },
+      { slug: 'grader', name: 'Grader', url: 'http://localhost:3201/api/health', up: true, detail: 'HTTP 200' },
+    ]);
+    mocks.auditApiKeys.mockReturnValue({
+      checkedAt: 'x', configured: 4, missing: 25, noKey: 10, total: 39,
+      items: [], missingNames: ['Finnhub'],
+    });
+    mocks.missingCriticalKeys.mockReturnValue([{ name: 'Finnhub', envVars: ['FINNHUB_API_KEY'], engine: 'E1' }]);
+    mocks.getLessons.mockResolvedValue([
+      { id: 'l1', agentId: 'scheduler:Book', pattern: 'book scan', lesson: 'Repeated failure: book scan fetch failed', evidenceCount: 3, lastSeen: 'x' },
+    ]);
+    mocks.listJobs.mockResolvedValue([
+      { name: 'Daily Book Library Scan', last_run_status: 'failed', last_error: 'fetch failed', cron_expression: '0 3 * * *', job_type: 'custom', job_config: {}, is_enabled: true, next_run_at: null, last_run_at: null, id: 'j1', run_count: 3, fail_count: 3, max_retries: 1, timeout_seconds: 300, notify_on_failure: true, notify_on_success: false, last_run_duration_ms: null, description: null, created_at: 'x', updated_at: 'x' },
+    ]);
+    mocks.callLLM.mockResolvedValue('Diagnostic summary');
+
+    const { result, chunks } = await collectTurn('reporank is down and book scan is failing');
+
+    expect(result.status).toBe('completed');
+    expect(chunks).toContain('Running diagnostics');
+    expect(result.result).toContain('Diagnostic summary');
+    expect(mocks.probeAllServices).toHaveBeenCalled();
+    expect(mocks.getLessons).toHaveBeenCalled();
+  });
+
+  it('feeds an uplift fallback failure into self-learning instead of a dead-end', async () => {
+    mocks.routeAndClassify.mockResolvedValue(
+      classify(route({ intent: 'unknown', confidence: 0.1 })),
+    );
+    mocks.dispatchTask.mockRejectedValue(new Error('uplift offline'));
+    mocks.probeAllServices.mockResolvedValue([]);
+    mocks.auditApiKeys.mockReturnValue({ checkedAt: 'x', configured: 0, missing: 0, noKey: 0, total: 0, items: [], missingNames: [] });
+    mocks.missingCriticalKeys.mockReturnValue([]);
+    mocks.getLessons.mockResolvedValue([]);
+    mocks.listJobs.mockResolvedValue([]);
+    mocks.callLLM.mockRejectedValue(new Error('llm down'));
+
+    const { result } = await collectTurn('do something ambitious');
+
+    expect(result.result).toContain('currently unavailable');
+    expect(result.result).toContain('repair team');
+    expect(mocks.recordOutcome).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: 'chat:uplift', success: false }),
+    );
+  });
+
+  it('answers unknown tasks conversationally through the general chat path', async () => {
+    mocks.routeAndClassify.mockResolvedValue(
+      classify(route({ intent: 'unknown', confidence: 0.1, reasoning: 'no match' })),
+    );
+    mocks.callLLM.mockResolvedValue('Here is a direct conversational answer.');
+
+    const { result, chunks } = await collectTurn('Why is the sky blue?');
+
+    expect(result.status).toBe('completed');
+    expect(result.result).toContain('Here is a direct conversational answer.');
+    expect(chunks).toContain('[unknown → general]');
+    expect(mocks.dispatchTask).not.toHaveBeenCalled();
+    expect(mocks.callLLM).toHaveBeenCalledWith(
+      expect.objectContaining({ userMessage: expect.stringContaining('Why is the sky blue?') }),
+    );
+  });
+
+  it('grounds general answers in the recent conversation (follow-ups)', async () => {
+    mocks.routeAndClassify.mockResolvedValue(
+      classify(route({ intent: 'unknown', confidence: 0.2 })),
+    );
+    mocks.callLLM.mockResolvedValue('Answer about the monitor.');
+
+    const conversation = [
+      { role: 'user' as const, content: 'set up a monitor for example.com' },
+      { role: 'assistant' as const, content: 'Done. Added the monitor.' },
+    ];
+    await collectTurn('what is its interval?', conversation);
+
+    const userMessage = (mocks.callLLM.mock.calls[0][0] as { userMessage: string }).userMessage;
+    expect(userMessage).toContain('set up a monitor for example.com');
+    expect(userMessage).toContain('Done. Added the monitor.');
+  });
+
+  it('injects relevant long-term memory into the general answer', async () => {
+    mocks.routeAndClassify.mockResolvedValue(
+      classify(route({ intent: 'unknown', confidence: 0.1 })),
+    );
+    mocks.searchMemories.mockResolvedValue([
+      {
+        memory: {
+          id: 'mem-1',
+          key: 'preferred-crm',
+          summary: 'User prefers CRM platform A',
+          value: {},
+          importance_score: 0.9,
+        },
+        relevance_score: 0.9,
+        match_type: 'summary',
+      },
+    ]);
+    mocks.callLLM.mockResolvedValue('Answer grounded in memory.');
+
+    await collectTurn('what CRM should I use?', [], { user_id: 'u-1' });
+
+    expect(mocks.searchMemories).toHaveBeenCalledWith(
+      'draymond',
+      'u-1',
+      'what CRM should I use?',
+      expect.objectContaining({ limit: 8 }),
+    );
+    const userMessage = (mocks.callLLM.mock.calls[0][0] as { userMessage: string }).userMessage;
+    expect(userMessage).toContain('preferred-crm');
+    expect(userMessage).toContain('User prefers CRM platform A');
+  });
+
+  it('passes attached images to the vision-capable LLM path', async () => {
+    mocks.routeAndClassify.mockResolvedValue(
+      classify(route({ intent: 'unknown', confidence: 0.1 })),
+    );
+    mocks.callLLM.mockResolvedValue('I can see a chart showing Q3 growth.');
+
+    const { result, chunks } = await collectTurn(
+      'what does this chart show?',
+      [],
+      { user_id: 'u-1', attachments: [{ mimeType: 'image/png', dataB64: 'aW1nZGF0YQ==' }] },
+    );
+
+    expect(result.status).toBe('completed');
+    expect(result.result).toContain('Q3 growth');
+    expect(chunks).toContain('Looking at your image');
+    expect(mocks.callLLM).toHaveBeenCalledWith(
+      expect.objectContaining({
+        images: [{ dataB64: 'aW1nZGF0YQ==', mediaType: 'image/png' }],
+      }),
+    );
+    expect(mocks.dispatchTask).not.toHaveBeenCalled();
+  });
+
+  it('compresses long conversations before answering', async () => {
+    mocks.routeAndClassify.mockResolvedValue(
+      classify(route({ intent: 'unknown', confidence: 0.1 })),
+    );
+    mocks.searchMemories.mockResolvedValue([]);
+    mocks.callLLM.mockImplementation(async ({ system }: { system: string }) =>
+      system.includes('conversation summarizer')
+        ? 'earlier discussion about launch plans'
+        : 'Final compressed answer',
+    );
+
+    const conversation = Array.from({ length: 14 }, (_, i) => ({
+      role: (i % 2 === 0 ? 'user' : 'assistant') as 'user' | 'assistant',
+      content: `message ${i}`,
+    }));
+
+    const { result } = await collectTurn('summarize our work', conversation);
+
+    expect(result.result).toContain('Final compressed answer');
+    const userMessage = mocks.callLLM.mock.calls
+      .map((c) => c[0] as { userMessage: string; system: string })
+      .find((c) => c.system.includes('conversation summarizer'))?.userMessage;
+    expect(userMessage).toBeDefined();
+  });
+
+  it('queues phone/device tasks to the Open-Chat worker', async () => {
+    mocks.routeAndClassify.mockResolvedValue(
+      classify(route({ intent: 'unknown', confidence: 0.1 })),
+    );
+    mocks.enqueueWorkerTask.mockResolvedValue('task-abc');
+
+    const { result, chunks } = await collectTurn(
+      'remind me to call the bank at 3pm',
+      [],
+      { user_id: 'u-1' },
+    );
+
+    expect(result.status).toBe('completed');
+    expect(result.result).toContain('Queued to your phone');
+    expect(result.result).toContain('task-abc');
+    expect(chunks).toContain('Queueing to your phone');
+    expect(mocks.enqueueWorkerTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skill_pack_id: 'on_device_ops:1.0.0',
+        payload: expect.objectContaining({ request: 'remind me to call the bank at 3pm' }),
+      }),
+    );
+    expect(mocks.dispatchTask).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a worker-enqueue failure gracefully', async () => {
+    mocks.routeAndClassify.mockResolvedValue(
+      classify(route({ intent: 'unknown', confidence: 0.1 })),
+    );
+    mocks.enqueueWorkerTask.mockRejectedValue(new Error('queue is down'));
+
+    const { result } = await collectTurn('take a screenshot on my phone');
+
+    expect(result.status).toBe('completed');
+    expect(result.result).toContain('Could not queue the on-device task');
+    expect(result.result).toContain('queue is down');
   });
 });

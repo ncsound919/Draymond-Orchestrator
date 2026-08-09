@@ -129,8 +129,8 @@ export const DEFAULT_STRATEGY: MissionStrategy = {
     {
       id: "research",
       name: "Research Brief",
-      agents: ["omni-research", "kaggle", "uplift-agent"],
-      skills: ["market-research-reports", "qingyan-research", "multi-search-engine"],
+      agents: ["omni-research", "kaggle", "uplift-agent", "bookbridge"],
+      skills: ["market-research-reports", "qingyan-research", "multi-search-engine", "book-bridge", "book-to-skill", "book-to-skill-chain", "book-synthesis-personal"],
       deliveryCostCents: 1500,
       targetMonthly: 1000,
       billing: "one_time",

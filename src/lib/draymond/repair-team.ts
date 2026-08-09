@@ -228,7 +228,7 @@ export async function repairFailedJob(
     try {
       const { isOnCooldown } = await import("./workflow-budget");
       const cooldownKey = `repair:${job.id}`;
-      const onCooldown = isOnCooldown(cooldownKey, "codegen", Number(process.env.DRAYMOND_REPAIR_DISPATCH_COOLDOWN_MS ?? 30 * 60 * 1000));
+      const onCooldown = isOnCooldown(cooldownKey, "codegen", Number(process.env.DRAYMOND_REPAIR_DISPATCH_COOLDOWN_MS) || 30 * 60 * 1000);
       if (onCooldown) {
         const detail = `coding repair dispatched recently (cooldown) — ${crew.lead} on the next window`;
         const action: RepairReport["action"] = "handed-off";
@@ -327,7 +327,7 @@ export function renderRepairReport(report: RepairReport): string {
   return lines.join('\n');
 }
 
-const reportCooldownMs = () => Number(process.env.DRAYMOND_REPAIR_REPORT_COOLDOWN_MS ?? 30 * 60 * 1000);
+const reportCooldownMs = () => Number(process.env.DRAYMOND_REPAIR_REPORT_COOLDOWN_MS) || 30 * 60 * 1000;
 
 /**
  * Push a deterministic repair report to the operator (email) AND the

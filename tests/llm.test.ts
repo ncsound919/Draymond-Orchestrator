@@ -98,6 +98,19 @@ describe('shared llm helper', () => {
     ).rejects.toThrow(/402/);
   });
 
+  it('returns the deterministic fallback when every provider fails', async () => {
+    process.env.DEEPSEEK_API_KEY = 'k';
+    fetchMock.mockRejectedValue(new Error('network down'));
+    vi.stubGlobal('fetch', fetchMock);
+    const text = await callLLM({
+      provider: 'deepseek',
+      system: 's',
+      userMessage: 'u',
+      deterministicFallback: 'deterministic-plan',
+    });
+    expect(text).toBe('deterministic-plan');
+  });
+
   it('prefers the local ollama tier when no remote provider key is set', () => {
     // The universal chain defaults to the free→go opencode tier, then deepseek,
     // gemini, and the always-available local ollama tier.

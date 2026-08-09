@@ -50,6 +50,7 @@ export const FREE_API_REGISTRY: ApiKeyEntry[] = [
   { name: 'CourtListener', engine: 'E1', envVars: ['COURTLISTENER_API_KEY'], noKey: false, signupUrl: 'https://www.courtlistener.com/accounts/register/', use: 'Justice: dockets/cases' },
 
   // ── E2 · B2B (Aetherdesk + marketing) ──────────────────────────────────
+  { name: 'Stripe (billing)', engine: 'E2', envVars: ['STRIPE_SECRET_KEY'], noKey: false, signupUrl: 'https://dashboard.stripe.com/apikeys', use: 'Billing — settled revenue for the Treasurer (treasury.ts)', fetcher: 'treasury.fetchStripeCharges' },
   { name: 'Resend', engine: 'E2', envVars: ['RESEND_API_KEY'], noKey: false, signupUrl: 'https://resend.com/api-keys', use: 'Agentmail + client comms' },
   { name: 'Twilio SendGrid', engine: 'E2', envVars: ['SENDGRID_API_KEY'], noKey: false, signupUrl: 'https://signup.sendgrid.com/', use: 'Notifications' },
   { name: 'Cal.com API', engine: 'E2', envVars: ['CALCOM_API_KEY'], noKey: false, signupUrl: 'https://app.cal.com/settings/developer/api-keys', use: 'Aetherdesk appointment booking' },

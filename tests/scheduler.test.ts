@@ -47,6 +47,14 @@ vi.mock('../src/lib/draymond/event-bridge', () => ({
 vi.mock('../src/lib/draymond/notifications', () => ({
   sendAlertEmail: vi.fn(async () => ({ id: 'n1' })),
 }));
+vi.mock('../src/lib/draymond/coding-repair', () => ({
+  dispatchCodingRepair: vi.fn(async () => ({
+    action: 'handed-off',
+    detail: 'coding crew (test mock) proposed a fix',
+    dispatch: { kind: 'codegen', engine: 'test-mock', result: 'mock', duration_ms: 1 },
+  })),
+  deterministicRepairPlan: (job: { name: string }) => `plan for ${job.name}`,
+}));
 vi.mock('../src/lib/draymond/kairos', () => ({
   kairosScan: vi.fn(async () => ({ detected: 2, created: 2, repeated: 0, notified: 1, errors: [], budgetExceeded: false, durationMs: 5 })),
 }));

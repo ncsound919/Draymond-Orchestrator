@@ -151,6 +151,67 @@ export async function seedSkillPacks(): Promise<SeedSkillPacksResult> {
       platforms: [],
       outputs: ['code', 'email'],
     },
+    {
+      name: 'book_grounded_research',
+      version: '1.0.0',
+      purpose: 'Ground a research topic against the BookBridge book library and synthesize a research brief.',
+      triggers: ['research', 'book library', 'grounded research', 'book-grounded', 'synthesize from books'],
+      instructions:
+        'Call BookBridge (/reading_plan then /search) for the topic, collect cited passages, ' +
+        'synthesize a research brief citing each book passage, and store it in the knowledge bank.',
+      tools: ['bookbridge_search', 'bookbridge_reading_plan', 'bookbridge_cite', 'knowledge_bank'],
+      platforms: [],
+      outputs: ['research_brief', 'citations'],
+    },
+    {
+      name: 'book_to_skill_distill',
+      version: '1.0.0',
+      purpose: 'Distill a book from the library into a reusable agent skill via the book-to-skill converter.',
+      triggers: ['distill book', 'book to skill', 'turn book into skill', 'book skill', 'library distill'],
+      instructions:
+        'Ground the book with BookBridge, run the book-to-skill converter on the source, ' +
+        'validate the generated skill, and register it in Draymond registry + entity registry.',
+      tools: ['bookbridge_search', 'book-to-skill', 'registry'],
+      platforms: [],
+      outputs: ['skill', 'registry_entry'],
+    },
+    {
+      name: 'book_synthesis_personal',
+      version: '1.0.0',
+      purpose: 'Produce a deeply personalized synthesis of a book translated into the reader\'s domain.',
+      triggers: ['synthesize book', 'book notes', 'personalized synthesis', 'summarize book for me'],
+      instructions:
+        'Load the reader profile if present, then follow the book-synthesis-personal workflow ' +
+        'to produce a personalized markdown + PDF synthesis.',
+      tools: ['book-synthesis-personal'],
+      platforms: [],
+      outputs: ['synthesis', 'pdf'],
+    },
+    {
+      name: 'github_pull',
+      version: '1.0.0',
+      purpose: 'Pull skills, tools, and agents from GitHub on demand and register them in the operational catalog.',
+      triggers: ['pull from github', 'get skill from github', 'install github tool', 'add repo', 'github skill'],
+      instructions:
+        'Use the gh CLI to search GitHub, clone/extract the resource into agents/skills or agents/, ' +
+        'validate the manifest, and register it in registry.json + entity registry + skill packs.',
+      tools: ['gh', 'github-manage', 'registry'],
+      platforms: [],
+      outputs: ['resource', 'registry_entry'],
+    },
+    {
+      name: 'on_device_ops',
+      version: '1.0.0',
+      purpose: 'Execute a task on the user\'s phone via Open Chat — phone control, capture, reminders, notifications, and on-device AI answers.',
+      triggers: ['on my phone', 'on my device', 'open whatsapp', 'open telegram', 'open instagram', 'take a screenshot', 'remind me', 'set a reminder', 'check my notifications', 'phone'],
+      instructions:
+        'Execute the requested on-device task. Use phone_control to inspect and drive the phone UI, ' +
+        'capture for screenshots, notify for local alerts, ai_apps for AI-app access, and text/llm to ' +
+        'answer questions with the on-device model. Report the outcome (and a screenshot reference when taken).',
+      tools: ['phone_control', 'capture', 'text', 'llm', 'notify', 'ai_apps', 'current_time', 'outputs'],
+      platforms: ['android'],
+      outputs: ['task_result', 'screenshot_ref'],
+    },
   ];
   const result: SeedSkillPacksResult = {
     seeded: 0,

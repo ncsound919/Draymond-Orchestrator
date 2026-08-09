@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { requireDraymondAuth } from '@/lib/draymond/auth';
-import ChatClient from './ChatClient';
+import ChatClient from '@/components/chat/ChatClient';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Chat | Draymond Orchestrator',
@@ -12,9 +14,5 @@ export default async function ChatPage() {
   const auth = await requireDraymondAuth();
   if (auth.error) redirect('/login');
 
-  return (
-    <div className="h-[calc(100vh-6rem)]">
-      <ChatClient userEmail={auth.user.email} />
-    </div>
-  );
+  return <ChatClient userEmail={auth.user.email} />;
 }

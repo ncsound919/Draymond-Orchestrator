@@ -580,7 +580,7 @@ export class LocalQueryBuilder {
 
       if (this.selectAfterWrite) {
         const ids = rows.map((r) => r.id).filter(Boolean);
-        if (ids.length === 0) return this.ok([], null);
+        if (ids.length === 0) return this.postProcessRows([], null);
         return this.postProcessRows(this.returningSelect([{ op: 'in', column: 'id', values: ids }]), null);
       }
       return this.ok(null, null);
@@ -592,7 +592,7 @@ export class LocalQueryBuilder {
       this.db.prepare(`DELETE FROM ${table}${sql}`).run(...params);
       if (this.selectAfterWrite) {
         const ids = affected.filter(Boolean);
-        if (ids.length === 0) return this.ok([], null);
+        if (ids.length === 0) return this.postProcessRows([], null);
         return this.postProcessRows(this.returningSelect([{ op: 'in', column: 'id', values: ids }]), null);
       }
       return this.ok(null, null);
@@ -614,7 +614,7 @@ export class LocalQueryBuilder {
       .run(...keys.map((k) => values[k]), ...params);
     if (this.selectAfterWrite) {
       const ids = affected.filter(Boolean);
-      if (ids.length === 0) return this.ok([], null);
+      if (ids.length === 0) return this.postProcessRows([], null);
       return this.postProcessRows(this.returningSelect([{ op: 'in', column: 'id', values: ids }]), null);
     }
     return this.ok(null, null);

@@ -11,6 +11,7 @@ let tempDir = '';
 
 const mocks = vi.hoisted(() => ({
   pipelineSummary: vi.fn(),
+  settledRevenueUsd: vi.fn(),
   getLessons: vi.fn(),
   newsDigest: vi.fn(),
   rdNightReport: vi.fn(),
@@ -52,6 +53,9 @@ async function loadCommunicator() {
   vi.doMock('../src/lib/draymond/business-pipeline', () => ({
     pipelineSummary: mocks.pipelineSummary,
   }));
+  vi.doMock('../src/lib/draymond/treasury-state', () => ({
+    settledRevenueUsd: mocks.settledRevenueUsd,
+  }));
   vi.doMock('../src/lib/draymond/self-learning', () => ({
     getLessons: mocks.getLessons,
   }));
@@ -69,6 +73,7 @@ async function loadCommunicator() {
 
 describe('buildRecap', () => {
   it('builds a recap with every section populated', async () => {
+    mocks.settledRevenueUsd.mockResolvedValue(150);
     mocks.pipelineSummary.mockResolvedValue({
       opportunities: { activePipelineValue: 12000, wonMonthlyValue: 3000 },
       monthlyTarget: 33000,
@@ -88,15 +93,16 @@ describe('buildRecap', () => {
     expect(r.phase).toBe('morning');
     expect(typeof r.generatedAt).toBe('string');
     expect(r.sections.money).toBe(
-      'Pipeline: $12000 active, $3000 won/mo. Target $33000/mo.',
+      'Settled revenue: $150. Pipeline: $12000 active, $3000 won/mo. Target $33000/mo.',
     );
     expect(r.sections.issues).toBe('2 lesson(s): retries; timeouts');
     expect(r.sections.insights).toBe('News: AI news | Markets');
     expect(r.sections.upgrades).toBe('Dev queue: New UI');
-    expect(r.summary).toBe('Morning recap: Pipeline: $12000 active, $3000 won/mo. Target $33000/mo.');
+    expect(r.summary).toBe('Morning recap: Settled revenue: $150. Pipeline: $12000 active, $3000 won/mo. Target $33000/mo.');
   });
 
   it('reports no recurring issues and no news/upgrades when they are empty', async () => {
+    mocks.settledRevenueUsd.mockResolvedValue(0);
     mocks.pipelineSummary.mockResolvedValue({
       opportunities: { activePipelineValue: 0, wonMonthlyValue: 0 },
       monthlyTarget: 33000,
@@ -111,10 +117,11 @@ describe('buildRecap', () => {
     expect(r.sections.issues).toBe('No recurring issues.');
     expect(r.sections.insights).toBeUndefined();
     expect(r.sections.upgrades).toBeUndefined();
-    expect(r.summary).toBe('Night recap: Pipeline: $0 active, $0 won/mo. Target $33000/mo.');
+    expect(r.summary).toBe('Night recap: Settled revenue: $0. Pipeline: $0 active, $0 won/mo. Target $33000/mo.');
   });
 
   it('falls back to n/a sections when all modules throw', async () => {
+    mocks.settledRevenueUsd.mockRejectedValue(new Error('boom'));
     mocks.pipelineSummary.mockRejectedValue(new Error('boom'));
     mocks.getLessons.mockRejectedValue(new Error('boom'));
     mocks.newsDigest.mockRejectedValue(new Error('boom'));

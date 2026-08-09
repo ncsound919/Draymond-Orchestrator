@@ -18,6 +18,11 @@ let cached: Db | null = null;
 /** Columns added to existing tables after their initial CREATE TABLE. */
 const SCHEMA_UPGRADES: Array<{ table: string; column: string; ddl: string }> = [
   {
+    table: 'draymond_messages',
+    column: 'seq',
+    ddl: 'ALTER TABLE draymond_messages ADD COLUMN seq INTEGER NOT NULL DEFAULT 0',
+  },
+  {
     table: 'draymond_benchmarks',
     column: 'deep_scores',
     ddl: 'ALTER TABLE draymond_benchmarks ADD COLUMN deep_scores TEXT NOT NULL DEFAULT \'{}\'',
@@ -34,6 +39,15 @@ export function applyUpgrades(db: Db): void {
   const have = new Set(cols.map((c) => c.name));
   for (const upgrade of SCHEMA_UPGRADES) {
     if (upgrade.table === 'draymond_benchmarks' && have.has(upgrade.column)) continue;
+    const tableExists = !!db
+      .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
+      .get(upgrade.table);
+    if (!tableExists) continue; // table doesn't exist yet — nothing to upgrade
+    const existing = db
+      .prepare(`PRAGMA table_info(${upgrade.table})`)
+      .all() as Array<{ name: string }>;
+    const hasColumn = existing.some((c) => c.name === upgrade.column);
+    if (hasColumn) continue;
     db.exec(upgrade.ddl);
   }
 }

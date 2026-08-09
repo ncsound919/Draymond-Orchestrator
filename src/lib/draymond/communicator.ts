@@ -44,8 +44,10 @@ export async function buildRecap(phase: PhaseRecap["phase"]): Promise<PhaseRecap
   // Money — from the business pipeline + treasury.
   try {
     const { pipelineSummary } = await import("./business-pipeline");
-    const p = await pipelineSummary();
-    money.push(`Pipeline: $${p.opportunities.activePipelineValue} active, $${p.opportunities.wonMonthlyValue} won/mo. Target $${p.monthlyTarget}/mo.`);
+    const { settledRevenueUsd } = await import("./treasury-state");
+    const revenueToDate = await settledRevenueUsd();
+    const p = await pipelineSummary(revenueToDate);
+    money.push(`Settled revenue: $${revenueToDate}. Pipeline: $${p.opportunities.activePipelineValue} active, $${p.opportunities.wonMonthlyValue} won/mo. Target $${p.monthlyTarget}/mo.`);
   } catch { /* pipeline unavailable */ }
 
   // Issues — from self-learning lessons + repair log.

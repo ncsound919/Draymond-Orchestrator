@@ -24,12 +24,12 @@ async function main(): Promise<void> {
   console.log(
     JSON.stringify(
       {
-        business: { chains: biz.chains?.length, jobs: biz.jobs?.length, errors: biz.errors?.length },
+        business: { chains: biz.chains.slugs.length, jobs: biz.jobs.names.length, errors: biz.errors.length },
         monitors: { created: mon.created, skipped: mon.skipped },
-        skills: { seeded: sk.seeded?.length },
-        entities: { registered: ent.registered, errors: ent.errors?.length },
-        chains: { seeded: chains.seeded?.length, errors: chains.errors?.length },
-        missionChains: { seeded: missionChains.seeded?.length, errors: missionChains.errors?.length },
+        skills: { seeded: sk.seeded },
+        entities: { registered: ent.registered, errors: ent.errors.length },
+        chains: { seeded: chains.seeded.length, errors: chains.errors.length },
+        missionChains: { seeded: missionChains.seeded.length, errors: missionChains.errors.length },
         jobs: { created: jobs },
       },
       null,

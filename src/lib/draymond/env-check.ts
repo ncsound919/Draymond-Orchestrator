@@ -28,9 +28,6 @@ const OPTIONAL_VARS: EnvVar[] = [
   { name: 'GMAIL_USER', required: false, description: 'Gmail address for email notifications' },
   { name: 'GMAIL_APP_PASSWORD', required: false, description: 'Gmail app password for SMTP' },
   { name: 'DRAYMOND_ALERT_EMAIL', required: false, description: 'Alert recipient email' },
-  { name: 'NTFY_URL', required: false, description: 'ntfy server base URL (push-approval relay)' },
-  { name: 'NTFY_TOPIC', required: false, description: 'ntfy topic for approval requests' },
-  { name: 'DRAYMOND_PUBLIC_URL', required: false, description: 'Public URL for ntfy approval action callbacks' },
   { name: 'UPLIFT_BASE_URL', required: false, description: 'Uplift Agent base URL' },
   { name: 'SPORTS_STEVE_URL', required: false, description: 'Sports Steve agent URL' },
   { name: 'BET_BUDDY_URL', required: false, description: 'Bet Buddy agent URL' },
@@ -55,6 +52,12 @@ const OPTIONAL_VARS: EnvVar[] = [
   { name: 'AETHERDESK_BASE_URL', required: false, description: 'AetherDesk API base URL (e.g. http://127.0.0.1:8000/api/v1)' },
   { name: 'AETHERDESK_API_KEY', required: false, description: 'AetherDesk INTERNAL_API_KEY for x-api-key auth' },
   { name: 'NTFY_TOPIC_RESULTS', required: false, description: 'ntfy topic for execution result notifications (separate from approvals)' },
+  { name: 'NTFY_TOPIC_REPAIR', required: false, description: 'ntfy topic for deterministic repair reports (defaults to NTFY_TOPIC_RESULTS)' },
+  { name: 'DRAYMOND_REPAIR_IMMEDIATE', required: false, description: 'Dispatch the coding crew on the FIRST failure (default "1"); "0" keeps the old evidence-gated behaviour' },
+  { name: 'DRAYMOND_REPAIR_AT_FAILURE', required: false, description: 'Dispatch a bounded repair at the exact moment a job fails (default "1"); "0" waits for the hourly Repair Team job' },
+  { name: 'DRAYMOND_REPAIR_AT_FAILURE_TIMEOUT_MS', required: false, description: 'Per-engine codegen timeout for the at-failure dispatch (default 30000)' },
+  { name: 'DRAYMOND_REPAIR_DISPATCH_COOLDOWN_MS', required: false, description: 'Cooldown between coding-crew dispatches for the same job (default 30min)' },
+  { name: 'DRAYMOND_REPAIR_REPORT_COOLDOWN_MS', required: false, description: 'Dedupe window for deterministic repair-report emails per job+outcome (default 30min)' },
 ];
 
 /**

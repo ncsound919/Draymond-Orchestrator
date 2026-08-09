@@ -16,6 +16,10 @@ export interface ColumnMap {
 }
 
 export const COLUMN_MAPS: Record<string, ColumnMap> = {
+  draymond_conversations: {
+    json: [],
+    bool: [],
+  },
   draymond_agents: {
     json: ['capabilities', 'config'],
     bool: ['auto_recovery_enabled'],
@@ -136,6 +140,7 @@ export const COLUMN_MAPS: Record<string, ColumnMap> = {
 
 /** Names of the draymond tables that carry an auto-managed `id` (uuid) column. */
 const TABLES_WITH_ID = new Set([
+  'draymond_conversations',
   'draymond_agents',
   'draymond_sessions',
   'draymond_events',
@@ -171,6 +176,15 @@ export function tableHasIdColumn(table: string): boolean {
 // ============================================================================
 
 export const SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS draymond_conversations (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  title TEXT NOT NULL DEFAULT 'New chat',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_draymond_conversations_user ON draymond_conversations(user_id, updated_at DESC);
+
 CREATE TABLE IF NOT EXISTS draymond_agents (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -535,9 +549,10 @@ CREATE TABLE IF NOT EXISTS draymond_messages (
   content TEXT NOT NULL,
   protocol TEXT NOT NULL DEFAULT 'draymond',
   metadata TEXT NOT NULL DEFAULT '{}',
+  seq INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_draymond_messages_session ON draymond_messages(session_id);
+CREATE INDEX IF NOT EXISTS idx_draymond_messages_session ON draymond_messages(session_id, seq);
 CREATE INDEX IF NOT EXISTS idx_draymond_messages_created ON draymond_messages(created_at DESC);
 
 CREATE TABLE IF NOT EXISTS draymond_execution_logs (

@@ -20,9 +20,13 @@
 # production
 /build
 
+# electron-builder output (large binaries — never push to GitHub)
+/release/
+
 # misc
 .DS_Store
 *.pem
+
 
 # debug
 npm-debug.log*

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { createMissionCheckout } from '../actions';
+import { createMissionCheckout } from '@/app/mission/actions';
 
 export interface CheckoutTierProps {
   id: string;

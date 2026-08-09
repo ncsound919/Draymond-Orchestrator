@@ -1,10 +1,71 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { decideByMonteCarlo } from '../src/lib/ide/monte-carlo';
+
+// ============================================================================
+// Hermetic network mocks — the session manager dispatches to live engines
+// (LLM providers, Uplift, Mutly, Codegang, opencode) that are NOT running in
+// tests. Mock them so steps fail fast and deterministically instead of hanging
+// on real HTTP/LLM timeouts. The tests assert the orchestration logic (DAG,
+// fail-soft, decisions), not live-engine integration.
+// ============================================================================
+
+vi.mock('../src/lib/draymond/llm', () => ({
+  callLLM: vi.fn(async () => {
+    throw new Error('llm offline in tests');
+  }),
+  callLocalModel: vi.fn(async () => {
+    throw new Error('llm offline in tests');
+  }),
+  maxTokensForMode: vi.fn(() => 1024),
+  truncateToTokens: vi.fn((t: string) => t),
+}));
+
+vi.mock('../src/lib/uplift', () => ({
+  dispatchTask: vi.fn(async () => {
+    throw new Error('uplift offline in tests');
+  }),
+  pingUplift: vi.fn(async () => false),
+}));
+
+vi.mock('../src/lib/ide/mutly-client', () => ({
+  mutlyIsUp: vi.fn(async () => false),
+  mutlyScan: vi.fn(async () => ({})),
+  mutlySymbols: vi.fn(async () => []),
+  mutlyAnalyze: vi.fn(async () => ({})),
+  mutlyPipelineStart: vi.fn(async () => ({})),
+  mutlyPipelineStatus: vi.fn(async () => ({ status: 'error' })),
+}));
+
+vi.mock('../src/lib/ide/codegang-client', () => ({
+  codegangIsUp: vi.fn(async () => false),
+  codegangAnalyzeFile: vi.fn(async () => ({ success: false })),
+  codegangFinishProject: vi.fn(async () => ({})),
+}));
+
+vi.mock('../src/lib/ide/opencode-client', () => ({
+  runOpencodeCodegen: vi.fn(async () => ({ success: false, content: '', error: 'opencode offline in tests' })),
+}));
+
+// Probe: return a deterministic "not started" diagnosis for every service so
+// diagnose/verify steps and the probe test never depend on live ports.
+vi.mock('../src/lib/ide/service-probe', () => ({
+  probeService: vi.fn(async (slug: string) => ({
+    slug,
+    port: null,
+    listening: false,
+    httpCode: null,
+    healthUrl: null,
+    logTail: [],
+    missingEnv: [],
+    signature: 'not_started',
+    notes: ['not listening and no recent logs — service likely not started'],
+  })),
+}));
 
 const execFileAsync = promisify(execFile);
 

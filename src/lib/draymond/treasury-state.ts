@@ -32,6 +32,10 @@ export interface TreasuryState {
   revenueCents: number;
   /** id → settled charge ledger (dedupe + refund tracking). */
   charges: Record<string, SettledCharge>;
+  /** Charge ids that already fired a sale alert (so each sale alerts once). */
+  alertedChargeIds: string[];
+  /** When the last sale alert was published. */
+  lastAlertAt: string | null;
   lastPulseAt: string | null;
   lastPulseStatus: "ok" | "not-configured" | "error";
   lastPulseError: string | null;
@@ -39,7 +43,7 @@ export interface TreasuryState {
 }
 
 export function emptyTreasuryState(): TreasuryState {
-  return { revenueCents: 0, charges: {}, lastPulseAt: null, lastPulseStatus: "not-configured", lastPulseError: null, updatedAt: new Date().toISOString() };
+  return { revenueCents: 0, charges: {}, alertedChargeIds: [], lastAlertAt: null, lastPulseAt: null, lastPulseStatus: "not-configured", lastPulseError: null, updatedAt: new Date().toISOString() };
 }
 
 export async function readState(): Promise<TreasuryState> {
@@ -49,6 +53,8 @@ export async function readState(): Promise<TreasuryState> {
     return {
       revenueCents: typeof parsed.revenueCents === "number" ? parsed.revenueCents : 0,
       charges: parsed.charges && typeof parsed.charges === "object" ? parsed.charges : {},
+      alertedChargeIds: Array.isArray(parsed.alertedChargeIds) ? parsed.alertedChargeIds : [],
+      lastAlertAt: parsed.lastAlertAt ?? null,
       lastPulseAt: parsed.lastPulseAt ?? null,
       lastPulseStatus: parsed.lastPulseStatus ?? "not-configured",
       lastPulseError: parsed.lastPulseError ?? null,

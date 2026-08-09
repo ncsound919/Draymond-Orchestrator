@@ -99,31 +99,44 @@ describe('skill-packs', () => {
     expect(changed).toBe(false);
   });
 
-  it('seeds the five first skill packs', async () => {
+  it('seeds the first skill packs', async () => {
     const result = await seedSkillPacks();
-    expect(result.seeded).toBe(5);
     expect(result.errors).toEqual([]);
-    expect(result.names).toEqual(['marketing_draft', 'social_post', 'email_report', 'lead_pulse', 'vibe_ui_gen']);
+    expect(result.names).toEqual([
+      'marketing_draft', 'social_post', 'email_report', 'lead_pulse', 'vibe_ui_gen',
+      'book_grounded_research', 'book_to_skill_distill', 'book_synthesis_personal',
+      'github_pull', 'on_device_ops',
+    ]);
     const all = await listSkillPacks();
     const names = new Set(all.map((p) => p.name));
-    for (const n of ['marketing_draft', 'social_post', 'email_report', 'lead_pulse', 'vibe_ui_gen']) {
+    for (const n of ['marketing_draft', 'social_post', 'email_report', 'lead_pulse', 'vibe_ui_gen',
+      'book_grounded_research', 'book_to_skill_distill', 'book_synthesis_personal', 'github_pull', 'on_device_ops']) {
       expect(names.has(n)).toBe(true);
     }
   });
 
-  it('seeds idempotently — a second run still yields 5 packs', async () => {
+  it('seeds idempotently — a second run still yields 10 packs', async () => {
     await seedSkillPacks();
     await seedSkillPacks();
     const all = await listSkillPacks();
-    expect(all).toHaveLength(5);
+    expect(all).toHaveLength(10);
   });
 
   it('seeds packs as approved', async () => {
     await seedSkillPacks();
     const all = await listSkillPacks();
-    expect(all).toHaveLength(5);
+    expect(all).toHaveLength(10);
     for (const pack of all) {
       expect(pack.review_status).toBe('approved');
     }
+  });
+
+  it('seeds the on-device ops pack with Open-Chat-executable tools', async () => {
+    await seedSkillPacks();
+    const pack = await getSkillPack('on_device_ops', '1.0.0');
+    expect(pack).not.toBeNull();
+    expect(pack?.tools).toEqual(
+      expect.arrayContaining(['phone_control', 'capture', 'text', 'llm', 'notify', 'ai_apps'])
+    );
   });
 });

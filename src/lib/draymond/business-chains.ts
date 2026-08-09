@@ -578,6 +578,68 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     category: 'research',
     health_endpoint: '/kaggle/status',
   },
+
+  // ── BookBridge service ──────────────────────────────────────────────
+  // Book library daemon (:8777 REST / :8778 MCP) — grounded research,
+  // reading plans, citations. Used by the book-grounded-research chain.
+  {
+    name: 'BookBridge',
+    slug: 'bookbridge',
+    kind: 'service',
+    description:
+      'Local book library daemon (REST :8777, MCP :8778). Hybrid search, full-text retrieval, reading plans, citations, summaries, flashcards, knowledge graph, and provenance linking over the indexed library.',
+    invocation_method: 'http_api',
+    invocation_config: {
+      url: agentUrl('BOOKBRIDGE_URL', 'http://127.0.0.1:8777'),
+      method: 'POST',
+      health_url: `${agentUrl('BOOKBRIDGE_URL', 'http://127.0.0.1:8777')}/health`,
+      endpoints: {
+        health: '/health',
+        search: '/search',
+        reading_plan: '/reading_plan',
+        retrieve: '/retrieve',
+        citation: '/citation',
+        summarize: '/summarize',
+        books: '/books',
+        add: '/books/add',
+        scan: '/scan',
+        link_activity: '/link_activity',
+      },
+    },
+    capabilities: [
+      'book_search',
+      'book_retrieval',
+      'reading_plan',
+      'citations',
+      'summarization',
+      'knowledge_graph',
+      'provenance',
+    ],
+    tags: ['books', 'library', 'research', 'grounding'],
+    category: 'research',
+    health_endpoint: '/health',
+  },
+
+  // ── Book-to-Skill Chain orchestrator ────────────────────────────────
+  // Pipeline: ground with BookBridge -> synthesize -> convert to a skill
+  // -> register. Used by the book-grounded-research chain final step.
+  {
+    name: 'Book-to-Skill Chain',
+    slug: 'book-to-skill-chain',
+    kind: 'tool',
+    description:
+      'Orchestrator pipeline: ground with BookBridge, synthesize the book, run the book-to-skill converter, and register the generated skill in Draymond registry + entity registry.',
+    invocation_method: 'internal',
+    invocation_config: {},
+    capabilities: [
+      'book_pipeline',
+      'skill_registration',
+      'library_distillation',
+      'framework_extraction',
+    ],
+    tags: ['books', 'pipeline', 'skills', 'research'],
+    category: 'research',
+  },
 ];
 
 // ============================================================================
@@ -1246,6 +1308,57 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
       },
     ],
   },
+
+  // ── Chain 12: Book-Grounded Research ─────────────────────────────────
+  // Research arm: ground a topic against the BookBridge library, synthesize
+  // the author frameworks into a brief, and distill any targeted book into a
+  // reusable agent skill so the knowledge compounds.
+  {
+    name: 'Book-Grounded Research',
+    slug: 'book-grounded-research',
+    description:
+      'Books → research: grounds a research topic against the BookBridge library (reading plan + passages), synthesizes a research brief, and optionally distills a source book into a reusable agent skill via book-to-skill.',
+    steps: [
+      {
+        name: 'Ground with BookBridge',
+        entitySlug: 'bookbridge',
+        action: 'bookbridge_ground',
+        input_mapping: {
+          topic: '$.input.topic',
+          source: '$.input.source',
+          max_results: '$.input.max_results',
+        },
+        output_key: 'grounding',
+        step_order: 1,
+        depends_on_indices: [],
+      },
+      {
+        name: 'Synthesize from Books',
+        entitySlug: 'omni-research',
+        action: 'research_news',
+        input_mapping: {
+          query: '$.input.topic',
+          grounding: '$.steps.grounding.output',
+        },
+        output_key: 'research_brief',
+        step_order: 2,
+        depends_on_indices: [0],
+      },
+      {
+        name: 'Distill Book to Skill',
+        entitySlug: 'book-to-skill-chain',
+        action: 'distill_book_to_skill',
+        input_mapping: {
+          source: '$.input.source',
+          skill_name: '$.input.skill_name',
+          topic: '$.input.topic',
+        },
+        output_key: 'generated_skill',
+        step_order: 3,
+        depends_on_indices: [0],
+      },
+    ],
+  },
 ];
 
 // ============================================================================
@@ -1444,6 +1557,22 @@ const JOB_DEFS: JobSeedDef[] = [
         topic: 'NBA performance trends',
         tags: 'research,data',
         force: false,
+      },
+    },
+    notify_on_failure: true,
+  },
+
+  // ── Book-Grounded Research + Library Distill (5AM daily) ─────────────
+  {
+    name: 'Book-Grounded Research',
+    cron_expression: '0 5 * * *',
+    job_type: 'chain',
+    job_config: {
+      chain_slug: 'book-grounded-research',
+      input: {
+        topic: 'strategy, business frameworks, agent autonomy',
+        source: null,
+        skill_name: 'library-insights',
       },
     },
     notify_on_failure: true,

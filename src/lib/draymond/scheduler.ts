@@ -1400,6 +1400,33 @@ export async function runDueJobs(): Promise<JobRunResult[]> {
           console.error(`[Draymond Scheduler] Failed to push failure chat alert for "${job.name}":`, notifyErr);
         }
       }
+
+      // IMMEDIATE repair dispatch — don't wait for the hourly Repair Team job.
+      // The repair/coding crew starts on the first failure now; the per-job
+      // cooldown inside repairFailedJob stops repeated identical failures from
+      // re-dispatching and burning tokens. Best-effort: it can never break the
+      // scheduler tick. Disable with DRAYMOND_REPAIR_AT_FAILURE=0.
+      if (process.env.DRAYMOND_REPAIR_AT_FAILURE !== '0') {
+        try {
+          const { updateJob } = await import('./scheduler');
+          const { repairFailedJob } = await import('./repair-team');
+          await repairFailedJob(
+            { id: job.id, name: job.name, job_type: job.job_type, job_config: job.job_config ?? {} },
+            errorMessage,
+            { updateJobConfig: (id, config) => updateJob(id, { job_config: config }) },
+            [],
+            {
+              // Respect DRAYMOND_REPAIR_IMMEDIATE so the legacy evidence gate
+              // still applies when the operator opts out of first-failure
+              // dispatch (DRAYMOND_REPAIR_AT_FAILURE=0 stops this entirely).
+              immediate: process.env.DRAYMOND_REPAIR_IMMEDIATE !== '0',
+              dispatchTimeoutMs: Number(process.env.DRAYMOND_REPAIR_AT_FAILURE_TIMEOUT_MS) || 30_000,
+            },
+          );
+        } catch (repairErr) {
+          console.error(`[Draymond Scheduler] Immediate repair dispatch failed for "${job.name}":`, repairErr);
+        }
+      }
     }
   }
 
