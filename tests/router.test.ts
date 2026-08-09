@@ -13,6 +13,11 @@ const mockEntities = vi.hoisted(() => [
   },
 ]);
 
+const mockChains = vi.hoisted(() => [
+  { slug: 'morning-briefing', name: 'Morning Briefing', description: null, trigger_type: 'scheduled' },
+  { slug: 'daily-marketing-run', name: 'Daily Marketing Run', description: null, trigger_type: 'scheduled' },
+]);
+
 // Mock the Supabase client so the router never touches next/headers.
 vi.mock('../src/lib/draymond/client', () => ({
   createDraymondAdminClient: vi.fn(() => ({
@@ -30,9 +35,7 @@ vi.mock('../src/lib/draymond/client', () => ({
         return {
           select: () => ({
             eq: () => ({
-              eq: () => ({
-                order: async () => ({ data: [], error: null }),
-              }),
+              order: async () => ({ data: mockChains, error: null }),
             }),
           }),
         };
@@ -166,5 +169,20 @@ describe('router opencode-free provider', () => {
     expect(result.intent).toBe('invoke_entity');
     expect(result.entity_slug).toBe('deterministic-brain');
     expect(result.action).toBe('sweep');
+  });
+
+  it('direct-matches a natural-language chain request by name', async () => {
+    // Templates are seeded as 'draft'; the router must still see them and match
+    // "run the morning briefing" → morning-briefing without the LLM.
+    const result = await routeTask('run the morning briefing');
+    expect(result.intent).toBe('execute_chain');
+    expect(result.chain_slug).toBe('morning-briefing');
+    expect(result.confidence).toBeGreaterThanOrEqual(0.9);
+  });
+
+  it('direct-matches trigger/start phrasings to chains by name', async () => {
+    const r1 = await routeTask('trigger the daily marketing run');
+    expect(r1.intent).toBe('execute_chain');
+    expect(r1.chain_slug).toBe('daily-marketing-run');
   });
 });

@@ -83,7 +83,9 @@ async function getRegistrySnapshot(): Promise<RegistrySnapshot> {
       .from('draymond_chains')
       .select('slug, name, description, trigger_type')
       .eq('is_template', true)
-      .eq('status', 'active')
+      // Templates are seeded as 'draft'; they are the routable definitions,
+      // so include them regardless of status (a 'paused' template is still a
+      // valid target — instantiateChain handles it).
       .order('name'),
   ]);
 
@@ -539,6 +541,33 @@ function tryDirectMatch(task: string, snapshot: RegistrySnapshot): RouteResult |
       resolved_at: new Date().toISOString(),
       latency_ms: 0,
     };
+  }
+
+  // Natural-language chain-name match: "run the morning briefing" should hit
+  // the "morning-briefing" chain without the LLM. Matches on a run/start/do
+  // verb followed by words that normalize to a known chain name or slug.
+  const CHAIN_TRIGGER_RE = /^(?:run|start|trigger|do|execute|fire|kick\s+off)\b/i;
+  if (CHAIN_TRIGGER_RE.test(trimmed)) {
+    const norm = trimmed
+      .toLowerCase()
+      .replace(/^(?:please\s+)?(?:run|start|trigger|do|execute|fire|kick\s+off)\s+(?:the\s+|a\s+)?/i, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    for (const c of snapshot.chains) {
+      const chainKey = c.slug.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      const nameKey = (c.name ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      if (norm === chainKey || norm === nameKey || norm.startsWith(chainKey + '-') || norm.endsWith('-' + chainKey)) {
+        return {
+          intent: 'execute_chain',
+          confidence: 0.9,
+          chain_slug: c.slug,
+          reasoning: `Chain name "${trimmed.slice(0, 60)}" matched "${c.name}" — skipped LLM routing`,
+          alternatives: [],
+          resolved_at: new Date().toISOString(),
+          latency_ms: 0,
+        };
+      }
+    }
   }
 
   // Check for web search pattern
