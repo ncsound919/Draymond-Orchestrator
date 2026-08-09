@@ -1002,6 +1002,74 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         return { handler, built: articles.length, pushed: pushed.imported };
       }
 
+      if (handler === 'treasury_pulse') {
+        // Treasurer cash pulse — settled Stripe revenue only. Feeds the
+        // business pipeline + recaps. Wired to the day-orchestrator's 08:00
+        // treasury step (the old `overlay-treasurer` job had no handler).
+        const { runTreasuryPulse } = await import('./treasury');
+        const lookbackDays = Number(process.env.TREASURY_LOOKBACK_DAYS ?? 30);
+        const r = await runTreasuryPulse(Number.isFinite(lookbackDays) ? lookbackDays : 30);
+        return {
+          handler,
+          status: r.status,
+          revenueUsd: r.revenueUsd,
+          newSettled: r.newSettled,
+          error: r.error ?? null,
+          report: r.markdown.slice(0, 1500),
+        };
+      }
+
+      if (handler === 'mission_strategy_review') {
+        const { missionDashboard } = await import('./mission-pipeline');
+        const { readStrategy, totalMonthlyTarget } = await import('./mission-strategy');
+        const { settledRevenueUsd } = await import('./treasury-state');
+        const [dash, strategy, revenue] = await Promise.all([missionDashboard(), readStrategy(), settledRevenueUsd()]);
+        const target = totalMonthlyTarget(strategy);
+        const memo = [
+          '# Mission Strategy Review',
+          '',
+          `**Settled revenue to date: $${revenue}** (target: $${target}/mo by day ${strategy.runwayDays})`,
+          `**Pipeline:** ${dash.opportunities.total} opps · ${dash.velocity.leads} leads · ${dash.velocity.won} won · ${dash.velocity.invoiced} invoiced · ${dash.velocity.paid} paid`,
+          '',
+          '| Service | Target | Won (USD) | Paid (USD) |',
+          '|---|---|---|---|',
+          ...strategy.services.map((s) => `| ${s.name} | $${s.targetMonthly} | $${dash.byService[s.id].won} | $${dash.byService[s.id].paid} |`),
+          '',
+          `Revenue vs target: ${revenue >= target ? 'ON TARGET' : `$${Math.max(0, target - revenue)} short`}`,
+        ].join('\n');
+        try {
+          const { sendNotification } = await import('./notifications');
+          await sendNotification({
+            channel: 'email',
+            recipient: process.env.DRAYMOND_ALERT_EMAIL ?? process.env.GMAIL_USER ?? 'admin@localhost',
+            subject: 'Mission Strategy Review',
+            body: memo,
+            type: 'custom',
+            priority: 'normal',
+          });
+        } catch (e) { console.error('[scheduler] mission strategy review notify failed:', e); }
+        return { handler, revenue, target, memo: memo.slice(0, 1500) };
+      }
+
+      if (handler === 'mission_pipeline_sync') {
+        const { missionDashboard } = await import('./mission-pipeline');
+        const { listOpportunities } = await import('./business-pipeline');
+        const dash = await missionDashboard();
+        const ops = await listOpportunities();
+        // Flag leads older than 14 days as stale (diagnostic only — no mutation).
+        const stale = ops.filter((o) => o.stage === 'lead' && Date.now() - new Date(o.updatedAt).getTime() > 14 * 86400_000);
+        return { handler, total: dash.opportunities.total, byStage: dash.opportunities.byStage, staleLeads: stale.map((o) => o.id) };
+      }
+
+      if (handler === 'mission_run_maas_cycle') {
+        const { listOpportunities } = await import('./business-pipeline');
+        const { dispatchDelivery } = await import('./mission-delivery');
+        const clients = (await listOpportunities()).filter((o) => o.serviceId === 'maas' && (o.stage === 'won' || o.stage === 'delivering'));
+        const results = [];
+        for (const c of clients.slice(0, 10)) results.push(await dispatchDelivery(c.id));
+        return { handler, clients: clients.length, results };
+      }
+
       console.log(
         `[Draymond Scheduler] Custom job "${job.name}" triggered (handler: ${handler ?? 'none'}). ` +
         `No built-in handler registered — skipping execution.`
@@ -1495,6 +1563,38 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     cron_expression: '0 9 * * *',
     job_type: 'custom',
     job_config: { handler: 'api_key_audit' },
+    is_enabled: true,
+  },
+  {
+    name: 'Treasurer Cash Pulse',
+    description: 'Daily 8am — pull settled Stripe charges, update revenue to date, feed the business pipeline + recaps.',
+    cron_expression: '0 8 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'treasury_pulse' },
+    is_enabled: true,
+  },
+  {
+    name: 'Mission Pipeline Sync',
+    description: 'Daily 6am — reconcile opportunity stages, flag stale leads, compute mission KPIs.',
+    cron_expression: '0 6 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'mission_pipeline_sync' },
+    is_enabled: true,
+  },
+  {
+    name: 'Mission Strategy Review',
+    description: 'Weekly Monday 8am — pipeline + settled revenue vs target, emailed strategy memo.',
+    cron_expression: '0 8 * * 1',
+    job_type: 'custom',
+    job_config: { handler: 'mission_strategy_review' },
+    is_enabled: true,
+  },
+  {
+    name: 'MaaS Monthly Cycle',
+    description: 'Weekly Monday 9am — run the MaaS delivery chain for each active MaaS client.',
+    cron_expression: '0 9 * * 1',
+    job_type: 'custom',
+    job_config: { handler: 'mission_run_maas_cycle' },
     is_enabled: true,
   },
 ];
