@@ -5,15 +5,19 @@
  * (coding agents for config/code, skill agents for skill issues) → apply a
  * known deterministic repair (config patches) or hand off to a coding agent →
  * supervised by Big Homie → outcome recorded to self-learning so lessons drive
- * future repairs.
+ * future repairs. Every real outcome is ALSO reported to the operator + the
+ * repair/coding team via a deterministic (templated, LLM-free) report.
  *
- * Fixing, not reporting: unlike the old "handed-off" behaviour, this module
- * ACTUALLY dispatches repairs:
+ * Fixing, not reporting: this module ACTUALLY dispatches repairs:
  *   - service_down  → attempts to START the real service (service-manager).
- *   - code_error    → dispatches the coding crew (opencode) to generate a patch,
- *                     bounded by per-job evidence + cooldown so tokens aren't
- *                     burned on repeated identical failures.
+ *   - code_error    → dispatches the coding crew (opencode) to generate a patch
+ *                     IMMEDIATELY on the first failure (bounded by a per-job
+ *                     cooldown so tokens aren't burned on identical repeats).
  *   - missing_env   → escalates with a concrete provisioning instruction.
+ *
+ * Determinism for token savings: reports and info-passing between the repair
+ * team, the coding crew, and the operator are rendered from fixed templates —
+ * no LLM in the reporting path.
  */
 
 import fs from "node:fs/promises";
@@ -41,7 +45,7 @@ export interface RepairReport {
   /** Lessons distilled from prior outcomes of this job (learning → repair feedback). */
   lessonHints?: string[];
   /** When a real agent/process was dispatched, what happened. */
-  dispatch?: { kind: string; result: string; duration_ms?: number };
+  dispatch?: { kind: string; result: string; duration_ms?: number; engine?: string };
 }
 
 const DIR = process.env.DRAYMOND_REGISTRY_DIR ?? path.join(process.cwd(), ".draymond");
@@ -136,6 +140,13 @@ export function serviceForFailure(jobName: string, error: string): string[] {
   return matches;
 }
 
+export interface RepairRepairOptions {
+  /** Per-engine codegen timeout (ms) for this dispatch. */
+  dispatchTimeoutMs?: number;
+  /** Override the immediate-dispatch mode for this call. */
+  immediate?: boolean;
+}
+
 /**
  * Apply a known deterministic repair. Returns the report.
  * `getJobConfig`/`updateJobConfig` are injected so this module stays pure-ish
@@ -149,6 +160,7 @@ export async function repairFailedJob(
   },
   /** Distilled lessons for this job — the repair crew consults them. */
   lessonHints: string[] = [],
+  options: RepairRepairOptions = {},
 ): Promise<RepairReport> {
   const kind = classifyFailure(error);
   const crew = assembleCrew(kind);
@@ -205,25 +217,32 @@ export async function repairFailedJob(
     }
   }
 
-  // code_error / unknown → dispatch the coding crew to GENERATE a fix, but
-  // bounded: only when there is evidence (repeated-failure lesson) and not on
-  // cooldown, so tokens aren't burned on every identical failure.
+  // code_error / unknown → dispatch the coding crew to GENERATE a fix. With
+  // immediate mode (default) the FIRST failure dispatches so fixes start now;
+  // the per-job cooldown stops repeated identical failures from re-dispatching
+  // and burning tokens. Legacy mode (DRAYMOND_REPAIR_IMMEDIATE=0) keeps the
+  // old evidence-gated behaviour (dispatches only after repeated failures).
   if (kind === "code_error" || kind === "unknown") {
+    const immediate = options.immediate ?? process.env.DRAYMOND_REPAIR_IMMEDIATE !== "0";
     const hasEvidence = lessonHints.length > 0 || /repeated/i.test(error);
     try {
       const { isOnCooldown } = await import("./workflow-budget");
       const cooldownKey = `repair:${job.id}`;
       const onCooldown = isOnCooldown(cooldownKey, "codegen", Number(process.env.DRAYMOND_REPAIR_DISPATCH_COOLDOWN_MS ?? 30 * 60 * 1000));
-      if (!hasEvidence || onCooldown) {
-        const detail = hasEvidence
-          ? `coding repair dispatched recently (cooldown) — ${crew.lead} on next evidence window`
-          : `no repeated-failure evidence yet — ${crew.lead} will repair after 2+ failures (token-saving)`;
+      if (onCooldown) {
+        const detail = `coding repair dispatched recently (cooldown) — ${crew.lead} on the next window`;
+        const action: RepairReport["action"] = "handed-off";
+        await recordRepair({ ...base, action, detail, dispatch: { kind: "deferred", result: detail } });
+        return { ...base, action, detail, dispatch: { kind: "deferred", result: detail } };
+      }
+      if (!immediate && !hasEvidence) {
+        const detail = `no repeated-failure evidence yet — ${crew.lead} will repair after 2+ failures (token-saving)`;
         const action: RepairReport["action"] = "handed-off";
         await recordRepair({ ...base, action, detail, dispatch: { kind: "deferred", result: detail } });
         return { ...base, action, detail, dispatch: { kind: "deferred", result: detail } };
       }
       const { dispatchCodingRepair } = await import("./coding-repair");
-      const outcome = await dispatchCodingRepair(job, error, lessonHints, crew);
+      const outcome = await dispatchCodingRepair(job, error, lessonHints, crew, { timeoutMs: options.dispatchTimeoutMs });
       await recordRepair({ ...base, action: outcome.action, detail: outcome.detail, dispatch: outcome.dispatch });
       return { ...base, action: outcome.action, detail: outcome.detail, dispatch: outcome.dispatch };
     } catch (err) {
@@ -258,6 +277,102 @@ async function recordRepair(report: RepairReport): Promise<void> {
       detail: report.detail,
     });
   } catch { /* best-effort */ }
+
+  // Deterministic report to the operator + the repair/coding team. Silent
+  // deferrals (cooldown / waiting for evidence) don't email; real outcomes do.
+  const shouldReport =
+    report.action === 'fixed' ||
+    report.action === 'escalated' ||
+    (report.action === 'handed-off' && report.dispatch?.kind !== 'deferred');
+  if (shouldReport) {
+    try {
+      await sendRepairReport(report);
+    } catch { /* best-effort */ }
+  }
+}
+
+// ============================================================================
+// DETERMINISTIC REPAIR REPORT — templated, no LLM (token-saving by design)
+// ============================================================================
+
+const FAILURE_LABEL: Record<FailureKind, string> = {
+  chain_config: 'Chain config',
+  notification_config: 'Notification config',
+  missing_env: 'Missing env',
+  service_down: 'Service down',
+  code_error: 'Code error',
+  unknown: 'Unknown',
+};
+
+const ACTION_LABEL: Record<RepairReport['action'], string> = {
+  fixed: 'FIXED',
+  'handed-off': 'HANDED OFF',
+  escalated: 'ESCALATED',
+};
+
+/** Render a repair report as a fixed, deterministic text block (no LLM). */
+export function renderRepairReport(report: RepairReport): string {
+  const lines = [
+    `Draymond Repair Report`,
+    ``,
+    `Job: ${report.jobName} (${report.jobId})`,
+    `Failure: ${FAILURE_LABEL[report.failureKind] ?? report.failureKind}`,
+    `Outcome: ${ACTION_LABEL[report.action] ?? report.action}`,
+    `Crew: ${report.crew.lead}${report.crew.members.length ? ` + ${report.crew.members.join(', ')}` : ''}`,
+    ``,
+    `Detail: ${report.detail}`,
+    report.dispatch ? `Dispatch: [${report.dispatch.kind}] ${report.dispatch.result}` : '',
+    report.lessonHints?.length ? `Lessons: ${report.lessonHints.join(' | ')}` : '',
+  ].filter(Boolean);
+  return lines.join('\n');
+}
+
+const reportCooldownMs = () => Number(process.env.DRAYMOND_REPAIR_REPORT_COOLDOWN_MS ?? 30 * 60 * 1000);
+
+/**
+ * Push a deterministic repair report to the operator (email) AND the
+ * repair/coding team (ntfy repair topic). Best-effort, never throws, and
+ * deduped per job+outcome so a burst of failures cannot flood the inbox.
+ */
+export async function sendRepairReport(report: RepairReport): Promise<boolean> {
+  const text = renderRepairReport(report);
+  let sent = false;
+
+  // ntfy → the repair/coding team + the phone (Open-Chat auto-speaks).
+  try {
+    const base = process.env.NTFY_URL;
+    const topic = process.env.NTFY_TOPIC_REPAIR ?? process.env.NTFY_TOPIC_RESULTS;
+    if (base && topic) {
+      const res = await fetch(base.replace(/\/+$/, ''), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          topic,
+          title: `Draymond repair — ${report.jobName} (${report.action})`,
+          message: text.slice(0, 1500),
+          tags: report.action === 'fixed' ? ['white_check_mark'] : ['wrench'],
+          priority: report.action === 'escalated' ? 5 : 3,
+        }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      sent = sent || res.ok;
+    }
+  } catch { /* best-effort */ }
+
+  // Email → the operator. Deduped so identical job outcomes don't spam.
+  try {
+    const recipient = process.env.DRAYMOND_ALERT_EMAIL ?? process.env.GMAIL_USER;
+    if (recipient) {
+      const { isOnCooldown } = await import('./workflow-budget');
+      if (!isOnCooldown(`report:${report.jobId}`, report.action, reportCooldownMs())) {
+        const { sendMemo } = await import('./notifications');
+        await sendMemo(`Draymond repair — ${report.jobName} (${report.action})`, text, recipient);
+        sent = true;
+      }
+    }
+  } catch { /* best-effort */ }
+
+  return sent;
 }
 
 export async function repairLog(limit = 50): Promise<RepairReport[]> {
