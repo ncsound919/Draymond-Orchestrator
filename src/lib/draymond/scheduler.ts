@@ -1108,6 +1108,29 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         return { handler, clients: clients.length, results };
       }
 
+      if (handler === 'kairos_scan') {
+        // Proactive fleet scan — surface kairos moments (down monitors, failed
+        // jobs, stale leads, revenue shortfall, budget pressure, weak agents,
+        // repair loops, stale heartbeats).
+        const { kairosScan } = await import('./kairos');
+        const r = await kairosScan();
+        return { handler, ...r };
+      }
+
+      if (handler === 'dream_cycle') {
+        // AutoDream — gated 4-phase memory consolidation (self-gates, never throws).
+        const { runDreamCycle } = await import('./dream-cycle');
+        const r = await runDreamCycle();
+        return { handler, gatedBy: r.gatedBy ?? null, sessionsCounted: r.sessionsCounted, entries: r.entries };
+      }
+
+      if (handler === 'ultraplan_process') {
+        // Drain the oldest queued ultraplan through the deep-planning lane.
+        const { processNextUltraplan } = await import('./ultraplan');
+        const r = await processNextUltraplan();
+        return { handler, ...r };
+      }
+
       console.log(
         `[Draymond Scheduler] Custom job "${job.name}" triggered (handler: ${handler ?? 'none'}). ` +
         `No built-in handler registered — skipping execution.`
@@ -1629,10 +1652,50 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
   },
   {
     name: 'MaaS Monthly Cycle',
-    description: 'Weekly Monday 9am — run the MaaS delivery chain for each active MaaS client.',
+    description: 'Weekly Monday 9am \u2014 run the MaaS delivery chain for each active MaaS client.',
     cron_expression: '0 9 * * 1',
     job_type: 'custom',
     job_config: { handler: 'mission_run_maas_cycle' },
+    is_enabled: true,
+  },
+  {
+    name: 'Kairos Scan',
+    description: 'Every 15min \u2014 proactive fleet scan: detectors surface kairos moments (down monitors, failed jobs, stale leads, revenue shortfall, budget pressure, weak agents, repair loops, stale heartbeats).',
+    cron_expression: '*/15 * * * *',
+    job_type: 'custom',
+    job_config: { handler: 'kairos_scan' },
+    is_enabled: true,
+  },
+  {
+    name: 'Dream Cycle',
+    description: 'Nightly 2am \u2014 AutoDream 4-phase memory consolidation (gated: 24h + 5 sessions + idle).',
+    cron_expression: '0 2 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'dream_cycle' },
+    is_enabled: true,
+  },
+  {
+    name: 'Ultraplan Process',
+    description: 'Nightly 2:30am \u2014 run the deep-planning pass on queued ultraplans.',
+    cron_expression: '30 2 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'ultraplan_process' },
+    is_enabled: true,
+  },
+  {
+    name: 'On-Device Ops Dispatch',
+    description: 'Daily 9:45am — enqueue a phone ops task (morning snapshot) for the Open-Chat worker.',
+    cron_expression: '45 9 * * *',
+    job_type: 'custom',
+    job_config: {
+      handler: 'dispatch_worker_tasks',
+      tasks: [
+        {
+          skill_pack_id: 'on_device_ops:1.0.0',
+          payload: { action: 'morning_snapshot', note: 'Capture a phone state snapshot and report the foreground app + notifications.' },
+        },
+      ],
+    },
     is_enabled: true,
   },
 ];

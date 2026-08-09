@@ -47,6 +47,15 @@ vi.mock('../src/lib/draymond/event-bridge', () => ({
 vi.mock('../src/lib/draymond/notifications', () => ({
   sendAlertEmail: vi.fn(async () => ({ id: 'n1' })),
 }));
+vi.mock('../src/lib/draymond/kairos', () => ({
+  kairosScan: vi.fn(async () => ({ detected: 2, created: 2, repeated: 0, notified: 1, errors: [], budgetExceeded: false, durationMs: 5 })),
+}));
+vi.mock('../src/lib/draymond/dream-cycle', () => ({
+  runDreamCycle: vi.fn(async () => ({ lastDreamAt: new Date().toISOString(), sessionsCounted: 0, phases: {}, entries: [], durationMs: 3, gatedBy: 'sessions' })),
+}));
+vi.mock('../src/lib/draymond/ultraplan', () => ({
+  processNextUltraplan: vi.fn(async () => ({ processed: 1, id: 'up_1', status: 'plan_ready' })),
+}));
 
 import { listJobs, getJob, createJob, updateJob, deleteJob, enableJob, disableJob, runDueJobs } from '../src/lib/draymond/scheduler';
 
@@ -194,5 +203,35 @@ describe('runDueJobs', () => {
       delete process.env.DRAYMOND_REGISTRY_DIR;
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('cognition custom handlers', () => {
+  const runCustom = async (handler: string) => {
+    const dueJob = job({ id: `job-${handler}`, name: `cognition-${handler}`, job_config: { handler }, run_count: 0, notify_on_success: false });
+    mockAdmin._tables.set('draymond_scheduled_jobs', (op: string) => {
+      if (op === 'select') return { data: [dueJob], error: null };
+      if (op === 'claim') return { data: { id: `job-${handler}` }, error: null };
+      return { data: null, error: null };
+    });
+    return runDueJobs();
+  };
+
+  it('kairos_scan handler runs a scan and returns its report', async () => {
+    const results = await runCustom('kairos_scan');
+    expect(results[0].status).toBe('success');
+    expect(results[0].output).toMatchObject({ handler: 'kairos_scan', detected: 2, notified: 1 });
+  });
+
+  it('dream_cycle handler runs the consolidation and reports gating', async () => {
+    const results = await runCustom('dream_cycle');
+    expect(results[0].status).toBe('success');
+    expect(results[0].output).toMatchObject({ handler: 'dream_cycle', gatedBy: 'sessions' });
+  });
+
+  it('ultraplan_process handler drains the queue', async () => {
+    const results = await runCustom('ultraplan_process');
+    expect(results[0].status).toBe('success');
+    expect(results[0].output).toMatchObject({ handler: 'ultraplan_process', processed: 1, status: 'plan_ready' });
   });
 });
