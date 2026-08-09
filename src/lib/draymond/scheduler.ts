@@ -840,7 +840,35 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
             call = `HTTP ${res.status}`;
           } catch { call = 'aetherdesk unreachable'; }
         }
-        return { handler, summary: recap.summary, call, callTextLength: text.length };
+
+        // Also publish the recap to ntfy tagged "call" so Open-Chat auto-speaks
+        // it on the phone (Draymond calls through the Open-Chat tunnel). This is
+        // the tunnel path — no Aetherdesk required.
+        let ntfyCall = 'not-published';
+        try {
+          const ntfyBase = process.env.NTFY_URL;
+          const ntfyTopic = process.env.NTFY_TOPIC_RESULTS;
+          if (ntfyBase && ntfyTopic) {
+            const res = await fetch(ntfyBase.replace(/\/+$/, ''), {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                topic: ntfyTopic,
+                title: '📞 Call from Draymond',
+                message: recap.summary,
+                tags: ['call', 'recap'],
+                priority: 5,
+                click: process.env.DRAYMOND_PUBLIC_URL || '',
+              }),
+              signal: AbortSignal.timeout(10_000),
+            });
+            ntfyCall = `HTTP ${res.status}`;
+          }
+        } catch (err) {
+          ntfyCall = `error: ${err instanceof Error ? err.message : String(err)}`;
+        }
+
+        return { handler, summary: recap.summary, call, ntfyCall, callTextLength: text.length };
       }
 
       if (handler === 'rotate_tokens') {
@@ -1009,12 +1037,22 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         const { runTreasuryPulse } = await import('./treasury');
         const lookbackDays = Number(process.env.TREASURY_LOOKBACK_DAYS ?? 30);
         const r = await runTreasuryPulse(Number.isFinite(lookbackDays) ? lookbackDays : 30);
+        // Catch-up sale alerts: anything the webhook missed while Draymond was
+        // offline fires now. Best-effort.
+        let saleAlerts = 0;
+        try {
+          const { sendSaleAlerts } = await import('./sale-alerts');
+          saleAlerts = (await sendSaleAlerts()).length;
+        } catch {
+          /* sale alerts best-effort */
+        }
         return {
           handler,
           status: r.status,
           revenueUsd: r.revenueUsd,
           newSettled: r.newSettled,
           error: r.error ?? null,
+          saleAlerts,
           report: r.markdown.slice(0, 1500),
         };
       }
