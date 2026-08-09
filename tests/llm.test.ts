@@ -20,12 +20,16 @@ describe('shared llm helper', () => {
   });
 
   it('falls back to the first configured provider when preferred is unconfigured', () => {
+    // ollama is always available (local tier); with ANTHROPIC also set,
+    // the first in fallback order that has a key is ollama (local tier).
     process.env.ANTHROPIC_API_KEY = 'a';
-    expect(resolveLLMProvider('deepseek')).toBe('anthropic');
+    expect(resolveLLMProvider('deepseek')).toBe('ollama');
   });
 
-  it('throws when no provider has a key', () => {
-    expect(() => resolveLLMProvider('deepseek')).toThrow(/No LLM API key/);
+  it('falls back to ollama even when no remote provider has a key', () => {
+    // The local Ollama tier is always available, so the chain never throws
+    // for missing keys — it resolves to the on-device model.
+    expect(resolveLLMProvider('deepseek')).toBe('ollama');
   });
 
   it('calls deepseek with Bearer auth, model, and system+user messages', async () => {
@@ -94,10 +98,10 @@ describe('shared llm helper', () => {
     ).rejects.toThrow(/402/);
   });
 
-  it('prefers litellm when its key is set (first in fallback order)', () => {
-    process.env.LITELLM_API_KEY = 'lk';
-    expect(resolveLLMProvider()).toBe('litellm');
-    delete process.env.LITELLM_API_KEY;
+  it('prefers the local ollama tier when no remote provider key is set', () => {
+    // The universal chain defaults to the free→go opencode tier, then deepseek,
+    // gemini, and the always-available local ollama tier.
+    expect(resolveLLMProvider()).toBe('ollama');
   });
 
   it('routes litellm to the OpenAI-compatible gateway endpoint', async () => {

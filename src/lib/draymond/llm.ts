@@ -80,11 +80,16 @@ const DEFAULT_MODELS: Record<LLMProvider, string> = {
 
 /** Resolution order when no explicit provider is requested. */
 const FALLBACK_ORDER: LLMProvider[] = [
-  'litellm',
+  // Free tier first (no-cost); falls to Go when quota-limited or failing.
   'opencode-free',
+  // Go tier — reliable paid models (deepseek-v4-flash etc.) via opencode.
   'opencode',
+  // DeepSeek direct + Gemini direct.
   'deepseek',
   'gemini',
+  // Local Ollama (free, on-device) — used for cheap/quick calls.
+  'ollama',
+  // Remaining providers.
   'openai',
   'anthropic',
   'qwen',
@@ -122,6 +127,8 @@ export function resolveLLMProvider(preferred?: LLMProvider): LLMProvider {
 }
 
 function getApiKey(provider: LLMProvider): string {
+  // Ollama is a local server — no API key required (OLLAMA_ENABLED gates it).
+  if (provider === 'ollama') return '';
   const key = process.env[PROVIDER_ENV[provider]];
   if (!key) throw new Error(`Missing API key for provider "${provider}"`);
   return key;
@@ -291,7 +298,36 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
     }
 
     const choices = data.choices as Array<{ message?: { content?: string } }>;
-    const content = choices?.[0]?.message?.content ?? '';
+    let content = choices?.[0]?.message?.content ?? '';
+    // Some opencode/deepseek responses put the answer in `reasoning_content`
+    // with empty `content` when max_tokens is small. Retry once with a larger
+    // budget before giving up so the fallback chain isn't tripped.
+    if (!content && provider.startsWith('opencode')) {
+      const bigger = Math.max(maxTokens, 512);
+      const retry = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: bigger,
+          temperature,
+          messages: [
+            { role: 'system', content: options.system },
+            { role: 'user', content: options.userMessage },
+          ],
+          ...(options.responseFormat ? { response_format: options.responseFormat } : {}),
+        }),
+        signal: controller.signal,
+      });
+      if (retry.ok) {
+        const retryData = (await retry.json()) as Record<string, unknown>;
+        const retryChoices = retryData.choices as Array<{ message?: { content?: string } }>;
+        content = retryChoices?.[0]?.message?.content ?? '';
+      }
+    }
     if (!content) throw new Error('Empty response from LLM');
     return content;
   } finally {

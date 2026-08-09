@@ -1,6 +1,23 @@
 # LiteLLM proxy config — routes LLM calls to configured providers.
 # Keys come from .env.local (process env). Only providers with keys are usable.
+# This mirrors the universal fallback in src/lib/draymond/llm.ts:
+#   free (opencode-free) → go (opencode) → deepseek → gemini → ollama (local).
 model_list:
+  - model_name: opencode-free
+    litellm_params:
+      model: openai/deepseek-v4-flash-free
+      api_key: os.environ/OPENCODE_API_KEY
+      api_base: https://opencode.ai/zen/v1
+  - model_name: opencode
+    litellm_params:
+      model: openai/deepseek-v4-flash
+      api_key: os.environ/OPENCODE_API_KEY
+      api_base: https://opencode.ai/zen/go/v1
+  - model_name: opencode-pro
+    litellm_params:
+      model: openai/deepseek-v4-pro
+      api_key: os.environ/OPENCODE_API_KEY
+      api_base: https://opencode.ai/zen/go/v1
   - model_name: deepseek
     litellm_params:
       model: deepseek/deepseek-chat
@@ -13,10 +30,6 @@ model_list:
     litellm_params:
       model: gemini/gemini-1.5-flash
       api_key: os.environ/GEMINI_API_KEY
-  - model_name: opencode
-    litellm_params:
-      model: opencode/deepseek-v4-flash
-      api_key: os.environ/OPENCODE_API_KEY
   - model_name: ollama-llama
     litellm_params:
       model: ollama/llama3.2:1b
