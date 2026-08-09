@@ -116,7 +116,7 @@ export async function seedMissionChains(): Promise<Array<{ name: string; slug: s
         output_key: s.output_key,
         depends_on_steps: [], // remapped below
         parallel_group: s.parallel_group,
-        risk_level: s.name.startsWith("QA") ? "medium" : "low",
+        risk_level: s.name.includes("QA") ? "medium" : "low",
         max_retries: 2,
       }))
     );
