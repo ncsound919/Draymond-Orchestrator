@@ -64,6 +64,8 @@ describe('cognition base', () => {
   });
 
   it('isSystemIdle returns false when a job or chain is running', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 7, 9, 12, 0)); // outside the morning burst
     const { listJobs } = await import('../src/lib/draymond/scheduler');
     const { listChains } = await import('../src/lib/draymond/chains');
     vi.mocked(listJobs).mockResolvedValueOnce([{ id: 'j1' } as never]);
@@ -121,5 +123,27 @@ describe('cognition base', () => {
   it('deepenLoop throws when no round produces a parseable plan', async () => {
     mockCallLLM.mockResolvedValue('still not json');
     await expect(deepenLoop({ system: 'sys', userMessage: 'brief' }, 3)).rejects.toThrow();
+  });
+
+  it('readJsonState falls back when the file does not contain an object', async () => {
+    fs.writeFileSync(path.join(tmp, 'not-an-object.json'), '42');
+    expect(await readJsonState('not-an-object', { fallback: true })).toEqual({ fallback: true });
+  });
+
+  it('isSystemIdle fails open to idle when job/chain reads error', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 7, 9, 12, 0)); // outside the morning burst
+    const { listJobs } = await import('../src/lib/draymond/scheduler');
+    const { listChains } = await import('../src/lib/draymond/chains');
+    vi.mocked(listJobs).mockRejectedValueOnce(new Error('db down'));
+    vi.mocked(listChains).mockRejectedValueOnce(new Error('db down'));
+    expect(await isSystemIdle()).toBe(true);
+  });
+
+  it('callDeepLLM routes with an undefined provider when no reasoning key is set', async () => {
+    mockHasKey.mockImplementation(() => false);
+    mockCallLLM.mockResolvedValueOnce('x');
+    await callDeepLLM({ system: 's', userMessage: 'm' });
+    expect(mockCallLLM.mock.calls[0][0].provider).toBeUndefined();
   });
 });

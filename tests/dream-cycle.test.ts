@@ -256,3 +256,93 @@ describe('AutoDream phases', () => {
     expect(report.state.lastDreamAt).toBeTruthy();
   });
 });
+
+describe('AutoDream branch coverage', () => {
+  function baseTables() {
+    setTable('draymond_actions', null, null, 7);
+    setTable('draymond_scheduled_jobs', null, null, 0);
+    setTable('draymond_chains', null, null, 0);
+    setTable('draymond_events', []);
+  }
+
+  it('gathers outcomes from the learning-outcomes file since the last dream', async () => {
+    baseTables();
+    // A prior dream yesterday → only newer outcomes are gathered.
+    fs.mkdirSync(tmp, { recursive: true });
+    fs.writeFileSync(
+      path.join(tmp, 'dream-cycle.json'),
+      JSON.stringify({
+        lastDreamAt: new Date(Date.now() - 86_400_000).toISOString(),
+        sessionsCounted: 0,
+        lock: { locked: false, lockedAt: null },
+        reports: [],
+        updatedAt: new Date().toISOString(),
+      })
+    );
+    fs.writeFileSync(
+      path.join(tmp, 'learning-outcomes.json'),
+      JSON.stringify([
+        { id: 'o1', createdAt: new Date().toISOString() },
+        { id: 'o2', createdAt: new Date(Date.now() - 30 * 86_400_000).toISOString() },
+        'not-an-object',
+      ])
+    );
+    setTable('draymond_memory', []);
+    const report = await runDreamCycle();
+    expect(report.phases.gathered.outcomes).toBe(1);
+  });
+
+  it('degrades when the memory read fails (orient error entry, rest continues)', async () => {
+    baseTables();
+    setTable('draymond_memory', null, { message: 'boom' });
+    const report = await runDreamCycle();
+    expect(report.gatedBy).toBeUndefined();
+    expect(report.entries.some((e) => e.includes('oriented failed'))).toBe(true);
+  });
+
+  it('degrades the events read to zero events when the query rejects', async () => {
+    baseTables();
+    mockAdmin._tables.set('draymond_events', () => {
+      throw new Error('db down');
+    });
+    setTable('draymond_memory', []);
+    const report = await runDreamCycle();
+    expect(report.phases.gathered.events).toBe(0);
+    expect(report.gatedBy).toBeUndefined();
+  });
+
+  it('corrects contradicted summaries from the latest event', async () => {
+    baseTables();
+    const stale = new Date(Date.now() - 40 * 86_400_000).toISOString();
+    setTable('draymond_events', [
+      { id: 'e1', event_type: 'chain.completed', message: 'k:c conflict resolved', created_at: new Date().toISOString() },
+    ]);
+    setTable('draymond_memory', [
+      memory({ id: 'm1', key: 'k:c', summary: 'version A', importance_score: 0.5, last_accessed_at: new Date().toISOString() }),
+      memory({ id: 'm2', key: 'k:c', summary: 'version B', importance_score: 0.6, last_accessed_at: stale }),
+    ]);
+    const report = await runDreamCycle();
+    expect(report.phases.consolidated.correctedKeys).toBe(1);
+    const corr = mockStoreMemory.mock.calls.find((c) => c[0].source_event === 'dream_correct')![0];
+    expect(corr.summary).toContain('corrected');
+  });
+
+  it('degrades when the decay sweep fails (prune falls back to zeros)', async () => {
+    mockRunDecaySweep.mockRejectedValueOnce(new Error('sweep boom'));
+    baseTables();
+    setTable('draymond_memory', []);
+    const report = await runDreamCycle();
+    expect(report.phases.pruned.decayed).toBe(0);
+    expect(report.gatedBy).toBeUndefined();
+  });
+
+  it('idle gate fails open when the idle check errors', async () => {
+    const { isSystemIdle } = await import('../src/lib/draymond/cognition');
+    vi.mocked(isSystemIdle).mockRejectedValueOnce(new Error('idle check boom'));
+    baseTables();
+    setTable('draymond_memory', []);
+    const report = await runDreamCycle();
+    expect(report.gatedBy).toBeUndefined();
+    expect(report.entries.length).toBeGreaterThan(0);
+  });
+});

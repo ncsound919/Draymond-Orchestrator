@@ -164,3 +164,43 @@ describe('ultraplan queue + state machine', () => {
     expect(r2.status).toBe('plan_ready');
   });
 });
+
+describe('ultraplan branch coverage', () => {
+  it('enqueue carries scope and sources into the stored task', async () => {
+    const plan = await enqueueUltraplan({ title: 'Scoped', brief: 'b', scope: 'src/lib', sources: ['a.md', 'b.md'] });
+    expect(plan.task.scope).toBe('src/lib');
+    expect(plan.task.sources).toEqual(['a.md', 'b.md']);
+  });
+
+  it('processUltraplan throws for an unknown id', async () => {
+    await expect(processUltraplan('nope')).rejects.toThrow(/not found/);
+  });
+
+  it('processUltraplan is single-flight while a plan is planning', async () => {
+    const plan = await enqueueUltraplan({ title: 'Inflight', brief: 'x' });
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    mockDeepenLoop.mockImplementationOnce(() => gate.then(() => ARTIFACT));
+    const inflight = processUltraplan(plan.id);
+    await vi.waitFor(async () => expect((await getUltraplan(plan.id))?.status).toBe('planning'));
+    const again = await processUltraplan(plan.id);
+    expect(again.status).toBe('planning');
+    release();
+    expect((await inflight).status).toBe('plan_ready');
+  });
+
+  it('approve/reject on a non-ready plan throw state-machine errors', async () => {
+    const plan = await enqueueUltraplan({ title: 'Early', brief: 'x' });
+    await expect(approveUltraplan(plan.id)).rejects.toThrow(/not plan_ready/);
+    await expect(rejectUltraplan(plan.id)).rejects.toThrow(/not plan_ready/);
+  });
+
+  it('processNextUltraplan reports a failed deep lane via the plan status', async () => {
+    const plan = await enqueueUltraplan({ title: 'Failsoft', brief: 'x' });
+    mockDeepenLoop.mockRejectedValueOnce(new Error('deep down'));
+    const r = await processNextUltraplan();
+    expect(r.processed).toBe(1);
+    expect(r.status).toBe('failed');
+    expect((await getUltraplan(plan.id))?.status).toBe('failed');
+  });
+});

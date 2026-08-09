@@ -226,3 +226,123 @@ describe('kairos daemon', () => {
     expect(monitors.checkAllSites).toHaveBeenCalledTimes(2); // no further ticks
   });
 });
+
+describe('kairos branch coverage', () => {
+  it('flags stale leads and skips fresh or non-lead opportunities', async () => {
+    pipeline.listOpportunities.mockResolvedValue([
+      { id: 'o1', name: 'Old Corp', stage: 'lead', updatedAt: new Date(Date.now() - 40 * 86_400_000).toISOString() },
+      { id: 'o2', name: 'Fresh Corp', stage: 'lead', updatedAt: new Date().toISOString() },
+      { id: 'o3', name: 'Won Corp', stage: 'won', updatedAt: new Date(Date.now() - 40 * 86_400_000).toISOString() },
+    ]);
+    await kairos.kairosScan();
+    const feed = await kairos.kairosFeed();
+    expect(feed.filter((m) => m.kind === 'stale_lead')).toHaveLength(1);
+    expect(feed[0]!.title).toContain('Old Corp');
+  });
+
+  it('emits a revenue shortfall moment but stays quiet at/above target', async () => {
+    strategy.totalMonthlyTarget.mockReturnValue(10_000);
+    treasury.settledRevenueUsd.mockResolvedValue(4_000);
+    await kairos.kairosScan();
+    let feed = await kairos.kairosFeed();
+    expect(feed.filter((m) => m.kind === 'revenue_shortfall')).toHaveLength(1);
+    // above target → no new moment
+    treasury.settledRevenueUsd.mockResolvedValue(12_000);
+    await kairos.kairosScan();
+    feed = await kairos.kairosFeed();
+    expect(feed.filter((m) => m.kind === 'revenue_shortfall')).toHaveLength(1);
+  });
+
+  it('emits budget-pressure moments only for exhausted providers', async () => {
+    llm.buildProviderOrder.mockReturnValue(['deepseek', 'openai']);
+    budget.canCallProvider.mockImplementation((p: string) =>
+      p === 'deepseek' ? { ok: false, reason: 'out of budget' } : { ok: true }
+    );
+    budget.providerBudget.mockReturnValue(100);
+    await kairos.kairosScan();
+    const feed = await kairos.kairosFeed();
+    expect(feed.filter((m) => m.kind === 'budget_pressure')).toHaveLength(1);
+    expect(feed[0]!.detail).toContain('out of budget');
+  });
+
+  it('flags the weakest agent when above the score floor', async () => {
+    queue.listUpgradeQueue.mockResolvedValue([
+      { id: 'q1', component_name: 'coder', component_class: 'coder', component_slug: 'coder', weakness_score: 0.9, proposed_action: 'retrain' },
+      { id: 'q2', component_name: 'planner', component_class: 'planner', component_slug: 'planner', weakness_score: 0.3 },
+    ]);
+    await kairos.kairosScan();
+    const feed = await kairos.kairosFeed();
+    const hits = feed.filter((m) => m.kind === 'weak_agent');
+    expect(hits).toHaveLength(1);
+    expect(hits[0]!.detail).toContain('coder');
+  });
+
+  it('emits repair_loop moments only for escalated loops', async () => {
+    repair.detectRepairLoops.mockResolvedValue([
+      { signal: 'job x', attempts: 6, window: { from: 'a', to: 'b' }, action: 'escalated' },
+      { signal: 'job y', attempts: 2, window: { from: 'a', to: 'b' }, action: 'keep-going' },
+    ]);
+    await kairos.kairosScan();
+    const feed = await kairos.kairosFeed();
+    expect(feed.filter((m) => m.kind === 'repair_loop')).toHaveLength(1);
+  });
+
+  it('flags stale/down heartbeats and ignores healthy ones', async () => {
+    heartbeat.getHeartbeats.mockResolvedValue({
+      a1: { slug: 'a1', name: 'A', last_seen: new Date(Date.now() - 2 * 3_600_000).toISOString(), up: true, detail: 'stale' },
+      a2: { slug: 'a2', name: 'B', last_seen: new Date().toISOString(), up: false, detail: 'down' },
+      a3: { slug: 'a3', name: 'C', last_seen: new Date().toISOString(), up: true, detail: '' },
+    });
+    await kairos.kairosScan();
+    const feed = await kairos.kairosFeed();
+    expect(feed.filter((m) => m.kind === 'stale_heartbeat')).toHaveLength(2);
+  });
+
+  it('trims the feed to KAIROS_CAP', async () => {
+    process.env.KAIROS_CAP = '10'; // cap() clamps anything below 10 up to 10
+    for (const id of ['j1', 'j2', 'j3', 'j4', 'j5', 'j6', 'j7', 'j8', 'j9', 'j10', 'j11', 'j12']) {
+      scheduler.listJobs.mockResolvedValue([
+        { id, name: `job-${id}`, last_run_status: 'failed', last_error: `boom-${id}`, fail_count: 1 },
+      ]);
+      await kairos.kairosScan();
+    }
+    expect(await kairos.kairosFeed()).toHaveLength(10);
+  });
+
+  it('ackMoment returns false for unknown ids', async () => {
+    expect(await kairos.ackMoment('nope')).toBe(false);
+  });
+
+  it('re-notifies when lastSeen is older than the repeat window (even without escalation)', async () => {
+    process.env.KAIROS_REPEAT_NOTIFY_HOURS = '1';
+    monitors.checkAllSites.mockResolvedValue(DOWN_RESULT);
+    scheduler.listJobs.mockResolvedValue([
+      { id: 'j1', name: 'night-recap', last_run_status: 'failed', last_error: 'boom', fail_count: 2 },
+    ]);
+    await kairos.kairosScan();
+    expect(ntfy.publishIssueNotification).toHaveBeenCalledTimes(1); // monitor_down critical only
+    // Age both moments beyond the repeat window and re-scan.
+    const file = path.join(tmp, 'kairos.json');
+    const state = JSON.parse(fs.readFileSync(file, 'utf-8'));
+    for (const m of state.moments) m.lastSeen = new Date(Date.now() - 2 * 3_600_000).toISOString();
+    fs.writeFileSync(file, JSON.stringify(state));
+    await kairos.kairosScan();
+    // job_failed escalates warn→critical (notify), monitor_down re-notifies via the repeat window (notify).
+    expect(ntfy.publishIssueNotification).toHaveBeenCalledTimes(3);
+  });
+
+  it('startKairos is idempotent and survives a failing scan', async () => {
+    process.env.KAIROS_TICK_MS = '5000';
+    monitors.checkAllSites.mockResolvedValue({ ...DOWN_RESULT, results: [] });
+    vi.useFakeTimers();
+    kairos.startKairos();
+    kairos.startKairos(); // already running → no second timer
+    expect(kairos.isKairosRunning()).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(monitors.checkAllSites).toHaveBeenCalledTimes(1); // single catch-up
+    monitors.checkAllSites.mockRejectedValue(new Error('boom'));
+    await vi.advanceTimersByTimeAsync(5000); // tick with failing scan → error swallowed
+    kairos.stopKairos();
+    expect(kairos.isKairosRunning()).toBe(false);
+  });
+});
