@@ -27,6 +27,13 @@ const eslintConfig = defineConfig([
     "scripts/**",
     // Archived upstream snapshot — reference only, not part of this app.
     "docs/mathx-source-reference/**",
+    // Packaged Electron builds — minified/bundled output.
+    "release/**",
+    // Draymond operational data store — runtime scratch data.
+    ".draymond/**",
+    ".audit/**",
+    // Session scratch helpers (opencode bootstrap, CJS by design).
+    "_oc_*.cjs",
   ]),
 ]);
 

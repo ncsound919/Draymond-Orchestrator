@@ -193,7 +193,6 @@ async function gatherPhase(lastDreamAt: string | null): Promise<GatherResult> {
 // ============================================================================
 
 async function consolidatePhase(gathered: GatherResult): Promise<DreamPhaseCounts['consolidated']> {
-  const supabase = createDraymondAdminClient();
   const mems = await allMemories().catch(() => []);
   const byKey = new Map<string, DraymondMemory[]>();
   for (const m of mems) {

@@ -448,7 +448,14 @@ export async function kairosFeed(opts: KairosFeedOptions = {}): Promise<KairosMo
   if (opts.kind) list = list.filter((m) => m.kind === opts.kind);
   if (opts.severity) list = list.filter((m) => m.severity === opts.severity);
   if (opts.acked !== undefined) list = list.filter((m) => m.acked === opts.acked);
-  return list.slice(0, opts.limit ?? 50);
+  // Ranked: critical first, then most recently seen.
+  return [...list]
+    .sort(
+      (a, b) =>
+        SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity] ||
+        +new Date(b.lastSeen) - +new Date(a.lastSeen)
+    )
+    .slice(0, opts.limit ?? 50);
 }
 
 export async function ackMoment(id: string): Promise<boolean> {

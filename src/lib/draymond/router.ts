@@ -330,7 +330,7 @@ export async function routeTask(
   // configured (use_local_model), since 1B models misclassify. If the paid
   // provider chain fails entirely (e.g. all keys out of balance), fall back to
   // the local model so routing still works.
-  let usedLocal = false;
+  const usedLocal = false;
   if (_config.use_local_model) {
     const localResult = await tryLocalRoute(task, startMs, snapshot, userMessage);
     if (localResult) return localResult;
