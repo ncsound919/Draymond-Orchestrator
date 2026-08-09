@@ -525,3 +525,32 @@ export async function interconnectSystem(): Promise<{
   const consolidation = await consolidateSystem();
   return { agenda, graph, consolidation };
 }
+
+// ============================================================================
+// COGNITION LAYER — orchestration surface (Kairos · AutoDream · Ultraplan)
+// ============================================================================
+// The systemic layer exposes the three cognition subsystems so callers
+// (instrumentation, scheduler handlers, day-orchestrator, API routes) never
+// import the leaf modules directly. Existing consolidateSystem /
+// interconnectSystem / ingestEvent are untouched.
+
+/**
+ * Boot the cognition daemons: start Kairos and recover ultraplans stuck in
+ * `planning` from a previous crash. Called from instrumentation.ts.
+ */
+export async function startCognition(): Promise<void> {
+  const { startKairos } = await import('./kairos');
+  startKairos();
+  const { recoverStuckUltraplans } = await import('./ultraplan');
+  await recoverStuckUltraplans().catch(() => {});
+}
+
+/** Delegate to the AutoDream cycle (self-gating, never rejects). */
+export async function runDreamCycle(): Promise<import('./dream-cycle').DreamReport> {
+  return (await import('./dream-cycle')).runDreamCycle();
+}
+
+/** Delegate to the Ultraplan enqueue. */
+export async function enqueueUltraplan(task: import('./ultraplan').UltraplanTask): Promise<import('./ultraplan').UltraplanPlan> {
+  return (await import('./ultraplan')).enqueueUltraplan(task);
+}
