@@ -673,7 +673,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
   {
     name: 'Book-to-Skill Chain',
     slug: 'book-to-skill-chain',
-    kind: 'skill',
+    kind: 'service',
     description:
       'Orchestrator pipeline: ground with BookBridge, synthesize the book, run the book-to-skill converter, and register the generated skill in Draymond registry + entity registry.',
     invocation_method: 'internal',

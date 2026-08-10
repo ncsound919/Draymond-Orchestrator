@@ -12,7 +12,7 @@ def fatigue_score(hrv, load):
 
 def injury_risk_percent(fatigue, acute_chronic, sleep_hrs):
     raw = fatigue * 50 + abs(acute_chronic - 1) * 30 + max(0.0, 7 - sleep_hrs) * 8
-    return round(_clamp01(raw) * 100, 2)
+    return round(max(0.0, min(100.0, raw)), 2)
 
 
 def recovery_priority(injury_risk):
