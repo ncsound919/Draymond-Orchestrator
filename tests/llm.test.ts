@@ -132,6 +132,35 @@ describe('shared llm helper', () => {
     expect(text).toBe('deterministic-plan');
   });
 
+  it('stops before any provider when the fleet budget is exhausted', async () => {
+    process.env.DEEPSEEK_API_KEY = 'k';
+    process.env.DRAYMOND_FLEET_DAILY_BUDGET = '10';
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({ choices: [{ message: { content: 'should-not-run' } }] }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const { consumeTokens, resetBudget } = await import('../src/lib/draymond/workflow-budget');
+      resetBudget();
+      consumeTokens('deepseek', 20); // exhaust the tiny fleet cap
+      const text = await callLLM({
+        provider: 'deepseek',
+        system: 's',
+        userMessage: 'u',
+        deterministicFallback: 'fleet-cap-fallback',
+      });
+      expect(text).toBe('fleet-cap-fallback');
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.DRAYMOND_FLEET_DAILY_BUDGET;
+      const { resetBudget } = await import('../src/lib/draymond/workflow-budget');
+      resetBudget();
+    }
+  });
+
   it('prefers the local ollama tier when no remote provider key is set', () => {
     // The universal chain defaults to the free→go opencode tier, then deepseek,
     // gemini, and the always-available local ollama tier.

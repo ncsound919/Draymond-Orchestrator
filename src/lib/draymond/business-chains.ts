@@ -1760,6 +1760,16 @@ const JOB_DEFS: JobSeedDef[] = [
     job_config: { handler: 'editorial_push' },
     notify_on_failure: true,
   },
+
+  // ── Research Rotation (6AM daily) ───────────────────────────────────
+  // Drains the highest-priority ready science experiment from the queue.
+  {
+    name: 'Research Rotation',
+    cron_expression: '0 6 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'research_rotation' },
+    notify_on_failure: true,
+  },
 ];
 
 /** Return a copy of the seeded scheduled job definitions (JOB_DEFS). */

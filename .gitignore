@@ -97,3 +97,9 @@ sessions/
 
 # Generated knowledge-graph output (build artifact)
 /graphify-out/
+
+# Raw downloaded datasets (2.5GB+; re-fetch via science_engine/data/*_ingest.py or Kaggle)
+/datasets/
+
+# Dev server log
+/dev-server.log

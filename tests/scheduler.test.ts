@@ -215,14 +215,14 @@ describe('runDueJobs', () => {
 });
 
 describe('cognition custom handlers', () => {
-  const runCustom = async (handler: string) => {
+  const runCustom = async (handler: string, now = new Date()) => {
     const dueJob = job({ id: `job-${handler}`, name: `cognition-${handler}`, job_config: { handler }, run_count: 0, notify_on_success: false });
     mockAdmin._tables.set('draymond_scheduled_jobs', (op: string) => {
       if (op === 'select') return { data: [dueJob], error: null };
       if (op === 'claim') return { data: { id: `job-${handler}` }, error: null };
       return { data: null, error: null };
     });
-    return runDueJobs();
+    return runDueJobs(now);
   };
 
   it('kairos_scan handler runs a scan and returns its report', async () => {
@@ -232,14 +232,23 @@ describe('cognition custom handlers', () => {
   });
 
   it('dream_cycle handler runs the consolidation and reports gating', async () => {
-    const results = await runCustom('dream_cycle');
+    // Night window — dream_cycle is a night-phase handler.
+    const results = await runCustom('dream_cycle', new Date(2026, 7, 6, 2, 0));
     expect(results[0].status).toBe('success');
     expect(results[0].output).toMatchObject({ handler: 'dream_cycle', gatedBy: 'sessions' });
   });
 
   it('ultraplan_process handler drains the queue', async () => {
-    const results = await runCustom('ultraplan_process');
+    // Night window — ultraplan_process is a night-phase handler.
+    const results = await runCustom('ultraplan_process', new Date(2026, 7, 6, 2, 30));
     expect(results[0].status).toBe('success');
     expect(results[0].output).toMatchObject({ handler: 'ultraplan_process', processed: 1, status: 'plan_ready' });
+  });
+
+  it('defers a due custom job whose delegation window is closed', async () => {
+    // dream_cycle is night-only; running mid-day must defer, not execute.
+    const results = await runCustom('dream_cycle', new Date(2026, 7, 6, 14, 0));
+    expect(results[0].status).toBe('skipped');
+    expect(results[0].error).toContain('Delegation window closed');
   });
 });

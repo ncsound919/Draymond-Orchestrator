@@ -11,6 +11,34 @@ import { instantiateChain, executeChain } from './chains';
 import { checkAllAgentHealth } from './index';
 import { sendNotification, sendAlertEmail } from './notifications';
 import { emitJobStarted, emitJobCompleted, emitJobFailed } from '@/lib/draymond/event-bridge';
+import { delegationTimeoutSeconds, delegationFor, isWithinWindow, delegationWindow } from './delegation';
+
+// ============================================================================
+// DELEGATION WINDOW GATE
+// ============================================================================
+// A custom job whose handler has a delegation-plan window only executes inside
+// that window. When a due job fires outside its window (e.g. the R&D night job
+// reaching its slot during the day) it is deferred — rescheduled to its next
+// real slot without burning tokens.
+// ============================================================================
+
+/** True when a due job should be deferred because its delegation window is closed. */
+function isOutsideDelegationWindow(job: ScheduledJob, now: Date): boolean {
+  if (job.job_type !== 'custom') return false;
+  const handler = job.job_config?.handler;
+  if (typeof handler !== 'string') return false;
+  const spec = delegationFor(handler);
+  if (!spec) return false; // unplanned handlers run as scheduled
+  return !isWithinWindow(spec, now);
+}
+
+/** Human-readable window label for skip reasons (defaults to the phase window). */
+function delegationWindowLabel(job: ScheduledJob): string {
+  const handler = job.job_config?.handler;
+  if (typeof handler !== 'string') return 'unplanned';
+  const window = delegationWindow(handler);
+  return `${window.start}-${window.end}`;
+}
 
 // ============================================================================
 // TYPES
@@ -258,6 +286,15 @@ export async function createJob(input: ScheduledJobInsert): Promise<ScheduledJob
 
   const nextRun = input.next_run_at ?? getNextRunTime(input.cron_expression).toISOString();
 
+  // Custom handlers inherit their max duration from the delegation plan so the
+  // scheduler and the day orchestration agree on how long a task may run.
+  const handler =
+    input.job_type === 'custom' && typeof input.job_config?.handler === 'string'
+      ? input.job_config.handler
+      : undefined;
+  const delegationTimeout = handler ? delegationTimeoutSeconds(handler) : undefined;
+  const timeoutSeconds = input.timeout_seconds ?? delegationTimeout ?? 300;
+
   const { data, error } = await supabase
     .from('draymond_scheduled_jobs')
     .insert({
@@ -269,7 +306,7 @@ export async function createJob(input: ScheduledJobInsert): Promise<ScheduledJob
       is_enabled: input.is_enabled ?? true,
       next_run_at: nextRun,
       max_retries: input.max_retries ?? 1,
-      timeout_seconds: input.timeout_seconds ?? 300,
+      timeout_seconds: timeoutSeconds,
       notify_on_failure: input.notify_on_failure ?? true,
       notify_on_success: input.notify_on_success ?? false,
     })
@@ -1293,9 +1330,8 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
  *
  * Returns an array of results for each job attempted.
  */
-export async function runDueJobs(): Promise<JobRunResult[]> {
+export async function runDueJobs(now = new Date()): Promise<JobRunResult[]> {
   const supabase = createDraymondAdminClient();
-  const now = new Date();
   const results: JobRunResult[] = [];
   const recipient = getNotificationRecipient();
 
@@ -1324,13 +1360,45 @@ export async function runDueJobs(): Promise<JobRunResult[]> {
   const nowMs = now.getTime();
   const runnable: ScheduledJob[] = [];
   const stale: ScheduledJob[] = [];
+  const deferred: ScheduledJob[] = [];
   for (const raw of dueJobs) {
     const job = raw as ScheduledJob;
     const dueMs = job.next_run_at ? new Date(job.next_run_at).getTime() : nowMs;
     if (Number.isFinite(dueMs) && nowMs - dueMs > CATCH_UP_GRACE_MS) {
       stale.push(job);
+    } else if (isOutsideDelegationWindow(job, now)) {
+      // The handler's delegation window is closed right now — defer instead of
+      // burning tokens on work scheduled for another time of day.
+      deferred.push(job);
     } else {
       runnable.push(job);
+    }
+  }
+
+  // Defer jobs whose delegation window is closed. Same treatment as stale:
+  // skip execution, advance next_run_at, no notifications or token spend.
+  for (const job of deferred) {
+    try {
+      const nextRunAt = getNextRunTime(job.cron_expression, now).toISOString();
+      await supabase
+        .from('draymond_scheduled_jobs')
+        .update({
+          last_run_at: now.toISOString(),
+          last_run_status: 'skipped',
+          last_error: `Delegation window closed (${delegationWindowLabel(job)}) — deferred to next scheduled slot`,
+          next_run_at: nextRunAt,
+        })
+        .eq('id', job.id);
+      results.push({
+        job_id: job.id,
+        job_name: job.name,
+        job_type: job.job_type,
+        status: 'skipped',
+        duration_ms: 0,
+        error: `Delegation window closed (${delegationWindowLabel(job)}) — deferred`,
+      });
+    } catch (err) {
+      console.error(`[Draymond Scheduler] Failed to defer job "${job.name}":`, err);
     }
   }
 

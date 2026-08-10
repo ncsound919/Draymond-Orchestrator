@@ -37,6 +37,23 @@ const rateCalls: Record<string, number[]> = {}; // provider -> timestamps
 const cooldowns = new Map<string, number>(); // `${agent}:${op}` -> expiresAt
 const lanes = new Map<string, AgentLane>();
 
+/** Fleet-wide daily token cap — the whole ecosystem stays under this. */
+function fleetDailyBudget(): number {
+  const raw = Number(process.env.DRAYMOND_FLEET_DAILY_BUDGET ?? 5_000_000);
+  return Number.isFinite(raw) && raw > 0 ? raw : 5_000_000;
+}
+
+let fleetTokens = 0;
+let fleetDay = '';
+
+function ensureFleetDay(): void {
+  const today = new Date().toISOString().slice(0, 10);
+  if (fleetDay !== today) {
+    fleetDay = today;
+    fleetTokens = 0;
+  }
+}
+
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -45,8 +62,34 @@ export function providerBudget(provider: string): number {
   return PROVIDER_DAILY_BUDGETS[provider] ?? 500_000;
 }
 
+/** Remaining fleet-wide daily token budget. */
+export function fleetBudgetRemaining(): number {
+  ensureFleetDay();
+  return Math.max(0, fleetDailyBudget() - fleetTokens);
+}
+
+/** Reserve + record fleet-wide token consumption (cap enforced in consumeTokens). */
+export function consumeFleetTokens(tokens: number): void {
+  ensureFleetDay();
+  fleetTokens += Math.max(0, tokens);
+}
+
+/** True if the fleet still has budget for an estimated call size. */
+export function canCallFleet(tokens = 1024): { ok: boolean; reason?: string } {
+  ensureFleetDay();
+  const projected = fleetTokens + Math.max(0, tokens);
+  if (projected >= fleetDailyBudget()) {
+    return { ok: false, reason: `fleet budget exhausted (${fleetTokens}/${fleetDailyBudget()})` };
+  }
+  return { ok: true };
+}
+
 /** True if this provider still has budget + isn't rate-limited. */
 export function canCallProvider(provider: string): { ok: boolean; reason?: string } {
+  ensureFleetDay();
+  if (fleetTokens >= fleetDailyBudget()) {
+    return { ok: false, reason: `fleet budget exhausted (${fleetTokens}/${fleetDailyBudget()})` };
+  }
   const entry = providerTokens[provider] ?? (providerTokens[provider] = { used: 0, day: today() });
   if (entry.day !== today()) {
     entry.day = today();
@@ -74,6 +117,8 @@ export function consumeTokens(provider: string, tokens: number): void {
   entry.used += Math.max(0, tokens);
   const window = rateCalls[provider] ?? (rateCalls[provider] = []);
   window.push(Date.now());
+  // Every provider token also counts toward the fleet cap.
+  consumeFleetTokens(tokens);
 }
 
 /** Cooldown: skip a repeated op within the window (e.g. don't re-run QA every minute). */
@@ -138,4 +183,6 @@ export function resetBudget(): void {
   for (const k of Object.keys(rateCalls)) delete rateCalls[k];
   cooldowns.clear();
   lanes.clear();
+  fleetTokens = 0;
+  fleetDay = '';
 }

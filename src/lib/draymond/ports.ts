@@ -64,7 +64,7 @@ export const TOOL_PORTS: ToolPort[] = [
   { slug: 'deterministic-brain', name: 'Deterministic Brain', category: 'knowledge', port: 3210, env: 'BRAIN_URL', health: '/health', cwd: 'agents/deterministic-brain', start: 'python main.py --serve', notes: 'Metacognitive observer (Recognition → Labeling → Intervention). API_PORT=3210. Sweep: POST /brain/sweep · Status: GET /brain/status.' },
 
   // ── Security scanning ────────────────────────────────────────────────────
-  { slug: 'claw-protect', name: 'Claw-Protect', category: 'security', port: 3300, env: 'CLAW_PROTECT_URL', health: '/health', cwd: 'agents/Claw-Protect-main', start: 'npm run dev', notes: 'Secrets / prompt-injection scanner. Moved off 3333 (Ghostfolio).' },
+  { slug: 'claw-protect', name: 'Claw-Protect', category: 'security', port: 3300, env: 'CLAW_PROTECT_URL', health: '/api/health', cwd: 'agents/Claw-Protect-main', start: 'npm run dev', notes: 'Secrets / prompt-injection scanner. Service-mode port is 3300 (see server.ts); CLAW_PORT overrides.' },
   { slug: 'depscan', name: 'dep-scan', category: 'security', port: 3301, env: 'DEPScan_URL', health: '/health', notes: 'Dependency CVE scanner.' },
   { slug: 'nuclei-scanner', name: 'Nuclei Scanner', category: 'security', port: 3302, env: 'NUCLEI_URL', health: '/health', notes: 'External vuln surface scanner.' },
 

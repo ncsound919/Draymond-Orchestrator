@@ -9,6 +9,7 @@
  */
 
 import { estimateTokens, costAwareOrder } from '../mathx';
+import { delegationFor, recordDelegationConsumption, phaseBudget } from './delegation';
 
 export type DayPhase = 'morning' | 'midday' | 'evening' | 'night';
 
@@ -20,6 +21,10 @@ export interface OrchestrationStep {
   purpose: string;
   /** Agents/systems this step feeds. */
   feedsTo?: string[];
+  /** Max duration for this step's run (ms) — from the delegation plan. */
+  durationMs?: number;
+  /** Estimated tokens for this step's run — from the delegation plan. */
+  tokenBudget?: number;
 }
 
 export const DAY_FLOW: OrchestrationStep[] = [
@@ -54,6 +59,27 @@ export function currentPhase(now = new Date()): DayPhase {
   if (h >= 17 && h < 22) return 'evening';
   return 'night';
 }
+
+// ============================================================================
+// DELEGATION ENRICHMENT
+// ============================================================================
+// Pull per-step duration + token budgets from the delegation plan so the day
+// flow and the runtime budget (workflow-budget fleet cap) agree on cost.
+// ============================================================================
+
+function applyDelegationBudgets(steps: OrchestrationStep[]): OrchestrationStep[] {
+  for (const step of steps) {
+    const spec = delegationFor(step.job);
+    if (spec) {
+      step.durationMs = spec.timeBudgetMs;
+      step.tokenBudget = spec.tokenBudgetPerRun;
+    }
+  }
+  return steps;
+}
+
+// Enrich in place at module load so DAY_FLOW callers see real budgets.
+applyDelegationBudgets(DAY_FLOW);
 
 export function dayPlan(now = new Date()): {
   phase: DayPhase;
@@ -102,8 +128,12 @@ const PHASE_WEIGHT: Record<DayPhase, number> = { morning: 3, midday: 2, evening:
 
 const PHASE_OFFSET: Record<DayPhase, number> = { morning: 0, midday: 1440, evening: 2880, night: 4320 };
 
-/** Estimate the LLM-context tokens a step will need (prose heuristic). */
+/** Estimate the LLM-context tokens a step will need. Uses the delegation plan's
+ *  per-run budget when the step maps to a planned handler, else a prose
+ *  heuristic so unplanned steps still get an estimate. */
 export function estimateStepTokens(step: OrchestrationStep): number {
+  const spec = delegationFor(step.job);
+  if (spec) return spec.tokenBudgetPerRun;
   return estimateTokens(`${step.purpose} ${step.job} ${step.id}`, 'prose');
 }
 
@@ -112,6 +142,11 @@ export function dayTokenBudget(): { total: number; byPhase: Record<DayPhase, num
   const byPhase = { morning: 0, midday: 0, evening: 0, night: 0 } as Record<DayPhase, number>;
   for (const s of DAY_FLOW) byPhase[s.phase] += estimateStepTokens(s);
   return { total: Object.values(byPhase).reduce((a, b) => a + b, 0), byPhase };
+}
+
+/** Recommended phase budget from the delegation plan (fleet share of the day). */
+export function dayPhaseBudget(phase: DayPhase): number {
+  return phaseBudget(phase);
 }
 
 /** Absolute deadline (minutes since midnight of the first phase) for a step. */
@@ -225,6 +260,9 @@ export async function runPhase(phase: DayPhase, budgetTokens?: number): Promise<
     try {
       await fn();
       executed.push(step.id);
+      // Charge the run to the delegation plan so the fleet cap reflects real
+      // day-orchestrator execution, not just LLM calls.
+      recordDelegationConsumption(step.job, estimateStepTokens(step));
     } catch (err) {
       errors.push(`${step.id}: ${err instanceof Error ? err.message : String(err)}`);
     }

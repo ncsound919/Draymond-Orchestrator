@@ -78,6 +78,12 @@ const START_MAP: Record<string, { command: [string, string[]]; port: number; hea
     port: 8010,
     health: '/health',
   },
+  'claw-protect': {
+    command: ['npm', ['run', 'dev']],
+    port: 3300,
+    health: '/api/health',
+    env: { CLAW_PORT: '3300', CLAW_SERVE_SAAS: 'false' },
+  },
 };
 
 /** Canonical service registry — slug -> { port, health, env } from ports.ts. */

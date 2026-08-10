@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeRequest } from '@/lib/draymond/api-auth';
-import { dayPlan, runPhase, DAY_FLOW, type DayPhase } from '@/lib/draymond/day-orchestrator';
+import { dayPlan, runPhase, DAY_FLOW, dayPhaseBudget, type DayPhase } from '@/lib/draymond/day-orchestrator';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,10 +11,12 @@ export async function GET(request: NextRequest) {
   const authError = authorizeRequest(request);
   if (authError) return authError;
   const plan = dayPlan();
-  return NextResponse.json({ ...plan, totalSteps: DAY_FLOW.length });
+  const phaseBudgets = Object.fromEntries(PHASES.map((p) => [p, dayPhaseBudget(p)]));
+  return NextResponse.json({ ...plan, totalSteps: DAY_FLOW.length, phaseBudgets });
 }
 
-/** POST /api/ops/day?phase=morning|midday|evening|night — run a phase group now */
+/** POST /api/ops/day?phase=morning|midday|evening|night — run a phase group now,
+ *  bounded by the delegation plan's token budget for that phase. */
 export async function POST(request: NextRequest) {
   const authError = authorizeRequest(request);
   if (authError) return authError;
@@ -22,6 +24,6 @@ export async function POST(request: NextRequest) {
   if (!phase || !PHASES.includes(phase)) {
     return NextResponse.json({ error: `phase must be one of: ${PHASES.join(', ')}` }, { status: 400 });
   }
-  const result = await runPhase(phase);
+  const result = await runPhase(phase, dayPhaseBudget(phase));
   return NextResponse.json(result, { status: result.errors.length ? 202 : 200 });
 }

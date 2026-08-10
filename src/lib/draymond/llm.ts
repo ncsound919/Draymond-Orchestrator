@@ -400,6 +400,20 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
   }
 
   let lastErr: unknown;
+  // Pre-gate: if the projected fleet budget can't cover this call, skip the
+  // whole provider chain rather than burning attempts. The per-provider gate
+  // inside the loop still applies; this is the early-out for the shared cap.
+  {
+    const { canCallFleet } = await import('./workflow-budget');
+    const fleetGate = canCallFleet(budget);
+    if (!fleetGate.ok) {
+      if (options.deterministicFallback !== undefined) {
+        console.warn(`[llm] ${fleetGate.reason} — returning deterministic fallback.`);
+        return options.deterministicFallback;
+      }
+      throw new Error(fleetGate.reason);
+    }
+  }
   for (const provider of deduped) {
     try {
       // Budget gate: skip a provider whose daily token budget is exhausted or

@@ -42,7 +42,7 @@ $TOOLS = @{
   # MCP /mcp endpoint only accepts POST; GET /mcp is the SSE handshake and 406s
   # by spec). --json-response + --stateless for plain-JSON MCP clients.
   "graphify"      = @{ cmd = "python";   args = @("scripts\serve-graphify.py", "graphify-out\graph.json", "--transport", "http", "--port", "3203", "--host", "127.0.0.1", "--json-response", "--stateless"); cwd = "."; port = 3203; health = "/health" }
-  "claw-protect"  = @{ cmd = "npm";      args = @("run", "dev");                           cwd = "agents\Claw-Protect-main"; port = 3300; health = "/health" }
+  "claw-protect"  = @{ cmd = "npm";      args = @("run", "dev");                           cwd = "agents\Claw-Protect-main"; port = 3300; health = "/api/health" }
   "vibeserve"     = @{ cmd = "python";   args = @("-m", "vibeserve");                      cwd = "agents\VibeServe-main"; port = 3600; health = "/health" }
   "big-homie"     = @{ cmd = "uvicorn";  args = @("big_homie_web:app", "--port", "3500");  cwd = "agents\AgentBrowser-main\Big-Homie-main"; port = 3500; health = "/health" }
   "litellm"       = @{ cmd = "litellm";  args = @("--config", "litellm.yaml", "--port", "4100"); cwd = "."; port = 4100; health = "/health" }
