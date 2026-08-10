@@ -25,7 +25,6 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from biotech_science.onco_metrics import (  # noqa: E402
-    compute_onco_metrics,
     four_factors,
     ter_score,
 )

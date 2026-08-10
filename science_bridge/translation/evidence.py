@@ -30,7 +30,6 @@ def grade_translation(result: dict) -> dict:
     """
     confidence = float(result.get("confidence", 0.0))
     base = grade_confidence(confidence)
-    domain = result.get("domain", "diagnosis")
     bidirectional = bool(result.get("bidirectional_possible", True))
     tiers = list(EVIDENCE_TIERS)
     idx = tiers.index(base)

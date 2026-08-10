@@ -9,7 +9,6 @@ checkpoint, substitution <-> treatment-line switch. Rule-based (E3).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
 
 
 @dataclass

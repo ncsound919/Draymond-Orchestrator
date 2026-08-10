@@ -13,7 +13,7 @@ the deterministic brain.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 try:
@@ -91,21 +91,21 @@ FORMULAS: list[FormulaDef] = [
     ),
     FormulaDef(
         key="NET_RATING", name="Net Rating",
-        expr=(_PTS - _PTS * sp.Rational(1, 1)) + 0,  # placeholder; real: off_rating - def_rating
+        expr=(_PTS - _PTS) + (_REB + _AST + _STL + _BLK - _TOV),  # box-only net-possession proxy
         unit="score",
         biotech_analog="Net Pathway Contribution Index",
         biotech_expr=None,
-        interpretation="Net rating = offensive rating minus defensive rating; biotech analog is differential viability vs control (overall system contribution).",
-        primitives=("PTS",),
+        interpretation="Net rating = offensive rating minus defensive rating. Box-only proxy: positive production minus negative possessions (true on/off splits need lineup data -> E4).",
+        primitives=("PTS", "REB", "AST", "STL", "BLK", "TOV"),
     ),
     FormulaDef(
         key="PLUS_MINUS", name="Plus/Minus",
-        expr=_PTS,  # net on-court scoring differential per 100; proxy with PTS when box-only
+        expr=(_PTS - _PF) + (_AST + _REB) - (_TOV * 2),  # box-only net-impact proxy
         unit="score",
         biotech_analog="Therapeutic Index (log-ratio)",
         biotech_expr=None,
-        interpretation="+/- measures net impact on the game; biotech analog is the therapeutic index log(Toxic Dose / Effective Dose).",
-        primitives=("PTS",),
+        interpretation="+/- measures net on-court impact; biotech analog is therapeutic index log(Toxic/Effective). Box-only proxy; true on/off splits need lineups -> E4.",
+        primitives=("PTS", "PF", "AST", "REB", "TOV"),
     ),
 ]
 
@@ -153,22 +153,20 @@ def compute_box_score(box: dict[str, float]) -> list[dict]:
     Returns [{key, name, value, unit, biotech_analog, biotech_value, evidence_tier, trust_score}].
     """
     results: list[dict] = []
+    has_lineup = any(k in box for k in ("OFF_RATING", "DEF_RATING", "ON_COURT", "OFF_COURT"))
     for f in FORMULAS:
-        if f.key == "NET_RATING":
-            # net rating needs opponent splits; skip without them (E4 note).
+        if f.key in ("NET_RATING", "PLUS_MINUS"):
+            # True net rating / +/- need on/off lineup splits. With box-only
+            # data we emit a deterministic proxy but grade it E4 (modeled).
+            value = _apply_expr(f.expr, box)
+            verdict = verify_formula(f)
             results.append({
-                "key": f.key, "name": f.name, "value": None, "unit": f.unit,
-                "biotech_analog": f.biotech_analog, "biotech_value": None,
-                "interpretation": f.interpretation, "evidence_tier": "E4",
-                "trust_score": 0.0,
-            })
-            continue
-        if f.key == "PLUS_MINUS":
-            results.append({
-                "key": f.key, "name": f.name, "value": None, "unit": f.unit,
-                "biotech_analog": f.biotech_analog, "biotech_value": None,
-                "interpretation": f.interpretation, "evidence_tier": "E4",
-                "trust_score": 0.0,
+                "key": f.key, "name": f.name, "value": round(value, 4), "unit": f.unit,
+                "biotech_analog": f.biotech_analog, "biotech_value": round(value, 4),
+                "interpretation": f.interpretation,
+                "evidence_tier": "E1" if has_lineup else "E4",
+                "trust_score": verdict["trust_score"],
+                "note": "lineup-aware" if has_lineup else "box-only proxy (needs on/off splits for E1)",
             })
             continue
         value = _apply_expr(f.expr, box)

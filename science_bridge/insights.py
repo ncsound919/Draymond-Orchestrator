@@ -10,7 +10,6 @@ Deterministic, rule-based, evidence-tiered. No LLM dependency.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
 
 from .translation.engine import BiotechTranslationEngine
 from .translation.evidence import grade_confidence
