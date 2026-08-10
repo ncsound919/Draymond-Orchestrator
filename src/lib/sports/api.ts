@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import type { EngineName, ExperimentStatus, Task, TaskDAG } from './types';
 import { runDag, topoOrder, type Executor } from './dag';
 import { saveExperiment, getExperimentsMap as readMap } from './store';
-import { runPythonMetrics, runPythonCoach } from './pythonExecutors';
+import { runPythonMetrics, runPythonCoach, runPythonTranslate, runPythonInsights } from './pythonExecutors';
 import { runRustSimPlay, runRustSimBatch } from './rustExecutors';
 import { validateOutput } from './validate';
 
@@ -63,9 +63,20 @@ const makeExecutor: Executor = (task, upstream) => {
       : runRustSimPlay(task.inputs);
     return sim;
   }
+  if (task.engine === 'translation') {
+    const term = String(task.inputs?.term ?? '');
+    const value = task.inputs?.value !== undefined ? Number(task.inputs.value) : undefined;
+    const fromSports = (task.inputs?.from_sports ?? true) as boolean;
+    return runPythonTranslate(term, value, fromSports);
+  }
+  if (task.engine === 'insights') {
+    const profile = (task.inputs?.profile ?? {}) as Record<string, unknown>;
+    const fromBiotech = (task.inputs?.from_biotech ?? false) as boolean;
+    return runPythonInsights(profile, fromBiotech);
+  }
   return Promise.resolve({
     success: false,
-    data: {},
+    data: { data: [], error: `unknown engine ${task.engine}` },
     error: `unknown engine ${task.engine}`,
     evidence_tier: 'E3',
   });

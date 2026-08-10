@@ -1,6 +1,6 @@
 import csv
 
-DEFAULT_BOXREC_PATH = r"C:\Users\User\Downloads\Uplift\Overlay Science\Sports\Boxing Sim\BoxRec Boxers Data.csv"
+DEFAULT_BOXREC_PATH = r"C:\Users\User\Downloads\Uplift\02_Pillars\Overlay Science\Sports\Boxing Sim\BoxRec Boxers Data.csv"
 
 
 def _as_float(value):

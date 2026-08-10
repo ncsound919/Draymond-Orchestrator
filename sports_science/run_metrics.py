@@ -15,7 +15,9 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from sports_science.codex_metrics import ter_score, four_factors, gravity_index, flow_index  # noqa: E402
+from sports_science.evidence import grade_metric  # noqa: E402
 from sports_science.injury_risk import fatigue_score, injury_risk_percent, recovery_priority  # noqa: E402
+from sports_science.clinical import baseline_form, projected_availability, availability_tier  # noqa: E402
 
 
 def compute_metrics_from_json(input_path: Path) -> dict[str, Any]:
@@ -43,15 +45,29 @@ def compute_metrics_from_json(input_path: Path) -> dict[str, Any]:
         acute_chronic=b.get("acute_chronic", 1.0),
         sleep_hrs=b.get("sleep_hrs", 8.0),
     )
+    risk_frac = risk / 100.0
+    availability = projected_availability(fatigue, risk_frac, b.get("acute_chronic", 1.0))
+    form = baseline_form(ter, gravity, flow)
+    acute_chronic = b.get("acute_chronic", 1.0)
     return {
         "sport": raw.get("sport", "unknown"),
         "ter": ter,
+        "ter_evidence": grade_metric("ter", ter, source="derived"),
         "four_factors": factors,
         "gravity": gravity,
         "flow": flow,
         "fatigue": fatigue,
+        "fatigue_evidence": grade_metric("fatigue", fatigue, source="derived"),
         "injury_risk": risk,
+        "injury_risk_evidence": grade_metric("injury_risk", risk, source="derived"),
         "recovery_priority": recovery_priority(risk),
+        # Clinical/performance-risk projection (scientific-rigor parity).
+        "baseline_form": form,
+        "baseline_form_evidence": grade_metric("baseline_form", form, source="derived"),
+        "availability": availability,
+        "availability_evidence": grade_metric("availability", availability, source="derived"),
+        "availability_tier": availability_tier(risk_frac),
+        "acute_chronic": acute_chronic,
         "evidence_tier": "E1",
     }
 

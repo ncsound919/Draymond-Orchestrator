@@ -142,3 +142,61 @@ export async function runPythonCoach(
     fs.rmSync(dir, { recursive: true, force: true });
   }
 }
+
+export async function runPythonTranslate(
+  term: string,
+  value?: number,
+  fromSports = true,
+): Promise<PythonResult> {
+  if (!term) {
+    return {
+      success: false,
+      data: failureData('term required'),
+      error: 'term required',
+      evidence_tier: 'E3',
+    };
+  }
+  const args = ['session', term];
+  if (value !== undefined) args.push('--value', String(value));
+  if (!fromSports) args.push('--from_biotech');
+  try {
+    const { stdout } = await runCli('run_translate.py', args);
+    const data = JSON.parse(stdout);
+    return { success: true, data: wrap(stripInnerEvidenceTier(data)), error: null, evidence_tier: 'E3' };
+  } catch (err) {
+    const message = errorMessage(err);
+    return { success: false, data: failureData(message), error: message, evidence_tier: 'E3' };
+  }
+}
+
+export async function runPythonInsights(
+  profile: Record<string, unknown>,
+  fromBiotech = false,
+): Promise<PythonResult> {
+  if (!profile || Object.keys(profile).length === 0) {
+    return {
+      success: false,
+      data: failureData('profile required'),
+      error: 'profile required',
+      evidence_tier: 'E3',
+    };
+  }
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sports-insights-'));
+  const file = path.join(dir, 'profile.json');
+  try {
+    fs.writeFileSync(file, JSON.stringify(profile));
+    const args = ['session', file];
+    if (fromBiotech) args.push('--from_biotech');
+    const { stdout } = await runCli('run_insights.py', args);
+    const data = JSON.parse(stdout);
+    if (data.error) {
+      return { success: false, data: failureData(data.error), error: data.error, evidence_tier: 'E3' };
+    }
+    return { success: true, data: wrap(stripInnerEvidenceTier(data)), error: null, evidence_tier: 'E3' };
+  } catch (err) {
+    const message = errorMessage(err);
+    return { success: false, data: failureData(message), error: message, evidence_tier: 'E3' };
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}

@@ -1,6 +1,27 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { callLLM, resolveLLMProvider } from '../src/lib/draymond/llm';
 
+/**
+ * Seed a memory row into the DB that `retrieveContext` reads, so the context
+ * block is non-empty and LLMLingua-2 compression actually runs. Uses the same
+ * `getDb()` singleton the retrieval module uses.
+ */
+async function seedMemoryRow() {
+  const { getDb } = await import('../src/lib/db/connection');
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.prepare(
+    `INSERT OR REPLACE INTO draymond_memory
+      (id, agent_id, user_id, key, value, summary, tier, importance_score, decay_rate,
+       last_accessed_at, access_count, is_active, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    'mem-test-1', 'agent-test', 'user-test', 'test-key', '{}',
+    'Important lesson: field-goal efficiency maps to tumor proliferation.', 'core', 0.9, 0.01,
+    now, 1, 1, now, now,
+  );
+}
+
 describe('shared llm helper', () => {
   const fetchMock = vi.fn();
 
@@ -329,6 +350,7 @@ describe('shared llm helper', () => {
     it('compresses the block when compress=true and the service is available', async () => {
       delete process.env.LLMLINGUA_DISABLE;
       process.env.LLMLINGUA_URL = 'http://example.com';
+      await seedMemoryRow();
       fetchMock.mockResolvedValue(
         new Response(
           JSON.stringify({
@@ -374,6 +396,7 @@ describe('shared llm helper', () => {
     it('compresses the RAG block by default (compressRag undefined)', async () => {
       delete process.env.LLMLINGUA_DISABLE;
       process.env.LLMLINGUA_URL = 'http://example.com';
+      await seedMemoryRow();
       // First fetch = compressor; every later fetch = ollama (fresh Response each call).
       fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
         const url = String(input);

@@ -201,6 +201,15 @@ export async function runPhase(phase: DayPhase, budgetTokens?: number): Promise<
       return runTreasuryPulse(Number.isFinite(lookbackDays) ? lookbackDays : 30);
     },
     generate_agent_avatars: async () => {
+      // Fail-soft: avatar generation needs the Gemini key + registry, and is a
+      // weekly optional task. Skip cleanly when either is unavailable so the
+      // night phase doesn't collect a spurious avatars error.
+      const fs = await import('node:fs');
+      const pathMod = await import('node:path');
+      const registryDir = process.env.DRAYMOND_REGISTRY_DIR ?? pathMod.default.join(process.cwd(), '.draymond');
+      if (!process.env.GEMINI_API_KEY || !fs.default.existsSync(pathMod.default.join(registryDir, 'registry.json'))) {
+        return { skipped: 'avatar generation requires GEMINI_API_KEY and the registry (weekly optional)' };
+      }
       const { execFile } = await import('node:child_process');
       const { promisify } = await import('node:util');
       return promisify(execFile)('node', ['scripts/generate-agent-avatars.mjs'], { timeout: 600_000 });

@@ -1,13 +1,20 @@
-# biotech_science/translation/mappings.py
+# science_bridge/translation/mappings.py
 """Bidirectional sports <-> biotech mapping tables.
 
 Terminology, archetype, and metric-conversion maps used by the translation
 engine. Extends bb_tech_core's mappings with the full archetype set and
 evidence-aware confidence metadata.
+
+Carries the AUTHORITATIVE formula-backed lexicon ported from Overlay Science's
+`disease_research/translation.py` (12 stat mappings with formulas + significance
+scores, the archetype spine, and the verifiable-formula table) so the shared
+seam matches the Overlay Science translation point exactly.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 
 class TranslationDirection(Enum):
@@ -133,3 +140,117 @@ METRIC_CONVERSIONS: list[dict] = [
         "formula": "tempo x possession quality -> treatment tempo x response quality",
     },
 ]
+
+# ============================================================================
+# AUTHORITATIVE FORMULA-BACKED LEXICON (ported from disease_research/translation.py)
+# ============================================================================
+
+
+@dataclass(frozen=True)
+class Mapping:
+    """A single bidirectional concept mapping (authoritative lexicon entry)."""
+
+    sports_term: str
+    biotech_term: str
+    description: str
+    formula: str | None = None
+    significance: float = 0.5
+    aliases: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class TranslatedRecord:
+    source_domain: str
+    target_domain: str
+    source_term: str
+    target_term: str
+    source_value: float | None = None
+    target_value: float | None = None
+    interpretation: str = ""
+    confidence: float = 0.0
+    evidence_tier: str = "E3"
+    formula_verified: bool = False
+    trust_score: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "source_domain": self.source_domain,
+            "target_domain": self.target_domain,
+            "source_term": self.source_term,
+            "target_term": self.target_term,
+            "source_value": self.source_value,
+            "target_value": self.target_value,
+            "interpretation": self.interpretation,
+            "confidence": round(self.confidence, 4),
+            "evidence_tier": self.evidence_tier,
+            "formula_verified": self.formula_verified,
+            "trust_score": self.trust_score,
+        }
+
+
+# The 12 stat mappings (from Basketball-IDE analogies.ts + disease_research).
+FORMULA_MAPPINGS: list[Mapping] = [
+    Mapping("Field Goal Percentage (FG%)", "Transfection Efficiency",
+            "FG% measures successful shots out of attempts; transfection efficiency measures successful gene deliveries out of total attempts.",
+            "FG% = FGM / FGA ~ Transfected Cells / Total Cells", 0.95, ("FG_PCT", "FGM", "FGA", "fg")),
+    Mapping("Three-Point Percentage (3P%)", "Specificity Ratio",
+            "Like 3-pointers requiring more precision, specificity measures how precisely a drug hits its target vs off-target effects.",
+            "3P% = 3PM / 3PA ~ Target Hits / (Target + Off-target Hits)", 0.88, ("FG3_PCT", "3PM", "3PA", "tp")),
+    Mapping("Assists (AST)", "Synergistic Drug Interactions",
+            "Assists set up scoring; synergistic interactions enhance therapeutic outcomes.",
+            "AST Rate ~ Synergy Index", 0.82, ("AST", "ast")),
+    Mapping("Rebounds (REB)", "Recapture Rate",
+            "Rebounds recover missed shots; recapture rates measure how well biological systems recover or recycle molecules.",
+            "REB% ~ Molecules Recycled / Total Molecules Lost", 0.75, ("REB",)),
+    Mapping("Turnovers (TOV)", "Adverse Events",
+            "Turnovers are lost possessions; adverse events are unintended negative outcomes in treatment.",
+            "TOV Rate ~ Adverse Events / Treatment Duration", 0.92, ("TOV", "tov")),
+    Mapping("Plus/Minus (+/-)", "Therapeutic Index",
+            "Plus/minus measures net impact; therapeutic index is the ratio of toxic dose to effective dose.",
+            "+/- ~ log(Toxic Dose / Effective Dose)", 0.89, ("PLUS_MINUS",)),
+    Mapping("Points Per Game (PPG)", "Bioavailability",
+            "PPG measures scoring output; bioavailability measures how much drug reaches systemic circulation.",
+            "PPG ~ AUC of Drug Concentration", 0.85, ("PTS",)),
+    Mapping("Free Throw Percentage (FT%)", "Baseline Efficacy",
+            "Free throws are uncontested; baseline efficacy is performance under controlled conditions.",
+            "FT% ~ Response Rate in Control Arm", 0.78, ("FT_PCT",)),
+    Mapping("Blocks (BLK)", "Inhibition Constants (Ki)",
+            "Blocks prevent opponent scoring; inhibition constants measure how well a compound blocks a target.",
+            "BLK Rate ~ 1 / Ki", 0.87, ("BLK",)),
+    Mapping("Steals (STL)", "Competitive Binding Affinity",
+            "Steals take possession; competitive binding measures how well a drug displaces competitors.",
+            "STL Rate ~ Competitive Displacement Index", 0.83, ("STL",)),
+    Mapping("Minutes Played (MIN)", "Half-Life",
+            "Minutes indicate duration of contribution; half-life indicates duration of drug presence.",
+            "MIN ~ Half-life x Clearance Factor", 0.91, ("MIN",)),
+    Mapping("Offensive Rebounds (OREB)", "Reuptake Inhibition",
+            "Offensive rebounds create new scoring chances; reuptake inhibition maintains higher neurotransmitter levels.",
+            "OREB Rate ~ Reuptake Blockade %", 0.76, ("OREB",)),
+]
+
+FORMULA_ALIASES: dict[str, Mapping] = {}
+for _m in FORMULA_MAPPINGS:
+    for _a in _m.aliases:
+        FORMULA_ALIASES[_a.strip().lower()] = _m
+    FORMULA_ALIASES[_m.sports_term.strip().lower()] = _m
+    FORMULA_ALIASES[_m.biotech_term.strip().lower()] = _m
+
+# Verifiable formula identities (SymPy/Z3) — E1 when proven, else E3.
+VERIFIABLE_FORMULAS: dict[str, tuple[str, str]] = {
+    "TOV": ("-tov", "-adverse_events"),        # turnover penalty ~ adverse event rate
+    "FG_PCT": ("fg_m/fga", "transfected/total"),  # FG% ~ transfection efficiency
+    "PLUS_MINUS": ("points_for - points_against", "log(td/ed)"),  # +/- ~ therapeutic index log-ratio
+}
+
+# Archetype spine: athlete archetype -> (sports read, biotech phenotype).
+ARCHETYPE_SPINE: dict[str, tuple[str, str]] = {
+    "viral": ("explosive spread, high R0, immune escape", "infectious/immune-escape phenotype"),
+    "mutation": ("adaptation under stress, defensive evasion", "evasive/adaptive tumor or pathogen"),
+    "malignant": ("clonal expansion, host takeover", "high-pace aggressive tumor (Jordan model)"),
+    "cns_endocrine": ("network control, hormonal distribution", "CNS/neuroendocrine regulatory axis"),
+    "master_regulator": ("plasticity, differentiation, system control", "master transcription factor network"),
+    "tcell": ("coordination, cytokine bursts, systemic defense", "cytotoxic immune surveillance"),
+    "macrophage": ("resource recycling, inflammation management", "tumor-associated macrophage axis"),
+    "invasive": ("barrier breach, structural deformation", "invasive/metastatic phenotype"),
+    "rule_exploiter": ("efficiency exploitation, entropy management", "metabolic hijacking / Warburg phenotype"),
+}

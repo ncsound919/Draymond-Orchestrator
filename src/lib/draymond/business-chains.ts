@@ -334,6 +334,53 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     health_endpoint: '/health',
   },
 
+  // ── 8b. Cheetah ─────────────────────────────────────────────────────
+  // Deterministic autocoding engine — template-driven scaffolding, UI
+  // component generation, pinned dependencies, Docker, telemetry. No LLM.
+  {
+    name: 'Cheetah',
+    slug: 'cheetah',
+    kind: 'tool',
+    description:
+      'Enterprise deterministic autocoding engine (FastAPI :4120). Template-driven project scaffolds, pinned dependency lockfiles, Dockerfile generation, Game Maker UI component + preset generation, resource monitoring, and build telemetry. 100% reproducible without an LLM. Complements the deterministic-brain skill packs and the code-automation pipeline.',
+    invocation_method: 'http_api',
+    invocation_config: {
+      url: agentUrl('CHEETAH_URL', 'http://localhost:4120'),
+      method: 'POST',
+      health_url: `${agentUrl('CHEETAH_URL', 'http://localhost:4120')}/health`,
+      endpoints: {
+        health: '/health',
+        capabilities: '/capabilities',
+        preflight: '/preflight',
+        generate: '/generate',
+        build: '/build',
+        components: '/components',
+        presets: '/presets',
+        components_generate: '/components/generate',
+        presets_generate: '/presets/generate',
+        security_scan: '/audit/security-scan',
+        suggest_stack: '/enhance/suggest-stack',
+        component_config: '/enhance/component-config',
+        components_from_description: '/components/from-description',
+        readme: '/enhance/readme',
+      },
+    },
+    capabilities: [
+      'project_scaffolding',
+      'template_generation',
+      'dependency_pinning',
+      'docker_generation',
+      'ui_component_generation',
+      'preset_generation',
+      'resource_monitoring',
+      'build_telemetry',
+      'security_scanning',
+    ],
+    tags: ['coding', 'scaffolding', 'templates', 'deterministic', 'game-maker', 'ui'],
+    category: 'development',
+    health_endpoint: '/health',
+  },
+
   // ── 9. Overlay Chain (ChainFlow) ────────────────────────────────────
   // Next.js supply chain intelligence — demand forecast, anomaly detection, blockchain
   {
@@ -626,7 +673,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
   {
     name: 'Book-to-Skill Chain',
     slug: 'book-to-skill-chain',
-    kind: 'tool',
+    kind: 'skill',
     description:
       'Orchestrator pipeline: ground with BookBridge, synthesize the book, run the book-to-skill converter, and register the generated skill in Draymond registry + entity registry.',
     invocation_method: 'internal',
@@ -958,6 +1005,69 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
         },
         output_key: 'verification_report',
         step_order: 4,
+        depends_on_indices: [2],
+      },
+    ],
+  },
+
+  // ── Chain 5c: Cheetah Scaffold Pipeline ─────────────────────────────
+  // Deterministic codegen: Cheetah scaffold spec + UI preset (parallel),
+  // then build the project and validate via Uplift Agent. No LLM in the
+  // generation steps — fully reproducible output.
+  {
+    name: 'Cheetah Scaffold Pipeline',
+    slug: 'cheetah-scaffold-pipeline',
+    description:
+      'Deterministic project generation via Cheetah: build spec + Game Maker UI preset (parallel), execute the build, then audit/validate with Uplift Agent.',
+    steps: [
+      {
+        name: 'Generate Build Spec',
+        entitySlug: 'cheetah',
+        action: 'generate',
+        input_mapping: {
+          name: '$.input.name',
+          project_type: '$.input.project_type',
+          features: '$.input.features',
+          stack: '$.input.stack',
+        },
+        output_key: 'spec',
+        step_order: 1,
+        depends_on_indices: [],
+      },
+      {
+        name: 'Generate UI Preset',
+        entitySlug: 'cheetah',
+        action: 'presets_generate',
+        input_mapping: {
+          preset_name: '$.input.preset_name',
+          project_root: '$.input.project_root',
+        },
+        output_key: 'ui_components',
+        step_order: 1,
+        parallel_group: 'cheetah_scaffold',
+        depends_on_indices: [],
+      },
+      {
+        name: 'Execute Build',
+        entitySlug: 'cheetah',
+        action: 'build',
+        input_mapping: {
+          yaml_content: '$.steps.spec.output.yaml',
+        },
+        output_key: 'build_result',
+        step_order: 2,
+        depends_on_indices: [0],
+      },
+      {
+        name: 'Audit & Validate',
+        entitySlug: 'uplift-agent',
+        action: 'batch',
+        input_mapping: {
+          task: 'validate_and_test',
+          code: '$.steps.build_result.output.files',
+        },
+        output_key: 'validation',
+        step_order: 3,
         depends_on_indices: [2],
       },
     ],

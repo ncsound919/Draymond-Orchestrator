@@ -1,4 +1,4 @@
-# biotech_science/translation/engine.py
+# sports_science/translation/engine.py
 """Re-export of the shared bidirectional engine from science_bridge."""
 
 from __future__ import annotations

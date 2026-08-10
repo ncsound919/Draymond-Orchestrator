@@ -1,11 +1,13 @@
 # sports_science/run_coach.py
-"""Coach runner: metrics -> simple deterministic game-plan recommendation."""
+"""Coach runner: metrics -> deterministic, evidence-tiered game plan."""
 from __future__ import annotations
 
 import argparse
 import json
 import sys
 from typing import Any
+
+from sports_science.clinical import availability_tier, gameplan_response  # noqa: E402
 
 RECOVERY_PLAY: dict[str, str] = {
     "critical": "pull from rotation; load management 48h; physio protocol",
@@ -15,7 +17,7 @@ RECOVERY_PLAY: dict[str, str] = {
 
 
 def build_gameplan(sport: str, metrics_file: Any) -> dict[str, Any]:
-    """Build a deterministic game plan from metrics.
+    """Build a deterministic, evidence-tiered game plan from metrics.
 
     `metrics_file` may be: None (error), a path to a metrics JSON, or an
     already-loaded dict (so the LabDirector bridge can pass upstream metrics
@@ -31,14 +33,14 @@ def build_gameplan(sport: str, metrics_file: Any) -> dict[str, Any]:
                 m = json.load(f)
         except (OSError, ValueError):
             return {"status": "error", "message": f"unreadable metrics file: {metrics_file}"}
-    plan = {
-        "sport": sport,
-        "status": "ok",
-        "ter": m.get("ter"),
-        "recovery": RECOVERY_PLAY.get(m.get("recovery_priority", "normal")),
-        "focus": "increase spacing pressure" if m.get("gravity", 0) < 0.5 else "maintain spacing",
-        "evidence_tier": "E1",
-    }
+    plan = gameplan_response(m)
+    risk_frac = float(m.get("injury_risk", 0.0)) / 100.0 if float(m.get("injury_risk", 0.0)) > 1.0 else float(m.get("injury_risk", 0.0))
+    tier = availability_tier(risk_frac)
+    plan["sport"] = sport
+    plan["status"] = "ok"
+    plan["ter"] = m.get("ter")
+    plan["recovery"] = RECOVERY_PLAY.get(m.get("recovery_priority", tier), RECOVERY_PLAY[tier])
+    plan["focus"] = "increase spacing pressure" if m.get("gravity", 0) < 0.5 else "maintain spacing"
     return plan
 
 
