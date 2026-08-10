@@ -1,0 +1,26 @@
+{
+  "hypotheses": [
+    { "id": "biotech-01-h1", "goal_id": "biotech-01", "claim": "A burden-threshold risk model can flag life-threatening windows before clinical presentation.", "status": "untested", "experiment_ids": [] },
+    { "id": "biotech-01-h2", "goal_id": "biotech-01", "claim": "Screening sensitivity gains monotonically reduce detection lag and risk score.", "status": "untested", "experiment_ids": [] },
+    { "id": "biotech-02-h1", "goal_id": "biotech-02", "claim": "Protective interventions outweigh modifiable risk burden when biological aging accelerates.", "status": "untested", "experiment_ids": [] },
+    { "id": "biotech-03-h1", "goal_id": "biotech-03", "claim": "Genomic classification match drives durable residual-disease clearance.", "status": "untested", "experiment_ids": [] },
+    { "id": "biotech-04-h1", "goal_id": "biotech-04", "claim": "Resistance accumulates monotonically when immune engagement wanes.", "status": "untested", "experiment_ids": [] },
+    { "id": "biotech-05-h1", "goal_id": "biotech-05", "claim": "Pathway blockade above a seeding threshold halts metastatic colonization.", "status": "untested", "experiment_ids": [] },
+    { "id": "biotech-06-h1", "goal_id": "biotech-06", "claim": "Clonal diversity predicts treatment-failure risk independent of dominant clone.", "status": "untested", "experiment_ids": [] },
+    { "id": "biotech-07-h1", "goal_id": "biotech-07", "claim": "ADC selectivity trades efficacy against off-target toxicity and quality of life.", "status": "untested", "experiment_ids": [] },
+    { "id": "biotech-08-h1", "goal_id": "biotech-08", "claim": "Interoperability is the binding constraint on AI diagnostic accuracy.", "status": "untested", "experiment_ids": [] },
+    { "id": "biotech-09-h1", "goal_id": "biotech-09", "claim": "Outreach narrows access gap faster than screening-rate gains alone.", "status": "untested", "experiment_ids": [] },
+    { "id": "biotech-10-h1", "goal_id": "biotech-10", "claim": "Manufacturing scale gates population-level survival gains more than discovery maturity.", "status": "untested", "experiment_ids": [] },
+    { "id": "sports-01-h1", "goal_id": "sports-01", "claim": "Stress load above an adaptation ceiling predicts development stagnation.", "status": "untested", "experiment_ids": [] },
+    { "id": "sports-02-h1", "goal_id": "sports-02", "claim": "Validation coverage is the dominant driver of decision usefulness.", "status": "untested", "experiment_ids": [] },
+    { "id": "sports-03-h1", "goal_id": "sports-03", "claim": "Fatigue crosses a threshold before injury-risk window opens.", "status": "untested", "experiment_ids": [] },
+    { "id": "sports-03-h2", "goal_id": "sports-03", "claim": "Recovery half-life shortens as stress toxicity rises.", "status": "untested", "experiment_ids": [] },
+    { "id": "sports-04-h1", "goal_id": "sports-04", "claim": "Trait fidelity decays across sport gaps but recovers with adaptation training.", "status": "untested", "experiment_ids": [] },
+    { "id": "sports-05-h1", "goal_id": "sports-05", "claim": "Cognitive fatigue degrades decision quality before reaction time collapses.", "status": "untested", "experiment_ids": [] },
+    { "id": "sports-06-h1", "goal_id": "sports-06", "claim": "Contract risk is more sensitive to injury probability than to performance value.", "status": "untested", "experiment_ids": [] },
+    { "id": "sports-07-h1", "goal_id": "sports-07", "claim": "Punch-impact load drives head-trauma accumulation faster than fatigue toxicity.", "status": "untested", "experiment_ids": [] },
+    { "id": "sports-08-h1", "goal_id": "sports-08", "claim": "Data coverage is the binding constraint on universal-model maturity.", "status": "untested", "experiment_ids": [] },
+    { "id": "sports-09-h1", "goal_id": "sports-09", "claim": "Injury susceptibility decays career longevity faster than age.", "status": "untested", "experiment_ids": [] },
+    { "id": "sports-10-h1", "goal_id": "sports-10", "claim": "Standardization resolves sensor conflict faster than protocol variance.", "status": "untested", "experiment_ids": [] }
+  ]
+}

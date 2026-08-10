@@ -24,6 +24,7 @@ export const KAIROS_KINDS = [
   'weak_agent',
   'repair_loop',
   'stale_heartbeat',
+  'stale_experiment',
 ] as const;
 export type KairosKind = (typeof KAIROS_KINDS)[number];
 
@@ -217,6 +218,28 @@ export async function detectStaleHeartbeat(): Promise<DetectorHit[]> {
   return hits;
 }
 
+/** Flag experiments stuck in 'queued' or 'running' beyond the stale window. */
+export async function detectStaleExperiment(): Promise<DetectorHit[]> {
+  const { listExperiments } = await import('@/lib/science/experiments');
+  const experiments = await listExperiments();
+  const staleHours = Math.max(1, Number(process.env.SCIENCE_STALE_EXPERIMENT_HOURS ?? 24));
+  const cutoff = Date.now() - staleHours * 3_600_000;
+  const hits: DetectorHit[] = [];
+  for (const exp of experiments) {
+    if (exp.status !== 'queued' && exp.status !== 'running') continue;
+    const updated = new Date(exp.updated_at).getTime();
+    if (Number.isNaN(updated) || updated >= cutoff) continue;
+    hits.push({
+      kind: 'stale_experiment' as const,
+      severity: 'warn' as const,
+      title: `Stale experiment: ${exp.experiment_id}`,
+      detail: `${exp.type}/${exp.domain} stuck ${exp.status} for ${Math.max(1, Math.round((Date.now() - updated) / 3_600_000))}h (${exp.goal_id})`,
+      source: 'science',
+    });
+  }
+  return hits;
+}
+
 export const DETECTORS: Array<{ kind: KairosKind; run: () => Promise<DetectorHit[]> }> = [
   { kind: 'monitor_down', run: detectMonitorDown },
   { kind: 'job_failed', run: detectJobFailed },
@@ -226,6 +249,7 @@ export const DETECTORS: Array<{ kind: KairosKind; run: () => Promise<DetectorHit
   { kind: 'weak_agent', run: detectWeakAgent },
   { kind: 'repair_loop', run: detectRepairLoop },
   { kind: 'stale_heartbeat', run: detectStaleHeartbeat },
+  { kind: 'stale_experiment', run: detectStaleExperiment },
 ];
 
 // ============================================================================
@@ -252,6 +276,7 @@ const EVENT_CATEGORY: Record<KairosKind, EventCategory> = {
   weak_agent: 'confidence',
   repair_loop: 'recovery',
   stale_heartbeat: 'health',
+  stale_experiment: 'goal',
 };
 
 const EVENT_SEVERITY: Record<KairosSeverity, EventSeverity> = {

@@ -767,4 +767,22 @@ CREATE TABLE IF NOT EXISTS draymond_worker_proposals (
   created_at TEXT NOT NULL,
   reviewed_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS science_experiments (
+  experiment_id TEXT PRIMARY KEY,
+  goal_id TEXT,
+  hypothesis_id TEXT,
+  domain TEXT NOT NULL DEFAULT 'sports',
+  type TEXT NOT NULL DEFAULT 'analysis',
+  model_id TEXT,
+  status TEXT NOT NULL DEFAULT 'running',
+  result TEXT NOT NULL DEFAULT '{}',
+  evidence_tier TEXT NOT NULL DEFAULT 'E3',
+  error TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_science_experiments_goal ON science_experiments(goal_id);
+CREATE INDEX IF NOT EXISTS idx_science_experiments_status ON science_experiments(status);
 `;
+

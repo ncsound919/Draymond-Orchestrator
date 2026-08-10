@@ -529,6 +529,7 @@ export const CUSTOM_HANDLERS: CustomHandlerDef[] = [
   { handler: 'mission_run_maas_cycle', label: 'MaaS Monthly Cycle', description: 'Run the MaaS delivery chain for each active client.' },
   { handler: 'dream_cycle', label: 'Dream Cycle', description: 'AutoDream 4-phase memory consolidation (self-gated).' },
   { handler: 'ultraplan_process', label: 'Ultraplan Process', description: 'Drain the deep-planning queue.' },
+  { handler: 'research_rotation', label: 'Research Rotation', description: 'Drain the highest-priority ready science experiment from the queue.' },
 ];
 
 /**
@@ -1260,6 +1261,13 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         // Drain the oldest queued ultraplan through the deep-planning lane.
         const { processNextUltraplan } = await import('./ultraplan');
         const r = await processNextUltraplan();
+        return { handler, ...r };
+      }
+
+      if (handler === 'research_rotation') {
+        // Research rotation: drain the highest-priority ready science experiment.
+        const { researchRotation } = await import('@/lib/science/experiments');
+        const r = await researchRotation();
         return { handler, ...r };
       }
 
