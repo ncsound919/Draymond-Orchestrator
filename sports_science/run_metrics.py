@@ -1,0 +1,75 @@
+# sports_science/run_metrics.py
+"""CLI + importable runner: raw sports data JSON -> Codex + injury metrics (E1)."""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+# Allow running as a script from the repo root (DCA skill packs invoke
+# `python sports_science/run_metrics.py ...`): make the repo root importable.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from sports_science.codex_metrics import ter_score, four_factors, gravity_index, flow_index  # noqa: E402
+from sports_science.injury_risk import fatigue_score, injury_risk_percent, recovery_priority  # noqa: E402
+
+
+def compute_metrics_from_json(input_path: Path) -> dict[str, Any]:
+    raw = json.loads(Path(input_path).read_text(encoding="utf-8"))
+    p = raw.get("performance", {})
+    b = raw.get("biometrics", {})
+    ter = ter_score(
+        fg=p.get("fg", 0.0), tp=p.get("tp", 0.0), ast=p.get("ast", 0.0),
+        oreb=p.get("oreb", 0.0), tov=p.get("tov", 0.0), pf=p.get("pf", 0.0),
+    )
+    factors = four_factors(
+        proliferation=p.get("proliferation", 50.0),
+        clearance=p.get("clearance", 50.0),
+        resource=p.get("resource", 50.0),
+        metastasis=p.get("metastasis", 50.0),
+    )
+    gravity = gravity_index(
+        defensive_attention=p.get("defensive_attention", 0.5),
+        court_spacing=p.get("court_spacing", 0.5),
+    )
+    flow = flow_index(tempo=p.get("tempo", 0.5), possession_quality=p.get("possession_quality", 0.5))
+    fatigue = fatigue_score(hrv=b.get("hrv", 65.0), load=b.get("load", 0.0))
+    risk = injury_risk_percent(
+        fatigue=fatigue,
+        acute_chronic=b.get("acute_chronic", 1.0),
+        sleep_hrs=b.get("sleep_hrs", 8.0),
+    )
+    return {
+        "sport": raw.get("sport", "unknown"),
+        "ter": ter,
+        "four_factors": factors,
+        "gravity": gravity,
+        "flow": flow,
+        "fatigue": fatigue,
+        "injury_risk": risk,
+        "recovery_priority": recovery_priority(risk),
+        "evidence_tier": "E1",
+    }
+
+
+def _main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("session_id")
+    parser.add_argument("sport")
+    parser.add_argument("dataset")
+    args = parser.parse_args()
+    input_path = Path(args.dataset)
+    if not input_path.exists():
+        print(json.dumps({"error": f"dataset not found: {args.dataset}"}))
+        return 1
+    result = compute_metrics_from_json(input_path)
+    print(json.dumps(result))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(_main())

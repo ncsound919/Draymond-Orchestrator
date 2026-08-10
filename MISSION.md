@@ -16,7 +16,7 @@ We get there by stacking **four revenue engines**, not one:
 | **E1 · Platform tiers** | $10k/mo | Overlay Health / Wealth / Justice paid tiers | Web platforms, Treasurer (billing), Strategist (roadmap) |
 | **E2 · B2B services** | $12k/mo | Aetherdesk Call Center + Marketing-as-a-Service | Aetherdesk, Marketing-Tool, Content-Creation-Engine, Observer |
 | **E3 · Business tooling / API** | $6k/mo | AI QA/monitoring + Security/SCA audits + Agent building | AgentBrowser QA, Auditor, dep-scan/nuclei, deterministic-brain |
-| **E4 · Vertical products** | $5k/mo | Music rights, sports intel, wealth insights, research | music-rights, Sports Steve, ghostfolio, BookBridge |
+| **E4 · Vertical products** | $5k/mo | Music rights, sports intel, wealth insights, research, writing/publishing | music-rights, Sports Steve, ghostfolio, BookBridge, Overlay Music, sports_science, Overlay Science, Overlay Writing |
 
 > $10k + $12k + $6k + $5k = $33k/mo → $99k in 90 days. Headroom on E2/E3 gets us over $100k.
 
@@ -52,6 +52,21 @@ Everything below is **buildable today** from tools already in the fleet — the 
 
 ---
 
+## 2.5 The Six New Systems — Revenue Roles
+
+| System | Becomes | Engine | Revenue model |
+|---|---|---|---|
+| Overlay Music | E4 vertical product | E4 | Music rights registration (ASCAP/HFA/MLC) as a service ($150/song, bundles); production + distribution for artists |
+| Overlay AI-Safety | E3 security service + cross-cutting guardrail layer | E3 | Security/SCA/AI-safety audit reports ($250–1,000/audit); powers The Guardian + Auditor |
+| Overlay Finance | E1 Wealth pillar expansion | E1 | Paid financial-strategy tiers, IP portfolio tools, business solutions; backs Treasurer / ghostfolio |
+| Overlay Writing | E2/E4 content & IP engine | E2/E4 | Publishing-as-a-service, book/product IP production, white-label content |
+| Overlay Science | E4 research arm (Learn/Science) | E4 | Research/knowledge subscriptions; AI-Scientist paper generation; sports + biotech intel |
+| sports_science | E4 sports intel engine | E4 | Feeds Sports Steve / Bet Buddy picks subscriptions ($50–200/mo) |
+
+Cross-cutting: Overlay AI-Safety gates all pillars (Guardian hard-gate, Auditor QA).
+
+---
+
 ## 3. Mission Control — every agent plays its role
 
 | Agent | Mission role | KPI |
@@ -68,6 +83,12 @@ Everything below is **buildable today** from tools already in the fleet — the 
 | **ghostfolio-engine** | Wealth tier analytics | tier activation |
 | **Aetherdesk** | Call center delivery | # active sites |
 | **Draymond** | Mission control: pipeline, cron, revenue sync | pipeline velocity |
+| **Overlay AI-Safety** | Guardrails + audits for every pillar (pairs with Guardian/Auditor) | 0 compliance flags open |
+| **Overlay Finance** | Wealth-pillar finance + IP strategy (pairs with Treasurer) | # finance/IP products shipped |
+| **Overlay Music** | Music rights + distribution pipeline | # registrations |
+| **Overlay Writing** | Publishing / book IP production | # titles shipped |
+| **Overlay Science** | Research arm — sports + biotech intel | # research products |
+| **sports_science** | Feeds Sports Steve / Bet Buddy picks | # subscribers |
 
 ---
 

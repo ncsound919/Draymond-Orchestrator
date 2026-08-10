@@ -1,0 +1,6 @@
+# Optional dependencies for the vision (shot-detection) adapter.
+# Install with:  pip install -r requirements-vision.txt
+ultralytics>=8.0.26
+opencv-python>=4.5.4
+torch>=1.7.0
+torchvision>=0.8.1
