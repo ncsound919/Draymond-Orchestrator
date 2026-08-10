@@ -1,0 +1,7 @@
+# scipy is intentionally absent: onco_metrics imports the analytics
+# submodules (ter_engine, four_factors) directly, so bbtech's analytics/__init__
+# chain (spatial_metrics, optimization_engine) is only pulled in when scipy is
+# present. clinical.py imports risk_calculator directly.
+numpy>=1.20
+requests>=2.25
+sympy>=1.9
