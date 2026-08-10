@@ -1,0 +1,19 @@
+{
+  "model_id": "sports-04-cross-sport-transfer",
+  "description": "Cross-sport transfer model: NBA/NFL/boxing trait transferability — movement, contact durability, neuromuscular timing, load cycling.",
+  "state_vars": ["transfer_index", "trait_fidelity", "sport_gap", "adaptation_potential"],
+  "params": {"fidelity_gain": 0.05, "gap_decay": 0.04, "transfer_eff": 0.06},
+  "initial_state": {"transfer_index": 0.3, "trait_fidelity": 0.5, "sport_gap": 0.7, "adaptation_potential": 0.4},
+  "update_rules": {
+    "transfer_index": "min(transfer_index + transfer_eff*trait_fidelity - sport_gap*0.02, 1)",
+    "trait_fidelity": "min(trait_fidelity + fidelity_gain, 1)",
+    "sport_gap": "max(sport_gap - gap_decay, 0)",
+    "adaptation_potential": "trait_fidelity * (1 - sport_gap)"
+  },
+  "events": [
+    {"when": "transfer_index > 0.7", "action": "flag:transferable_traits"},
+    {"when": "sport_gap < 0.2", "action": "flag:cross_sport_convergence"}
+  ],
+  "outputs": ["transfer_index", "adaptation_potential"],
+  "ticks": 48
+}

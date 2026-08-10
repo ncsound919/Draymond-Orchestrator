@@ -1,0 +1,19 @@
+{
+  "model_id": "sports-09-durability",
+  "description": "Stress-robustness & durability forecasting model: stress response, injury susceptibility, recovery phenotype, career longevity.",
+  "state_vars": ["stress_response", "injury_susceptibility", "recovery_phenotype", "career_longevity"],
+  "params": {"stress_rate": 0.05, "susceptibility_gain": 0.04, "recovery_eff": 0.06, "longevity_decay": 0.02},
+  "initial_state": {"stress_response": 0.5, "injury_susceptibility": 0.2, "recovery_phenotype": 0.6, "career_longevity": 1.0},
+  "update_rules": {
+    "stress_response": "min(stress_response + stress_rate - recovery_eff*recovery_phenotype, 1)",
+    "injury_susceptibility": "min(injury_susceptibility + susceptibility_gain*stress_response, 1)",
+    "recovery_phenotype": "min(recovery_phenotype + recovery_eff - injury_susceptibility*0.1, 1)",
+    "career_longevity": "max(career_longevity - longevity_decay - injury_susceptibility*0.15, 0)"
+  },
+  "events": [
+    {"when": "injury_susceptibility > 0.6", "action": "flag:durability_concern"},
+    {"when": "career_longevity < 0.4", "action": "flag:career_at_risk"}
+  ],
+  "outputs": ["injury_susceptibility", "career_longevity"],
+  "ticks": 60
+}

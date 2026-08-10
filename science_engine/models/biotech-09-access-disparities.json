@@ -1,0 +1,19 @@
+{
+  "model_id": "biotech-09-access-disparities",
+  "description": "Healthcare access & disparities model: access gap widens with geographic/socioeconomic barriers; outreach narrows it.",
+  "state_vars": ["access_gap", "screening_rate", "outreach", "outcome_disparity"],
+  "params": {"barrier_rate": 0.04, "outreach_eff": 0.07, "screening_gain": 0.05, "disparity_penalty": 0.3},
+  "initial_state": {"access_gap": 0.6, "screening_rate": 0.3, "outreach": 0.1, "outcome_disparity": 0.5},
+  "update_rules": {
+    "access_gap": "max(access_gap - outreach*outreach_eff + barrier_rate*0.3, 0)",
+    "screening_rate": "min(screening_rate + screening_gain*(1-access_gap), 1)",
+    "outreach": "min(outreach + 0.03, 1)",
+    "outcome_disparity": "access_gap * (1 - screening_rate) * (1 + disparity_penalty)"
+  },
+  "events": [
+    {"when": "access_gap > 0.8", "action": "flag:severe_access_gap"},
+    {"when": "outcome_disparity < 0.2", "action": "flag:disparity_narrowed"}
+  ],
+  "outputs": ["screening_rate", "outcome_disparity"],
+  "ticks": 60
+}

@@ -1,0 +1,19 @@
+{
+  "model_id": "biotech-03-precision-treatment",
+  "description": "Precision treatment personalization model: genomic classification drives therapy match; mismatch raises resistance pressure.",
+  "state_vars": ["classification_match", "therapy_efficacy", "residual_disease", "personalization_score"],
+  "params": {"match_gain": 0.12, "efficacy_decay": 0.05, "resistance_rate": 0.03, "mismatch_penalty": 0.2},
+  "initial_state": {"classification_match": 0.5, "therapy_efficacy": 0.6, "residual_disease": 1.0, "personalization_score": 0.5},
+  "update_rules": {
+    "classification_match": "min(classification_match + match_gain*0.5, 1)",
+    "therapy_efficacy": "therapy_efficacy + 0.04*classification_match - efficacy_decay",
+    "residual_disease": "residual_disease * (1 - 0.1*therapy_efficacy*classification_match + resistance_rate*(1-classification_match))",
+    "personalization_score": "classification_match * therapy_efficacy"
+  },
+  "events": [
+    {"when": "classification_match < 0.3", "action": "flag:suboptimal_match"},
+    {"when": "residual_disease < 0.2", "action": "flag:durable_response"}
+  ],
+  "outputs": ["personalization_score", "residual_disease"],
+  "ticks": 48
+}

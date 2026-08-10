@@ -1,0 +1,19 @@
+{
+  "model_id": "biotech-01-early-detection",
+  "description": "Early detection & interception risk model: tumor burden grows, detection sensitivity improves with screening, interception lowers established burden.",
+  "state_vars": ["burden", "detection_lag", "interception", "risk_score"],
+  "params": {"growth_rate": 0.06, "sensitivity": 0.05, "intercept_eff": 0.08, "lag_decay": 0.1},
+  "initial_state": {"burden": 1.0, "detection_lag": 1.0, "interception": 0.0, "risk_score": 0.2},
+  "update_rules": {
+    "burden": "burden * (1 + growth_rate - interception*intercept_eff - sensitivity)",
+    "detection_lag": "max(detection_lag - lag_decay, 0.1)",
+    "interception": "interception + 0.02",
+    "risk_score": "1 - exp(-burden * (1 + detection_lag))"
+  },
+  "events": [
+    {"when": "risk_score > 0.8", "action": "flag:life_threatening_window"},
+    {"when": "burden < 0.5", "action": "flag:intercepted_early"}
+  ],
+  "outputs": ["burden", "risk_score"],
+  "ticks": 48
+}

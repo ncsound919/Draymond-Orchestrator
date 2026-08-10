@@ -1,0 +1,20 @@
+{
+  "model_id": "biotech-10-bench-to-bedside",
+  "description": "Bench-to-bedside translation model: breakthrough maturity vs adoption/affordability/manufacturing barriers; community penetration narrows the gap.",
+  "state_vars": ["breakthrough_maturity", "community_adoption", "affordability", "manufacturing_scale", "survival_gain"],
+  "params": {"maturity_gain": 0.08, "adoption_eff": 0.05, "cost_barrier": 0.3, "scale_eff": 0.04},
+  "initial_state": {"breakthrough_maturity": 0.3, "community_adoption": 0.2, "affordability": 0.3, "manufacturing_scale": 0.2, "survival_gain": 0.1},
+  "update_rules": {
+    "breakthrough_maturity": "min(breakthrough_maturity + maturity_gain, 1)",
+    "community_adoption": "min(community_adoption + adoption_eff*breakthrough_maturity - cost_barrier*0.1, 1)",
+    "affordability": "min(affordability + scale_eff + adoption_eff*0.5, 1)",
+    "manufacturing_scale": "min(manufacturing_scale + scale_eff*breakthrough_maturity, 1)",
+    "survival_gain": "breakthrough_maturity * community_adoption * (0.5 + affordability + manufacturing_scale) / 2"
+  },
+  "events": [
+    {"when": "community_adoption < 0.2", "action": "flag:bench_to_bedside_gap"},
+    {"when": "survival_gain > 0.5", "action": "flag:population_level_impact"}
+  ],
+  "outputs": ["survival_gain", "community_adoption"],
+  "ticks": 48
+}

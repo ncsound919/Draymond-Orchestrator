@@ -1,0 +1,19 @@
+{
+  "model_id": "sports-07-boxing-science",
+  "description": "Boxing's scientific void model: punch-impact load, head-trauma accumulation, footwork efficiency, fatigue toxicity thresholds.",
+  "state_vars": ["punch_impact_load", "head_trauma", "footwork_efficiency", "fatigue_toxicity"],
+  "params": {"impact_rate": 0.08, "trauma_acc": 0.05, "footwork_gain": 0.04, "toxicity_threshold": 0.7},
+  "initial_state": {"punch_impact_load": 0.2, "head_trauma": 0.1, "footwork_efficiency": 0.5, "fatigue_toxicity": 0.2},
+  "update_rules": {
+    "punch_impact_load": "min(punch_impact_load + impact_rate - footwork_efficiency*0.03, 1)",
+    "head_trauma": "min(head_trauma + trauma_acc*punch_impact_load, 1)",
+    "footwork_efficiency": "min(footwork_efficiency + footwork_gain, 1)",
+    "fatigue_toxicity": "min(fatigue_toxicity + impact_rate - footwork_efficiency*0.02, 1)"
+  },
+  "events": [
+    {"when": "head_trauma > 0.6", "action": "flag:head_trauma_concern"},
+    {"when": "fatigue_toxicity > toxicity_threshold", "action": "flag:fatigue_toxicity_threshold"}
+  ],
+  "outputs": ["head_trauma", "fatigue_toxicity"],
+  "ticks": 48
+}

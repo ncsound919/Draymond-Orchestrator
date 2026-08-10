@@ -1,0 +1,19 @@
+{
+  "model_id": "biotech-08-ai-diagnostics",
+  "description": "AI-driven diagnostics & data integration model: data quality + interoperability gate diagnostic accuracy; AI reduces error rate as integration matures.",
+  "state_vars": ["data_quality", "interoperability", "diagnostic_accuracy", "error_rate"],
+  "params": {"quality_gain": 0.05, "interop_gain": 0.04, "ai_capability": 0.06, "integration_barrier": 0.3},
+  "initial_state": {"data_quality": 0.4, "interoperability": 0.3, "diagnostic_accuracy": 0.7, "error_rate": 0.3},
+  "update_rules": {
+    "data_quality": "min(data_quality + quality_gain, 1)",
+    "interoperability": "min(interoperability + interop_gain, 1)",
+    "diagnostic_accuracy": "min(0.5 + 0.3*data_quality + 0.2*interoperability, 0.99)",
+    "error_rate": "max(1 - diagnostic_accuracy - ai_capability*data_quality*interoperability, 0.01)"
+  },
+  "events": [
+    {"when": "interoperability < 0.2", "action": "flag:data_fragmentation"},
+    {"when": "error_rate < 0.1", "action": "flag:clinically_ready_accuracy"}
+  ],
+  "outputs": ["diagnostic_accuracy", "error_rate"],
+  "ticks": 48
+}

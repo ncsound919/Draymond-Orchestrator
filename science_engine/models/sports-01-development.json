@@ -1,0 +1,19 @@
+{
+  "model_id": "sports-01-development",
+  "description": "Athlete development black-box model: nonlinear growth curves with stress-response adaptation and phenotype drift under load.",
+  "state_vars": ["development_index", "stress_load", "adaptation", "phenotype_drift"],
+  "params": {"growth_rate": 0.05, "stress_rate": 0.04, "adapt_eff": 0.06, "drift_rate": 0.02},
+  "initial_state": {"development_index": 0.3, "stress_load": 0.2, "adaptation": 0.4, "phenotype_drift": 0.1},
+  "update_rules": {
+    "development_index": "min(development_index + growth_rate*adaptation, 1)",
+    "stress_load": "min(stress_load + stress_rate - adaptation*adapt_eff, 1)",
+    "adaptation": "min(adaptation + adapt_eff - stress_load*0.05, 1)",
+    "phenotype_drift": "min(phenotype_drift + drift_rate*stress_load, 1)"
+  },
+  "events": [
+    {"when": "development_index > 0.8", "action": "flag:elite_trajectory"},
+    {"when": "stress_load > 0.8", "action": "flag:stagnation_risk"}
+  ],
+  "outputs": ["development_index", "stress_load"],
+  "ticks": 60
+}

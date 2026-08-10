@@ -1,0 +1,19 @@
+{
+  "model_id": "biotech-04-drug-resistance",
+  "description": "Drug resistance & immunotherapy failure model: resistance accumulates, immune engagement wanes; CAR-T efficacy in solid tumors dampened by evasion.",
+  "state_vars": ["resistance", "immune_engagement", "tumor_load", "treatment_efficacy"],
+  "params": {"resist_rate": 0.05, "immune_decay": 0.03, "immune_boost": 0.06, "evasion_penalty": 0.15},
+  "initial_state": {"resistance": 0.1, "immune_engagement": 0.7, "tumor_load": 1.0, "treatment_efficacy": 0.8},
+  "update_rules": {
+    "resistance": "min(resistance + resist_rate + evasion_penalty*(1-immune_engagement), 1)",
+    "immune_engagement": "immune_engagement + immune_boost - immune_decay*resistance*2",
+    "tumor_load": "tumor_load * (1 - 0.12*treatment_efficacy + 0.1*resistance)",
+    "treatment_efficacy": "treatment_efficacy * (1 - resistance*0.3)"
+  },
+  "events": [
+    {"when": "resistance > 0.7", "action": "flag:resistance_breakthrough"},
+    {"when": "immune_engagement < 0.3", "action": "flag:immune_exhaustion"}
+  ],
+  "outputs": ["resistance", "tumor_load"],
+  "ticks": 60
+}

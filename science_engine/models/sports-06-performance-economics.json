@@ -1,0 +1,19 @@
+{
+  "model_id": "sports-06-performance-economics",
+  "description": "Multi-league economic + performance integration model: biometrics → contract risk, load → salary optimization, injury → roster construction.",
+  "state_vars": ["performance_value", "injury_probability", "contract_risk", "roster_optimization"],
+  "params": {"value_gain": 0.06, "injury_rate": 0.04, "risk_penalty": 0.3, "optimization_eff": 0.05},
+  "initial_state": {"performance_value": 0.5, "injury_probability": 0.2, "contract_risk": 0.3, "roster_optimization": 0.4},
+  "update_rules": {
+    "performance_value": "min(performance_value + value_gain, 1)",
+    "injury_probability": "min(injury_probability + injury_rate - optimization_eff*0.3, 1)",
+    "contract_risk": "0.5*injury_probability + 0.3*(1-performance_value)",
+    "roster_optimization": "min(roster_optimization + optimization_eff - contract_risk*risk_penalty*0.2, 1)"
+  },
+  "events": [
+    {"when": "contract_risk > 0.6", "action": "flag:contract_overvalued"},
+    {"when": "roster_optimization > 0.7", "action": "flag:front_office_edge"}
+  ],
+  "outputs": ["contract_risk", "roster_optimization"],
+  "ticks": 48
+}

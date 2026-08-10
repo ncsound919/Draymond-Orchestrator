@@ -1,0 +1,19 @@
+{
+  "model_id": "biotech-06-tumor-heterogeneity",
+  "description": "Tumor heterogeneity model: clonal diversity rises with mutation; dominant clone drives treatment failure and outcome uncertainty.",
+  "state_vars": ["clonal_diversity", "dominant_clone", "treatment_failure_risk", "heterogeneity_score"],
+  "params": {"mut_rate": 0.04, "selection": 0.03, "therapy_pressure": 0.05},
+  "initial_state": {"clonal_diversity": 0.3, "dominant_clone": 0.4, "treatment_failure_risk": 0.2, "heterogeneity_score": 0.3},
+  "update_rules": {
+    "clonal_diversity": "min(clonal_diversity + mut_rate + therapy_pressure*0.2, 1)",
+    "dominant_clone": "min(dominant_clone + selection - therapy_pressure*0.1, 1)",
+    "treatment_failure_risk": "0.5*clonal_diversity + 0.3*dominant_clone",
+    "heterogeneity_score": "clonal_diversity * (1 - dominant_clone)"
+  },
+  "events": [
+    {"when": "clonal_diversity > 0.7", "action": "flag:highly_heterogeneous"},
+    {"when": "treatment_failure_risk > 0.6", "action": "flag:durable_cure_at_risk"}
+  ],
+  "outputs": ["heterogeneity_score", "treatment_failure_risk"],
+  "ticks": 48
+}

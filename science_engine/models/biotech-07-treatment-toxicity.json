@@ -1,0 +1,19 @@
+{
+  "model_id": "biotech-07-treatment-toxicity",
+  "description": "Treatment toxicity & safety model: efficacy vs on-target/off-target toxicity; ADCs balance payload delivery against healthy-tissue damage.",
+  "state_vars": ["efficacy", "on_target_toxicity", "off_target_toxicity", "quality_of_life"],
+  "params": {"efficacy_gain": 0.09, "toxicity_rate": 0.04, "adc_selectivity": 0.5, "qol_decay": 0.02},
+  "initial_state": {"efficacy": 0.3, "on_target_toxicity": 0.1, "off_target_toxicity": 0.1, "quality_of_life": 1.0},
+  "update_rules": {
+    "efficacy": "min(efficacy + efficacy_gain, 1)",
+    "on_target_toxicity": "min(on_target_toxicity + toxicity_rate*adc_selectivity, 1)",
+    "off_target_toxicity": "min(off_target_toxicity + toxicity_rate*(1-adc_selectivity), 1)",
+    "quality_of_life": "max(quality_of_life - qol_decay - (on_target_toxicity+off_target_toxicity)*0.1, 0)"
+  },
+  "events": [
+    {"when": "off_target_toxicity > 0.5", "action": "flag:tolerability_concern"},
+    {"when": "quality_of_life < 0.4", "action": "flag:quality_of_life_at_risk"}
+  ],
+  "outputs": ["efficacy", "quality_of_life"],
+  "ticks": 40
+}

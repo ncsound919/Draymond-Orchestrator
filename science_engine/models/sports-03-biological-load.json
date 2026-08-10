@@ -1,0 +1,19 @@
+{
+  "model_id": "sports-03-biological-load",
+  "description": "Real-time biological load model: fatigue, recovery half-life, stress toxicity, and injury-risk windows (maps to sports_science clinical).",
+  "state_vars": ["fatigue", "recovery", "stress_toxicity", "injury_risk"],
+  "params": {"load_rate": 0.3, "recovery_rate": 0.08, "hrv_sensitivity": 0.4, "acwr": 1.3},
+  "initial_state": {"fatigue": 0.2, "recovery": 0.5, "stress_toxicity": 0.1, "injury_risk": 0.2},
+  "update_rules": {
+    "fatigue": "min(fatigue + load_rate - recovery_rate*recovery, 1)",
+    "recovery": "min(recovery + recovery_rate - fatigue*0.02, 1)",
+    "stress_toxicity": "min(stress_toxicity + load_rate*hrv_sensitivity - recovery_rate, 1)",
+    "injury_risk": "0.5*fatigue + 0.3*abs(acwr-1) + 0.2*stress_toxicity"
+  },
+  "events": [
+    {"when": "injury_risk > 0.8", "action": "flag:collapse_window"},
+    {"when": "fatigue > 0.7", "action": "flag:fatigue_threshold"}
+  ],
+  "outputs": ["fatigue", "injury_risk"],
+  "ticks": 48
+}

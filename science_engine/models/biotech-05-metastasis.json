@@ -1,0 +1,19 @@
+{
+  "model_id": "biotech-05-metastasis",
+  "description": "Metastasis model: primary tumor sheds cells, circulating cells colonize distant sites; blocking pathways lowers seeding.",
+  "state_vars": ["primary_tumor", "circulating_cells", "metastatic_sites", "seeding_rate"],
+  "params": {"growth": 0.05, "shed_rate": 0.02, "colonization": 0.03, "blockade_eff": 0.07},
+  "initial_state": {"primary_tumor": 1.0, "circulating_cells": 0.1, "metastatic_sites": 0.0, "seeding_rate": 0.2},
+  "update_rules": {
+    "primary_tumor": "primary_tumor * (1 + growth)",
+    "circulating_cells": "circulating_cells + primary_tumor*shed_rate - seeding_rate*colonization - blockade_eff*circulating_cells",
+    "metastatic_sites": "metastatic_sites + max(circulating_cells*colonization - blockade_eff, 0)",
+    "seeding_rate": "min(seeding_rate + 0.01, 1)"
+  },
+  "events": [
+    {"when": "metastatic_sites > 1.5", "action": "flag:metastatic_spread"},
+    {"when": "circulating_cells < 0.05", "action": "flag:seeding_blocked"}
+  ],
+  "outputs": ["metastatic_sites", "circulating_cells"],
+  "ticks": 60
+}

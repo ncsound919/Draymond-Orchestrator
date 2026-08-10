@@ -1,0 +1,19 @@
+{
+  "model_id": "sports-05-cognitive-load",
+  "description": "Invisible cognitive load model: decision-making degradation, pattern-recognition drift, reaction-time collapse under stress.",
+  "state_vars": ["mental_bw", "cognitive_fatigue", "decision_quality", "reaction_time"],
+  "params": {"load_rate": 0.25, "recovery_rate": 0.06, "stress_sensitivity": 0.3},
+  "initial_state": {"mental_bw": 1.0, "cognitive_fatigue": 0.1, "decision_quality": 0.9, "reaction_time": 0.4},
+  "update_rules": {
+    "mental_bw": "max(mental_bw - load_rate*0.15, 0.3)",
+    "cognitive_fatigue": "min(cognitive_fatigue + load_rate*stress_sensitivity - recovery_rate, 1)",
+    "decision_quality": "max(0.9 - 0.5*cognitive_fatigue, 0.1)",
+    "reaction_time": "min(0.4 + 0.5*cognitive_fatigue, 1.2)"
+  },
+  "events": [
+    {"when": "cognitive_fatigue > 0.7", "action": "flag:decision_collapse"},
+    {"when": "decision_quality < 0.3", "action": "flag:optimal_decision_window_closed"}
+  ],
+  "outputs": ["decision_quality", "reaction_time"],
+  "ticks": 48
+}

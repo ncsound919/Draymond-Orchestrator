@@ -1,0 +1,19 @@
+{
+  "model_id": "sports-08-unified-ai",
+  "description": "Unified multi-sport AI model: ingests NBA/NFL/boxing data, models universal human performance laws, outputs sport-specific predictions.",
+  "state_vars": ["data_coverage", "universal_model_maturity", "sport_specific_accuracy", "integration_score"],
+  "params": {"coverage_gain": 0.05, "maturity_gain": 0.06, "accuracy_gain": 0.07, "silo_penalty": 0.2},
+  "initial_state": {"data_coverage": 0.4, "universal_model_maturity": 0.3, "sport_specific_accuracy": 0.5, "integration_score": 0.4},
+  "update_rules": {
+    "data_coverage": "min(data_coverage + coverage_gain, 1)",
+    "universal_model_maturity": "min(universal_model_maturity + maturity_gain*data_coverage, 1)",
+    "sport_specific_accuracy": "min(sport_specific_accuracy + accuracy_gain*universal_model_maturity, 1)",
+    "integration_score": "(0.4*data_coverage + 0.3*universal_model_maturity + 0.3*sport_specific_accuracy) * (1 - silo_penalty)"
+  },
+  "events": [
+    {"when": "integration_score < 0.3", "action": "flag:siloed_systems"},
+    {"when": "integration_score > 0.7", "action": "flag:unified_sports_ai"}
+  ],
+  "outputs": ["integration_score", "sport_specific_accuracy"],
+  "ticks": 60
+}

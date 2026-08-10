@@ -1,0 +1,19 @@
+{
+  "model_id": "biotech-02-prevention",
+  "description": "Cancer prevention model: modifiable risk burden vs protective interventions; accelerated biological aging raises baseline risk.",
+  "state_vars": ["risk_burden", "protective", "biological_age", "prevention_score"],
+  "params": {"aging_rate": 0.03, "risk_decay": 0.04, "protection_eff": 0.06, "aging_penalty": 0.2},
+  "initial_state": {"risk_burden": 0.6, "protective": 0.1, "biological_age": 1.0, "prevention_score": 0.5},
+  "update_rules": {
+    "risk_burden": "max(risk_burden - protective*protection_eff - risk_decay, 0)",
+    "protective": "min(protective + 0.03, 1)",
+    "biological_age": "biological_age * (1 + aging_rate)",
+    "prevention_score": "1 - risk_burden / (1 + biological_age*aging_penalty)"
+  },
+  "events": [
+    {"when": "prevention_score < 0.3", "action": "flag:elevated_risk_profile"},
+    {"when": "protective > 0.5", "action": "flag:protective_intervention_active"}
+  ],
+  "outputs": ["risk_burden", "prevention_score"],
+  "ticks": 60
+}

@@ -1,0 +1,19 @@
+{
+  "model_id": "sports-10-truth-layer",
+  "description": "The 'truth layer' problem: sensor conflict, tracking variance, protocol divergence → no single source of truth. Agreement index rises with standardization.",
+  "state_vars": ["source_agreement", "sensor_conflict", "protocol_variance", "truth_index"],
+  "params": {"agree_gain": 0.06, "conflict_decay": 0.04, "variance_decay": 0.05, "standardization_eff": 0.07},
+  "initial_state": {"source_agreement": 0.4, "sensor_conflict": 0.6, "protocol_variance": 0.5, "truth_index": 0.4},
+  "update_rules": {
+    "source_agreement": "min(source_agreement + agree_gain + standardization_eff, 1)",
+    "sensor_conflict": "max(sensor_conflict - conflict_decay - standardization_eff*0.3, 0)",
+    "protocol_variance": "max(protocol_variance - variance_decay - standardization_eff*0.4, 0)",
+    "truth_index": "0.5*source_agreement + 0.3*(1-sensor_conflict) + 0.2*(1-protocol_variance)"
+  },
+  "events": [
+    {"when": "truth_index < 0.3", "action": "flag:no_single_source_of_truth"},
+    {"when": "truth_index > 0.7", "action": "flag:truth_layer_established"}
+  ],
+  "outputs": ["truth_index", "source_agreement"],
+  "ticks": 48
+}
