@@ -53,7 +53,7 @@ function agentUrl(envVar: string, fallback: string): string {
 interface EntitySeedDef {
   name: string;
   slug: string;
-  kind: 'agent' | 'service' | 'tool';
+  kind: 'agent' | 'service' | 'tool' | 'skill';
   description: string;
   invocation_method: InvocationMethod;
   invocation_config: Record<string, unknown>;
@@ -673,7 +673,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
   {
     name: 'Book-to-Skill Chain',
     slug: 'book-to-skill-chain',
-    kind: 'service',
+    kind: 'skill',
     description:
       'Orchestrator pipeline: ground with BookBridge, synthesize the book, run the book-to-skill converter, and register the generated skill in Draymond registry + entity registry.',
     invocation_method: 'internal',
