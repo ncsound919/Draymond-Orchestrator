@@ -13,7 +13,8 @@ function pythonCommand(): string {
 
 function repoRoot(): string {
   if (process.env.BIOTECH_ROOT) return process.env.BIOTECH_ROOT;
-  if (typeof __dirname !== 'undefined') return path.resolve(__dirname, '../../..');
+  // Next.js sets cwd to the project root; prefer it over __dirname, which
+  // under bundling resolves inside .next/server chunks.
   return path.resolve(process.cwd());
 }
 
