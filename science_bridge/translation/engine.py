@@ -237,6 +237,51 @@ class TranslationEngine:
             if m.sports_term
         ]
 
+    # ── Layered translation (terminology / strategy / procedure) ────────────
+    def translate_layer(self, name: str, from_sports: bool = True) -> dict:
+        """Walk the three layers: terminology, then strategy, then procedure.
+
+        Returns the first matching layer's record. Each layer is rule-based
+        (E3); terminology records that pass formula verification upgrade to E1.
+        """
+        # Layer 1: terminology (terms + formulas).
+        term = self.translate(name, from_sports=from_sports)
+        if term.get("confidence", 0) > 0 or term.get("target_term"):
+            if "no direct mapping" not in term.get("description", ""):
+                term["layer"] = "terminology"
+                return term
+
+        # Layer 2: strategy.
+        try:
+            from science_bridge.strategy import translate_strategy
+            strat = translate_strategy(name, from_sports=from_sports)
+            if strat.get("target_term"):
+                return strat
+        except Exception:  # noqa: BLE001
+            pass
+
+        # Layer 3: procedure.
+        try:
+            from science_bridge.procedure import translate_procedure
+            proc = translate_procedure(name, from_sports=from_sports)
+            if proc.get("target_term"):
+                return proc
+        except Exception:  # noqa: BLE001
+            pass
+
+        return {
+            "layer": "terminology",
+            "source_term": name,
+            "target_term": None,
+            "confidence": 0.0,
+            "evidence_tier": "E4",
+            "description": "no mapping in any layer",
+        }
+
+    def translate_full(self, names: list[str], from_sports: bool = True) -> list[dict]:
+        """Translate a list of terms across all three layers."""
+        return [self.translate_layer(n, from_sports=from_sports) for n in names]
+
 
 # Backward-compatible alias: the biotech platform historically exposed this class
 # as BiotechTranslationEngine. Both names point at the same shared core.

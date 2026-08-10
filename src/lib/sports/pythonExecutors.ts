@@ -200,3 +200,64 @@ export async function runPythonInsights(
     fs.rmSync(dir, { recursive: true, force: true });
   }
 }
+
+export async function runPythonFormula(
+  box: Record<string, unknown>,
+  stat?: string,
+): Promise<PythonResult> {
+  if (!box || Object.keys(box).length === 0) {
+    return {
+      success: false,
+      data: failureData('box score required'),
+      error: 'box score required',
+      evidence_tier: 'E1',
+    };
+  }
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'formula-'));
+  const file = path.join(dir, 'box.json');
+  try {
+    fs.writeFileSync(file, JSON.stringify(box));
+    const args = ['session', file];
+    if (stat) args.push('--stat', stat);
+    const { stdout } = await runCli('../science_bridge/run_formula.py', args);
+    const data = JSON.parse(stdout);
+    if (data.error) {
+      return { success: false, data: failureData(data.error), error: data.error, evidence_tier: 'E1' };
+    }
+    return { success: true, data: wrap(stripInnerEvidenceTier(data)), error: null, evidence_tier: 'E1' };
+  } catch (err) {
+    const message = errorMessage(err);
+    return { success: false, data: failureData(message), error: message, evidence_tier: 'E1' };
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+export async function runPythonLayers(
+  terms: string[],
+  layer: string,
+  fromSports = true,
+): Promise<PythonResult> {
+  if (!terms || terms.length === 0) {
+    return {
+      success: false,
+      data: failureData('terms required'),
+      error: 'terms required',
+      evidence_tier: 'E3',
+    };
+  }
+  const args = ['session', terms.join(',')];
+  if (layer && layer !== 'all') args.push('--layer', layer);
+  if (!fromSports) args.push('--from_biotech');
+  try {
+    const { stdout } = await runCli('../science_bridge/run_layers.py', args);
+    const data = JSON.parse(stdout);
+    if (data.error) {
+      return { success: false, data: failureData(data.error), error: data.error, evidence_tier: 'E3' };
+    }
+    return { success: true, data: wrap(stripInnerEvidenceTier(data)), error: null, evidence_tier: 'E3' };
+  } catch (err) {
+    const message = errorMessage(err);
+    return { success: false, data: failureData(message), error: message, evidence_tier: 'E3' };
+  }
+}

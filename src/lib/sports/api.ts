@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import type { EngineName, ExperimentStatus, Task, TaskDAG } from './types';
 import { runDag, topoOrder, type Executor } from './dag';
 import { saveExperiment, getExperimentsMap as readMap } from './store';
-import { runPythonMetrics, runPythonCoach, runPythonTranslate, runPythonInsights } from './pythonExecutors';
+import { runPythonMetrics, runPythonCoach, runPythonTranslate, runPythonInsights, runPythonFormula, runPythonLayers } from './pythonExecutors';
 import { runRustSimPlay, runRustSimBatch } from './rustExecutors';
 import { validateOutput } from './validate';
 
@@ -73,6 +73,17 @@ const makeExecutor: Executor = (task, upstream) => {
     const profile = (task.inputs?.profile ?? {}) as Record<string, unknown>;
     const fromBiotech = (task.inputs?.from_biotech ?? false) as boolean;
     return runPythonInsights(profile, fromBiotech);
+  }
+  if (task.engine === 'formula') {
+    const box = (task.inputs?.box ?? {}) as Record<string, unknown>;
+    const stat = task.inputs?.stat !== undefined ? String(task.inputs.stat) : undefined;
+    return runPythonFormula(box, stat);
+  }
+  if (task.engine === 'layers') {
+    const terms = (task.inputs?.terms ?? []) as string[];
+    const layer = String(task.inputs?.layer ?? 'all');
+    const fromSports = (task.inputs?.from_sports ?? true) as boolean;
+    return runPythonLayers(terms, layer, fromSports);
   }
   return Promise.resolve({
     success: false,
