@@ -53,7 +53,7 @@ export async function syncFinanceGoals(deps: {
 }): Promise<Array<{ ok: boolean; goalId?: string; error?: string }>> {
   const res = await authed('/api/v1/goals');
   if (!res.ok) return [{ ok: false, error: res.error }];
-  const { goals } = res.data as { goals: GoalInput[] };
+  const goals = ((res.data as { goals?: GoalInput[] })?.goals ?? []);
   const results: Array<{ ok: boolean; goalId?: string; error?: string }> = [];
   for (const g of goals) {
     try {
