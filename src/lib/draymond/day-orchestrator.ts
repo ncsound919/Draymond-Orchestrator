@@ -34,6 +34,8 @@ export const DAY_FLOW: OrchestrationStep[] = [
   { id: 'market', phase: 'morning', time: '07:00', job: 'fetch_market_data', purpose: 'Crypto + papers snapshot', feedsTo: ['overlay-treasurer', 'trading-agents', 'ghostfolio-engine', 'sports-steve'] },
   { id: 'qa', phase: 'morning', time: '07:00', job: 'run_overlay_qa', purpose: 'Site integrity pass', feedsTo: ['overlay-auditor'] },
   { id: 'treasury', phase: 'morning', time: '08:00', job: 'treasury_pulse', purpose: 'Cash pulse with market context', feedsTo: ['mission-pipeline'] },
+  { id: 'finance-strategy', phase: 'morning', time: '08:15', job: 'finance_strategy_brief', purpose: 'Book-grounded daily finance strategy brief', feedsTo: ['overlay-treasurer', 'overlay-strategist', 'fs-agent'] },
+  { id: 'finance-goals', phase: 'morning', time: '08:45', job: 'finance_goals_sync', purpose: 'Sync capability-grounded goals into draymond_goals' },
   { id: 'mission', phase: 'morning', time: '09:30', job: 'wf-mission-sync', purpose: 'Pipeline + revenue vs target' },
   // ── Midday — steady state ───────────────────────────────────────────────
   { id: 'duty', phase: 'midday', time: 'hourly', job: 'fleet_duty_sync', purpose: 'On-duty roster check' },
@@ -235,6 +237,12 @@ export async function runPhase(phase: DayPhase, budgetTokens?: number): Promise<
       const lookbackDays = Number(process.env.TREASURY_LOOKBACK_DAYS ?? 30);
       return runTreasuryPulse(Number.isFinite(lookbackDays) ? lookbackDays : 30);
     },
+    finance_strategy_brief: async () => (await import('./finance-sync')).fetchFinanceBrief(),
+    finance_goals_sync: async () =>
+      (await import('./finance-sync')).syncFinanceGoals({
+        createGoal: async (input) => (await import('./index')).createGoal(input),
+        updateGoalProgress: async (goalId, progressPct) => (await import('./index')).updateGoalProgress(goalId, progressPct),
+      }),
     generate_agent_avatars: async () => {
       // Fail-soft: avatar generation needs the Gemini key + registry, and is a
       // weekly optional task. Skip cleanly when either is unavailable so the
