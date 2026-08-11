@@ -47,9 +47,49 @@ describe('finance-sync', () => {
     expect(res.error).toMatch(/not configured/i);
   });
 
-  it('lists remote goals (no upsert when createGoal is stubbed out)', async () => {
-    const res = await syncFinanceGoals({ createGoal: async () => 'goal-id', updateGoalProgress: async () => {} });
+  it('returns ok:false when the backend has no strategy brief yet', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === `${BASE}/api/v1/strategy/daily`) {
+        return new Response(JSON.stringify({ ok: true, data: null }), { status: 200 });
+      }
+      return new Response('{}', { status: 404 });
+    }));
+    const res = await fetchFinanceBrief();
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/no strategy brief/i);
+  });
+
+  it('lists remote goals and creates a new goal when none exists', async () => {
+    const res = await syncFinanceGoals({
+      createGoal: async () => 'goal-id',
+      updateGoalProgress: async () => {},
+      findGoal: async () => null,
+    });
     expect(res).toHaveLength(1);
     expect(res[0].ok).toBe(true);
+  });
+
+  it('upserts: updates the existing goal instead of creating a duplicate', async () => {
+    const createGoal = vi.fn(async () => 'fresh-id');
+    const updateGoalProgress = vi.fn(async () => {});
+    const findGoal = vi.fn(async () => ({ id: 'existing-goal-1' }));
+    const res = await syncFinanceGoals({ createGoal, updateGoalProgress, findGoal });
+    expect(createGoal).not.toHaveBeenCalled();
+    expect(updateGoalProgress).toHaveBeenCalledWith('existing-goal-1', 0);
+    expect(res).toHaveLength(1);
+    expect(res[0]).toMatchObject({ ok: true, goalId: 'existing-goal-1', updated: true });
+  });
+
+  it('creates a goal when no match exists, then records progress', async () => {
+    const createGoal = vi.fn(async () => 'goal-id');
+    const updateGoalProgress = vi.fn(async () => {});
+    const findGoal = vi.fn(async () => null);
+    const res = await syncFinanceGoals({ createGoal, updateGoalProgress, findGoal });
+    expect(createGoal).toHaveBeenCalledTimes(1);
+    expect(createGoal).toHaveBeenCalledWith(
+      expect.objectContaining({ agent_id: 'overlay-treasurer', title: 'Run the book-grounded daily strategy brief', horizon: 'medium_term', priority: 60 })
+    );
+    expect(updateGoalProgress).toHaveBeenCalledWith('goal-id', 0);
+    expect(res[0]).toMatchObject({ ok: true, goalId: 'goal-id', updated: false });
   });
 });

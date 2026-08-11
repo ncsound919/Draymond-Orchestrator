@@ -980,6 +980,29 @@ export async function createGoal(input: {
 }
 
 /**
+ * Find a goal for an agent by title. Used by the finance-connect sync to
+ * upsert instead of creating duplicates. Returns the most recent match.
+ */
+export async function findGoal(input: {
+  agent_id: string;
+  title: string;
+}): Promise<{ id: string } | null> {
+  const supabase = await createDraymondClient();
+
+  const { data, error } = await supabase
+    .from('draymond_goals')
+    .select('id')
+    .eq('agent_id', input.agent_id)
+    .eq('title', input.title)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(`Failed to find goal: ${error.message}`);
+  return (data as { id: string } | null) ?? null;
+}
+
+/**
  * Update goal progress
  */
 export async function updateGoalProgress(

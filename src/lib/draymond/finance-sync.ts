@@ -43,6 +43,9 @@ async function authed(path: string): Promise<{ ok: true; data: unknown } | { ok:
 export async function fetchFinanceBrief(): Promise<FinanceBriefResult> {
   const res = await authed('/api/v1/strategy/daily');
   if (!res.ok) return res;
+  // The backend returns `{ ok: true, data: null }` until the first strategy run
+  // exists. Surface that as a soft error instead of a brief:null on ok:true.
+  if (res.data == null) return { ok: false, error: 'no strategy brief yet' };
   return { ok: true, brief: res.data as FinanceBriefResult['brief'] };
 }
 
@@ -50,23 +53,31 @@ export async function fetchFinanceBrief(): Promise<FinanceBriefResult> {
 export async function syncFinanceGoals(deps: {
   createGoal: (input: { agent_id: string; title: string; description?: string; horizon?: Horizon; priority?: number }) => Promise<string>;
   updateGoalProgress: (goalId: string, progressPct: number) => Promise<void>;
-}): Promise<Array<{ ok: boolean; goalId?: string; error?: string }>> {
+  findGoal?: (input: { agent_id: string; title: string }) => Promise<{ id: string } | null>;
+}): Promise<Array<{ ok: boolean; goalId?: string; updated?: boolean; error?: string }>> {
+  const findGoal = deps.findGoal ?? (async (input: { agent_id: string; title: string }) => (await import('./index')).findGoal(input));
   const res = await authed('/api/v1/goals');
   if (!res.ok) return [{ ok: false, error: res.error }];
   const goals = ((res.data as { goals?: GoalInput[] })?.goals ?? []);
-  const results: Array<{ ok: boolean; goalId?: string; error?: string }> = [];
+  const results: Array<{ ok: boolean; goalId?: string; updated?: boolean; error?: string }> = [];
   for (const g of goals) {
     try {
       const horizon: Horizon = g.horizon === 'daily' ? 'immediate' : g.horizon === 'weekly' ? 'short_term' : 'medium_term';
-      const goalId = await deps.createGoal({
-        agent_id: 'overlay-treasurer',
-        title: g.title,
-        description: `Capability: ${g.capability} (synced from finance-connect)`,
-        horizon,
-        priority: 60,
-      });
-      await deps.updateGoalProgress(goalId, g.progressPct);
-      results.push({ ok: true, goalId });
+      const existing = await findGoal({ agent_id: 'overlay-treasurer', title: g.title });
+      if (existing) {
+        await deps.updateGoalProgress(existing.id, g.progressPct);
+        results.push({ ok: true, goalId: existing.id, updated: true });
+      } else {
+        const goalId = await deps.createGoal({
+          agent_id: 'overlay-treasurer',
+          title: g.title,
+          description: `Capability: ${g.capability} (synced from finance-connect)`,
+          horizon,
+          priority: 60,
+        });
+        await deps.updateGoalProgress(goalId, g.progressPct);
+        results.push({ ok: true, goalId, updated: false });
+      }
     } catch (err) {
       results.push({ ok: false, error: err instanceof Error ? err.message : String(err) });
     }
