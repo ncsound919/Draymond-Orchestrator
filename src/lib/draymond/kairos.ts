@@ -256,9 +256,27 @@ export const DETECTORS: Array<{ kind: KairosKind; run: () => Promise<DetectorHit
 // MOMENT RECORDING — dedupe, escalation, notify
 // ============================================================================
 
+/**
+ * Normalize a detector detail for dedupe hashing. Variable fragments that
+ * change on every scan — failure counters like "(167x)", relative ages like
+ * "last seen 539m ago", overdue minutes, and dollar amounts — are collapsed so
+ * the SAME underlying condition produces ONE moment instead of a new moment
+ * (and new critical push) every tick.
+ */
+export function normalizeMomentDetail(detail: string): string {
+  return detail
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/\(\d+x\)/g, '(Nx)') // consecutive-failure counters
+    .replace(/last seen \d+[smhd] ago/g, 'last seen Na ago') // relative heartbeat ages
+    .replace(/overdue by \d+min/g, 'overdue by Nmin') // scheduler miss windows
+    .replace(/\$\d+(?:\.\d+)?/g, '$N') // revenue/shortfall amounts
+    .trim();
+}
+
 /** Dedupe key: kind + normalized detail. */
 export function momentHash(kind: string, detail: string): string {
-  return `${kind}:${detail.toLowerCase().replace(/\s+/g, ' ').trim()}`;
+  return `${kind}:${normalizeMomentDetail(detail)}`;
 }
 
 const SEVERITY_RANK: Record<KairosSeverity, number> = { info: 0, warn: 1, critical: 2 };
@@ -501,6 +519,13 @@ let _scanRunning = false;
 
 export function startKairos(): void {
   if (_kairosTimer) return; // already running
+  // One-time cleanup of duplicate moments created by the old (non-normalizing)
+  // dedupe hash — before the first scan so the feed starts clean.
+  pruneDuplicateMoments()
+    .then((kept) => {
+      if (kept > 0) console.log(`[kairos] pruned duplicate moments (${kept} kept)`);
+    })
+    .catch(() => {});
   _kairosTimer = setInterval(() => {
     if (_scanRunning) return; // single-flight — never overlap
     _scanRunning = true;
@@ -520,6 +545,46 @@ export function stopKairos(): void {
   if (_kairosTimer) {
     clearInterval(_kairosTimer);
     _kairosTimer = null;
+  }
+}
+
+/**
+ * Collapse duplicate moments left over from pre-normalization hashes. Every
+ * scan used to include variable data (failure counts, relative ages) in the
+ * dedupe key, so a monitor that stayed down spawned a fresh moment each tick.
+ * Re-hash everything with the current normalizer and merge repeats into the
+ * oldest entry, preserving ack state. Best-effort.
+ */
+export async function pruneDuplicateMoments(): Promise<number> {
+  try {
+    const state = await readJsonState<KairosState>('kairos', DEFAULT_STATE());
+    if (!state.moments || state.moments.length === 0) return 0;
+
+    const merged: KairosMoment[] = [];
+    const byHash = new Map<string, KairosMoment>();
+    for (const m of state.moments) {
+      const key = momentHash(m.kind, m.detail);
+      const existing = byHash.get(key);
+      if (existing) {
+        existing.occurrences += m.occurrences;
+        existing.acked = existing.acked && m.acked;
+        if (new Date(m.lastSeen) > new Date(existing.lastSeen)) existing.lastSeen = m.lastSeen;
+        // Keep the highest severity seen.
+        if (SEVERITY_RANK[m.severity] > SEVERITY_RANK[existing.severity]) existing.severity = m.severity;
+      } else {
+        const copy = { ...m, hash: key };
+        byHash.set(key, copy);
+        merged.push(copy);
+      }
+    }
+    if (merged.length === state.moments.length) return 0;
+    state.moments = merged;
+    state.updatedAt = nowIso();
+    await writeJsonState('kairos', state);
+    return state.moments.length;
+  } catch (err) {
+    console.error(`[kairos] prune failed: ${err instanceof Error ? err.message : err}`);
+    return 0;
   }
 }
 

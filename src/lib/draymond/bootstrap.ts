@@ -21,15 +21,19 @@
 
 import { seedBasicJobs } from './scheduler';
 import { startDownServices, probeService } from './service-manager';
+import { seedAgentMonitors, disableAbsentServiceMonitors } from './monitors';
 
 /** Services that the daily jobs depend on; started automatically at boot.
- * Only slugs with a start recipe in service-manager.ts are included — anything
- * else would probe + escalate ("no start recipe") on every boot. */
+ * Only slugs with a working start recipe in service-manager.ts AND a real
+ * runnable entrypoint are included — anything else would probe + escalate on
+ * every boot. */
 export const DEFAULT_CORE_SERVICES = [
   'deterministic-brain',
   'bookbridge',
-  'uplift',
+  'uplift-agent',
+  'opencode',
   'sports-steve',
+  'social-media-dashboard',
   'hemp-os',
   'hempforge',
 ] as const;
@@ -59,6 +63,19 @@ export async function bootstrapEcosystem(): Promise<{
     }
   } catch (err) {
     console.warn('[bootstrap] seedBasicJobs skipped:', err instanceof Error ? err.message : err);
+  }
+
+  // 1b. Seed site monitors and disable the ones for services not present on
+  // this machine, so the fleet doesn't fire "down" forever for agents that
+  // aren't supposed to run here (OmniResearch, Indy Music, Overlay Chain, ...).
+  try {
+    const monitorResult = await seedAgentMonitors();
+    const changed = await disableAbsentServiceMonitors();
+    if (monitorResult.created > 0 || changed > 0) {
+      console.log(`[bootstrap] monitors: ${monitorResult.created} created, ${changed} reconciled (absent services)`);
+    }
+  } catch (err) {
+    console.warn('[bootstrap] monitor seed skipped:', err instanceof Error ? err.message : err);
   }
 
   // 2. Bring up the core services (deterministic brain first — it's the

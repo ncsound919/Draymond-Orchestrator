@@ -34,6 +34,9 @@ export function StrategyRunner() {
   const [isPending, startTransition] = useTransition();
 
   async function run() {
+    if (isPending) return;
+    setResult(null);
+
     const payload: Record<string, unknown> = { mode };
 
     if (periodStart) payload.periodStart = periodStart;
@@ -89,6 +92,7 @@ export function StrategyRunner() {
             <button
               key={m.id}
               onClick={() => setMode(m.id)}
+              aria-pressed={mode === m.id}
               className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
                 mode === m.id
                   ? 'border-blue-500/50 bg-blue-500/10 text-blue-400'
@@ -137,13 +141,13 @@ export function StrategyRunner() {
 
       {/* Results */}
       {result && !result.ok && (
-        <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
+        <div role="alert" className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
           {result.error ?? 'Strategy run failed.'}
         </div>
       )}
 
       {result?.ok && (
-        <div className="space-y-6">
+        <div aria-live="polite" className="space-y-6">
           {result.brief && <IntelPanel brief={result.brief} />}
           {result.proposals && <ProposalsPanel proposals={result.proposals} autoCount={result.autoCount} reviewCount={result.reviewCount} />}
           {result.report && <StrategistPanel report={result.report} />}

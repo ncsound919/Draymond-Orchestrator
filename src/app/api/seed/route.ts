@@ -12,7 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { seedBusinessAutomation } from '@/lib/draymond/business-chains';
-import { seedAgentMonitors } from '@/lib/draymond/monitors';
+import { seedAgentMonitors, disableAbsentServiceMonitors } from '@/lib/draymond/monitors';
 import { seedSkillPacks } from '@/lib/draymond/skill-packs';
 import { registerEntities } from '@/lib/draymond/registry';
 import { SEED_ENTITIES } from '@/lib/draymond/seed';
@@ -33,6 +33,9 @@ export async function POST(request: NextRequest) {
   try {
     const result = await seedBusinessAutomation();
     const monitorResult = await seedAgentMonitors();
+    // Flip off monitors for services not checked out / configured on this box,
+    // so the fleet doesn't fire "down" forever for agents that can't run here.
+    const monitorsDisabled = await disableAbsentServiceMonitors();
     const skillPackResult = await seedSkillPacks();
     const entityResult = await registerEntities(SEED_ENTITIES);
     const chainTemplatesResult = await seedChainTemplates();
@@ -59,6 +62,7 @@ export async function POST(request: NextRequest) {
       monitors: {
         created: monitorResult.created,
         skipped: monitorResult.skipped,
+        disabled: monitorsDisabled,
         names: monitorResult.names,
       },
       skill_packs: {

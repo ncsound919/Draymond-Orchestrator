@@ -1,6 +1,6 @@
 'use server';
 
-import { createJob, enableJob, disableJob, deleteJob, updateJob, runJobNow, type ScheduledJobInsert, type ScheduledJobUpdate } from '@/lib/draymond/scheduler';
+import { createJob, enableJob, disableJob, deleteJob, updateJob, runJobNow, runDueJobs, listJobs, type ScheduledJobInsert, type ScheduledJobUpdate } from '@/lib/draymond/scheduler';
 import { requireDraymondActionAuth } from '@/lib/draymond/auth';
 import { revalidatePath } from 'next/cache';
 
@@ -146,4 +146,50 @@ export async function runScheduledJob(id: string) {
   const result = await runJobNow(id);
   revalidatePath('/schedules');
   return result;
+}
+
+/**
+ * Catch up missed jobs: run every enabled job whose slot was missed while the
+ * server was offline (within the boot catch-up horizon, default 24h). Lets the
+ * operator press "Catch up missed" after downtime instead of losing the work.
+ */
+export async function catchUpMissedJobs() {
+  await requireDraymondActionAuth();
+  const horizonMs = Number(process.env.DRAYMOND_BOOT_CATCHUP_HORIZON_MS ?? 24 * 60 * 60 * 1000);
+  const results = await runDueJobs(new Date(), { catchupMs: horizonMs });
+  revalidatePath('/schedules');
+  return {
+    processed: results.length,
+    ran: results.filter((r) => r.status === 'success').length,
+    failed: results.filter((r) => r.status === 'failed').length,
+    skipped: results.filter((r) => r.status === 'skipped').length,
+    results: results.slice(0, 50).map((r) => ({
+      job_name: r.job_name,
+      status: r.status,
+      error: r.error ?? null,
+      duration_ms: r.duration_ms,
+    })),
+  };
+}
+
+/** Run every currently-failed job once, in one pass. Returns per-job outcomes. */
+export async function runAllFailedJobs() {
+  await requireDraymondActionAuth();
+  const failed = (await listJobs()).filter((j) => j.last_run_status === 'failed');
+  const results = [];
+  for (const job of failed) {
+    try {
+      const r = await runJobNow(job.id);
+      results.push({ job_name: job.name, status: r.status, error: r.error ?? null });
+    } catch (err) {
+      results.push({ job_name: job.name, status: 'failed', error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  revalidatePath('/schedules');
+  return {
+    attempted: failed.length,
+    ran: results.filter((r) => r.status === 'success').length,
+    failed: results.filter((r) => r.status === 'failed').length,
+    results,
+  };
 }

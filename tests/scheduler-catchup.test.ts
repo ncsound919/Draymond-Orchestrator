@@ -102,6 +102,42 @@ describe('scheduler catch-up guard', () => {
     const results = await runDueJobs();
     expect(results[0].status).toBe('success');
   });
+
+  it('runs an overdue job during catch-up when within the horizon (work begins on boot)', async () => {
+    // 8h overdue — normally skipped by the strict grace, but catch-up mode
+    // (horizon 24h) executes it so the missed work actually happens.
+    const missed = job({
+      id: 'missed-morning',
+      name: 'Morning Digest',
+      job_type: 'custom',
+      next_run_at: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
+    });
+    mockAdmin._tables.set('draymond_scheduled_jobs', (op: string) => {
+      if (op === 'select') return { data: [missed], error: null };
+      if (op === 'claim') return { data: { id: 'missed-morning' }, error: null };
+      return { data: null, error: null };
+    });
+    const results = await runDueJobs(new Date(), { catchupMs: 24 * 60 * 60 * 1000 });
+    expect(results[0].status).toBe('success');
+    expect(results[0].job_name).toBe('Morning Digest');
+  });
+
+  it('still skips a job overdue beyond the catch-up horizon', async () => {
+    // 2 days overdue — outside the 24h horizon, so catch-up reschedules it.
+    const ancient = job({
+      id: 'ancient',
+      name: 'Ancient Job',
+      job_type: 'custom',
+      next_run_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    mockAdmin._tables.set('draymond_scheduled_jobs', (op: string) => {
+      if (op === 'select') return { data: [ancient], error: null };
+      return { data: null, error: null };
+    });
+    const results = await runDueJobs(new Date(), { catchupMs: 24 * 60 * 60 * 1000 });
+    expect(results[0].status).toBe('skipped');
+    expect(results[0].error).toMatch(/Missed window/);
+  });
 });
 
 describe('in-process scheduler', () => {

@@ -10,6 +10,9 @@
 
 import { createDraymondAdminClient } from './client';
 import { sendNotification } from './notifications';
+import { isKaggleConfigured } from './data-apis';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { emitSiteDown, emitSiteRecovered, emitHealthCheckComplete } from '@/lib/draymond/event-bridge';
 
 // ============================================================================
@@ -533,6 +536,71 @@ interface AgentMonitorDef {
   metadata: Record<string, unknown>;
 }
 
+/**
+ * Local working directories for each monitored service slug, used to decide
+ * whether a default-localhost monitor should be created. When the service
+ * isn't checked out on this machine (e.g. OmniResearch, Indy Music, Overlay
+ * Chain) the monitor would fire "down" forever, so it is skipped unless an
+ * explicit *_URL env override points somewhere real.
+ */
+const LOCAL_SERVICE_DIRS: Record<string, string> = {
+  'uplift-agent': 'agents/Uplift-Agent',
+  'sports-steve': 'agents/Sports-Steve-main',
+  'bet-buddy': 'agents/Sports-Steve-main/Bet-Buddy--main/backend',
+  'social-media-dashboard': 'agents/Social-Media-Dashboard--main',
+  'megacode': 'agents/Megacode-main',
+  'omni-research': 'agents/OmniResearch',
+  'indy-music-platform': 'agents/Indy-Music',
+  'overlay-chain': '01_Platforms/Overlay365',
+};
+
+/**
+ * Services whose checkout exists but has NO runnable HTTP entrypoint on this
+ * machine — either the deps are missing (bet-buddy has no node_modules) or
+ * there is no start script / built output (megacode has no `start` script or
+ * dist). Their monitors would fire "down" forever, so they are gated off.
+ * Set the *_URL env override to point at a real deployment to re-enable.
+ */
+const NO_LOCAL_SERVER: Record<string, boolean> = {
+  'bet-buddy': true,
+  'megacode': true,
+};
+
+/** Env var that, when explicitly set, means the user pointed this service
+ * somewhere real and the monitor should exist regardless of local checkout. */
+const SERVICE_ENV_VARS: Record<string, string> = {
+  'uplift-agent': 'UPLIFT_BASE_URL',
+  'sports-steve': 'SPORTS_STEVE_URL',
+  'bet-buddy': 'BET_BUDDY_URL',
+  'social-media-dashboard': 'SOCIAL_MEDIA_URL',
+  'megacode': 'MEGACODE_URL',
+  'omni-research': 'OMNI_RESEARCH_URL',
+  'indy-music-platform': 'INDY_MUSIC_URL',
+  'overlay-chain': 'OVERLAY_CHAIN_URL',
+};
+
+function monitorShouldExist(slug: string): boolean {
+  // An explicit env override means the operator points the service at a real
+  // host — keep the monitor even if there's no local checkout.
+  const envVar = SERVICE_ENV_VARS[slug];
+  if (envVar) {
+    const val = process.env[envVar];
+    if (val && val.trim().length > 0 && !/^http:\/\/localhost:\d+$/i.test(val.trim())) {
+      return true;
+    }
+  }
+  // Services without a runnable HTTP server on this machine are gated off.
+  if (NO_LOCAL_SERVER[slug]) return false;
+  // Otherwise the monitor only makes sense if the service is checked out here.
+  const dir = LOCAL_SERVICE_DIRS[slug];
+  if (!dir) return true; // unknown slug — keep the monitor
+  try {
+    return existsSync(resolve(process.cwd(), dir));
+  } catch {
+    return true;
+  }
+}
+
 function getAgentMonitorDefs(): AgentMonitorDef[] {
   return [
     {
@@ -545,7 +613,7 @@ function getAgentMonitorDefs(): AgentMonitorDef[] {
     },
     {
       name: 'Sports Steve',
-      url: `${process.env.SPORTS_STEVE_URL || 'http://localhost:8010'}/health`,
+      url: `${process.env.SPORTS_STEVE_URL || 'http://localhost:8010'}/api/v1/health`,
       check_interval_seconds: 300,
       expected_status_code: 200,
       timeout_ms: 10000,
@@ -635,6 +703,20 @@ export async function seedAgentMonitors(): Promise<SeedMonitorsResult> {
 
   for (const def of defs) {
     try {
+      const slug = String(def.metadata?.slug ?? '');
+      // Skip monitors for services not present locally (no checkout + no env
+      // override) so the fleet doesn't fire "down" forever for agents that
+      // aren't supposed to be running on this machine.
+      if (!monitorShouldExist(slug)) {
+        result.skipped += 1;
+        continue;
+      }
+      // Kaggle only exists when credentials are configured — otherwise the
+      // self-check endpoint 503s and it looks like Draymond is broken.
+      if (slug === 'kaggle' && !isKaggleConfigured()) {
+        result.skipped += 1;
+        continue;
+      }
       // Use upsert to atomically create-or-update. The `name` column has a
       // unique constraint (from the migration), so onConflict works correctly.
       const { data, error } = await supabase
@@ -679,6 +761,44 @@ export async function seedAgentMonitors(): Promise<SeedMonitorsResult> {
   }
 
   return result;
+}
+
+/**
+ * Reconcile monitor enablement with what should exist on this machine. Disables
+ * monitors for services not present (no local checkout + no env override, or
+ * Kaggle without credentials) and re-enables monitors for services that are now
+ * runnable (e.g. the Uplift Agent's Hermes bridge). Prevents both the "down
+ * forever" wall for absent agents AND stale-disabled monitors after a service
+ * becomes available.
+ */
+export async function disableAbsentServiceMonitors(): Promise<number> {
+  const supabase = createDraymondAdminClient();
+  const { data: monitors } = await supabase
+    .from('draymond_site_monitors')
+    .select('id, name, metadata, is_enabled');
+
+  if (!monitors || monitors.length === 0) return 0;
+
+  let changed = 0;
+  for (const m of monitors) {
+    const slug = String((m.metadata as Record<string, unknown>)?.slug ?? '');
+    const shouldExist =
+      monitorShouldExist(slug) && (slug !== 'kaggle' || isKaggleConfigured());
+    if (!shouldExist && m.is_enabled) {
+      await supabase
+        .from('draymond_site_monitors')
+        .update({ is_enabled: false })
+        .eq('id', m.id);
+      changed += 1;
+    } else if (shouldExist && !m.is_enabled) {
+      await supabase
+        .from('draymond_site_monitors')
+        .update({ is_enabled: true })
+        .eq('id', m.id);
+      changed += 1;
+    }
+  }
+  return changed;
 }
 
 // ============================================================================

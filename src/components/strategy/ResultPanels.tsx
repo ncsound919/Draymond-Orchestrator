@@ -90,13 +90,16 @@ export function IntelPanel({ brief }: { brief: { findings: Finding[]; flags: str
                 <span className="text-xs font-mono text-gray-300 w-8 text-right">{f.score}</span>
               </div>
             </div>
-            {(f.assets ?? []).length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {f.assets!.map((a) => (
-                  <span key={a} className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-400">{a}</span>
-                ))}
-              </div>
-            )}
+            {(() => {
+              const assets = f.assets ?? [];
+              return assets.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {assets.map((a) => (
+                    <span key={a} className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-400">{a}</span>
+                  ))}
+                </div>
+              );
+            })()}
           </li>
         ))}
       </ul>
@@ -112,15 +115,16 @@ export function IntelPanel({ brief }: { brief: { findings: Finding[]; flags: str
 }
 
 export function ProposalsPanel({ proposals, autoCount, reviewCount }: { proposals: Proposal[]; autoCount?: number; reviewCount?: number }) {
+  const items = proposals ?? [];
   return (
-    <Panel title={`Venture Proposals (${proposals.length})`}>
-      {proposals.length === 0 && <p className="text-sm text-gray-500">No proposals composed.</p>}
+    <Panel title={`Venture Proposals (${items.length})`}>
+      {items.length === 0 && <p className="text-sm text-gray-500">No proposals composed.</p>}
       <div className="mb-3 flex gap-2 text-xs">
         <span className="rounded-full bg-green-500/15 text-green-400 px-2.5 py-0.5">auto: {autoCount ?? 0}</span>
         <span className="rounded-full bg-yellow-500/15 text-yellow-400 px-2.5 py-0.5">review: {reviewCount ?? 0}</span>
       </div>
       <ul className="space-y-3">
-        {proposals.map((p) => (
+        {items.map((p) => (
           <li key={p.id} className="rounded-lg border border-white/[0.06] bg-gray-900/40 p-3">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
@@ -136,7 +140,7 @@ export function ProposalsPanel({ proposals, autoCount, reviewCount }: { proposal
               <span className="rounded bg-gray-800 px-1.5 py-0.5">{p.sector}</span>
               <span className="rounded bg-gray-800 px-1.5 py-0.5">{p.revenue_lane}</span>
               <span className="rounded bg-gray-800 px-1.5 py-0.5">asset: {p.primary_asset}</span>
-              <span className="rounded bg-gray-800 px-1.5 py-0.5">{p.steps.length} steps</span>
+              <span className="rounded bg-gray-800 px-1.5 py-0.5">{(p.steps ?? []).length} steps</span>
             </div>
             {p.revenue_note && <p className="mt-2 text-xs text-gray-500">{p.revenue_note}</p>}
           </li>

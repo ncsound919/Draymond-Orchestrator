@@ -153,3 +153,27 @@ describe('monitor CRUD', () => {
   });
 });
 
+describe('disableAbsentServiceMonitors (reconcile)', () => {
+  it('disables absent services and re-enables present ones', async () => {
+    // Env overrides are not set → presence decided by local dirs.
+    delete process.env.OMNI_RESEARCH_URL;
+    delete process.env.UPLIFT_BASE_URL;
+    const absent = {
+      id: 'm-omni',
+      name: 'OmniResearch Pro',
+      metadata: { slug: 'omni-research' },
+      is_enabled: true,
+    };
+    const present = {
+      id: 'm-uplift',
+      name: 'Uplift Agent',
+      metadata: { slug: 'uplift-agent' },
+      is_enabled: false, // was disabled by an earlier boot — should be re-enabled
+    };
+    mockClient._tables.set('draymond_site_monitors', { data: [absent, present], error: null });
+    const changed = await mod.disableAbsentServiceMonitors();
+    // One disabled + one re-enabled.
+    expect(changed).toBe(2);
+  });
+});
+

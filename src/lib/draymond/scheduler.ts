@@ -474,13 +474,42 @@ let _tickTimer: ReturnType<typeof setInterval> | null = null;
 let _tickRunning = false;
 /** Max how late a job may be before it is SKIPPED (not run late) and rescheduled. */
 const CATCH_UP_GRACE_MS = Number(process.env.DRAYMOND_CRON_GRACE_MS ?? 15 * 60 * 1000);
+/** How far back the boot catch-up pass will reach for jobs missed while the
+ * server was down. Jobs overdue beyond this horizon are rescheduled (not run). */
+const BOOT_CATCHUP_HORIZON_MS = Number(
+  process.env.DRAYMOND_BOOT_CATCHUP_HORIZON_MS ?? 24 * 60 * 60 * 1000
+);
 
 /**
  * Start the in-process scheduler loop (idempotent). Called from
  * instrumentation.ts at server startup.
+ *
+ * On boot it also fires a one-shot catch-up pass so jobs that were missed while
+ * the server was offline actually RUN (within the horizon) instead of being
+ * silently skipped as "Missed window" — when Draymond starts, the work begins.
  */
 export function startInProcessScheduler(): void {
   if (_tickTimer) return; // already running
+
+  // Boot catch-up: execute enabled jobs whose slot was missed while the server
+  // was off, so overnight/downtime work is not lost. Best-effort and bounded by
+  // the horizon so a 2-week outage doesn't replay ancient slots.
+  if (BOOT_CATCHUP_HORIZON_MS > 0) {
+    void runDueJobs(new Date(), { catchupMs: BOOT_CATCHUP_HORIZON_MS })
+      .then((results) => {
+        const ran = results.filter((r) => r.status === 'success').length;
+        const failed = results.filter((r) => r.status === 'failed').length;
+        if (results.length > 0) {
+          console.log(
+            `[Draymond Scheduler] boot catch-up: ${results.length} missed job(s) processed (${ran} ok, ${failed} failed)`
+          );
+        }
+      })
+      .catch((err) => {
+        console.error(`[Draymond Scheduler] boot catch-up failed: ${err instanceof Error ? err.message : err}`);
+      });
+  }
+
   _tickTimer = setInterval(() => {
     if (_tickRunning) return; // single-flight — never overlap
     _tickRunning = true;
@@ -928,7 +957,7 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         // Ecosystem services down (BookBridge, brain, hemp stack) are started
         // directly — the real fix, not a report.
         const servicesDown: string[] = [];
-        const serviceSlugs = ['bookbridge', 'deterministic-brain', 'hemp-os', 'hempforge', 'sports-steve', 'uplift'];
+        const serviceSlugs = ['bookbridge', 'deterministic-brain', 'hemp-os', 'hempforge', 'sports-steve', 'uplift-agent'];
         for (const site of down.slice(0, 5)) {
           const name = String(site.monitor_name ?? '').toLowerCase().replace(/[\s-_]+/g, '');
           for (const slug of serviceSlugs) {
@@ -1320,6 +1349,16 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
   }
 }
 
+export interface RunDueJobsOptions {
+  /**
+   * When set, jobs overdue by more than the 15-min grace are still RUN (not
+   * skipped) as long as they are not overdue by more than `catchupMs`. Used by
+   * the boot catch-up pass so missed work executes when Draymond starts, while
+   * an ordinary tick keeps the strict "never run late" behaviour.
+   */
+  catchupMs?: number;
+}
+
 /**
  * Find all enabled jobs whose `next_run_at <= now()`, claim them atomically,
  * execute them, and update their run metadata.
@@ -1330,7 +1369,7 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
  *
  * Returns an array of results for each job attempted.
  */
-export async function runDueJobs(now = new Date()): Promise<JobRunResult[]> {
+export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Promise<JobRunResult[]> {
   const supabase = createDraymondAdminClient();
   const results: JobRunResult[] = [];
   const recipient = getNotificationRecipient();
@@ -1357,6 +1396,10 @@ export async function runDueJobs(now = new Date()): Promise<JobRunResult[]> {
   // cron only fired at 6am, etc.) should NOT fire late: that's the "night recap
   // at 6am" bug. It gets skipped (no execution, no email spam) and rescheduled
   // to its next real slot. Freshly-due jobs (within CATCH_UP_GRACE_MS) run.
+  //
+  // During a boot catch-up (`catchupMs` set) the horizon widens so jobs missed
+  // while the server was off are EXECUTED instead of skipped — the work happens
+  // when Draymond starts, bounded so ancient slots are not replayed.
   const nowMs = now.getTime();
   const runnable: ScheduledJob[] = [];
   const stale: ScheduledJob[] = [];
@@ -1364,12 +1407,19 @@ export async function runDueJobs(now = new Date()): Promise<JobRunResult[]> {
   for (const raw of dueJobs) {
     const job = raw as ScheduledJob;
     const dueMs = job.next_run_at ? new Date(job.next_run_at).getTime() : nowMs;
-    if (Number.isFinite(dueMs) && nowMs - dueMs > CATCH_UP_GRACE_MS) {
-      stale.push(job);
-    } else if (isOutsideDelegationWindow(job, now)) {
+    const overdueMs = Number.isFinite(dueMs) ? nowMs - dueMs : 0;
+    if (isOutsideDelegationWindow(job, now)) {
       // The handler's delegation window is closed right now — defer instead of
       // burning tokens on work scheduled for another time of day.
       deferred.push(job);
+    } else if (Number.isFinite(dueMs) && overdueMs > CATCH_UP_GRACE_MS) {
+      // Overdue beyond the strict grace. In catch-up mode, still run if within
+      // the horizon; otherwise treat as stale.
+      if (opts?.catchupMs && overdueMs <= opts.catchupMs) {
+        runnable.push(job);
+      } else {
+        stale.push(job);
+      }
     } else {
       runnable.push(job);
     }

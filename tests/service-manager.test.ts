@@ -159,9 +159,9 @@ describe('startService', () => {
   });
 
   it('escalates for known tools without a recipe, keeping the canonical name', async () => {
-    const r = await startService('mutly');
-    expect(r.name).toBe('Mutly');
-    expect(r.detail).toContain('no start recipe for "mutly" — escalate');
+    const r = await startService('reporank');
+    expect(r.name).toBe('RepoRank');
+    expect(r.detail).toContain('no start recipe for "reporank" — escalate');
   });
 
   it('short-circuits when the service is already healthy', async () => {
@@ -219,14 +219,18 @@ describe('startService', () => {
 
   it('resolves the working dir to the repo root when no override or tool cwd exists', async () => {
     fetchMock.mockReset().mockResolvedValue(new Response('{}', { status: 500 }));
+    // The uplift-agent override points at agents/Uplift-Agent; give the temp
+    // root that checkout so the recipe's working dir resolves instead of
+    // "missing".
+    fs.mkdirSync(path.join(tmp, 'agents', 'Uplift-Agent'), { recursive: true });
     vi.useFakeTimers();
-    const pending = startService('uplift');
+    const pending = startService('uplift-agent');
     await vi.advanceTimersByTimeAsync(12 * 1500);
     const r = await pending;
-    expect(r.url).toBeNull(); // 'uplift' is not in TOOL_PORTS — only a start recipe
-    expect(r.detail).toContain('started "python -m agent"');
+    expect(r.url).toBe('http://localhost:8000/health'); // uplift-agent is in TOOL_PORTS
+    expect(r.detail).toContain('started "node agents/Uplift-Agent/server.js"');
     const opts = mockSpawn.mock.calls[0]![2] as { cwd?: string };
-    expect(opts.cwd).toBe(tmp);
+    expect(opts.cwd).toBe(path.join(tmp, 'agents', 'Uplift-Agent'));
   });
 });
 

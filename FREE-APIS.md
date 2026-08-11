@@ -79,6 +79,7 @@ the mission-critical ones first, wire into the news/ops layer.
 | **Nominatim (OSM)** | free | Geocoding local biz | 🔲 |
 | **ExchangeRate-API** | free | Finance conversions | 🔲 |
 | **ip-api.com** | free | Geo analytics | 🔲 |
+| **Hermes api_server** | internal | Mission brain: real NousResearch Hermes agent on port 8642 (OpenAI SSE) | needs `API_SERVER_KEY` in `.env.local` (openssl rand -hex 32) |
 
 ---
 
@@ -99,3 +100,7 @@ them to `docs/` as a reference PDF/key sheet like the News APIs.
 The news/ops layer (`src/lib/draymond/`) already ingests from env-configured
 APIs — new keys follow the same pattern (add to `.env.local`, add a fetcher to
 the relevant module, add to the daily/`ops` route).
+
+The Hermes api_server trio (`API_SERVER_HOST/PORT/KEY`) is audited by
+`auditApiKeys()` under the `Hermes api_server` entry; see the
+`2026-08-11-hermes-as-brain-design` spec for the brain + tool-layer wiring.

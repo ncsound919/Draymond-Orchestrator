@@ -91,6 +91,9 @@ export const FREE_API_REGISTRY: ApiKeyEntry[] = [
 
   // ── Kaggle (new-style KGAT_ token) ─────────────────────────────────────
   { name: 'Kaggle', engine: 'E4', envVars: ['KAGGLE_API_TOKEN'], noKey: false, signupUrl: 'https://www.kaggle.com/settings/api', use: 'Datasets/competitions for research + backtesting', fetcher: 'data-apis.kaggleSearchDatasets' },
+
+  // ── Hermes api_server (mission brain) ───────────────────────────────────
+  { name: 'Hermes api_server', engine: 'ops', envVars: ['API_SERVER_HOST', 'API_SERVER_PORT', 'API_SERVER_KEY'], noKey: false, use: 'Open-Chat brain: real NousResearch Hermes on 8642' },
 ];
 
 /**

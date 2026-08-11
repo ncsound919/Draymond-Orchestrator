@@ -17,9 +17,18 @@ describe('tool port registry', () => {
 
   it('has a healthy toolcount and covers the definitive stack', () => {
     expect(toolCount()).toBeGreaterThanOrEqual(25);
-    for (const slug of ['reporank', 'grader', 'mutly', 'agent-browser', 'megacode', 'vibeserve', 'claw-protect', 'big-homie', 'sub-team', 'uplift-agent', 'graphify', 'deterministic-brain']) {
+    for (const slug of ['reporank', 'grader', 'mutly', 'agent-browser', 'megacode', 'vibeserve', 'claw-protect', 'big-homie', 'sub-team', 'uplift-agent', 'graphify', 'deterministic-brain', 'hermes-brain', 'hermes-proxy', 'squad-service']) {
       expect(toolBySlug(slug), `missing ${slug}`).toBeDefined();
     }
+  });
+
+  it('registers the Hermes mission-brain, proxy, and squad-service ports', () => {
+    expect(toolBySlug('hermes-brain')?.port).toBe(8642);
+    expect(toolBySlug('hermes-proxy')?.port).toBe(8648);
+    expect(toolBySlug('squad-service')?.port).toBe(8650);
+    // No collisions among the new ports:
+    const collisions = findPortCollisions();
+    expect(collisions).toEqual([]);
   });
 
   it('keeps Draymond on 3444 and spreads key tools off the crowded ports', () => {

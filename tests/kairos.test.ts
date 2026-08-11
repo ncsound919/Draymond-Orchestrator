@@ -227,6 +227,46 @@ describe('kairos daemon', () => {
   });
 });
 
+describe('kairos dedupe hash normalization', () => {
+  it('collapses failure counters, relative ages, and amounts into one hash', () => {
+    // A monitor that stays down increments its failure counter every scan —
+    // the old hash changed with it, spawning a new moment each tick.
+    const a = kairos.momentHash('monitor_down', 'http://localhost:8010/health — no response (40x)');
+    const b = kairos.momentHash('monitor_down', 'http://localhost:8010/health — no response (167x)');
+    expect(a).toBe(b);
+
+    // Stale-heartbeat "last seen Xm ago" ages must not break dedupe either.
+    const ha = kairos.momentHash('stale_heartbeat', 'down — last seen 4m ago (fetch failed)');
+    const hb = kairos.momentHash('stale_heartbeat', 'down — last seen 539m ago (fetch failed)');
+    expect(ha).toBe(hb);
+
+    // Distinct URLs still dedupe separately.
+    expect(kairos.momentHash('monitor_down', 'http://a — no response (40x)'))
+      .not.toBe(kairos.momentHash('monitor_down', 'http://b — no response (40x)'));
+  });
+
+  it('pruneDuplicateMoments merges pre-normalization duplicates', async () => {
+    const file = path.join(tmp, 'kairos.json');
+    const now = new Date().toISOString();
+    const state = {
+      moments: [
+        { id: 'km-a', kind: 'monitor_down', severity: 'critical', title: 'Site down: X', detail: 'http://x — no response (10x)', source: 'monitors', firstSeen: now, lastSeen: now, occurrences: 1, hash: 'old-a', acked: false },
+        { id: 'km-b', kind: 'monitor_down', severity: 'critical', title: 'Site down: X', detail: 'http://x — no response (11x)', source: 'monitors', firstSeen: now, lastSeen: now, occurrences: 1, hash: 'old-b', acked: false },
+        { id: 'km-c', kind: 'job_failed', severity: 'warn', title: 'Job failed: Y', detail: 'boom', source: 'scheduler', firstSeen: now, lastSeen: now, occurrences: 1, hash: 'old-c', acked: false },
+      ],
+      settings: {},
+      updatedAt: now,
+    };
+    fs.writeFileSync(file, JSON.stringify(state));
+    const kept = await kairos.pruneDuplicateMoments();
+    expect(kept).toBe(2);
+    const after = JSON.parse(fs.readFileSync(file, 'utf-8'));
+    expect(after.moments).toHaveLength(2);
+    const md = after.moments.find((m: { kind: string }) => m.kind === 'monitor_down');
+    expect(md?.occurrences).toBe(2);
+  });
+});
+
 describe('kairos branch coverage', () => {
   it('flags stale leads and skips fresh or non-lead opportunities', async () => {
     pipeline.listOpportunities.mockResolvedValue([

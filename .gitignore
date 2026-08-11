@@ -103,3 +103,10 @@ sessions/
 
 # Dev server log
 /dev-server.log
+
+# local task markers and temp logs
+/.task-markers/
+/server-test.log
+
+# Hermes api_server local secrets
+API_SERVER_KEY

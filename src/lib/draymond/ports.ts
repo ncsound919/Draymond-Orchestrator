@@ -13,6 +13,7 @@
 //   security       3300-3302        Claw-Protect · dep-scan · nuclei
 //   orchestration  3500-3700        Big Homie · VibeServe · AgentBrowser
 //   ecosystem      3001-3410/8000-8050/8777   app services
+//   mission brain  8642/8648/8650   Hermes api_server · hermes-proxy (media+voice) · squad-service
 //   mcp            stdio            UFC-MCP · CIS Assistant
 // ============================================================================
 
@@ -73,6 +74,11 @@ export const TOOL_PORTS: ToolPort[] = [
   { slug: 'vibeserve', name: 'VibeServe', category: 'orchestration', port: 3600, env: 'VIBESERVE_URL', health: '/health', cwd: 'agents/VibeServe-main', start: 'python -m vibeserve', notes: 'FastMCP tool router (stdio; 3600 is its optional HTTP bridge). Moved off 8000.' },
   { slug: 'agent-browser', name: 'AgentBrowser', category: 'orchestration', port: 3700, env: 'AGENTBROWSER_URL', health: '/api/health', cwd: 'agents/AgentBrowser-main', start: 'npm run dev -- -p 3700', notes: 'Playwright browser automation + ecosystem gateway. Moved off 3000 (Overlay Justice / HempForge).' },
 
+  // ── Hermes / mission brain ───────────────────────────────────────────────
+  { slug: 'hermes-brain', name: 'Hermes Agent (Mission Brain)', category: 'orchestration', port: 8642, env: 'HERMES_BRAIN_URL', health: '/health', notes: 'Real NousResearch Hermes api_server (OpenAI SSE /v1/chat/completions). Started via scripts/start-hermes-gateway.ps1. Auth via API_SERVER_KEY env.' },
+  { slug: 'hermes-proxy', name: 'Hermes Proxy (media+voice)', category: 'service', port: 8648, env: 'HERMES_PROXY_PORT', health: '/v1/health', notes: 'Node hermes-proxy: /media/* static + /api/v1/voice/* AetherDesk proxy. Chat role moved to hermes-brain (8642).' },
+  { slug: 'squad-service', name: 'Squad Service', category: 'service', port: 8650, env: 'SQUAD_SERVICE_PORT', health: '/v1/health', notes: 'Specialists riggs/moss/scribe/echo/hype (part of hermes-proxy backend).' },
+
   // ── Ecosystem app services ───────────────────────────────────────────────
   { slug: 'bet-buddy', name: 'Bet Buddy', category: 'service', port: 3001, env: 'BET_BUDDY_URL', health: '/health', notes: 'Betting companion (3001 is now free — RepoRank moved to 3200).' },
   { slug: 'omniresearch-pro', name: 'OmniResearch Pro', category: 'service', port: 3010, env: 'OMNI_RESEARCH_URL', health: '/api/health', notes: 'Deep research agent.' },
@@ -82,7 +88,7 @@ export const TOOL_PORTS: ToolPort[] = [
   { slug: 'ghostfolio', name: 'Ghostfolio', category: 'service', port: 3333, env: 'GHOSTFOLIO_URL', health: '/api/v1/health', notes: 'Portfolio tracker (kept; Claw-Protect moved off 3333).' },
   { slug: 'recursive-ip', name: 'Recursive IP', category: 'service', port: 3410, env: 'RECURSIVE_IP_URL', health: '/api/v1/health', notes: 'Moved off 8000.' },
   { slug: 'uplift-agent', name: 'Uplift Agent', category: 'service', port: 8000, env: 'UPLIFT_BASE_URL', health: '/health', notes: 'General-purpose coding agent.' },
-  { slug: 'sports-steve', name: 'Sports Steve', category: 'service', port: 8010, env: 'SPORTS_STEVE_URL', health: '/health', notes: 'Sports analytics agent.' },
+  { slug: 'sports-steve', name: 'Sports Steve', category: 'service', port: 8010, env: 'SPORTS_STEVE_URL', health: '/api/v1/health', notes: 'Sports analytics agent.' },
   { slug: 'indy-music', name: 'Indy Music Platform', category: 'service', port: 8020, env: 'INDY_MUSIC_URL', health: '/health', notes: 'Music industry automation.' },
   { slug: 'social-media-dashboard', name: 'Social Media Dashboard', category: 'service', port: 8030, env: 'SOCIAL_MEDIA_URL', health: '/api/ai/health', notes: 'Content creation service.' },
   { slug: 'trading-agents', name: 'TradingAgents', category: 'service', port: 8040, env: 'TRADING_AGENTS_URL', health: '/health', notes: 'Market analysis.' },

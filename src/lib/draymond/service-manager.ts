@@ -13,7 +13,7 @@
 // spawn).
 // ============================================================================
 
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { TOOL_PORTS } from './ports';
@@ -34,6 +34,11 @@ const CWD_OVERRIDES: Record<string, string> = {
   'hempforge': 'potential/HempForge-main',
   'deterministic-brain': 'agents/deterministic-brain',
   'opencode': '.',
+  'sports-steve': 'agents/Sports-Steve-main',
+  'social-media-dashboard': 'agents/Social-Media-Dashboard--main',
+  'mutly': 'agents/Mutly-Daemon-Agent',
+  'bet-buddy': 'agents/Sports-Steve-main/Bet-Buddy--main/backend',
+  'uplift-agent': 'agents/Uplift-Agent',
 };
 
 /**
@@ -63,19 +68,43 @@ const START_MAP: Record<string, { command: [string, string[]]; port: number; hea
     port: 3100,
     health: '/health',
   },
+  opencode: {
+    command: ['node', [path.join('node_modules', 'opencode-ai', 'bin', 'opencode'), 'serve', '--port', '4096']],
+    port: 4096,
+    health: '/',
+    // opencode-client.ts authenticates to the headless server with HTTP Basic
+    // (opencode:OPENCODE_SERVER_PASSWORD). Keep the default in sync so codegen
+    // steps (and the opencode service probe) can reach it.
+    env: { OPENCODE_SERVER_PASSWORD: 'ocpass' },
+  },
   hempforge: {
     command: ['npm', ['run', 'dev']],
     port: 3110,
     health: '/api/health',
   },
-  uplift: {
-    command: ['python', ['-m', 'agent']],
+  'uplift-agent': {
+    command: ['node', ['agents/Uplift-Agent/server.js']],
     port: 8000,
     health: '/health',
   },
   'sports-steve': {
-    command: ['python', ['-m', 'uvicorn', 'main:app', '--host', '127.0.0.1', '--port', '8010']],
+    command: ['python', ['-m', 'uvicorn', 'src.main:app', '--host', '127.0.0.1', '--port', '8010']],
     port: 8010,
+    health: '/api/v1/health',
+  },
+  'social-media-dashboard': {
+    command: ['python', ['-m', 'uvicorn', 'src.ai.api:app', '--host', '127.0.0.1', '--port', '8030']],
+    port: 8030,
+    health: '/api/ai/health',
+  },
+  'mutly': {
+    command: ['npm', ['run', 'dev']],
+    port: 4000,
+    health: '/api/health',
+  },
+  'bet-buddy': {
+    command: ['node', ['dist/server.js']],
+    port: 3001,
     health: '/health',
   },
   'claw-protect': {
@@ -165,6 +194,21 @@ function logPath(slug: string): { dir: string; out: string; err: string } {
 }
 
 /**
+ * Resolve a bare executable name (python, node, npm, ...) to its real path on
+ * Windows. `where.exe` finds .exe/.cmd/.bat; a .cmd shim (npm/npx) is NOT a
+ * valid Win32 application for spawn(), so those keep the cmd.exe fallback.
+ */
+function resolveWin32Executable(name: string): string | null {
+  try {
+    const result = execFileSync('where.exe', [name], { encoding: 'utf8', timeout: 5000 });
+    const first = result.split(/\r?\n/).map((s) => s.trim()).find(Boolean);
+    return first && first.length > 0 ? first : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Start one service (best-effort). Returns the probe result after a short
  * wait. Never throws — a failed start resolves with up=false + detail.
  */
@@ -187,10 +231,22 @@ export async function startService(slug: string): Promise<ServiceHealth> {
   const [cmd, args] = def.command;
   const { out, err } = logPath(slug);
   const env = def.env ? { ...process.env, ...def.env } : process.env;
-  const child =
-    process.platform === 'win32'
-      ? spawn('cmd.exe', ['/d', '/s', '/c', `"${cmd}" ${args.map((a) => (a.includes(' ') ? `"${a}"` : a)).join(' ')}`], { cwd, detached: true, stdio: 'ignore', env })
-      : spawn(cmd, args, { cwd, detached: true, stdio: 'ignore', env });
+
+  // Resolve the real executable. `cmd` may be a bare name (python, npm, node)
+  // — spawn it directly on Windows instead of wrapping in cmd.exe, which
+  // mis-parses `"python"` when the arg string is passed through /c.
+  let child: import('node:child_process').ChildProcess;
+  if (process.platform === 'win32') {
+    const resolvedExe = resolveWin32Executable(cmd);
+    if (resolvedExe && /\.exe$/i.test(resolvedExe)) {
+      child = spawn(resolvedExe, args, { cwd, detached: true, stdio: 'ignore', env });
+    } else {
+      // npm/npx/opencode are .cmd shims — fall back to cmd.exe /c for those.
+      child = spawn('cmd.exe', ['/d', '/s', '/c', `${cmd} ${args.map((a) => (a.includes(' ') ? `"${a}"` : a)).join(' ')}`], { cwd, detached: true, stdio: 'ignore', env });
+    }
+  } else {
+    child = spawn(cmd, args, { cwd, detached: true, stdio: 'ignore', env });
+  }
   child.unref();
   // Redirect to server-logs via the shell wrapper where possible; detached
   // processes with stdio ignore don't write logs, so emit a marker.

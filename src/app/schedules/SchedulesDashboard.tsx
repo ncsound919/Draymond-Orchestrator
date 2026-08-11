@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition, useEffect } from 'react';
-import { createScheduledJob, updateScheduledJob, toggleJob, removeJob, runScheduledJob } from './actions';
+import { createScheduledJob, updateScheduledJob, toggleJob, removeJob, runScheduledJob, catchUpMissedJobs, runAllFailedJobs } from './actions';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -177,6 +177,8 @@ export default function SchedulesDashboard({ initialJobs, chainOptions, customHa
   const [pendingJobId, setPendingJobId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [runResult, setRunResult] = useState<string | null>(null);
+  const [batchResult, setBatchResult] = useState<string | null>(null);
+  const [batchPending, setBatchPending] = useState(false);
   const [jobs, setJobs] = useState<Job[]>(initialJobs);
   const [loadedAt, setLoadedAt] = useState('');
   const [filter, setFilter] = useState<FilterTab>('all');
@@ -345,6 +347,50 @@ export default function SchedulesDashboard({ initialJobs, chainOptions, customHa
     });
   }
 
+  function handleCatchUp() {
+    setActionError(null);
+    setBatchResult(null);
+    setBatchPending(true);
+    startTransition(async () => {
+      try {
+        const r = await catchUpMissedJobs();
+        setBatchResult(
+          `Catch-up: ${r.processed} processed — ${r.ran} ran, ${r.failed} failed, ${r.skipped} skipped`
+        );
+        if (r.failed > 0) {
+          const failed = r.results.filter((x) => x.status === 'failed').slice(0, 3);
+          setBatchResult((prev) => prev + `\n${failed.map((f) => `• ${f.job_name}: ${f.error}`).join('\n')}`);
+        }
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : 'Failed to catch up missed jobs');
+      } finally {
+        setBatchPending(false);
+      }
+    });
+  }
+
+  function handleRunAllFailed() {
+    setActionError(null);
+    setBatchResult(null);
+    setBatchPending(true);
+    startTransition(async () => {
+      try {
+        const r = await runAllFailedJobs();
+        setBatchResult(
+          `Re-run failed: ${r.attempted} attempted — ${r.ran} passed, ${r.failed} still failing`
+        );
+        if (r.failed > 0) {
+          const failed = r.results.filter((x) => x.status === 'failed').slice(0, 3);
+          setBatchResult((prev) => prev + `\n${failed.map((f) => `• ${f.job_name}: ${f.error}`).join('\n')}`);
+        }
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : 'Failed to re-run failed jobs');
+      } finally {
+        setBatchPending(false);
+      }
+    });
+  }
+
   const filteredJobs = jobs.filter((j) => {
     if (filter === 'enabled') return j.is_enabled;
     if (filter === 'disabled') return !j.is_enabled;
@@ -386,6 +432,34 @@ export default function SchedulesDashboard({ initialJobs, chainOptions, customHa
         >
           {showForm && !editingJob ? 'Cancel' : '+ New Job'}
         </button>
+      </div>
+
+      {/* ── Fleet controls ─────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-3 rounded-xl bg-white/5 border border-white/10 p-4">
+        <div className="flex items-center gap-2 text-sm">
+          <span className="inline-flex h-2 w-2 rounded-full bg-[#22c55e]" />
+          <span className="text-white/70">Draymond running</span>
+        </div>
+        <div className="ml-auto flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={handleCatchUp}
+            disabled={batchPending}
+            className="rounded-lg px-4 py-2 bg-[#22c55e]/15 hover:bg-[#22c55e]/25 border border-[#22c55e]/30 text-emerald-300 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Run jobs whose scheduled slot was missed while the server was down (last 24h)"
+          >
+            {batchPending ? 'Running…' : 'Catch up missed'}
+          </button>
+          <button
+            type="button"
+            onClick={handleRunAllFailed}
+            disabled={batchPending || counts.failed === 0}
+            className="rounded-lg px-4 py-2 bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Re-run every job whose last run failed"
+          >
+            {batchPending ? 'Running…' : `Re-run failed (${counts.failed})`}
+          </button>
+        </div>
       </div>
 
       {/* ── Filter tabs ─────────────────────────────────────────────── */}
@@ -623,6 +697,20 @@ export default function SchedulesDashboard({ initialJobs, chainOptions, customHa
           </button>
         </div>
       )}
+      {batchResult && (
+        <div className="rounded-xl bg-cyan-500/10 border border-cyan-500/20 px-5 py-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-cyan-300 font-mono whitespace-pre-line">{batchResult}</p>
+            <button
+              type="button"
+              onClick={() => setBatchResult(null)}
+              className="text-cyan-400/60 hover:text-cyan-400 text-xs ml-4 shrink-0"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Job List ────────────────────────────────────────────────── */}
       <section>
@@ -718,7 +806,7 @@ export default function SchedulesDashboard({ initialJobs, chainOptions, customHa
                             {formatRelativeTime(job.last_run_at)}
                           </p>
                         )}
-                        {job.last_run_status === 'failed' && job.last_error && (
+                        {(job.last_run_status === 'failed' || job.last_run_status === 'skipped') && job.last_error && (
                           <p className="text-xs text-red-400/70 mt-0.5 truncate max-w-[220px]" title={job.last_error}>
                             {job.last_error}
                           </p>
