@@ -7,6 +7,7 @@ const navItems = [
   { name: 'IDE', href: '/ide' },
   { name: 'Math', href: '/math' },
   { name: 'Operations', href: '/operations' },
+  { name: 'Strategy', href: '/strategy' },
   { name: 'Mission', href: '/mission' },
   { name: 'Cognition', href: '/cognition' },
   { name: 'Agents', href: '/agents' },

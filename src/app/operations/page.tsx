@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 
+import Link from 'next/link';
 import { createDraymondAdminClient } from '@/lib/draymond/client';
 import type { Metadata } from 'next';
 import type { DraymondAgent, DraymondChain, DraymondEntity } from '@/lib/draymond/types';
@@ -841,6 +842,12 @@ export default async function OperationsPage() {
               color="yellow"
               onRun={runQuickAction}
             />
+            <Link
+              href="/strategy"
+              className="inline-flex items-center gap-2 rounded-lg border border-cyan-500/30 px-4 py-2.5 text-sm font-medium text-cyan-400 transition-colors hover:bg-cyan-500/10 hover:border-cyan-500/50"
+            >
+              Open Strategy Team <span aria-hidden="true">→</span>
+            </Link>
           </div>
         </section>
 
