@@ -205,8 +205,11 @@ export function isWithinWindow(spec: DelegationSpec, now: Date): boolean {
 }
 
 // ============================================================================
-// CONSUMPTION TRACKING (in-memory, resets on restart)
+// CONSUMPTION TRACKING (persisted to .draymond/delegation.json on write)
 // ============================================================================
+
+import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
 
 const consumed: Record<string, { day: string; tokens: number }> = {};
 
@@ -214,8 +217,59 @@ function todayKey(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** Registry dir used by the treasury/ad hoc file discipline. */
+function registryDir(): string {
+  return process.env.DRAYMOND_REGISTRY_DIR ?? resolve(process.cwd(), '.draymond');
+}
+
+function consumptionFile(): string {
+  return resolve(registryDir(), 'delegation.json');
+}
+
+interface PersistedConsumption {
+  consumed: Record<string, { day: string; tokens: number }>;
+  updatedAt: string;
+}
+
+let loaded = false;
+
+/** Load persisted consumption from .draymond/delegation.json (once per process). */
+function loadConsumption(): void {
+  if (loaded) return;
+  loaded = true;
+  try {
+    const file = consumptionFile();
+    if (!existsSync(file)) return;
+    const raw = JSON.parse(readFileSync(file, 'utf-8')) as PersistedConsumption;
+    if (raw?.consumed && typeof raw.consumed === 'object') {
+      for (const [slug, entry] of Object.entries(raw.consumed)) {
+        if (entry && typeof entry.day === 'string' && typeof entry.tokens === 'number') {
+          consumed[slug] = { day: entry.day, tokens: entry.tokens };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[Delegation] failed to load consumption: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+/** Persist consumption atomically (read-modify-write via temp file rename). */
+function persistConsumption(): void {
+  try {
+    const file = consumptionFile();
+    mkdirSync(dirname(file), { recursive: true });
+    const payload: PersistedConsumption = { consumed, updatedAt: new Date().toISOString() };
+    const tmp = `${file}.tmp`;
+    writeFileSync(tmp, JSON.stringify(payload, null, 2), 'utf-8');
+    renameSync(tmp, file);
+  } catch (err) {
+    console.warn(`[Delegation] failed to persist consumption: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 /** Tokens already consumed by a component today. */
 export function delegationConsumed(slug: string): number {
+  loadConsumption();
   const entry = consumed[slug];
   if (!entry || entry.day !== todayKey()) return 0;
   return entry.tokens;
@@ -223,12 +277,14 @@ export function delegationConsumed(slug: string): number {
 
 /** Record token consumption for a component (idempotent by day rollover). */
 export function recordDelegationConsumption(slug: string, tokens: number): void {
+  loadConsumption();
   const entry = consumed[slug];
   if (!entry || entry.day !== todayKey()) {
     consumed[slug] = { day: todayKey(), tokens: Math.max(0, tokens) };
-    return;
+  } else {
+    entry.tokens += Math.max(0, tokens);
   }
-  entry.tokens += Math.max(0, tokens);
+  persistConsumption();
 }
 
 /** Remaining per-day token budget for a component (unbounded when unplanned). */
@@ -269,7 +325,18 @@ export function delegationTimeoutSeconds(slug: string): number {
 
 /** Reset all consumption (tests, day rollover). */
 export function resetDelegation(): void {
+  loadConsumption();
   for (const k of Object.keys(consumed)) delete consumed[k];
+  try {
+    const file = consumptionFile();
+    if (existsSync(file)) {
+      const tmp = `${file}.tmp`;
+      writeFileSync(tmp, JSON.stringify({ consumed, updatedAt: new Date().toISOString() }, null, 2), 'utf-8');
+      renameSync(tmp, file);
+    }
+  } catch (err) {
+    console.warn(`[Delegation] failed to clear persisted consumption: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 export interface DelegationSnapshotEntry {

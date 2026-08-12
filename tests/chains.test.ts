@@ -43,6 +43,7 @@ const { mockAdmin, mockGetEntity, mockInvokeEntity, mockLogEvent } = vi.hoisted(
 
 vi.mock('../src/lib/draymond/client', () => ({
   createDraymondAdminClient: vi.fn(() => mockAdmin),
+  createDraymondClient: vi.fn(() => mockAdmin),
 }));
 vi.mock('../src/lib/draymond/registry', () => ({
   getEntity: mockGetEntity,

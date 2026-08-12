@@ -10,6 +10,7 @@ import { createDraymondAdminClient } from './client';
 import { logEvent, evaluateConfidence, submitAction, isActionApproved } from './index';
 import { getEntity, recordInvocation } from './registry';
 import { invokeEntity } from './invoker';
+import { recordChainStepCost } from './cost';
 import {
   emitChainStarted,
   emitChainStepCompleted,
@@ -305,6 +306,7 @@ async function executeStepGroups(
   supabase: any,
   opts: {
     chainId: string;
+    chainSlug: string;
     chainStartTime: number;
     timeoutMs: number;
     initialCompletedSteps: number;
@@ -313,7 +315,7 @@ async function executeStepGroups(
   }
 ): Promise<{ completedSteps: number; failedSteps: number }> {
   let { initialCompletedSteps: completedSteps, initialFailedSteps: failedSteps } = opts;
-  const { chainId, chainStartTime, timeoutMs, completedStepIds } = opts;
+  const { chainId, chainSlug, chainStartTime, timeoutMs, completedStepIds } = opts;
 
   // Group steps by step_order for sequential execution of groups
   const stepGroups = new Map<number, DraymondChainStep[]>();
@@ -381,6 +383,19 @@ async function executeStepGroups(
             }
 
             const result = await executeStep(step, ctx, agentId, supabase);
+            if (result.success) {
+              await recordChainStepCost(
+                chainId,
+                chainSlug,
+                step.id,
+                step.name,
+                step.entity_id,
+                step.input_data,
+                result.output,
+              ).catch((err: unknown) => {
+                console.warn(`[Draymond Chains] cost record failed for step ${step.id}: ${err instanceof Error ? err.message : String(err)}`);
+              });
+            }
             return { step, ...result, skipped: false };
           })
         );
@@ -448,6 +463,20 @@ async function executeStepGroups(
 
       const result = await executeStep(step, ctx, agentId, supabase);
       const outputKey = step.output_key || `step_${step.step_order}`;
+
+      if (result.success) {
+        await recordChainStepCost(
+          chainId,
+          chainSlug,
+          step.id,
+          step.name,
+          step.entity_id,
+          step.input_data,
+          result.output,
+        ).catch((err: unknown) => {
+          console.warn(`[Draymond Chains] cost record failed for step ${step.id}: ${err instanceof Error ? err.message : String(err)}`);
+        });
+      }
 
       ctx.steps[outputKey] = {
         status: result.success ? 'completed' : 'failed',
@@ -1090,6 +1119,7 @@ export async function executeChain(
     supabase,
     {
       chainId,
+      chainSlug: chain.slug,
       chainStartTime,
       timeoutMs,
       initialCompletedSteps: 0,
@@ -1339,6 +1369,7 @@ export async function resumeChain(
     supabase,
     {
       chainId,
+      chainSlug: chain.slug,
       chainStartTime,
       timeoutMs,
       initialCompletedSteps: restoredCompleted,
