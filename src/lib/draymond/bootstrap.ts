@@ -30,6 +30,7 @@ import { seedAgentMonitors, disableAbsentServiceMonitors } from './monitors';
 export const DEFAULT_CORE_SERVICES = [
   'deterministic-brain',
   'bookbridge',
+  'omni-research',
   'uplift-agent',
   'opencode',
   'sports-steve',

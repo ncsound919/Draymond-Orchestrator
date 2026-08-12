@@ -91,6 +91,10 @@ const config = {
       args: [vibeserveMain],
       env: {
         VIBESERVE_API_SECRET: env.VIBESERVE_API_SECRET || 'benchmark-secret-2024',
+        // Break the Hermes <-> VibeServe MCP recursion: VibeServe mounts a
+        // "hermes mcp serve" proxy when hermes is on PATH, which re-runs Hermes
+        // MCP discovery and spawns another VibeServe (process explosion).
+        VIBESERVE_DISABLE_HERMES_PROXY: '1',
       },
     },
   },

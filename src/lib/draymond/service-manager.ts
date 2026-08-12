@@ -39,6 +39,7 @@ const CWD_OVERRIDES: Record<string, string> = {
   'mutly': 'agents/Mutly-Daemon-Agent',
   'bet-buddy': 'agents/Sports-Steve-main/Bet-Buddy--main/backend',
   'uplift-agent': 'agents/Uplift-Agent',
+  'omni-research': 'agents/OmniResearch-Replacement',
 };
 
 /**
@@ -53,6 +54,11 @@ const START_MAP: Record<string, { command: [string, string[]]; port: number; hea
     command: ['python', ['main.py']],
     port: 8777,
     health: '/health',
+  },
+  'omni-research': {
+    command: ['python', ['-m', 'uvicorn', 'main:app', '--host', '127.0.0.1', '--port', '3010']],
+    port: 3010,
+    health: '/api/health',
   },
   'deterministic-brain': {
     command: ['python', ['main.py', '--serve']],
@@ -69,13 +75,11 @@ const START_MAP: Record<string, { command: [string, string[]]; port: number; hea
     health: '/health',
   },
   opencode: {
+    // Managed by PM2 (ecosystem.marketing.config.js) — headless codegen server.
+    // The service-manager probes health but never spawns it.
     command: ['node', [path.join('node_modules', 'opencode-ai', 'bin', 'opencode'), 'serve', '--port', '4096']],
     port: 4096,
     health: '/',
-    // opencode-client.ts authenticates to the headless server with HTTP Basic
-    // (opencode:OPENCODE_SERVER_PASSWORD). Keep the default in sync so codegen
-    // steps (and the opencode service probe) can reach it.
-    env: { OPENCODE_SERVER_PASSWORD: 'ocpass' },
   },
   hempforge: {
     command: ['npm', ['run', 'dev']],
@@ -93,6 +97,9 @@ const START_MAP: Record<string, { command: [string, string[]]; port: number; hea
     health: '/api/v1/health',
   },
   'social-media-dashboard': {
+    // Managed by PM2 (ecosystem.marketing.config.js) — remote backends,
+    // survives reboots. This entry is a no-op: the port probe still reports
+    // health, but the service-manager never spawns it.
     command: ['python', ['-m', 'uvicorn', 'src.ai.api:app', '--host', '127.0.0.1', '--port', '8030']],
     port: 8030,
     health: '/api/ai/health',
@@ -112,6 +119,34 @@ const START_MAP: Record<string, { command: [string, string[]]; port: number; hea
     port: 3300,
     health: '/api/health',
     env: { CLAW_PORT: '3300', CLAW_SERVE_SAAS: 'false' },
+  },
+  'cai': {
+    // CAI is Unix-only (termios REPL). Run via the WSL Ubuntu venv (native-fs ~/.venvs/cai-wsl, git source ~/cai-src).
+    // Installed: uv pip install --python ~/.venvs/cai-wsl/bin/python -e ~/cai-src
+    command: ['wsl', ['bash', '-lc', 'export PATH="$HOME/.local/bin:$PATH"; export CAI_TRACING=false; export CAI_DISABLE_USAGE_TRACKING=true; cd ~/cai-src && ~/.venvs/cai-wsl/bin/cai run']],
+    port: 3303,
+    health: '/health',
+    env: { CAI_AGENT_TYPE: 'one_tool_agent', CAI_MODEL: 'alias1' },
+  },
+  'codenexus': {
+    command: ['npm', ['run', 'dev']],
+    port: 3205,
+    health: '/api/health',
+  },
+  'cureforge': {
+    command: ['npm', ['run', 'dev']],
+    port: 3060,
+    health: '/api/health',
+  },
+  'bbtech-web-app': {
+    command: ['npm', ['run', 'dev']],
+    port: 3061,
+    health: '/health',
+  },
+  'paperclip': {
+    command: ['pnpm', ['dev']],
+    port: 3705,
+    health: '/health',
   },
 };
 
