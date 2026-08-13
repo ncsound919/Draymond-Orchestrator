@@ -105,27 +105,29 @@ describe('skill-packs', () => {
     expect(result.names).toEqual([
       'marketing_draft', 'social_post', 'email_report', 'lead_pulse', 'vibe_ui_gen',
       'book_grounded_research', 'book_to_skill_distill', 'book_synthesis_personal',
-      'github_pull', 'on_device_ops',
+      'github_pull', 'on_device_ops', 'marketing_capture', 'marketing_post',
+      'marketing_queue_review',
     ]);
     const all = await listSkillPacks();
     const names = new Set(all.map((p) => p.name));
     for (const n of ['marketing_draft', 'social_post', 'email_report', 'lead_pulse', 'vibe_ui_gen',
-      'book_grounded_research', 'book_to_skill_distill', 'book_synthesis_personal', 'github_pull', 'on_device_ops']) {
+      'book_grounded_research', 'book_to_skill_distill', 'book_synthesis_personal', 'github_pull', 'on_device_ops',
+      'marketing_capture', 'marketing_post', 'marketing_queue_review']) {
       expect(names.has(n)).toBe(true);
     }
   });
 
-  it('seeds idempotently — a second run still yields 10 packs', async () => {
+  it('seeds idempotently — a second run still yields 13 packs', async () => {
     await seedSkillPacks();
     await seedSkillPacks();
     const all = await listSkillPacks();
-    expect(all).toHaveLength(10);
+    expect(all).toHaveLength(13);
   });
 
   it('seeds packs as approved', async () => {
     await seedSkillPacks();
     const all = await listSkillPacks();
-    expect(all).toHaveLength(10);
+    expect(all).toHaveLength(13);
     for (const pack of all) {
       expect(pack.review_status).toBe('approved');
     }
@@ -138,5 +140,18 @@ describe('skill-packs', () => {
     expect(pack?.tools).toEqual(
       expect.arrayContaining(['phone_control', 'capture', 'text', 'llm', 'notify', 'ai_apps'])
     );
+  });
+
+  it('seeds the marketing capture/post/review packs with phone tools', async () => {
+    await seedSkillPacks();
+    const capture = await getSkillPack('marketing_capture', '1.0.0');
+    expect(capture).not.toBeNull();
+    expect(capture?.tools).toEqual(
+      expect.arrayContaining(['phone_control', 'capture', 'capture_to_smd', 'outputs'])
+    );
+    const post = await getSkillPack('marketing_post', '1.0.0');
+    expect(post?.tools).toEqual(expect.arrayContaining(['phone_control', 'capture']));
+    const review = await getSkillPack('marketing_queue_review', '1.0.0');
+    expect(review?.tools).toEqual(expect.arrayContaining(['smd_queue', 'outputs']));
   });
 });

@@ -212,6 +212,44 @@ export async function seedSkillPacks(): Promise<SeedSkillPacksResult> {
       platforms: ['android'],
       outputs: ['task_result', 'screenshot_ref'],
     },
+    {
+      name: 'marketing_capture',
+      version: '1.0.0',
+      purpose: 'Capture real in-app marketing content from the phone (competitor posts, saved drafts, platform UI) for the content pipeline.',
+      triggers: ['capture content', 'grab post', 'capture competitor', 'save screen', 'capture for marketing', 'content capture'],
+      instructions:
+        'Use phone_control to open the target app (Instagram/X/TikTok/notes), read_screen to find the target ' +
+        'content, then capture a screenshot. Upload the screenshot reference to the SMD media store so the ' +
+        'marketing chain can reuse it. Report the captured screen text + screenshot reference back.',
+      tools: ['phone_control', 'capture', 'capture_to_smd', 'outputs'],
+      platforms: ['android'],
+      outputs: ['screen_text', 'screenshot_ref', 'smd_ref'],
+    },
+    {
+      name: 'marketing_post',
+      version: '1.0.0',
+      purpose: 'Post an approved marketing draft through the real phone app with user confirmation.',
+      triggers: ['post approved draft', 'publish on phone', 'post to instagram', 'post to x from phone'],
+      instructions:
+        'Open the target phone app, wait for the UI, type the approved draft into the composer, and ' +
+        'tap publish. The confirmation gate will prompt the user before any tap/type — do not bypass it. ' +
+        'Capture the resulting post screenshot and report it back.',
+      tools: ['phone_control', 'capture', 'outputs'],
+      platforms: ['android'],
+      outputs: ['post_confirmation', 'screenshot_ref'],
+    },
+    {
+      name: 'marketing_queue_review',
+      version: '1.0.0',
+      purpose: 'Pull the SMD publish queue and review pending posts for human approval.',
+      triggers: ['review queue', 'pending posts', 'approve posts', 'check publish queue', 'queue review'],
+      instructions:
+        'Fetch the SMD publish queue via the smd_queue tool, list pending posts with their text and ' +
+        'platforms, and present them for the user to approve or reject. Report the decisions back.',
+      tools: ['smd_queue', 'outputs'],
+      platforms: [],
+      outputs: ['queue_snapshot', 'decisions'],
+    },
   ];
   const result: SeedSkillPacksResult = {
     seeded: 0,

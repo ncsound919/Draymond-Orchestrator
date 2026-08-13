@@ -691,6 +691,28 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     tags: ['books', 'pipeline', 'skills', 'research'],
     category: 'research',
   },
+
+  // ── Open-Chat Worker (marketing phone arm) ───────────────────────────
+  // The boss-side handle for the Open-Chat remote worker. Actions enqueue
+  // skill-pack tasks (marketing_capture, marketing_post, queue_review) that
+  // Open Chat pulls and executes on the phone.
+  {
+    name: 'Open-Chat Worker',
+    slug: 'open-chat-worker',
+    kind: 'service',
+    description:
+      'Draymond handle for the Open-Chat phone worker. Enqueues marketing skill-pack tasks (capture, post, queue review) that Open Chat executes on-device.',
+    invocation_method: 'internal',
+    invocation_config: {},
+    capabilities: [
+      'enqueue_worker_task',
+      'marketing_capture',
+      'marketing_post',
+      'queue_review',
+    ],
+    tags: ['worker', 'open-chat', 'marketing', 'phone'],
+    category: 'marketing',
+  },
 ];
 
 // ============================================================================
@@ -1459,6 +1481,32 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
         output_key: 'generated_skill',
         step_order: 3,
         depends_on_indices: [0],
+      },
+    ],
+  },
+
+  // ── Chain 12: Marketing Content Capture ──────────────────────────────
+  // Open-Chat phone arm: enqueues a marketing_capture worker task so the phone
+  // grabs real in-app content (competitor posts, drafts, platform UI) and feeds
+  // it to the content pipeline.
+  {
+    name: 'Marketing Content Capture',
+    slug: 'marketing-content-capture',
+    description:
+      'Queue an Open-Chat phone task that captures in-app marketing content (screenshots + screen text) into the SMD media store for reuse by the content pipeline.',
+    steps: [
+      {
+        name: 'Queue Phone Capture',
+        entitySlug: 'open-chat-worker',
+        action: 'enqueue_capture',
+        input_mapping: {
+          skill_pack_id: 'marketing_capture:1.0.0',
+          app: '$.input.app',
+          prompt: '$.input.prompt',
+        },
+        output_key: 'capture_task',
+        step_order: 1,
+        depends_on_indices: [],
       },
     ],
   },

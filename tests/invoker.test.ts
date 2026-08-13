@@ -255,6 +255,22 @@ describe('invokeEntity webhook / internal / manual / python_module', () => {
     expect(result.output.status).toBe('internal');
   });
 
+  it('open-chat-worker enqueue_capture queues a marketing worker task', async () => {
+    vi.doMock('../src/lib/draymond/worker-tasks', () => ({
+      enqueueWorkerTask: async () => 'task-1',
+    }));
+    // Re-import the invoker so the mocked worker-tasks module is used.
+    const mod = await import('../src/lib/draymond/invoker');
+    const result = await mod.invokeEntity(
+      entity({ slug: 'open-chat-worker', invocation_method: 'internal' }),
+      'enqueue_capture',
+      { app: 'instagram', prompt: 'capture reels' },
+    );
+    expect(result.success).toBe(true);
+    expect(result.output).toMatchObject({ queued: true, skill_pack_id: 'marketing_capture:1.0.0' });
+    expect(result.output.task_id).toBe('task-1');
+  });
+
   it('manual returns a manual_required marker', async () => {
     const result = await invokeEntity(entity({ invocation_method: 'manual' }), 'x', {});
     expect(result.success).toBe(true);

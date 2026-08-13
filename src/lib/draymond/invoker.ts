@@ -82,7 +82,7 @@ export async function invokeEntity(
       case 'webhook':
         return invokeWebhook(entity, input, options);
       case 'internal':
-        return invokeInternal(entity);
+        return invokeInternal(entity, action, input);
       case 'manual':
         return invokeManual(entity);
       case 'python_module':
@@ -702,9 +702,50 @@ async function invokeWebhook(
 
 /**
  * Internal entities are built-in tools that don't require remote invocation.
- * Returns immediately with a status marker.
+ *
+ * `open-chat-worker` actions enqueue skill-pack tasks into the worker queue so
+ * the Open-Chat phone arm picks them up (marketing capture / post / review).
+ * Everything else returns a status marker immediately.
  */
-function invokeInternal(entity: EntityForInvocation): Promise<InvocationResult> {
+async function invokeInternal(
+  entity: EntityForInvocation,
+  action: string,
+  input: Record<string, unknown>,
+): Promise<InvocationResult> {
+  const start = Date.now();
+
+  if (entity.slug === 'open-chat-worker' && action === 'enqueue_capture') {
+    try {
+      const { enqueueWorkerTask } = await import('./worker-tasks');
+      const skillPackId =
+        typeof input.skill_pack_id === 'string'
+          ? input.skill_pack_id
+          : 'marketing_capture:1.0.0';
+      const app = typeof input.app === 'string' ? input.app : '';
+      const prompt = typeof input.prompt === 'string' ? input.prompt : '';
+      const taskId = await enqueueWorkerTask({
+        skill_pack_id: skillPackId,
+        payload: {
+          app,
+          prompt,
+          source: 'marketing-content-capture',
+        },
+      });
+      return {
+        success: true,
+        output: { task_id: taskId, skill_pack_id: skillPackId, queued: true },
+        duration_ms: Date.now() - start,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        output: {},
+        error: err instanceof Error ? err.message : String(err),
+        duration_ms: Date.now() - start,
+      };
+    }
+  }
+
   return Promise.resolve({
     success: true,
     output: {

@@ -57,7 +57,7 @@ describe('book-to-skill pipeline (e2e)', () => {
 
   it('seeds the github_pull + book skill packs for worker dispatch', async () => {
     const result = await seedSkillPacks();
-    expect(result.seeded).toBe(10);
+    expect(result.seeded).toBe(13);
     for (const n of ['github_pull', 'book_grounded_research', 'book_to_skill_distill', 'book_synthesis_personal', 'on_device_ops']) {
       expect(result.names).toContain(n);
     }
