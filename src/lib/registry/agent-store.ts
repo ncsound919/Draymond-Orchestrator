@@ -15,17 +15,34 @@ const REGISTRY_FILE = path.join(REGISTRY_DIR, 'registry.json');
 const AVATAR_DIR = path.join(process.cwd(), 'public', 'avatars');
 
 /**
+ * Memoised avatar-existence check. The previous implementation ran a sync
+ * existsSync + statSync per agent on EVERY roster request (48+ stat calls
+ * per hit), which dominated the latency of /api/v1/agents and
+ * /api/registry/agents. Results are cached per avatar path and invalidated
+ * after AVATAR_CACHE_TTL_MS so a re-upload becomes visible within one TTL.
+ */
+const AVATAR_CACHE_TTL_MS = Number(process.env.DRAYMOND_AVATAR_CACHE_TTL_MS ?? 30000);
+const avatarCache = new Map<string, { real: boolean; at: number }>();
+
+/**
  * True when the agent has a real portrait file (not the 533-byte default
  * placeholder). Used to sort the roster so piced agents float to the top.
  */
 export function hasRealAvatar(agent: Pick<RegisteredAgent, 'avatarUrl'>): boolean {
   if (!agent.avatarUrl) return false;
-  try {
-    const file = path.join(AVATAR_DIR, path.basename(agent.avatarUrl));
-    return existsSync(file) && statSync(file).size > 1024;
-  } catch {
-    return false;
+  const file = path.join(AVATAR_DIR, path.basename(agent.avatarUrl));
+  const cached = avatarCache.get(file);
+  if (cached && Date.now() - cached.at < AVATAR_CACHE_TTL_MS) {
+    return cached.real;
   }
+  let real = false;
+  try {
+    real = existsSync(file) && statSync(file).size > 1024;
+  } catch {
+    real = false;
+  }
+  avatarCache.set(file, { real, at: Date.now() });
+  return real;
 }
 
 interface RegistryStore {
@@ -53,12 +70,37 @@ function withLock<T>(fn: () => Promise<T>): Promise<T> {
   return result;
 }
 
+/**
+ * TTL read-cache for the on-disk registry. Reads and JSON.parse of the full
+ * registry (179KB+) used to run on every /api/v1/agents and /api/registry/*
+ * request — the hottest fleet endpoints. The cache is invalidated on any
+ * write, so a fresh read happens at most once per READ_TTL_MS during steady
+ * state. Set READ_TTL_MS = 0 to disable caching entirely.
+ */
+const READ_TTL_MS = Number(process.env.DRAYMOND_REGISTRY_CACHE_TTL_MS ?? 5000);
+let _readCache: { store: RegistryStore; at: number } | null = null;
+
 async function ensureDir(): Promise<void> {
   await fs.mkdir(REGISTRY_DIR, { recursive: true });
 }
 
 async function readStore(): Promise<RegistryStore> {
   await ensureDir();
+  const now = Date.now();
+  if (_readCache && now - _readCache.at < READ_TTL_MS) {
+    return _readCache.store;
+  }
+  const store = await readStoreFromDisk();
+  if (READ_TTL_MS > 0) _readCache = { store, at: now };
+  return store;
+}
+
+async function invalidateReadCache(): Promise<void> {
+  _readCache = null;
+  _agentsListCache = null;
+}
+
+async function readStoreFromDisk(): Promise<RegistryStore> {
   try {
     const raw = await fs.readFile(REGISTRY_FILE, 'utf-8');
     const parsed: unknown = JSON.parse(raw);
@@ -99,16 +141,26 @@ async function writeStore(store: RegistryStore): Promise<void> {
   await ensureDir();
   store.updatedAt = new Date().toISOString();
   await fs.writeFile(REGISTRY_FILE, JSON.stringify(store, null, 2), 'utf-8');
+  await invalidateReadCache();
 }
 
 // ── Agents ───────────────────────────────────────────────────────────────────
 
+let _agentsListCache: { agents: RegisteredAgent[]; at: number } | null = null;
+const AGENTS_LIST_TTL_MS = Number(process.env.DRAYMOND_AGENTS_LIST_TTL_MS ?? 10000);
+
 export async function getAllAgents(): Promise<RegisteredAgent[]> {
+  const now = Date.now();
+  if (_agentsListCache && now - _agentsListCache.at < AGENTS_LIST_TTL_MS) {
+    return _agentsListCache.agents;
+  }
   const agents = (await readStore()).agents;
   // Piced agents first, stable within each group.
-  return [...agents].sort(
+  const sorted = [...agents].sort(
     (a, b) => Number(hasRealAvatar(b)) - Number(hasRealAvatar(a))
   );
+  if (AGENTS_LIST_TTL_MS > 0) _agentsListCache = { agents: sorted, at: now };
+  return sorted;
 }
 
 export async function getAgentBySlug(slug: string): Promise<RegisteredAgent | null> {

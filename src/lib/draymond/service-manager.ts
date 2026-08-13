@@ -109,6 +109,16 @@ const START_MAP: Record<string, { command: [string, string[]]; port: number; hea
     port: 4000,
     health: '/api/health',
   },
+  'grader': {
+    command: ['npm', ['run', 'dev']],
+    port: 3201,
+    health: '/api/health',
+  },
+  'agent-browser': {
+    command: ['npm', ['run', 'dev', '--', '-p', '3700']],
+    port: 3700,
+    health: '/api/health',
+  },
   'bet-buddy': {
     command: ['node', ['dist/server.js']],
     port: 3001,

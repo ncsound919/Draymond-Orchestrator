@@ -375,6 +375,7 @@ CREATE INDEX IF NOT EXISTS idx_draymond_entities_slug ON draymond_entities(slug)
 CREATE INDEX IF NOT EXISTS idx_draymond_entities_kind ON draymond_entities(kind);
 CREATE INDEX IF NOT EXISTS idx_draymond_entities_category ON draymond_entities(category);
 CREATE INDEX IF NOT EXISTS idx_draymond_entities_active ON draymond_entities(is_active) WHERE is_active = 1;
+CREATE INDEX IF NOT EXISTS idx_draymond_entities_created ON draymond_entities(created_at DESC);
 
 CREATE TABLE IF NOT EXISTS draymond_chains (
   id TEXT PRIMARY KEY,
@@ -408,6 +409,7 @@ CREATE TABLE IF NOT EXISTS draymond_chains (
 CREATE INDEX IF NOT EXISTS idx_draymond_chains_slug ON draymond_chains(slug);
 CREATE INDEX IF NOT EXISTS idx_draymond_chains_status ON draymond_chains(status);
 CREATE INDEX IF NOT EXISTS idx_draymond_chains_template ON draymond_chains(is_template) WHERE is_template = 1;
+CREATE INDEX IF NOT EXISTS idx_draymond_chains_created ON draymond_chains(created_at DESC);
 
 CREATE TABLE IF NOT EXISTS draymond_chain_steps (
   id TEXT PRIMARY KEY,
