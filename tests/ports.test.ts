@@ -50,7 +50,7 @@ describe('tool port registry', () => {
     // RepoRank's real health route is GET /health (its API app serves it at the
     // root, not /api/health).
     expect(toolHealthUrl('reporank')).toBe('http://localhost:3200/health');
-    expect(toolHealthUrl('agent-browser')).toBe('http://localhost:3700/api/health');
+    expect(toolHealthUrl('agent-browser')).toBe('http://localhost:3700/api/system/health');
     // stdio-only tools have no HTTP URL
     expect(toolUrl('ufc-mcp')).toBeNull();
     expect(toolHealthUrl('ufc-mcp')).toBeNull();

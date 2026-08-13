@@ -74,7 +74,7 @@ export const TOOL_PORTS: ToolPort[] = [
   // ── Orchestration backends ───────────────────────────────────────────────
   { slug: 'big-homie', name: 'Big Homie', category: 'orchestration', port: 3500, env: 'BIG_HOMIE_URL', health: '/health', start: 'uvicorn big_homie_web:app --port 3500', notes: 'LLM agent backend / quality gate.' },
   { slug: 'vibeserve', name: 'VibeServe', category: 'orchestration', port: 3600, env: 'VIBESERVE_URL', health: '/health', cwd: 'agents/VibeServe-main', start: 'python -m vibeserve', notes: 'FastMCP tool router (stdio; 3600 is its optional HTTP bridge). Moved off 8000.' },
-  { slug: 'agent-browser', name: 'AgentBrowser', category: 'orchestration', port: 3700, env: 'AGENTBROWSER_URL', health: '/api/health', cwd: 'agents/AgentBrowser-main', start: 'npm run dev -- -p 3700', notes: 'Playwright browser automation + ecosystem gateway. Moved off 3000 (Overlay Justice / HempForge).' },
+  { slug: 'agent-browser', name: 'AgentBrowser', category: 'orchestration', port: 3700, env: 'AGENTBROWSER_URL', health: '/api/system/health', cwd: 'agents/AgentBrowser-main', start: 'npm run dev -- -p 3700', notes: 'Playwright browser automation + ecosystem gateway + Overlay365 QA harness (/api/testing). Moved off 3000 (Overlay Justice / HempForge).' },
   { slug: 'paperclip', name: 'Paperclip', category: 'orchestration', port: 3705, env: 'PAPERCLIP_URL', health: '/health', cwd: '04_Integrations/paperclip', start: 'pnpm dev', notes: 'Team-of-agents orchestration server + React UI (org charts, budgets, governance, goal alignment). Backs the ext-paperclip extension.' },
 
   // ── Hermes / mission brain ───────────────────────────────────────────────
