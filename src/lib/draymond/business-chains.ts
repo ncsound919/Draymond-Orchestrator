@@ -74,18 +74,20 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     kind: 'agent',
     description:
       'General-purpose automation agent (Hermes fork). 52+ tools including Sub Team CPU pipeline (5 tools), MegaCode code completion (3 tools), terminal, browser, file ops, web research, delegation, and multi-agent coordination. 193+ skills across superpowers, Claude/CCE, and domain-specific catalogs. Served via batch_server.py.',
-    invocation_method: 'api_call',
-    invocation_config: {
-      url: agentUrl('UPLIFT_BASE_URL', 'http://localhost:8000'),
-      health_url: `${agentUrl('UPLIFT_BASE_URL', 'http://localhost:8000')}/health`,
-      endpoints: {
-        batch: '/batch',
-        batch_multi: '/batch/multi',
-        task_status: '/task/{id}',
-        session: '/session/{id}',
-        audit: '/audit',
+      invocation_method: 'http_api',
+      invocation_config: {
+        url: agentUrl('UPLIFT_BASE_URL', 'http://localhost:8000'),
+        health_url: `${agentUrl('UPLIFT_BASE_URL', 'http://localhost:8000')}/health`,
+        endpoints: {
+          default: { path: '/task', method: 'POST' },
+          chat: { path: '/task', method: 'POST' },
+          task: { path: '/task', method: 'POST' },
+          batch: { path: '/task', method: 'POST' },
+          batch_multi: { path: '/batch/multi', method: 'POST' },
+          task_status: { path: '/task/{id}', method: 'GET' },
+          session: { path: '/session/{id}', method: 'GET' },
+        },
       },
-    },
     capabilities: [
       'general_automation',
       'code_execution',

@@ -76,7 +76,8 @@ function sseWorkflow(workflowId: string, update: Record<string, unknown>): strin
 async function handleEntityInvocation(
   slug: string,
   metadata: Record<string, unknown>,
-  write: (chunk: string) => Promise<void>
+  write: (chunk: string) => Promise<void>,
+  fallbackTask?: string
 ): Promise<string> {
   const entity = await getEntity(slug);
   if (!entity) {
@@ -85,7 +86,17 @@ async function handleEntityInvocation(
   }
 
   const action = (metadata.action as string) ?? 'default';
-  const input = (metadata.input as Record<string, unknown>) ?? {};
+  const input = { ...((metadata.input as Record<string, unknown>) ?? {}) };
+
+  // For a plain chat routed to an entity with no explicit action/input, hand
+  // the raw task text to the entity's default endpoint (e.g. /task) so the
+  // agent can actually answer instead of 404ing on an empty body.
+  if ((action === 'default' || action === 'chat' || action === 'task') &&
+      typeof fallbackTask === 'string' && fallbackTask.trim() &&
+      typeof input.description !== 'string') {
+    input.description = fallbackTask.trim();
+    input.task = fallbackTask.trim();
+  }
   const startMs = Date.now();
 
   try {
@@ -384,7 +395,7 @@ export async function POST(request: NextRequest) {
             };
             resultText = route.entity_slug === 'aetherdesk'
               ? await handleAetherDeskInvocation(route.entity_slug, merged, write)
-              : await handleEntityInvocation(route.entity_slug, merged, write);
+              : await handleEntityInvocation(route.entity_slug, merged, write, task);
           } else if (routeResult.should_auto_execute && route.intent === 'execute_chain' && route.chain_slug) {
             resultText = await handleChainExecution(route.chain_slug, {
               ...metadata,
