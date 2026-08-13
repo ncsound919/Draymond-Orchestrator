@@ -318,13 +318,46 @@ export async function restartService(slug: string): Promise<ServiceHealth> {
   return startService(slug);
 }
 
-/** Start a batch of known-down services (repair team uses this). */
+/** True when a service has a start recipe AND its working dir exists locally
+ * AND its deps are installed (node_modules for npm/pnpm runs). Guards the
+ * repair team against wasting start attempts on services that can never boot
+ * here (no checkout, no recipe, missing deps). */
+export function canStartService(slug: string): boolean {
+  const def = START_MAP[slug];
+  if (!def) return false;
+  const tool = TOOL_PORTS.find((t) => t.slug === slug);
+  const cwd = path.resolve(process.cwd(), CWD_OVERRIDES[slug] ?? tool?.cwd ?? '.');
+  if (!fs.existsSync(cwd)) return false;
+  const [cmd] = def.command;
+  // npm/pnpm/pnpx/npx/npm run need installed deps to boot.
+  if (cmd === 'npm' || cmd === 'pnpm' || cmd === 'pnpx' || cmd === 'npx') {
+    return fs.existsSync(path.join(cwd, 'node_modules'));
+  }
+  return true;
+}
+
+/** Down services that can actually be started locally (repair candidates). */
+export function startableDownServices(slugs: string[]): string[] {
+  return slugs.filter(canStartService);
+}
+
+/** Start a batch of known-down services (repair team uses this).
+ * Services that are already up are reported as-is; only startable ones are
+ * spawned. Unstartable slugs are reported without burning a start attempt. */
 export async function startDownServices(slugs: string[]): Promise<ServiceHealth[]> {
   const out: ServiceHealth[] = [];
   for (const slug of slugs) {
     const probe = await probeService(slug, 1500);
     if (probe.up) {
       out.push(probe);
+      continue;
+    }
+    if (!canStartService(slug)) {
+      const tool = TOOL_PORTS.find((t) => t.slug === slug);
+      out.push({
+        slug, name: tool?.name ?? slug, url: serviceUrl(slug), up: false,
+        detail: 'no startable local recipe/checkout — escalate',
+      });
       continue;
     }
     out.push(await startService(slug));

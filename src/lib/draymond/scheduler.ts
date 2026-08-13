@@ -1127,15 +1127,17 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
       if (handler === 'service_health_repair') {
         // Probe the ecosystem services; auto-start the ones that are down
         // (BookBridge, brain, hemp stack, ...). The repair team's job handler.
-        const { probeAllServices, startDownServices } = await import('./service-manager');
+        const { probeAllServices, startDownServices, startableDownServices } = await import('./service-manager');
         const all = await probeAllServices();
         const down = all.filter((s) => !s.up).map((s) => s.slug);
-        const started = await startDownServices(down.slice(0, 5));
+        const startable = startableDownServices(down);
+        const started = await startDownServices(startable.slice(0, 5));
         return {
           handler,
           checked: all.length,
           up: all.filter((s) => s.up).length,
           down,
+          startable,
           started: started.map((s) => ({ slug: s.slug, up: s.up, detail: s.detail })),
         };
       }
@@ -1373,6 +1375,34 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
   const supabase = createDraymondAdminClient();
   const results: JobRunResult[] = [];
   const recipient = getNotificationRecipient();
+
+  // ── 0. Recover stale 'running' locks ───────────────────────────────────
+  // If the process crashed while a job was mid-flight, its row stays
+  // `last_run_status = 'running'` forever and the atomic claim below (which
+  // filters `.neq('running')`) would permanently skip it. Clear locks older
+  // than the recovery threshold so the job fires on its next slot instead.
+  const staleRunningMs = Number(process.env.DRAYMOND_STALE_RUNNING_MS ?? 45 * 60 * 1000);
+  const staleCutoff = new Date(now.getTime() - staleRunningMs).toISOString();
+  try {
+    const { data: staleRunning, error: staleErr } = await supabase
+      .from('draymond_scheduled_jobs')
+      .select('id, name')
+      .eq('last_run_status', 'running')
+      .lt('last_run_at', staleCutoff);
+    if (staleErr) {
+      console.error('[Draymond Scheduler] stale-running scan failed:', staleErr.message);
+    } else if (staleRunning && staleRunning.length > 0) {
+      for (const s of staleRunning) {
+        await supabase
+          .from('draymond_scheduled_jobs')
+          .update({ last_run_status: 'failed', last_error: 'Recovered stale running lock (previous process crashed mid-run)' })
+          .eq('id', s.id);
+      }
+      console.log(`[Draymond Scheduler] recovered ${staleRunning.length} stale running lock(s): ${staleRunning.map((s: { name?: unknown }) => String(s.name ?? '')).join(', ')}`);
+    }
+  } catch (err) {
+    console.error('[Draymond Scheduler] stale-running recovery failed:', err instanceof Error ? err.message : err);
+  }
 
   // 1. Fetch candidate due jobs
   const { data: dueJobs, error: fetchError } = await supabase

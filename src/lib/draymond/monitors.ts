@@ -549,7 +549,7 @@ const LOCAL_SERVICE_DIRS: Record<string, string> = {
   'bet-buddy': 'agents/Sports-Steve-main/Bet-Buddy--main/backend',
   'social-media-dashboard': 'agents/Social-Media-Dashboard--main',
   'megacode': 'agents/Megacode-main',
-  'omni-research': 'agents/OmniResearch',
+  'omni-research': 'agents/OmniResearch-Replacement',
   'indy-music-platform': 'agents/Indy-Music',
   'overlay-chain': '01_Platforms/Overlay365',
 };

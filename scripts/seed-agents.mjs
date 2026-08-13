@@ -366,7 +366,7 @@ const AGENTS = [
       { label: 'Hardening', value: 94 },
       { label: 'Ops', value: 88 },
     ],
-    endpoint: 'http://localhost:3333',
+    endpoint: 'http://localhost:3300',
   }),
   agent({
     slug: 'mutly',
@@ -420,7 +420,7 @@ const AGENTS = [
       { label: 'Coverage', value: 91 },
       { label: 'Speed', value: 82 },
     ],
-    endpoint: 'http://localhost:3000',
+    endpoint: 'http://localhost:3201',
   }),
   agent({
     slug: 'reporank',
@@ -447,7 +447,7 @@ const AGENTS = [
       { label: 'Coverage', value: 89 },
       { label: 'Scale', value: 91 },
     ],
-    endpoint: 'http://localhost:3001',
+    endpoint: 'http://localhost:3200',
   }),
   agent({
     slug: 'youtube-shorts',
@@ -564,7 +564,7 @@ const AGENTS = [
       { label: 'Rights Accuracy', value: 90 },
       { label: 'Business Focus', value: 92 },
     ],
-    endpoint: 'http://localhost:3000',
+    endpoint: 'http://localhost:3700',
   }),
   agent({
     slug: 'bookbridge',

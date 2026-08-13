@@ -159,9 +159,9 @@ describe('disableAbsentServiceMonitors (reconcile)', () => {
     delete process.env.OMNI_RESEARCH_URL;
     delete process.env.UPLIFT_BASE_URL;
     const absent = {
-      id: 'm-omni',
-      name: 'OmniResearch Pro',
-      metadata: { slug: 'omni-research' },
+      id: 'm-indy',
+      name: 'Indy Music Platform',
+      metadata: { slug: 'indy-music-platform' },
       is_enabled: true,
     };
     const present = {
