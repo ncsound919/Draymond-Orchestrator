@@ -45,6 +45,7 @@ const CWD_OVERRIDES: Record<string, string> = {
   'open-notebook': '../04_Integrations/integrations/open-notebook',
   'stirling-pdf': '../04_Integrations/integrations/Stirling-PDF',
   'litellm': '../04_Integrations/integrations/litellm',
+  'tap919-middleman': '../06_Resources/tap919-middleman-main',
 };
 
 /**
@@ -110,6 +111,13 @@ const START_MAP: Record<string, { command: [string, string[]]; port: number; hea
     command: ['python', ['-m', 'uvicorn', 'src.ai.api:app', '--host', '127.0.0.1', '--port', '8030']],
     port: 8030,
     health: '/api/ai/health',
+  },
+  'tap919-middleman': {
+    // Metered agent gateway (E3 cash register). Budget-engine meter.ts
+    // emits UsageEvents to /internal/execute when MIDDLEMAN_URL is set.
+    command: ['python', ['-m', 'uvicorn', 'app.main:app', '--host', '0.0.0.0', '--port', '8021']],
+    port: 8021,
+    health: '/internal/ping',
   },
   'mutly': {
     command: ['npm', ['run', 'dev']],

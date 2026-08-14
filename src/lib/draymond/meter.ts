@@ -45,7 +45,7 @@ export async function meterUsage(event: UsageEvent): Promise<void> {
         input: 'metered-usage',
         params: {
           metered: true,
-          units: event.units,
+          metered_units: event.units,
           unit_type: event.unit_type,
           provider: event.provider,
           meta: event.meta ?? {},

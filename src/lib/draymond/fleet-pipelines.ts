@@ -237,12 +237,12 @@ export const FLEET_PIPELINES: FleetPipeline[] = [
       },
       {
         tool: 'tap919-middleman',
-        label: 'Metered middleware',
-        purpose: 'Observable, metered agent-to-agent/agent-to-provider calls.',
+        label: 'Metered gateway',
+        purpose: 'Metered agent gateway — billable UsageEvents to the E3 cash register.',
         kind: 'http',
-        port: 4200,
-        healthPath: '/health',
-        env: 'TAP919_URL',
+        port: 8021,
+        healthPath: '/internal/ping',
+        env: 'MIDDLEMAN_URL',
       },
       {
         tool: 'llmlingua',
