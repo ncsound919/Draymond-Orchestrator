@@ -1,0 +1,11 @@
+# ============================================================================
+# trading-agents pipeline — consolidated dependencies
+# ============================================================================
+# One requirements file for the whole trading pipeline.
+# Install:  pip install -r pipelines/trading-agents/requirements.txt
+# ============================================================================
+
+# trading-agents — LangGraph market analysis (pyproject)
+-e ../../agents/TradingAgents-main
+
+# super-tool — ad-hoc trading/marketing pipeline scripts (no package manifest)

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { proposeActions } from '../src/lib/draymond/upgrade-queue';
+import { proposeActions, failoverActionFor } from '../src/lib/draymond/upgrade-queue';
 import type { WeaknessScore } from '../src/lib/draymond/types';
 
 async function loadUpgradeQueueModule(client: unknown) {
@@ -27,6 +27,42 @@ describe('upgrade queue', () => {
   it('proposes chain config review for a failing chain', () => {
     const action = proposeActions('chain', 'chain-fail', ['50% failed steps']);
     expect(action.toLowerCase()).toContain('config');
+  });
+
+  describe('failoverActionFor (weak-agent matrix)', () => {
+    it('maps score ≥80 entity to bump_model_tier with high urgency', () => {
+      const a = failoverActionFor(100, 'entity', ['crashed']);
+      expect(a.type).toBe('bump_model_tier');
+      expect(a.urgency).toBe('high');
+      expect(a.action.toLowerCase()).toMatch(/model tier|api profile/);
+    });
+
+    it('maps 50–79 entity to reconfigure with medium urgency', () => {
+      const a = failoverActionFor(60, 'entity', ['stale']);
+      expect(a.type).toBe('reconfigure');
+      expect(a.urgency).toBe('medium');
+      expect(a.action.toLowerCase()).toContain('reconfigure');
+    });
+
+    it('maps <50 entity to monitor', () => {
+      const a = failoverActionFor(30, 'entity', ['minor']);
+      expect(a.type).toBe('monitor');
+      expect(a.urgency).toBe('low');
+    });
+
+    it('maps a down site to a restart-style high action', () => {
+      const a = failoverActionFor(90, 'site', ['down status']);
+      expect(a.type).toBe('reconfigure');
+      expect(a.urgency).toBe('high');
+      expect(a.action.toLowerCase()).toContain('restart');
+    });
+
+    it('maps failing cron/chain to a repair-team handoff', () => {
+      const cron = failoverActionFor(80, 'cron', ['last run failed']);
+      expect(cron.action.toLowerCase()).toContain('repair-team');
+      const chain = failoverActionFor(80, 'chain', ['50% failed steps']);
+      expect(chain.action.toLowerCase()).toContain('repair-team');
+    });
   });
 
   it('queues the weakest N components', async () => {
@@ -321,5 +357,55 @@ describe('upgrade queue', () => {
     };
     const { listUpgradeQueue: list } = await loadUpgradeQueueModule(supabase);
     await expect(list()).rejects.toThrow('Failed to list upgrade queue: x');
+  });
+
+  describe('reconfigureEntity (failover matrix apply)', () => {
+    it('is a no-op (fail closed) when DRAYMOND_FAILOVER_MATRIX is unset', async () => {
+      delete process.env.DRAYMOND_FAILOVER_MATRIX;
+      const supabase = { from: vi.fn() };
+      const { reconfigureEntity: reconfigure } = await loadUpgradeQueueModule(supabase);
+      await expect(reconfigure('agent-browser', 90, ['crashed'])).resolves.toBeNull();
+      expect(supabase.from).not.toHaveBeenCalled();
+    });
+
+    it('applies the matrix change to the entity when enabled', async () => {
+      vi.stubEnv('DRAYMOND_FAILOVER_MATRIX', '1');
+      const updatePayload: unknown[] = [];
+      const supabase = {
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({ data: { id: 'ent-1' }, error: null })),
+            })),
+          })),
+          update: vi.fn((payload: unknown) => {
+            updatePayload.push(payload);
+            return { eq: vi.fn(async () => ({ error: null })) };
+          }),
+        })),
+      };
+      const { reconfigureEntity: reconfigure } = await loadUpgradeQueueModule(supabase);
+      const action = await reconfigure('agent-browser', 90, ['crashed']);
+      expect(action?.type).toBe('bump_model_tier');
+      expect(updatePayload).toHaveLength(1);
+      expect(updatePayload[0]).toMatchObject({ max_retries: 5, timeout_seconds: 600, health_status: 'unknown' });
+    });
+
+    it('skips (returns null) when the entity is not found', async () => {
+      vi.stubEnv('DRAYMOND_FAILOVER_MATRIX', '1');
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const supabase = {
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+            })),
+          })),
+        })),
+      };
+      const { reconfigureEntity: reconfigure } = await loadUpgradeQueueModule(supabase);
+      await expect(reconfigure('ghost', 90, ['crashed'])).resolves.toBeNull();
+      warn.mockRestore();
+    });
   });
 });

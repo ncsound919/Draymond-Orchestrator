@@ -120,7 +120,7 @@ export async function getSystemIntel(): Promise<SystemIntel> {
     supabase.from('draymond_entities').select('name, kind, health_status, is_active').eq('is_active', true).order('name'),
     supabase.from('draymond_chains').select('name, status, started_at').order('started_at', { ascending: false }).limit(20),
     supabase.from('draymond_scheduled_jobs').select('name, cron_expression, last_run_status, last_run_at, next_run_at, is_enabled').order('name'),
-    supabase.from('draymond_site_monitors').select('name, current_status, consecutive_failures').order('name'),
+    supabase.from('draymond_site_monitors').select('name, current_status, consecutive_failures, is_enabled').order('name'),
     supabase.from('draymond_notifications').select('type, subject, status, created_at').order('created_at', { ascending: false }).limit(10),
     supabase.from('draymond_actions').select('status, action_type, description, created_at').order('created_at', { ascending: false }).limit(60),
     supabase.from('draymond_goals').select('title, status, progress_pct, horizon').order('created_at').limit(30),
@@ -137,7 +137,7 @@ export async function getSystemIntel(): Promise<SystemIntel> {
   const entities = (entitiesRes.data ?? []) as Array<{ name: string; kind: string; health_status: string }>;
   const chains = (chainsRes.data ?? []) as SystemIntel['chains']['recent'];
   const jobs = (jobsRes.data ?? []) as Array<{ name: string; cron_expression: string; last_run_status: string; last_run_at: string | null; next_run_at: string | null; is_enabled: number }>;
-  const monitors = (monitorsRes.data ?? []) as Array<{ name: string; current_status: string }>;
+  const monitors = (monitorsRes.data ?? []) as Array<{ name: string; current_status: string; is_enabled: number }>;
   const notifications = (notificationsRes.data ?? []) as Array<{ type: string; subject: string; status: string; created_at: string }>;
   const actions = (actionsRes.data ?? []) as Array<{ status: string; action_type: string; description: string }>;
   const goals = (goalsRes.data ?? []) as Array<{ title: string; status: string; progress_pct: number; horizon: string }>;
@@ -184,7 +184,10 @@ export async function getSystemIntel(): Promise<SystemIntel> {
     },
     monitors: {
       total: monitors.length,
-      down: monitors.filter((m) => m.current_status === 'down').map((m) => m.name),
+      // Only ENABLED monitors count toward "down" — disabled monitors for
+      // services not present on this machine (Bet Buddy, Indy Music, Megacode)
+      // must not drive repair escalations / brain decisions forever.
+      down: monitors.filter((m) => m.is_enabled && m.current_status === 'down').map((m) => m.name),
     },
     notifications: {
       recent: notifications.map((n) => ({ type: n.type, subject: n.subject, status: n.status })),

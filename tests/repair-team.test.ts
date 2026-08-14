@@ -2,7 +2,7 @@ import { describe, expect, it, afterAll, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { classifyFailure, assembleCrew, repairFailedJob, renderRepairReport, type RepairReport } from '../src/lib/draymond/repair-team';
+import { classifyFailure, assembleCrew, repairFailedJob, repairWeakEntity, renderRepairReport, type RepairReport } from '../src/lib/draymond/repair-team';
 
 // Hermetic env: repairFailedJob → recordRepair + recordOutcome write to the
 // file-backed .draymond registry. Without this temp dir, the test fixtures
@@ -126,5 +126,53 @@ describe('repair team', () => {
     expect(text).toContain('FIXED');
     expect(text).toContain('opencode + big-homie, reporank');
     expect(text).toContain('rewrote job_config: chain -> chain_slug');
+  });
+});
+
+describe('benchmark weakness repair (Benchmark Olympics wiring)', () => {
+  it('hands off monitor-band components without dispatching any engine', async () => {
+    const report = await repairWeakEntity({
+      component_slug: 'cand-monitor',
+      component_name: 'Healthy Candidate',
+      weakness_score: 30,
+      reasons: ['slight regression'],
+      proposed_action: 'Monitor only.',
+    });
+    expect(report.failureKind).toBe('benchmark_weak');
+    expect(report.action).toBe('handed-off');
+    expect(report.detail).toContain('monitor only');
+    expect(report.dispatch).toBeUndefined();
+  });
+
+  it('dispatches the coding crew for a weak component above the remediation band', async () => {
+    const report = await repairWeakEntity({
+      component_slug: 'cand-weak-1',
+      component_name: 'Weak Proxy',
+      weakness_score: 82,
+      reasons: ['p99 latency exceeded SLA', 'memory growth under load'],
+      proposed_action: 'Bump model tier / rotate API profile.',
+    });
+    expect(report.failureKind).toBe('benchmark_weak');
+    expect(report.jobId).toBe('benchmark:cand-weak-1');
+    expect(report.dispatch?.kind).toBe('codegen');
+    expect((report.dispatch as { engine?: string }).engine).toBe('test-mock');
+  });
+
+  it('respects the auto-fix kill switch (proposal-only, no codegen)', async () => {
+    process.env.DRAYMOND_REPAIR_BENCHMARK_ENABLED = '0';
+    try {
+      const report = await repairWeakEntity({
+        component_slug: 'cand-weak-2',
+        component_name: 'Weak Guard',
+        weakness_score: 77,
+        reasons: ['security weakness'],
+        proposed_action: 'Reconfigure invocation.',
+      });
+      expect(report.action).toBe('handed-off');
+      expect(report.detail).toContain('Auto-fix disabled');
+      expect(report.dispatch).toBeUndefined();
+    } finally {
+      delete process.env.DRAYMOND_REPAIR_BENCHMARK_ENABLED;
+    }
   });
 });

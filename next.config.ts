@@ -52,6 +52,19 @@ const nextConfig: NextConfig = {
   // better-sqlite3 is a native module — never bundle it into server builds.
   serverExternalPackages: ['better-sqlite3'],
 
+  // Keep the fleet's live agent/service dirs OUT of the standalone trace. The
+  // standalone output was previously copying these (plus their live SQLite
+  // DBs), and the running services hold open handles on them — which made
+  // `next build` fail with EBUSY while trying to clean `.next/standalone`.
+  outputFileTracingExcludes: {
+    '/': [
+      './agents/**',
+      './**/agents/**',
+      './data/**',
+      './.next/standalone/**',
+    ],
+  },
+
   // Pin the workspace root �?" a stray pnpm-lock.yaml in a parent directory
   // makes Next infer the wrong root and double the path (e.g. ./src\src\...).
   turbopack: {

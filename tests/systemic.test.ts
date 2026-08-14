@@ -198,9 +198,9 @@ describe('systemic identity + agenda', () => {
     expect(systemic.SYSTEM_AGENT_ID).toBe('draymond');
   });
 
-  it('OVERLAY365_AGENDA ships 6 goals with agents, horizons, priorities and criteria', () => {
+  it('OVERLAY365_AGENDA ships 10 goals with agents, horizons, priorities and criteria', () => {
     const agenda = systemic.OVERLAY365_AGENDA;
-    expect(agenda).toHaveLength(6);
+    expect(agenda).toHaveLength(10);
     expect(agenda.filter((g) => g.agent_id === 'draymond')).toHaveLength(2);
     for (const goal of agenda) {
       expect(['immediate', 'short_term', 'medium_term', 'long_term']).toContain(goal.horizon);
@@ -210,6 +210,7 @@ describe('systemic identity + agenda', () => {
     }
     expect(agenda.map((g) => g.title)).toContain('Knowledge graph populated');
     expect(agenda.map((g) => g.title)).toContain('Self-learning loop active');
+    expect(agenda.map((g) => g.title)).toContain('E2 B2B services revenue');
   });
 });
 
@@ -434,9 +435,9 @@ describe('seedAgenda', () => {
   it('creates every agenda goal when none exist', async () => {
     const r = await systemic.seedAgenda();
 
-    expect(r).toEqual({ created: 6, skipped: 0 });
-    expect(indexMod.createGoal).toHaveBeenCalledTimes(6);
-    expect(queriedTables.filter((t) => t === 'draymond_goals')).toHaveLength(6);
+    expect(r).toEqual({ created: 10, skipped: 0 });
+    expect(indexMod.createGoal).toHaveBeenCalledTimes(10);
+    expect(queriedTables.filter((t) => t === 'draymond_goals')).toHaveLength(10);
     expect(indexMod.createGoal).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Weekly growth strategy', agent_id: 'overlay-strategist', priority: 60 })
     );
@@ -446,7 +447,7 @@ describe('seedAgenda', () => {
     tableResults.set('draymond_goals', { data: { id: 'g1' } });
 
     const r = await systemic.seedAgenda();
-    expect(r).toEqual({ created: 0, skipped: 6 });
+    expect(r).toEqual({ created: 0, skipped: 10 });
     expect(indexMod.createGoal).not.toHaveBeenCalled();
   });
 
@@ -454,8 +455,8 @@ describe('seedAgenda', () => {
     indexMod.createGoal.mockRejectedValue(new Error('insert failed'));
 
     const r = await systemic.seedAgenda();
-    expect(r).toEqual({ created: 0, skipped: 6 });
-    expect(indexMod.createGoal).toHaveBeenCalledTimes(6);
+    expect(r).toEqual({ created: 0, skipped: 10 });
+    expect(indexMod.createGoal).toHaveBeenCalledTimes(10);
   });
 });
 
@@ -598,11 +599,11 @@ describe('interconnectSystem', () => {
     const r = await systemic.interconnectSystem();
 
     expect(r).toEqual({
-      agenda: { created: 6, skipped: 0 },
+      agenda: { created: 10, skipped: 0 },
       graph: { relations: 0 },
       consolidation: { lessons: 0, memories: 0, goalsUpdated: 0, goalProgress: [] },
     });
-    expect(indexMod.createGoal).toHaveBeenCalledTimes(6);
+    expect(indexMod.createGoal).toHaveBeenCalledTimes(10);
   });
 });
 

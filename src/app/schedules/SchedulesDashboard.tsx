@@ -7,7 +7,7 @@ import { createScheduledJob, updateScheduledJob, toggleJob, removeJob, runSchedu
 // Types
 // ---------------------------------------------------------------------------
 
-type JobRunStatus = 'never' | 'running' | 'success' | 'failed' | 'skipped';
+type JobRunStatus = 'never' | 'running' | 'success' | 'failed' | 'skipped' | 'recovered';
 type JobType = 'chain' | 'health_check' | 'notification' | 'custom';
 
 type Job = {
@@ -142,6 +142,7 @@ const STATUS_STYLES: Record<string, string> = {
   running: 'bg-blue-500/20 text-blue-400',
   never: 'bg-white/10 text-white/40',
   skipped: 'bg-yellow-500/20 text-yellow-400',
+  recovered: 'bg-purple-500/20 text-purple-300',
 };
 
 const TYPE_STYLES: Record<string, string> = {

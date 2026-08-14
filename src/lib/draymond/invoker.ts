@@ -6,7 +6,8 @@
 // in the chain execution engine with real remote/local invocations.
 // ============================================================================
 
-import { execFile } from 'child_process';
+import { execFile, execFileSync } from 'child_process';
+import { hostIsLocalServiceAllowed } from './ssrf';
 
 // ============================================================================
 // TYPES
@@ -91,10 +92,12 @@ export async function invokeEntity(
         return invokeMcpTool(entity, input, options);
       case 'mcp_stdio':
         return invokeMcpStdio(entity, action, input, options);
+      case 'pipeline':
+        return invokePipeline(entity, action, input, options);
       default:
         throw new Error(
           `Unsupported invocation method "${method}" for entity "${entity.name}" (${entity.slug}). ` +
-          `Supported methods: http_api, api_call, subprocess, cli_command, webhook, internal, manual, python_module, mcp_tool, mcp_stdio.`,
+          `Supported methods: http_api, api_call, subprocess, cli_command, webhook, internal, manual, python_module, mcp_tool, mcp_stdio, pipeline.`,
         );
     }
   } catch (err) {
@@ -108,6 +111,86 @@ export async function invokeEntity(
     }
     throw err;
   }
+}
+
+// ============================================================================
+// HANDLER: pipeline
+// ============================================================================
+
+/**
+ * Pipeline invocation — the parent agent dispatches to one of its folded
+ * tools' real runnable entrypoints via the fleet-pipelines registry.
+ *
+ * `invocation_config` shape:
+ * ```
+ * { pipeline: "<parent slug>", tool: "<folded tool id>", action?: string }
+ * ```
+ * When `tool` is omitted the pipeline's first stage runs. The resolved stage
+ * is re-dispatched as a synthetic entity (http / cli / subprocess), so a
+ * parent agent is a single dispatcher over its folded tools — never a
+ * disjointed one-off call.
+ */
+async function invokePipeline(
+  entity: EntityForInvocation,
+  action: string,
+  input: Record<string, unknown>,
+  options?: InvocationOptions,
+): Promise<InvocationResult> {
+  const start = Date.now();
+  const config = entity.invocation_config;
+  const parent = config.pipeline as string | undefined;
+  const tool = config.tool as string | undefined;
+
+  if (!parent) {
+    return failResult('invocation_config.pipeline (parent slug) is required for pipeline', Date.now() - start);
+  }
+
+  const { pipelineFor, stageFor } = await import('./fleet-pipelines');
+  const pipeline = pipelineFor(parent);
+  if (!pipeline) {
+    return failResult(`No fleet pipeline registered for parent "${parent}"`, Date.now() - start);
+  }
+
+  const target = tool
+    ? pipeline.stages.find((s) => s.tool === tool)
+    : pipeline.stages[0];
+  if (!target) {
+    return failResult(
+      tool
+        ? `Folded tool "${tool}" is not a stage of pipeline "${parent}" (stages: ${pipeline.stages.map((s) => s.tool).join(', ')})`
+        : `Pipeline "${parent}" has no stages`,
+      Date.now() - start,
+    );
+  }
+
+  const { resolveStageRun } = await import('./fleet-pipelines');
+  const run = resolveStageRun(target);
+  if (!run) {
+    return failResult(`Cannot resolve a runnable target for "${target.tool}"`, Date.now() - start);
+  }
+
+  // Re-dispatch as a synthetic entity through the matching handler so all the
+  // existing security/validation logic applies to pipeline stages too.
+  const stageEntity: EntityForInvocation = {
+    id: `${parent}:${target.tool}`,
+    name: target.label,
+    slug: target.tool,
+    kind: 'tool',
+    invocation_method: run.url ? 'http_api' : (target.kind === 'mcp' ? 'mcp_tool' : 'cli_command'),
+    invocation_config: run.url
+      ? { url: run.url }
+      : { command: run.command, args: run.args ?? [], cwd: run.cwd },
+    timeout_seconds: Math.max(30, Math.round((entity.timeout_seconds || 120) / 1)),
+  };
+
+  const stageAction = action || 'run';
+  if (run.url) {
+    return invokeHttpApi(stageEntity, stageAction, input, options);
+  }
+  if (stageEntity.invocation_method === 'mcp_tool') {
+    return invokeMcpTool(stageEntity, input, options);
+  }
+  return invokeCliCommand(stageEntity, input, options);
 }
 
 // ============================================================================
@@ -138,12 +221,40 @@ function failResult(error: string, duration_ms: number, status_code?: number): I
 }
 
 /**
+ * True when a binary is resolvable on PATH (via `where` / `which`).
+ * Used to gate `cli_command` / `subprocess` skills on their declared
+ * `invocation_config.requires` bins so the fleet never dispatches to a
+ * missing runtime.
+ */
+export function binaryOnPath(bin: string): boolean {
+  if (!bin || typeof bin !== 'string') return false;
+  try {
+    const cmd = process.platform === 'win32' ? 'where' : 'which';
+    execFileSync(cmd, [bin], { stdio: 'ignore', timeout: 5000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Check an entity's declared `requires` bins; returns the first missing one, or null. */
+function missingRequiredBin(entity: EntityForInvocation): string | null {
+  const requires = (entity.invocation_config.requires ?? []) as unknown;
+  if (!Array.isArray(requires)) return null;
+  for (const bin of requires) {
+    if (typeof bin === 'string' && !binaryOnPath(bin)) return bin;
+  }
+  return null;
+}
+
+/**
  * Validate that a URL does not point to private/internal IP ranges (SSRF protection).
  * Blocks: 127.x, 10.x, 172.16-31.x, 192.168.x, 169.254.x, [::1], localhost, 0.0.0.0
  *
  * In development (NODE_ENV !== 'production'), localhost and private IPs are
  * ALLOWED because the entire agent fleet runs locally. Set ALLOW_LOCAL_AGENTS=1
- * to explicitly allow localhost in any environment.
+ * to explicitly allow localhost in any environment, or LOCAL_SERVICE_ALLOWLIST
+ * to allow only a fixed set of trusted fleet hosts (see ssrf.ts).
  */
 function validateUrlNotPrivate(urlStr: string): { valid: boolean; error?: string } {
   let parsed: URL;
@@ -158,18 +269,13 @@ function validateUrlNotPrivate(urlStr: string): { valid: boolean; error?: string
     return { valid: false, error: `Blocked URL scheme: "${parsed.protocol}". Only http/https allowed.` };
   }
 
-  // In development or when ALLOW_LOCAL_AGENTS is set, skip private IP checks.
-  // The agent fleet runs on localhost during local development.
-  const allowLocal =
-    process.env.NODE_ENV !== 'production' ||
-    process.env.ALLOW_LOCAL_AGENTS === '1' ||
-    process.env.ALLOW_LOCAL_AGENTS === 'true';
+  const hostname = parsed.hostname.toLowerCase();
 
-  if (allowLocal) {
+  // Development mode, ALLOW_LOCAL_AGENTS, or an explicit LOCAL_SERVICE_ALLOWLIST
+  // entry bypasses the private-host checks (the agent fleet runs locally).
+  if (hostIsLocalServiceAllowed(hostname)) {
     return { valid: true };
   }
-
-  const hostname = parsed.hostname.toLowerCase();
 
   // Block localhost variants
   if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1') {
@@ -563,6 +669,16 @@ async function invokeCliCommand(
 
   if (!command) {
     return failResult('invocation_config.command is required for cli_command', Date.now() - start);
+  }
+
+  // Gate on declared required binaries (`invocation_config.requires`) — never
+  // dispatch to a missing runtime (Step 9).
+  const missingBin = missingRequiredBin(entity);
+  if (missingBin) {
+    return failResult(
+      `Required binary "${missingBin}" not found on PATH for "${entity.name}"`,
+      Date.now() - start,
+    );
   }
 
   // Split command into base + args and validate against allowlist

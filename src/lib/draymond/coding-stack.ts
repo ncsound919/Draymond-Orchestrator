@@ -73,10 +73,10 @@ export const CODING_STACK: CodingLayer[] = [
   {
     id: 'tooling',
     label: 'Tool Orchestration & Browser',
-    primary: 'composio',
-    fallback: 'agent-browser',
-    tools: ['composio', 'agent-browser'],
-    description: 'Connect external tools/APIs (Composio) and drive the browser (AgentBrowser).',
+    primary: 'agent-browser',
+    fallback: 'composio',
+    tools: ['agent-browser', 'composio', 'browser-use', 'scrapling'],
+    description: 'Drive the browser and scrape the web through one pipeline: AgentBrowser (Playwright orchestration) owns browser-use (browser engine) and scrapling (adaptive scraping) as pipeline stages; Composio connects external tools/APIs.',
   },
   {
     id: 'verify',

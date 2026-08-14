@@ -64,13 +64,13 @@ describe('serviceCatalog', () => {
 
 describe('serviceUrl', () => {
   it('builds a localhost URL from the canonical port + health path', () => {
-    expect(serviceUrl('mutly')).toBe('http://localhost:4000/api/health');
+    expect(serviceUrl('mutly')).toBe('http://localhost:4000/api/agent/public-config');
     expect(serviceUrl('opencode')).toBe('http://localhost:4096/');
   });
 
   it('prefers a full-URL env override and strips trailing slashes', () => {
     process.env.MUTLY_URL = 'https://mutly.example.com/';
-    expect(serviceUrl('mutly')).toBe('https://mutly.example.com/api/health');
+    expect(serviceUrl('mutly')).toBe('https://mutly.example.com/api/agent/public-config');
   });
 
   it('ignores env vars that are bare port numbers', () => {
@@ -88,8 +88,8 @@ describe('probeService', () => {
   it('reports up for 2xx-4xx responses', async () => {
     const r = await probeService('mutly');
     expect(r).toMatchObject({ slug: 'mutly', name: 'Mutly', up: true, detail: 'HTTP 200', statusCode: 200 });
-    expect(r.url).toBe('http://localhost:4000/api/health');
-    expect(fetchMock).toHaveBeenCalledWith('http://localhost:4000/api/health', expect.objectContaining({ redirect: 'manual' }));
+    expect(r.url).toBe('http://localhost:4000/api/agent/public-config');
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:4000/api/agent/public-config', expect.objectContaining({ redirect: 'manual' }));
   });
 
   it('treats 5xx as not healthy', async () => {
@@ -132,7 +132,7 @@ describe('probeService', () => {
     const r = await probeService('mutly');
     expect(r.up).toBe(true);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://mutly.example.com/mcp/api/health');
+    expect(url).toBe('https://mutly.example.com/mcp/api/agent/public-config');
     expect(init.method).toBe('POST');
     expect(init.headers).toMatchObject({ 'Content-Type': 'application/json', Accept: 'application/json' });
     expect(init.body).toContain('"jsonrpc":"2.0"');

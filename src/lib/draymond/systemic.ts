@@ -248,6 +248,56 @@ export interface AgendaGoal {
 export const OVERLAY365_AGENDA: AgendaGoal[] = [
   {
     agent_id: 'overlay-strategist',
+    title: 'E2 B2B services revenue',
+    description: 'Sell what is already built: Aetherdesk call center, Marketing-as-a-Service retainers, AI Web QA & uptime monitoring. Target $12k/mo (fastest revenue engine).',
+    horizon: 'immediate',
+    priority: 95,
+    success_criteria: [
+      { description: 'Aetherdesk onboarding path live and demoable', met: false },
+      { description: 'Marketing-as-a-Service retainers quoted', met: false },
+      { description: 'First 5 B2B clients onboarded', met: false },
+      { description: 'E2 MRR $12k/mo', met: false },
+    ],
+  },
+  {
+    agent_id: 'overlay-treasurer',
+    title: 'E1 Platform tier revenue',
+    description: 'Launch paid tiers on Overlay Health/Wealth/Justice; drive tier activations and settled revenue. Target $10k/mo.',
+    horizon: 'short_term',
+    priority: 85,
+    success_criteria: [
+      { description: 'Health tier live with billing', met: false },
+      { description: 'Wealth tier live (ghostfolio) with billing', met: false },
+      { description: 'Justice tier live with billing', met: false },
+      { description: 'E1 MRR $10k/mo', met: false },
+    ],
+  },
+  {
+    agent_id: 'overlay-auditor',
+    title: 'E3 Tooling & API revenue',
+    description: 'Ship security/SCA audit reports (dep-scan, nuclei, Claw-Protect) and agent-building services. Target $6k/mo.',
+    horizon: 'short_term',
+    priority: 75,
+    success_criteria: [
+      { description: 'Audit report template delivered', met: false },
+      { description: 'First paid security audit', met: false },
+      { description: 'E3 MRR $6k/mo', met: false },
+    ],
+  },
+  {
+    agent_id: 'overlay-strategist',
+    title: 'E4 Vertical product revenue',
+    description: 'Monetize music rights registration, sports intel, wealth insights, knowledge subscriptions, writing/publishing. Target $5k/mo.',
+    horizon: 'medium_term',
+    priority: 65,
+    success_criteria: [
+      { description: 'First music rights registration client', met: false },
+      { description: 'Sports intel subscription waitlist live', met: false },
+      { description: 'E4 MRR $5k/mo', met: false },
+    ],
+  },
+  {
+    agent_id: 'overlay-strategist',
     title: 'Weekly growth strategy',
     description: 'Strategist runs bi-weekly product/growth analysis; produce recommendations that feed the marketing pipeline.',
     horizon: 'short_term',
@@ -522,14 +572,22 @@ export async function interconnectSystem(): Promise<{
 // interconnectSystem / ingestEvent are untouched.
 
 /**
- * Boot the cognition daemons: start Kairos and recover ultraplans stuck in
- * `planning` from a previous crash. Called from instrumentation.ts.
+ * Boot the cognition daemons: start Kairos, recover ultraplans stuck in
+ * `planning` from a previous crash, and start the discovery-loop daemon so
+ * autonomous research + repair-team auto-fixing run continuously while
+ * Draymond is live. Called from instrumentation.ts.
  */
 export async function startCognition(): Promise<void> {
   const { startKairos } = await import('./kairos');
   startKairos();
   const { recoverStuckUltraplans } = await import('./ultraplan');
   await recoverStuckUltraplans().catch(() => {});
+  try {
+    const { startDiscoveryLoopDaemon } = await import('./discovery-loop-daemon');
+    startDiscoveryLoopDaemon();
+  } catch (err) {
+    console.warn('[cognition] discovery-loop daemon skipped:', err instanceof Error ? err.message : err);
+  }
 }
 
 /** Delegate to the AutoDream cycle (self-gating, never rejects). */

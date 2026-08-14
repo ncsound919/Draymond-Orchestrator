@@ -30,8 +30,8 @@ export interface ServiceHealth {
 /** Canonical repo-root-relative working dir per slug (overrides ports.ts cwd). */
 const CWD_OVERRIDES: Record<string, string> = {
   'bookbridge': 'agents/BookBridge--main',
-  'hemp-os': 'potential/Hemp-OS-main',
-  'hempforge': 'potential/HempForge-main',
+  'hemp-os': '../potential/Hemp-OS-main',
+  'hempforge': '../potential/HempForge-main',
   'deterministic-brain': 'agents/deterministic-brain',
   'opencode': '.',
   'sports-steve': 'agents/Sports-Steve-main',
@@ -40,6 +40,11 @@ const CWD_OVERRIDES: Record<string, string> = {
   'bet-buddy': 'agents/Sports-Steve-main/Bet-Buddy--main/backend',
   'uplift-agent': 'agents/Uplift-Agent',
   'omni-research': 'agents/OmniResearch-Replacement',
+  'phoenix': '../04_Integrations/integrations/phoenix',
+  'generative-video-ai': '../04_Integrations/integrations/Generative-Video-AI',
+  'open-notebook': '../04_Integrations/integrations/open-notebook',
+  'stirling-pdf': '../04_Integrations/integrations/Stirling-PDF',
+  'litellm': '../04_Integrations/integrations/litellm',
 };
 
 /**
@@ -61,16 +66,18 @@ const START_MAP: Record<string, { command: [string, string[]]; port: number; hea
     health: '/api/health',
   },
   'deterministic-brain': {
-    command: ['python', ['main.py', '--serve']],
+    // Full boot (soul + learning loop + cron chains + KAIROS + swarm worker +
+    // server). main.py --serve only runs the API — the brain's own automation
+    // (26 cron chains from skill_chains.yaml) would never fire. Canonical port
+    // is 3210 (ports.ts); PM2 owns it under ecosystem.brain.config.js, so a
+    // service-manager start is only a fallback when PM2 is down.
+    command: ['python', ['startup.py']],
     port: 3210,
     health: '/health',
-    // main.py defaults to API_PORT=8000 (the Uplift Agent's port). The brain
-    // MUST boot on its canonical 3210 or it squats on uplift-agent and every
-    // BRAIN_URL probe fails.
     env: { API_PORT: '3210', UVICORN_WORKERS: '1' },
   },
   'hemp-os': {
-    command: ['python', ['main.py', '--serve']],
+    command: ['node', ['--import', 'tsx', 'server.ts']],
     port: 3100,
     health: '/health',
   },
@@ -130,6 +137,12 @@ const START_MAP: Record<string, { command: [string, string[]]; port: number; hea
     health: '/api/health',
     env: { CLAW_PORT: '3300', CLAW_SERVE_SAAS: 'false' },
   },
+  'system-agent': {
+    command: ['node', [path.join('node_modules', '.bin', 'tsx'), 'src/server.ts']],
+    port: 3405,
+    health: '/api/health',
+    env: { SYSTEM_AGENT_PORT: '3405' },
+  },
   'cai': {
     // CAI is Unix-only (termios REPL). Run via the WSL Ubuntu venv (native-fs ~/.venvs/cai-wsl, git source ~/cai-src).
     // Installed: uv pip install --python ~/.venvs/cai-wsl/bin/python -e ~/cai-src
@@ -157,6 +170,33 @@ const START_MAP: Record<string, { command: [string, string[]]; port: number; hea
     command: ['pnpm', ['dev']],
     port: 3705,
     health: '/health',
+  },
+  'phoenix': {
+    command: ['python', ['-m', 'phoenix.server.main', 'serve', '--port', '6006']],
+    port: 6006,
+    health: '/health',
+    env: { PHOENIX_PORT: '6006' },
+  },
+  'generative-video-ai': {
+    command: ['npm', ['run', 'dev', '--', '-p', '8055']],
+    port: 8055,
+    health: '/',
+  },
+  'open-notebook': {
+    command: ['python', ['-m', 'uvicorn', 'api.main:app', '--host', '127.0.0.1', '--port', '3030']],
+    port: 3030,
+    health: '/',
+  },
+  'stirling-pdf': {
+    command: ['docker', ['run', '-d', '-p', '8080:8080', 'frooodle/s-pdf:latest']],
+    port: 8080,
+    health: '/',
+  },
+  'litellm': {
+    command: ['litellm', ['--config', 'litellm.yaml', '--port', '4100']],
+    port: 4100,
+    health: '/health',
+    env: { LITELLM_PORT: '4100' },
   },
 };
 

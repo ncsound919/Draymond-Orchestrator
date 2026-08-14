@@ -110,3 +110,15 @@ sessions/
 
 # Hermes api_server local secrets
 API_SERVER_KEY
+
+# hermes-proxy runtime artifacts
+hermes-proxy/media/
+hermes-proxy/voice-proxy.log
+hermes-proxy/*.log
+hermes-proxy/__pycache__/
+
+# hermes-proxy deps
+hermes-proxy/node_modules/
+
+# Temp debug scripts
+q-tmp.cjs

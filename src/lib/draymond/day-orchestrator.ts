@@ -29,7 +29,7 @@ export interface OrchestrationStep {
 
 export const DAY_FLOW: OrchestrationStep[] = [
   // ── Morning — data in, then deliver ─────────────────────────────────────
-  { id: 'sec-scan', phase: 'morning', time: '05:00', job: 'supply-chain-health', purpose: 'Dependency/SCA scan', feedsTo: ['overlay-auditor'] },
+  { id: 'sec-scan', phase: 'morning', time: '05:00', job: 'depscan', purpose: 'Dependency/SCA scan', feedsTo: ['overlay-auditor'] },
   { id: 'news', phase: 'morning', time: '06:00', job: 'ingest_news', purpose: 'Current events into the fleet', feedsTo: ['overlay-strategist', 'omniresearch-pro'] },
   { id: 'market', phase: 'morning', time: '07:00', job: 'fetch_market_data', purpose: 'Crypto + papers snapshot', feedsTo: ['overlay-treasurer', 'trading-agents', 'ghostfolio-engine', 'sports-steve'] },
   { id: 'qa', phase: 'morning', time: '07:00', job: 'run_overlay_qa', purpose: 'Site integrity pass', feedsTo: ['overlay-auditor'] },
@@ -42,6 +42,9 @@ export const DAY_FLOW: OrchestrationStep[] = [
   { id: 'repair', phase: 'midday', time: ':15', job: 'self_repair_check', purpose: 'Auto-repair failures / escalate' },
   { id: 'bmk', phase: 'midday', time: '13:00', job: 'benchmark_chains', purpose: 'Benchmark chain health', feedsTo: ['deterministic-brain'] },
   { id: 'marketing', phase: 'midday', time: '10:00', job: 'marketing-pulse', purpose: 'Content + pipeline top-of-funnel' },
+  { id: 'media', phase: 'midday', time: '10:30', job: 'generative-video-ai', purpose: 'Media pipeline (shorts → episodes → studio)', feedsTo: ['social-media-dashboard'] },
+  { id: 'web', phase: 'midday', time: '11:00', job: 'agent-browser', purpose: 'Web automation pipeline (browser → scrape → QA)' },
+  { id: 'knowledge', phase: 'night', time: '02:20', job: 'bookbridge', purpose: 'Knowledge pipeline (library → synthesis → vector → memory)' },
   // ── Evening — prepare next day ──────────────────────────────────────────
   { id: 'eve-marketing', phase: 'evening', time: '20:00', job: 'marketing-pulse', purpose: 'Build next-day marketing tools' },
   // ── Night — learn + build while idle ────────────────────────────────────

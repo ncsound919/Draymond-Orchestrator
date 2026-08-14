@@ -27,6 +27,16 @@ const SCHEMA_UPGRADES: Array<{ table: string; column: string; ddl: string }> = [
     column: 'deep_scores',
     ddl: 'ALTER TABLE draymond_benchmarks ADD COLUMN deep_scores TEXT NOT NULL DEFAULT \'{}\'',
   },
+  {
+    table: 'draymond_scheduled_jobs',
+    column: 'lease_expires_at',
+    ddl: 'ALTER TABLE draymond_scheduled_jobs ADD COLUMN lease_expires_at TEXT',
+  },
+  {
+    table: 'draymond_chains',
+    column: 'lease_expires_at',
+    ddl: 'ALTER TABLE draymond_chains ADD COLUMN lease_expires_at TEXT',
+  },
 ];
 
 /**

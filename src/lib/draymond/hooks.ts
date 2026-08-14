@@ -14,6 +14,7 @@
 // ============================================================================
 
 import { createHmac, randomUUID } from 'crypto';
+import { hostIsLocalServiceAllowed } from './ssrf';
 
 // ============================================================================
 // TYPES
@@ -114,17 +115,13 @@ function validateCallbackUrl(urlStr: string): { valid: boolean; error?: string }
     return { valid: false, error: `Blocked URL scheme: "${parsed.protocol}". Only http/https allowed.` };
   }
 
-  // In development, skip private IP checks (agents run locally)
-  const allowLocal =
-    process.env.NODE_ENV !== 'production' ||
-    process.env.ALLOW_LOCAL_AGENTS === '1' ||
-    process.env.ALLOW_LOCAL_AGENTS === 'true';
+  // In development, ALLOW_LOCAL_AGENTS, or with an explicit LOCAL_SERVICE_ALLOWLIST
+  // entry, skip private IP checks (agents run locally).
+  const hostname = parsed.hostname.toLowerCase();
 
-  if (allowLocal) {
+  if (hostIsLocalServiceAllowed(hostname)) {
     return { valid: true };
   }
-
-  const hostname = parsed.hostname.toLowerCase();
 
   // Block localhost variants
   if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1') {

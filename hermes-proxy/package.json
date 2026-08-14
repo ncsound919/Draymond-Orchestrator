@@ -1,0 +1,14 @@
+{
+  "name": "hermes-gateway",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenAI-compatible proxy (port 8642) that lets Open-Chat's Hermes bot talk to DeepSeek V4 Flash.",
+  "scripts": {
+    "start": "node server.js",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.9"
+  }
+}

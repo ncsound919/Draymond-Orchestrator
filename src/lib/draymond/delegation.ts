@@ -125,10 +125,11 @@ export const DELEGATION_PLAN: DelegationSpec[] = [
   { slug: 'aetherdesk', label: 'Aetherdesk call center', phase: 'midday', window: { start: '09:00', end: '17:00' }, timeBudgetMs: 600_000, tokenBudgetPerRun: 48_000, tokenBudgetPerDay: 120_000, tier: 'flash', priority: 2, duty: 'shift' },
 
   // ── Trading / finance — market hours ────────────────────────────────────
-  { slug: 'trading-agents', label: 'TradingAgents', phase: 'midday', window: { start: '09:30', end: '16:00', days: [1, 2, 3, 4, 5] }, timeBudgetMs: 900_000, tokenBudgetPerRun: 80_000, tokenBudgetPerDay: 200_000, tier: 'pro', priority: 1, duty: 'shift' },
-  { slug: 'super-tool', label: 'Super tool (risk engine)', phase: 'midday', window: { start: '09:30', end: '16:00', days: [1, 2, 3, 4, 5] }, timeBudgetMs: 600_000, tokenBudgetPerRun: 48_000, tokenBudgetPerDay: 120_000, tier: 'flash', priority: 2, duty: 'shift' },
+  { slug: 'trading-agents', label: 'TradingAgents (+ super-tool risk engine)', phase: 'midday', window: { start: '09:30', end: '16:00', days: [1, 2, 3, 4, 5] }, timeBudgetMs: 1_500_000, tokenBudgetPerRun: 120_000, tokenBudgetPerDay: 320_000, tier: 'pro', priority: 1, duty: 'shift' },
   { slug: 'ghostfolio-engine', label: 'Ghostfolio wealth engine', phase: 'morning', timeBudgetMs: 300_000, tokenBudgetPerRun: 32_000, tokenBudgetPerDay: 64_000, tier: 'flash', priority: 2, duty: 'always-on' },
   { slug: 'overlay-treasurer', label: 'Overlay treasurer', phase: 'morning', timeBudgetMs: 300_000, tokenBudgetPerRun: 32_000, tokenBudgetPerDay: 64_000, tier: 'flash', priority: 1, duty: 'always-on' },
+  { slug: 'litellm', label: 'LiteLLM gateway (+ tap919 middleware, llmlingua)', phase: 'morning', window: { start: '00:00', end: '23:59' }, timeBudgetMs: 60_000, tokenBudgetPerRun: 8_000, tokenBudgetPerDay: 40_000, tier: 'free', priority: 1, duty: 'always-on' },
+  { slug: 'deterministic-brain', label: 'Deterministic brain', phase: 'midday', window: { start: '00:00', end: '23:59' }, timeBudgetMs: 120_000, tokenBudgetPerRun: 24_000, tokenBudgetPerDay: 120_000, tier: 'free', priority: 1, duty: 'always-on' },
 
   // ── Sports — daily + events ─────────────────────────────────────────────
   { slug: 'sports-steve', label: 'Sports Steve', phase: 'morning', window: { start: '06:00', end: '23:00' }, timeBudgetMs: 600_000, tokenBudgetPerRun: 48_000, tokenBudgetPerDay: 160_000, tier: 'flash', priority: 2, duty: 'shift' },
@@ -136,7 +137,12 @@ export const DELEGATION_PLAN: DelegationSpec[] = [
   { slug: 'sports-betting-daily', label: 'Sports betting daily', phase: 'morning', timeBudgetMs: 600_000, tokenBudgetPerRun: 64_000, tokenBudgetPerDay: 64_000, tier: 'flash', priority: 2, duty: 'shift' },
 
   // ── Science / research — deep work at night ─────────────────────────────
-  { slug: 'omniresearch-pro', label: 'OmniResearch Pro', phase: 'night', window: { start: '20:00', end: '06:00' }, timeBudgetMs: 1_800_000, tokenBudgetPerRun: 120_000, tokenBudgetPerDay: 300_000, tier: 'pro', priority: 2, duty: 'night' },
+  { slug: 'omniresearch-pro', label: 'OmniResearch Pro (+ open-notebook)', phase: 'night', window: { start: '20:00', end: '06:00' }, timeBudgetMs: 1_800_000, tokenBudgetPerRun: 120_000, tokenBudgetPerDay: 300_000, tier: 'pro', priority: 2, duty: 'night' },
+  { slug: 'bookbridge', label: 'BookBridge (+ synthesis, zvec, memagent)', phase: 'night', window: { start: '00:00', end: '06:00' }, timeBudgetMs: 600_000, tokenBudgetPerRun: 48_000, tokenBudgetPerDay: 96_000, tier: 'flash', priority: 2, duty: 'night' },
+  { slug: 'generative-video-ai', label: 'Generative Video AI (+ shorts, content engine)', phase: 'midday', window: { start: '10:00', end: '20:00' }, timeBudgetMs: 900_000, tokenBudgetPerRun: 64_000, tokenBudgetPerDay: 160_000, tier: 'flash', priority: 2, duty: 'always-on' },
+  { slug: 'agent-browser', label: 'AgentBrowser web pipeline (+ browser-use, scrapling)', phase: 'midday', window: { start: '00:00', end: '23:59' }, timeBudgetMs: 600_000, tokenBudgetPerRun: 48_000, tokenBudgetPerDay: 120_000, tier: 'flash', priority: 2, duty: 'always-on' },
+  { slug: 'ufc-mcp', label: 'File conversion pipeline (+ stirling-pdf)', phase: 'evening', window: { start: '00:00', end: '23:59' }, timeBudgetMs: 300_000, tokenBudgetPerRun: 24_000, tokenBudgetPerDay: 48_000, tier: 'free', priority: 2, duty: 'always-on' },
+  { slug: 'phoenix', label: 'Phoenix observability', phase: 'midday', window: { start: '00:00', end: '23:59' }, timeBudgetMs: 120_000, tokenBudgetPerRun: 16_000, tokenBudgetPerDay: 48_000, tier: 'free', priority: 2, duty: 'always-on' },
   { slug: 'rd_night', label: 'Night mode R&D', phase: 'night', timeBudgetMs: 1_200_000, tokenBudgetPerRun: 96_000, tokenBudgetPerDay: 96_000, tier: 'pro', priority: 2, duty: 'night' },
   { slug: 'dream_cycle', label: 'Dream cycle', phase: 'night', timeBudgetMs: 600_000, tokenBudgetPerRun: 48_000, tokenBudgetPerDay: 48_000, tier: 'flash', priority: 2, duty: 'night' },
   { slug: 'ultraplan_process', label: 'Ultraplan process', phase: 'night', timeBudgetMs: 900_000, tokenBudgetPerRun: 64_000, tokenBudgetPerDay: 64_000, tier: 'pro', priority: 2, duty: 'night' },
@@ -159,8 +165,7 @@ export const DELEGATION_PLAN: DelegationSpec[] = [
   { slug: 'code_review_check', label: 'Code review scan', phase: 'midday', timeBudgetMs: 300_000, tokenBudgetPerRun: 32_000, tokenBudgetPerDay: 32_000, tier: 'flash', priority: 3, duty: 'always-on' },
 
   // ── Security — Monday morning ───────────────────────────────────────────
-  { slug: 'supply-chain-health', label: 'Supply chain health', phase: 'morning', window: { start: '05:00', end: '10:00', days: [1] }, timeBudgetMs: 600_000, tokenBudgetPerRun: 48_000, tokenBudgetPerDay: 48_000, tier: 'flash', priority: 1, duty: 'always-on' },
-  { slug: 'depscan', label: 'Dep-scan', phase: 'morning', window: { start: '05:00', end: '10:00', days: [1] }, timeBudgetMs: 600_000, tokenBudgetPerRun: 32_000, tokenBudgetPerDay: 32_000, tier: 'free', priority: 1, duty: 'always-on' },
+  { slug: 'depscan', label: 'Dep-scan (+ supply-chain health)', phase: 'morning', window: { start: '05:00', end: '10:00', days: [1] }, timeBudgetMs: 900_000, tokenBudgetPerRun: 48_000, tokenBudgetPerDay: 80_000, tier: 'free', priority: 1, duty: 'always-on' },
   { slug: 'nuclei-scanner', label: 'Nuclei scanner', phase: 'morning', window: { start: '05:00', end: '10:00', days: [1] }, timeBudgetMs: 900_000, tokenBudgetPerRun: 48_000, tokenBudgetPerDay: 48_000, tier: 'free', priority: 1, duty: 'always-on' },
   { slug: 'overlay-auditor', label: 'Overlay auditor', phase: 'morning', timeBudgetMs: 600_000, tokenBudgetPerRun: 48_000, tokenBudgetPerDay: 96_000, tier: 'flash', priority: 1, duty: 'always-on' },
   { slug: 'overlay-guardian', label: 'Overlay guardian', phase: 'evening', timeBudgetMs: 300_000, tokenBudgetPerRun: 32_000, tokenBudgetPerDay: 64_000, tier: 'flash', priority: 1, duty: 'on-call' },

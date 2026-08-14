@@ -69,6 +69,8 @@ beforeEach(async () => {
 
 afterEach(() => {
   mockClient._tables.clear();
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
 });
 
 describe('subscription CRUD', () => {
@@ -143,6 +145,32 @@ describe('processEvent', () => {
     const result = await mod.processEvent('chain.completed', 'test', { chain_id: 'c1' });
     expect(result.triggered).toBe(1);
     expect(mockInstantiateChain).toHaveBeenCalledWith('daily', expect.anything());
+  });
+
+  it('blocks non-allowlisted localhost webhooks in production', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('LOCAL_SERVICE_ALLOWLIST', '');
+    setTable('draymond_event_subscriptions', [
+      subscription({ action_type: 'webhook', action_config: { webhook_url: 'https://localhost:9000/hook' } }),
+    ]);
+    const result = await mod.processEvent('chain.completed', 'test', { chain_id: 'c1' });
+    expect(result.matched).toBe(1);
+    expect(result.errors.length).toBe(1);
+    expect(result.errors[0]).toMatch(/private or internal/);
+  });
+
+  it('allows an allowlisted localhost webhook in production', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('LOCAL_SERVICE_ALLOWLIST', 'localhost');
+    const fetchMock = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    setTable('draymond_event_subscriptions', [
+      subscription({ action_type: 'webhook', action_config: { webhook_url: 'http://localhost:9000/hook' } }),
+    ]);
+    const result = await mod.processEvent('chain.completed', 'test', { chain_id: 'c1' });
+    expect(result.errors.length).toBe(0);
+    expect(result.triggered).toBe(1);
+    expect(fetchMock).toHaveBeenCalled();
   });
 });
 

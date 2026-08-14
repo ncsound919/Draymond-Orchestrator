@@ -17,6 +17,7 @@ import { logEvent } from './index';
 import { invokeEntity } from './invoker';
 import { getEntity } from './registry';
 import { instantiateChain, executeChain } from './chains';
+import { hostIsLocalServiceAllowed } from './ssrf';
 import type {
   EventPattern,
   EventSubscription,
@@ -456,15 +457,17 @@ async function executeSubscriptionAction(
         throw new Error(`Subscription "${sub.name}" missing webhook_url`);
       }
 
-      // SSRF guard — only allow HTTPS and block private/internal IPs
+      // SSRF guard — only allow HTTPS and block private/internal IPs. Fleet
+      // services on the LOCAL_SERVICE_ALLOWLIST are trusted and may use http.
       const url = new URL(config.webhook_url);
-      if (url.protocol !== 'https:') {
+      const hostname = url.hostname.toLowerCase();
+      const isLocalService = hostIsLocalServiceAllowed(hostname);
+      if (url.protocol !== 'https:' && !isLocalService) {
         throw new Error('Webhook URL must use HTTPS');
       }
       // Block known internal/metadata hostnames and private IP patterns
-      const hostname = url.hostname.toLowerCase();
       const blockedHosts = ['localhost', '127.0.0.1', '0.0.0.0', '169.254.169.254', 'metadata.google.internal', '[::1]'];
-      if (blockedHosts.includes(hostname) || hostname.startsWith('10.') || hostname.startsWith('192.168.') || hostname.startsWith('172.')) {
+      if (!isLocalService && (blockedHosts.includes(hostname) || hostname.startsWith('10.') || hostname.startsWith('192.168.') || hostname.startsWith('172.'))) {
         throw new Error('Webhook URL must not target private or internal addresses');
       }
 

@@ -286,6 +286,7 @@ async function dispatch(spec: ExperimentSpec): Promise<{ result: Record<string, 
 
 /**
  * Scheduler hook: drain the highest-priority ready experiment (research rotation).
+ * After draining, re-seeds the queue so science & sports keep producing.
  * Returns a summary suitable for the job runner / kairos.
  */
 export async function researchRotation(): Promise<{
@@ -300,6 +301,9 @@ export async function researchRotation(): Promise<{
   if (!spec) return { processed: 0 };
   const experiment = await runExperiment(spec);
   await dequeueExperiment(spec.id ?? experiment.experiment_id);
+  // Keep the pipeline fed: re-seed from the campaign backlog after each drain.
+  const { ensureResearchBacklog } = await import('./campaigns');
+  const backlog = await ensureResearchBacklog();
   return {
     processed: 1,
     experiment_id: experiment.experiment_id,
@@ -307,5 +311,8 @@ export async function researchRotation(): Promise<{
     status: experiment.status,
     evidence_tier: experiment.evidence_tier,
     error: experiment.error,
+    ...(backlog.seededCount > 0
+      ? { reseeded: backlog.seededCount, queue_after: backlog.queuedAfter }
+      : {}),
   };
 }

@@ -1,0 +1,15 @@
+# ============================================================================
+# litellm pipeline — consolidated dependencies
+# ============================================================================
+# One requirements file for the whole LLM-gateway pipeline.
+# Install:  pip install -r pipelines/litellm/requirements.txt
+# ============================================================================
+
+# litellm — provider gateway (pyproject; installed via uv/pip)
+-e ../../../04_Integrations/integrations/litellm
+
+# llmlingua — prompt/context compression (setup.py)
+-e ../../../04_Integrations/integrations/LLMLingua
+
+# tap919-middleman — metered gateway. Scaffolding-only checkout (no code yet);
+# no installable deps at this time.

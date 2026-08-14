@@ -1,0 +1,15 @@
+# ============================================================================
+# agent-browser pipeline — consolidated dependencies
+# ============================================================================
+# One requirements file for the whole web-automation pipeline.
+# Install:  pip install -r pipelines/agent-browser/requirements.txt
+# ============================================================================
+
+# browser-use — AI browser engine (pyproject)
+-e ../../../04_Integrations/integrations/browser-use
+
+# scrapling — adaptive web scraping (pyproject)
+-e ../../../04_Integrations/integrations/Scrapling
+
+# agent-browser orchestrator is a Next.js app — npm install in
+# agents/AgentBrowser-main (not pip).

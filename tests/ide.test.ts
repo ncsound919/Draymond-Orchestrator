@@ -326,7 +326,7 @@ describe('ide session manager', () => {
 
     const status = await execFileAsync('git', ['status', '--porcelain'], { cwd: repoDir });
     expect(status.stdout.trim()).toBe('');
-  });
+  }, 60_000);
 
   it('recovery sweep marks dead running sessions as error and records memory', async () => {
     const { createIdeSession } = await import('../src/lib/ide/session-manager');

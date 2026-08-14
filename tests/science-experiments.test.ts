@@ -119,7 +119,7 @@ describe('science experiments', () => {
     expect(mockSim.runModelById).toHaveBeenCalledWith('sports-03-biological-load', 48, {});
   });
 
-  it('researchRotation drains the highest-priority ready experiment', async () => {
+  it('researchRotation drains the highest-priority ready experiment and re-seeds the backlog', async () => {
     const { saveGoals } = await import('@/lib/science/goals');
     await saveGoals([
       { id: 'sports-03', domain: 'sports', area: 'a', title: 't', opportunity: 'o', rationale: 'r', base_weight: 1, cross_domain_value: 0.9, status: 'active', model_id: 'm3', hypothesis_ids: [] },
@@ -128,7 +128,8 @@ describe('science experiments', () => {
     const result = await researchRotation();
     expect(result.processed).toBe(1);
     expect(result.status).toBe('completed');
-    expect(await listQueuedExperiments()).toHaveLength(0);
+    // The campaign re-seeder tops the queue back up so rotation never runs dry.
+    expect(await listQueuedExperiments()).not.toHaveLength(0);
   });
 
   it('researchRotation returns processed:0 when queue is empty', async () => {

@@ -8,6 +8,64 @@
 import { createDraymondAdminClient } from './client';
 import type { ComponentClass, DeepScoreResult, UpgradeQueueItem, WeaknessScore } from './types';
 
+// ============================================================================
+// FAILOVER MATRIX — weakness score → machine-readable remediation
+// ============================================================================
+// Industry pattern (OpenClaw failover engine): convert a weakness score into a
+// concrete, auto-appliable action instead of a bare number. Bands:
+//   ≥80  → bump model tier / rotate API profile (highest urgency)
+//   50–79 → reconfigure invocation (model, endpoint, retries) + repair pass
+//   <50  → monitor only
+// The matrix is recommendation-first (fail closed): `reconfigureEntity` only
+// applies changes when DRAYMOND_FAILOVER_MATRIX=1.
+// ============================================================================
+
+export type FailoverAction =
+  | { type: 'bump_model_tier'; urgency: 'high'; action: string; change?: Record<string, unknown> }
+  | { type: 'reconfigure'; urgency: 'high' | 'medium'; action: string; change?: Record<string, unknown> }
+  | { type: 'monitor'; urgency: 'low'; action: string };
+
+export function failoverActionFor(
+  score: number,
+  componentClass: ComponentClass,
+  reasons: string[]
+): FailoverAction {
+  if (componentClass === 'entity') {
+    if (score >= 80) {
+      return {
+        type: 'bump_model_tier',
+        urgency: 'high',
+        action: 'Bump model tier / rotate API profile, then re-run the benchmark.',
+        change: { max_retries: 5, timeout_seconds: 600 },
+      };
+    }
+    if (score >= 50) {
+      return {
+        type: 'reconfigure',
+        urgency: 'medium',
+        action: 'Reconfigure entity invocation (model, endpoint, retries) and run a repair pass.',
+        change: { max_retries: 3, timeout_seconds: 450 },
+      };
+    }
+    return { type: 'monitor', urgency: 'low', action: 'Monitor only — score below remediation band.' };
+  }
+  if (componentClass === 'site' && (score >= 80 || reasons.some((r) => /down|failure|unreachable/i.test(r)))) {
+    return {
+      type: 'reconfigure',
+      urgency: 'high',
+      action: 'Restart the service and verify the health endpoint; check deployment logs.',
+    };
+  }
+  if (componentClass === 'cron' || componentClass === 'chain') {
+    return {
+      type: 'reconfigure',
+      urgency: 'medium',
+      action: 'Hand off to repair-team for config fix; verify cron expression and job handler.',
+    };
+  }
+  return { type: 'monitor', urgency: 'low', action: 'Monitor — no remediation band matched.' };
+}
+
 /** Map weakness reasons to a concrete, human/agent-actionable proposal. */
 export function proposeActions(
   componentClass: ComponentClass,
@@ -31,6 +89,47 @@ export function proposeActions(
     return 'Hand off to repair-team for config fix; verify cron expression and job handler.';
   }
   return 'Review chain config: entity slugs, step mappings, timeouts, and retries.';
+}
+
+/**
+ * Apply a matrix action to a weak ENTITY's registry row. Gated by
+ * DRAYMOND_FAILOVER_MATRIX=1 (fail closed — review-first by default). Only
+ * touches safe, reversible columns: max_retries, timeout_seconds, and resets
+ * health_status so the next benchmark re-scores the entity fresh. Returns the
+ * action applied or null when gated/skipped.
+ */
+export async function reconfigureEntity(
+  slug: string,
+  score: number,
+  reasons: string[]
+): Promise<FailoverAction | null> {
+  const enabled = process.env.DRAYMOND_FAILOVER_MATRIX === '1' || process.env.DRAYMOND_FAILOVER_MATRIX === 'true';
+  if (!enabled) return null;
+
+  const action = failoverActionFor(score, 'entity', reasons);
+  if (action.type === 'monitor' || !action.change) return action.type === 'monitor' ? action : null;
+
+  const supabase = createDraymondAdminClient();
+  const { data: entity, error: findErr } = await supabase
+    .from('draymond_entities')
+    .select('id')
+    .eq('slug', slug)
+    .maybeSingle();
+  if (findErr || !entity) {
+    console.warn(`[upgrade-queue] reconfigure skip ${slug}: ${findErr?.message ?? 'entity not found'}`);
+    return null;
+  }
+
+  const { error } = await supabase
+    .from('draymond_entities')
+    .update({ ...action.change, health_status: 'unknown' })
+    .eq('id', entity.id);
+  if (error) {
+    console.warn(`[upgrade-queue] reconfigure failed ${slug}: ${error.message}`);
+    return null;
+  }
+  console.log(`[upgrade-queue] reconfigured ${slug} (weakness ${score.toFixed(2)}): ${action.action}`);
+  return action;
 }
 
 /**

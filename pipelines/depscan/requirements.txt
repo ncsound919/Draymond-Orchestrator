@@ -1,0 +1,14 @@
+# ============================================================================
+# depscan pipeline — consolidated dependencies
+# ============================================================================
+# One requirements file for the whole dependency-security pipeline.
+# Install:  pip install -r pipelines/depscan/requirements.txt
+# ============================================================================
+
+# depscan — OWASP dependency CVE scanner (pyproject)
+-e ../../../04_Integrations/integrations/dep-scan
+
+# supply-chain-health (heisenberg) — SBOM + deps.dev health (pyproject)
+-e ../../../04_Integrations/integrations/heisenberg-ssc-health-check
+
+# nuclei-scanner is a Go binary (github.com/projectdiscovery/nuclei) — not pip.

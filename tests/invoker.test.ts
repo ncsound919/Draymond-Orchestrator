@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { execFileMock, fetchMock } = vi.hoisted(() => ({
+const { execFileMock, fetchMock, execFileSyncMock } = vi.hoisted(() => ({
   execFileMock: vi.fn(),
   fetchMock: vi.fn(),
+  execFileSyncMock: vi.fn<(cmd: string) => unknown>(() => {
+    throw new Error('ENOENT'); // default: binary not found
+  }),
 }));
 
-vi.mock('node:child_process', () => ({ execFile: execFileMock }));
+vi.mock('node:child_process', () => ({ execFile: execFileMock, execFileSync: execFileSyncMock }));
 vi.stubGlobal('fetch', fetchMock);
 
 import { invokeEntity } from '../src/lib/draymond/invoker';
@@ -35,6 +38,7 @@ afterEach(() => {
   delete process.env.ALLOW_LOCAL_AGENTS;
   fetchMock.mockReset();
   execFileMock.mockReset();
+  execFileSyncMock.mockReset();
 });
 
 describe('invokeEntity http_api', () => {
@@ -76,9 +80,36 @@ describe('invokeEntity http_api', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('allows a localhost URL in production when on LOCAL_SERVICE_ALLOWLIST', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    delete process.env.ALLOW_LOCAL_AGENTS;
+    vi.stubEnv('LOCAL_SERVICE_ALLOWLIST', 'localhost,127.0.0.1');
+    fetchMock.mockResolvedValue(jsonResponse({ ok: true }));
+    const result = await invokeEntity(
+      entity({ invocation_config: { url: 'http://127.0.0.1:8000/invoke' } }),
+      'run',
+      {},
+    );
+    expect(result.success).toBe(true);
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
+  it('still blocks localhost in production when the allowlist omits it', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    delete process.env.ALLOW_LOCAL_AGENTS;
+    vi.stubEnv('LOCAL_SERVICE_ALLOWLIST', 'services.internal');
+    const result = await invokeEntity(
+      entity({ invocation_config: { url: 'http://127.0.0.1:3000/invoke' } }),
+      'run',
+      {},
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/SSRF blocked/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('reports an abort/timeout as a timed-out failure', async () => {
-    const err = new Error('aborted');
-    err.name = 'AbortError';
+    const err = new Error('aborted');    err.name = 'AbortError';
     fetchMock.mockRejectedValue(err);
     const result = await invokeEntity(
       entity({ invocation_config: { url: 'https://api.example.com/invoke' } }),
@@ -417,5 +448,54 @@ describe('invokeEntity dispatch', () => {
     await expect(
       invokeEntity(entity({ invocation_method: 'not-real' }), 'x', {}),
     ).rejects.toThrow(/Unsupported invocation method/);
+  });
+});
+
+describe('cli_command requires gating (Step 9)', () => {
+  it('fails closed when a declared required binary is missing', async () => {
+    execFileSyncMock.mockImplementation(() => {
+      throw new Error('ENOENT');
+    });
+    const result = await invokeEntity(
+      entity({
+        invocation_method: 'cli_command',
+        invocation_config: { command: 'node script.js', requires: ['a-binary-that-does-not-exist-xyz'] },
+      }),
+      'run',
+      {},
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Required binary "a-binary-that-does-not-exist-xyz" not found/);
+    expect(execFileMock).not.toHaveBeenCalled();
+  });
+
+  it('passes through when no requires are declared (backward compatible)', async () => {
+    execFileMock.mockImplementation((_cmd, _args, _opts, cb) => {
+      cb(null, '{}', '');
+      return { on: () => {}, stdin: { write: () => {}, end: () => {} } };
+    });
+    const result = await invokeEntity(
+      entity({ invocation_method: 'cli_command', invocation_config: { command: 'node script.js' } }),
+      'run',
+      {},
+    );
+    expect(result.success).toBe(true);
+  });
+
+  it('allows dispatch when the required binary resolves', async () => {
+    execFileSyncMock.mockImplementation(() => undefined); // `where node` succeeds
+    execFileMock.mockImplementation((_cmd, _args, _opts, cb) => {
+      cb(null, '{}', '');
+      return { on: () => {}, stdin: { write: () => {}, end: () => {} } };
+    });
+    const result = await invokeEntity(
+      entity({
+        invocation_method: 'cli_command',
+        invocation_config: { command: 'node script.js', requires: ['node'] },
+      }),
+      'run',
+      {},
+    );
+    expect(result.success).toBe(true);
   });
 });

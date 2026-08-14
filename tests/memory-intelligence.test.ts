@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
-const { mockClient } = vi.hoisted(() => {
+const { mockClient, upsertCalls } = vi.hoisted(() => {
+  const upsertCalls: Array<{ table: string; payload: unknown }> = [];
   const makeChain = (tables: Map<string, unknown>, table: string) => {
     const resolve = () => tables.get(table) ?? { data: null, error: null };
     const chain = {
@@ -14,7 +18,10 @@ const { mockClient } = vi.hoisted(() => {
       insert: vi.fn(() => chain),
       update: vi.fn(() => chain),
       delete: vi.fn(() => chain),
-      upsert: vi.fn(() => chain),
+      upsert: vi.fn((payload: unknown) => {
+        upsertCalls.push({ table, payload });
+        return chain;
+      }),
       single: vi.fn(() => Promise.resolve(resolve())),
       then: (onF: (v: unknown) => unknown, onR?: (e: unknown) => unknown) =>
         Promise.resolve(resolve()).then(onF, onR),
@@ -23,7 +30,7 @@ const { mockClient } = vi.hoisted(() => {
   };
   const tables = new Map<string, unknown>();
   const client = { from: vi.fn((t: string) => makeChain(tables, t)), _tables: tables };
-  return { mockClient: client };
+  return { mockClient: client, upsertCalls };
 });
 
 vi.mock('../src/lib/draymond/client', () => ({
@@ -65,6 +72,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   mockClient._tables.clear();
+  upsertCalls.length = 0;
 });
 
 describe('searchMemories', () => {
@@ -143,6 +151,70 @@ describe('memory access', () => {
     setTable('draymond_memory', [memory()]);
     const insights = await mod.getMemoryInsights('agent-1');
     expect(insights.agent_id).toBe('agent-1');
+  });
+});
+
+describe('rebuildProjectionsFromBrainState', () => {
+  it('indexes canonical brain-state files with provenance and tier', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'brain-'));
+    fs.writeFileSync(path.join(dir, 'system-goals.json'), JSON.stringify({ goals: [{ id: 'g1', title: 'Goal A' }] }));
+    fs.writeFileSync(
+      path.join(dir, 'learning-lessons.json'),
+      JSON.stringify({ lessons: [{ id: 'l1', pattern: 'P1' }, { id: 'l2', pattern: 'P2' }] }),
+    );
+    fs.writeFileSync(path.join(dir, 'kairos.json'), JSON.stringify({ moments: [{ id: 'm1', title: 'M1' }] }));
+    fs.writeFileSync(path.join(dir, 'treasury.json'), JSON.stringify({ revenueCents: 0 }));
+    fs.writeFileSync(path.join(dir, 'registry.json'), JSON.stringify({ agents: [] })); // not tiered → not indexed
+
+    const result = await mod.rebuildProjectionsFromBrainState({
+      agentId: 'draymond',
+      userId: 'fleet',
+      brainStateDir: dir,
+    });
+    expect(result.indexed).toBe(5);
+    expect(result.skipped).toBe(0);
+
+    const memoryUpserts = upsertCalls.filter((c) => c.table === 'draymond_memory');
+    const sources = new Set(memoryUpserts.map((c) => (c.payload as Record<string, unknown>).source_event as string));
+    expect(sources).toContain('brain_state:system-goals.json');
+    expect(sources).toContain('brain_state:learning-lessons.json');
+    expect(sources).toContain('brain_state:kairos.json');
+
+    const core = memoryUpserts.find((c) => (c.payload as Record<string, unknown>).key === 'system-goals:g1');
+    expect(core?.payload).toMatchObject({ tier: 'core', decay_rate: 0, importance_score: 0.9 });
+
+    const lesson = memoryUpserts.find((c) => (c.payload as Record<string, unknown>).key === 'learning-lessons:l1');
+    expect(lesson?.payload).toMatchObject({ tier: 'important', decay_rate: 0.01 });
+  });
+
+  it('returns zeros when the brain-state dir is missing', async () => {
+    const result = await mod.rebuildProjectionsFromBrainState({
+      brainStateDir: path.join(os.tmpdir(), 'definitely-not-a-real-dir-xyz'),
+    });
+    expect(result).toEqual({ indexed: 0, skipped: 0 });
+  });
+});
+
+describe('checkBrainStateBudget', () => {
+  it('flags files over their cap and reports sizes', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'brain-budget-'));
+    fs.writeFileSync(path.join(dir, 'learning-lessons.json'), Buffer.alloc(600 * 1024, 'x')); // 600KB > 500KB cap
+    fs.writeFileSync(path.join(dir, 'hypotheses.json'), JSON.stringify({ hypotheses: [] })); // tiny
+    fs.writeFileSync(path.join(dir, 'unindexed-file.json'), Buffer.alloc(10 * 1024 * 1024)); // no cap → ignored
+
+    const files = await mod.checkBrainStateBudget(dir);
+    const lessons = files.find((f) => f.file === 'learning-lessons.json');
+    const hypotheses = files.find((f) => f.file === 'hypotheses.json');
+    expect(lessons?.overBudget).toBe(true);
+    expect(lessons?.capBytes).toBe(500 * 1024);
+    expect(hypotheses?.overBudget).toBe(false);
+    expect(files.some((f) => f.file === 'unindexed-file.json')).toBe(false);
+  });
+
+  it('returns an empty array when the dir is missing', async () => {
+    await expect(
+      mod.checkBrainStateBudget(path.join(os.tmpdir(), 'definitely-not-a-real-dir-xyz')),
+    ).resolves.toEqual([]);
   });
 });
 

@@ -156,6 +156,7 @@ function buildSystemPrompt(snapshot: RegistrySnapshot): string {
     '  - invoke_entity: the task should be handled by a specific entity',
     '  - execute_chain: the task requires a multi-step chain',
     '  - query_status: the user wants system status, health, analytics, crons/schedules, workflows/chains, the agenda/goals, repairs/recovery, or any question about how the Draymond system is doing',
+    '  - casual_chat: a greeting, thank-you, small talk, or any friendly message that needs a conversational reply, not a system action',
     '  - manage_memory: the user wants to store, retrieve, or manage memory',
     '  - decompose_goal: the task is complex and needs to be broken into subtasks',
     '  - web_search: the user wants current/online information that requires a live web search',
@@ -163,7 +164,7 @@ function buildSystemPrompt(snapshot: RegistrySnapshot): string {
     '',
     'Respond ONLY with valid JSON (no markdown fences):',
     '{',
-    '  "intent": "invoke_entity|execute_chain|query_status|manage_memory|decompose_goal|web_search|unknown",',
+    '  "intent": "invoke_entity|execute_chain|query_status|manage_memory|decompose_goal|web_search|casual_chat|unknown",',
     '  "confidence": 0.0-1.0,',
     '  "entity_slug": "slug or null",',
     '  "chain_slug": "slug or null",',
@@ -190,11 +191,12 @@ function buildCompactPrompt(snapshot: RegistrySnapshot): string {
 
   return [
     'You are Draymond\'s task router. Classify the intent and pick ONE entity or chain slug from the lists.',
-    'Intents: invoke_entity | execute_chain | query_status | manage_memory | decompose_goal | web_search | unknown',
+    'Intents: invoke_entity | execute_chain | query_status | manage_memory | decompose_goal | web_search | casual_chat | unknown',
     'Rules:',
     '  - "run <x>", "trigger <x>", "execute <x>" where <x> is a workflow/chain -> execute_chain with chain_slug.',
     '  - "check if <service> is up/online", "is <service> down", "status of <service>" -> query_status (no entity_slug).',
     '  - asking about system status/health/crons/schedules/chains/repairs/agenda -> query_status.',
+    '  - a greeting, thank-you, or friendly small talk -> casual_chat (no entity_slug, no chain_slug).',
     '  - asking an entity to DO a one-off action (post, analyze, generate, send) -> invoke_entity with entity_slug.',
     'Available entity slugs:',
     entityList || '  (none)',
@@ -217,6 +219,7 @@ const VALID_INTENTS: Set<RouterIntent> = new Set([
   'manage_memory',
   'decompose_goal',
   'web_search',
+  'casual_chat',
   'unknown',
 ]);
 
@@ -482,6 +485,7 @@ export async function routeAndClassify(
 const ENTITY_PREFIX_RE = /^(?:run|invoke|execute|use|call)\s+(?:entity\s+)?['""]?([a-z0-9_-]+)['""]?/i;
 const CHAIN_PREFIX_RE = /^(?:run|execute|start)\s+(?:chain\s+)?['""]?([a-z0-9_-]+)['""]?\s*chain/i;
 const STATUS_RE = /^(?:show|get|what(?:'s| is))\s+(?:the\s+)?(?:status|health|dashboard)/i;
+const CASUAL_RE = /^(?:(?:hi|hey|hello|yo|sup|good\s*(?:morning|afternoon|evening)|how(?:'s| is) it going|how are you|what'?s up|thanks|thank you|thx|ok(?:ay)?|cool|great|awesome|nice|perfect|love it|noted)\b[\s!.,]*)+$/i;
 const SYSTEM_QUERY_RE =
   /^(?:how|what|why|any|are|is|show|get|check|list)\b.*\b(crons?|scheduled jobs?|workflows?|chains?|repairs?|recovery|upgrade queue|agenda|goals?|monitors?|benchmarks?|system|jobs?|brain)\b|(?:\b)(crons?|scheduled jobs?|workflows?|chains?|repairs?|monitors?|agents?|goals?|system|jobs?|brain)\b.*\b(doing|status|health|running|failing|progress|up|down|needs|find)\b/i;
 const WEB_SEARCH_RE = /^(?:search(?: the web| online| google)?|google|look up|lookup|find(?: information)?(?: about)?|research online)\s+(?:for\s+)?(.+)$/i;
@@ -499,6 +503,18 @@ function tryDirectMatch(task: string, snapshot: RegistrySnapshot): RouteResult |
       entity_slug: 'deterministic-brain',
       action: 'sweep',
       reasoning: 'Direct deterministic-brain sweep request — skipped LLM routing',
+      alternatives: [],
+      resolved_at: new Date().toISOString(),
+      latency_ms: 0,
+    };
+  }
+
+  // Greetings / small talk → conversational reply, never a JSON status dump.
+  if (CASUAL_RE.test(trimmed) || trimmed.length <= 2) {
+    return {
+      intent: 'casual_chat',
+      confidence: 0.95,
+      reasoning: 'Greeting or casual message — route to the conversational assistant',
       alternatives: [],
       resolved_at: new Date().toISOString(),
       latency_ms: 0,

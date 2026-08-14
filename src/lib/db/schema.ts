@@ -403,6 +403,7 @@ CREATE TABLE IF NOT EXISTS draymond_chains (
   retry_count INTEGER NOT NULL DEFAULT 0,
   max_retries INTEGER NOT NULL DEFAULT 1,
   session_id TEXT,
+  lease_expires_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -516,6 +517,7 @@ CREATE TABLE IF NOT EXISTS draymond_scheduled_jobs (
   timeout_seconds INTEGER NOT NULL DEFAULT 300,
   notify_on_failure INTEGER NOT NULL DEFAULT 1,
   notify_on_success INTEGER NOT NULL DEFAULT 0,
+  lease_expires_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

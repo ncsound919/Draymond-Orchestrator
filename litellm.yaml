@@ -28,7 +28,7 @@ model_list:
       api_key: os.environ/DEEPSEEK_API_KEY
   - model_name: gemini
     litellm_params:
-      model: gemini/gemini-1.5-flash
+      model: gemini/gemini-3.5-flash
       api_key: os.environ/GEMINI_API_KEY
   - model_name: ollama-llama
     litellm_params:

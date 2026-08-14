@@ -10,6 +10,12 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    // Many fleet tests spawn subprocesses (python, git, npm) which are slow
+    // under full-suite CPU contention. Give every test a generous default so
+    // none silently trips the 5s vitest baseline; long-running suites override
+    // per-test as needed.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

@@ -1,0 +1,20 @@
+# ============================================================================
+# bookbridge pipeline — consolidated dependencies
+# ============================================================================
+# One requirements file for the whole knowledge/memory pipeline. Each stage's
+# real manifest is included with `-r` so nothing drifts from the folded tools.
+# Install:  pip install -r pipelines/bookbridge/requirements.txt
+# ============================================================================
+
+# bookbridge — library daemon (search / citations / retrieval)
+-r ../../agents/BookBridge--main/requirements.txt
+
+# book-synthesis — multi-book synthesis + web validation
+-r ../../agents/Book-Synthesis-Engine-main/requirements.txt
+
+# zvec — in-process vector database (pyproject-only; install editable)
+-e ../../../04_Integrations/integrations/zvec
+
+# memagent — long-context memory (heavy: torch/transformers/ray/flash-attn).
+# Heavy ML stack; skip with --no-deps if only the library is needed.
+-r ../../../04_Integrations/integrations/MemAgent/requirements.txt

@@ -1,0 +1,6 @@
+# ============================================================================
+# ufc-mcp pipeline — consolidated dependencies
+# ============================================================================
+# ufc-mcp is a stdio MCP server (Node) — npm install in agents/UFC-MCP-main.
+# stirling-pdf is a Docker service (frooodle/s-pdf) — no pip deps.
+# This pipeline has no Python dependencies today.

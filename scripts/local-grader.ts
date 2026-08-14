@@ -41,16 +41,40 @@ async function main() {
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
 
   let repoMeta: Record<string, unknown> | null = null;
+  let readmeStr = '';
+  let packageJsonStr = '';
+  const fileList: string[] = [];
   try {
-    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
-    if (res.ok) repoMeta = (await res.json()) as Record<string, unknown>;
+    const [metaRes, readmeRes, pkgRes, treeRes] = await Promise.all([
+      fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers }),
+      fetch(`https://api.github.com/repos/${owner}/${repo}/readme`, { headers }),
+      fetch(`https://api.github.com/repos/${owner}/${repo}/contents/package.json`, { headers }),
+      fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/HEAD?recursive=1`, { headers }),
+    ]);
+    if (metaRes.ok) repoMeta = (await metaRes.json()) as Record<string, unknown>;
+    if (readmeRes.ok) {
+      const d = (await readmeRes.json()) as { content?: string };
+      if (d.content) readmeStr = Buffer.from(d.content, 'base64').toString('utf8');
+    }
+    if (pkgRes.ok) {
+      const d = (await pkgRes.json()) as { content?: string };
+      if (d.content) packageJsonStr = Buffer.from(d.content, 'base64').toString('utf8');
+    }
+    if (treeRes.ok) {
+      const d = (await treeRes.json()) as { tree?: Array<{ path: string; type: string }> };
+      if (Array.isArray(d.tree)) {
+        for (const t of d.tree) {
+          if (t.type === 'blob') fileList.push(t.path);
+        }
+      }
+    }
   } catch {
-    repoMeta = null;
+    // fall through with whatever we got
   }
 
   const report = await GradingService.gradeRepo(
     { repoUrl, owner, repo },
-    { repoMeta, packageJsonStr: undefined, readmeStr: undefined, fileList: undefined }
+    { repoMeta, packageJsonStr, readmeStr: readmeStr.slice(0, 20000), fileList: fileList.slice(0, 200) }
   );
 
   console.log(

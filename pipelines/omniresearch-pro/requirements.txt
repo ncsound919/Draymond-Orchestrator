@@ -1,0 +1,12 @@
+# ============================================================================
+# omniresearch-pro pipeline — consolidated dependencies
+# ============================================================================
+# One requirements file for the whole research pipeline.
+# Install:  pip install -r pipelines/omniresearch-pro/requirements.txt
+# ============================================================================
+
+# omniresearch-pro — deep research engine
+-r ../../agents/OmniResearch-Replacement/requirements.txt
+
+# open-notebook — NotebookLM-style workspace (pyproject)
+-e ../../../04_Integrations/integrations/open-notebook

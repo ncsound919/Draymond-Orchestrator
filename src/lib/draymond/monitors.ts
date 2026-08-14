@@ -552,6 +552,13 @@ const LOCAL_SERVICE_DIRS: Record<string, string> = {
   'omni-research': 'agents/OmniResearch-Replacement',
   'indy-music-platform': 'agents/Indy-Music',
   'overlay-chain': '01_Platforms/Overlay365',
+  'phoenix': '04_Integrations/integrations/phoenix',
+  'generative-video-ai': '04_Integrations/integrations/Generative-Video-AI',
+  'litellm': '04_Integrations/integrations/litellm',
+  'deterministic-brain': 'agents/deterministic-brain',
+  'bookbridge': 'agents/BookBridge--main',
+  'open-notebook': '04_Integrations/integrations/open-notebook',
+  'stirling-pdf': '04_Integrations/integrations/Stirling-PDF',
 };
 
 /**
@@ -577,6 +584,13 @@ const SERVICE_ENV_VARS: Record<string, string> = {
   'omni-research': 'OMNI_RESEARCH_URL',
   'indy-music-platform': 'INDY_MUSIC_URL',
   'overlay-chain': 'OVERLAY_CHAIN_URL',
+  'phoenix': 'PHOENIX_URL',
+  'generative-video-ai': 'GENERATIVE_VIDEO_URL',
+  'litellm': 'LITELLM_URL',
+  'deterministic-brain': 'BRAIN_URL',
+  'bookbridge': 'BOOKBRIDGE_URL',
+  'open-notebook': 'OPEN_NOTEBOOK_URL',
+  'stirling-pdf': 'STIRLING_PDF_URL',
 };
 
 function monitorShouldExist(slug: string): boolean {
@@ -674,6 +688,62 @@ function getAgentMonitorDefs(): AgentMonitorDef[] {
       expected_status_code: 200,
       timeout_ms: 15000,
       metadata: { slug: 'kaggle', category: 'data' },
+    },
+    {
+      name: 'Phoenix',
+      url: `${process.env.PHOENIX_URL || 'http://localhost:6006'}/health`,
+      check_interval_seconds: 300,
+      expected_status_code: 200,
+      timeout_ms: 10000,
+      metadata: { slug: 'phoenix', category: 'observability' },
+    },
+    {
+      name: 'Generative Video AI',
+      url: `${process.env.GENERATIVE_VIDEO_URL || 'http://localhost:8055'}/`,
+      check_interval_seconds: 300,
+      expected_status_code: 200,
+      timeout_ms: 10000,
+      metadata: { slug: 'generative-video-ai', category: 'media' },
+    },
+    {
+      name: 'LiteLLM',
+      url: `${process.env.LITELLM_URL || 'http://localhost:4100'}/health`,
+      check_interval_seconds: 300,
+      expected_status_code: 200,
+      timeout_ms: 10000,
+      metadata: { slug: 'litellm', category: 'infrastructure' },
+    },
+    {
+      name: 'Deterministic Brain',
+      url: `${process.env.BRAIN_URL || 'http://localhost:3210'}/health`,
+      check_interval_seconds: 300,
+      expected_status_code: 200,
+      timeout_ms: 10000,
+      metadata: { slug: 'deterministic-brain', category: 'control' },
+    },
+    {
+      name: 'BookBridge',
+      url: `${process.env.BOOKBRIDGE_URL || 'http://localhost:8777'}/health`,
+      check_interval_seconds: 300,
+      expected_status_code: 200,
+      timeout_ms: 10000,
+      metadata: { slug: 'bookbridge', category: 'knowledge' },
+    },
+    {
+      name: 'Open Notebook',
+      url: `${process.env.OPEN_NOTEBOOK_URL || 'http://localhost:3030'}/`,
+      check_interval_seconds: 300,
+      expected_status_code: 200,
+      timeout_ms: 10000,
+      metadata: { slug: 'open-notebook', category: 'research' },
+    },
+    {
+      name: 'Stirling PDF',
+      url: `${process.env.STIRLING_PDF_URL || 'http://localhost:8080'}/`,
+      check_interval_seconds: 300,
+      expected_status_code: 200,
+      timeout_ms: 10000,
+      metadata: { slug: 'stirling-pdf', category: 'conversion' },
     },
   ];
 }

@@ -12,6 +12,69 @@ import { checkAllAgentHealth } from './index';
 import { sendNotification, sendAlertEmail } from './notifications';
 import { emitJobStarted, emitJobCompleted, emitJobFailed } from '@/lib/draymond/event-bridge';
 import { delegationTimeoutSeconds, delegationFor, isWithinWindow, delegationWindow } from './delegation';
+import { classifyRetryable, retryDelayMs } from './retry';
+
+// ============================================================================
+// RUN LEASES + HEARTBEAT
+// ============================================================================
+// A claimed run gets a lease (`lease_expires_at`). The executing process
+// heartbeats the lease so slow-but-alive runs are never treated as crashed.
+// Only a lease that has actually expired (process died mid-run) is recovered —
+// the fixed 45-minute threshold is the fallback for legacy rows that predate
+// the lease column. Recovered runs are marked `recovered`, NOT `failed`, so a
+// crashed process doesn't manufacture a kairos failure storm.
+// ============================================================================
+
+/** Lease duration (ms). Tune via DRAYMOND_JOB_LEASE_MS. Default 10 minutes. */
+function leaseExpiryMs(): number {
+  const raw = Number(process.env.DRAYMOND_JOB_LEASE_MS ?? 10 * 60 * 1000);
+  return Number.isFinite(raw) && raw > 0 ? raw : 10 * 60 * 1000;
+}
+
+/** ISO timestamp marking when a lease claimed at `now` will expire. */
+function leaseExpiryIso(now: Date): string {
+  return new Date(now.getTime() + leaseExpiryMs()).toISOString();
+}
+
+/** Refresh a job's lease so a long-running job is not misread as crashed. */
+async function refreshJobLease(jobId: string): Promise<void> {
+  const supabase = createDraymondAdminClient();
+  await supabase
+    .from('draymond_scheduled_jobs')
+    .update({ lease_expires_at: new Date(Date.now() + leaseExpiryMs()).toISOString() })
+    .eq('id', jobId);
+}
+
+/** Start a heartbeat that refreshes the job lease; returns a stop() handle. */
+function startJobHeartbeat(jobId: string): () => void {
+  const intervalMs = Math.max(10_000, Math.min(60_000, Math.floor(leaseExpiryMs() / 4)));
+  const timer = setInterval(() => {
+    refreshJobLease(jobId).catch(() => {});
+  }, intervalMs);
+  return () => clearInterval(timer);
+}
+
+/**
+ * True when a running row is actually dead. Prefers the lease column; falls
+ * back to the legacy `last_run_at` threshold for rows that predate it.
+ */
+export function isStaleLease(
+  leaseExpiresAt: string | null | undefined,
+  lastActivityAt: string | null,
+  nowMs: number,
+  legacyThresholdMs: number
+): boolean {
+  if (leaseExpiresAt) {
+    const t = new Date(leaseExpiresAt).getTime();
+    if (Number.isFinite(t)) return t < nowMs;
+  }
+  // Legacy fallback: no lease → use last activity + threshold.
+  if (lastActivityAt) {
+    const t = new Date(lastActivityAt).getTime();
+    if (Number.isFinite(t)) return t < nowMs - legacyThresholdMs;
+  }
+  return true; // no timestamps at all — treat as dead
+}
 
 // ============================================================================
 // DELEGATION WINDOW GATE
@@ -46,7 +109,7 @@ function delegationWindowLabel(job: ScheduledJob): string {
 
 export type JobType = 'chain' | 'health_check' | 'notification' | 'decay_sweep' | 'custom';
 
-export type JobRunStatus = 'never' | 'running' | 'success' | 'failed' | 'skipped';
+export type JobRunStatus = 'never' | 'running' | 'success' | 'failed' | 'skipped' | 'recovered';
 
 export interface ScheduledJob {
   id: string;
@@ -67,6 +130,8 @@ export interface ScheduledJob {
   timeout_seconds: number;
   notify_on_failure: boolean;
   notify_on_success: boolean;
+  /** When a run is claimed: the instant the running lease expires (crashed-run detection). */
+  lease_expires_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -408,9 +473,10 @@ export async function runJobNow(id: string): Promise<JobRunResult> {
   }
 
   // Atomic claim so a concurrent tick doesn't double-run.
+  const claimNow = new Date();
   const { data: claimed, error: claimError } = await supabase
     .from('draymond_scheduled_jobs')
-    .update({ last_run_status: 'running' })
+    .update({ last_run_status: 'running', lease_expires_at: leaseExpiryIso(claimNow) })
     .eq('id', job.id)
     .neq('last_run_status', 'running')
     .select('id')
@@ -422,11 +488,13 @@ export async function runJobNow(id: string): Promise<JobRunResult> {
 
   const startTime = Date.now();
   const now = new Date();
+  const stopHeartbeat = startJobHeartbeat(job.id);
   emitJobStarted(job.id, job.name, job.job_type);
 
   try {
     const output = await executeJobByType(job);
     const durationMs = Date.now() - startTime;
+    stopHeartbeat();
     await supabase
       .from('draymond_scheduled_jobs')
       .update({
@@ -434,6 +502,7 @@ export async function runJobNow(id: string): Promise<JobRunResult> {
         last_run_status: 'success',
         last_run_duration_ms: durationMs,
         last_error: null,
+        lease_expires_at: null,
         run_count: job.run_count + 1,
       })
       .eq('id', job.id);
@@ -442,6 +511,7 @@ export async function runJobNow(id: string): Promise<JobRunResult> {
   } catch (err) {
     const durationMs = Date.now() - startTime;
     const errorMessage = err instanceof Error ? err.message : String(err);
+    stopHeartbeat();
     await supabase
       .from('draymond_scheduled_jobs')
       .update({
@@ -449,6 +519,7 @@ export async function runJobNow(id: string): Promise<JobRunResult> {
         last_run_status: 'failed',
         last_run_duration_ms: durationMs,
         last_error: errorMessage,
+        lease_expires_at: null,
         run_count: job.run_count + 1,
         fail_count: job.fail_count + 1,
       })
@@ -583,6 +654,7 @@ export const CUSTOM_HANDLERS: CustomHandlerDef[] = [
   { handler: 'benchmark_chains', label: 'Benchmark: Chains', description: 'Run a benchmark cycle over chains.' },
   { handler: 'run_overlay_qa', label: 'Overlay365 QA', description: 'Playwright QA pass across Overlay365 sites.' },
   { handler: 'scan_book_library', label: 'Book Library Scan', description: 'Auto-ingest new books from the library folders.' },
+  { handler: 'publish_social_queue', label: 'Social Publish Drainer', description: 'Drain the SMD publish queue to X/LinkedIn (deterministic publisher).' },
   { handler: 'wiki_sync', label: 'Brain Wiki Sync', description: 'Sync the deterministic-brain wiki into the cache.' },
   { handler: 'file_share_check', label: 'Overlay File Share Test', description: 'Exercise the file-sharing / browser-fetch surface.' },
   { handler: 'code_review_check', label: 'Overlay Code Review Scan', description: 'Exercise the local deep-analysis code-review scorer.' },
@@ -596,6 +668,8 @@ export const CUSTOM_HANDLERS: CustomHandlerDef[] = [
   { handler: 'dream_cycle', label: 'Dream Cycle', description: 'AutoDream 4-phase memory consolidation (self-gated).' },
   { handler: 'ultraplan_process', label: 'Ultraplan Process', description: 'Drain the deep-planning queue.' },
   { handler: 'research_rotation', label: 'Research Rotation', description: 'Drain the highest-priority ready science experiment from the queue.' },
+  { handler: 'science_campaign_seed', label: 'Science Campaign Seed', description: 'Re-seed the science/sports experiment backlog from real datasets + papers when the queue runs low.' },
+  { handler: 'benchmark_discovery_loop', label: 'Benchmark Olympics Discovery Loop', description: 'Autonomous research loop: probe the fleet, mature discovery hypotheses, surface quick-upgrade insights, and auto-fix weak components via the repair team.' },
 ];
 
 /**
@@ -736,6 +810,28 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         const { scanBookLibrary } = await import('../bookbridge');
         const result = await scanBookLibrary();
         return { handler, ...result };
+      }
+
+      if (handler === 'publish_social_queue') {
+        // Drain the SMD publish queue → X/LinkedIn (deterministic publisher).
+        const base = process.env.SOCIAL_MEDIA_URL?.replace(/\/+$/, '') ?? 'http://localhost:8030';
+        const res = await fetch(`${base}/api/ai/publish/drain`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: '{}',
+        });
+        if (!res.ok) throw new Error(`publish drain failed: HTTP ${res.status}`);
+        const body = (await res.json()) as { checked?: number; processed?: number; persisted?: number; outcomes?: Array<{ status: string }> };
+        return {
+          handler,
+          checked: body.checked ?? 0,
+          processed: body.processed ?? 0,
+          persisted: body.persisted ?? 0,
+          statuses: (body.outcomes ?? []).reduce<Record<string, number>>((acc, o) => {
+            acc[o.status] = (acc[o.status] ?? 0) + 1;
+            return acc;
+          }, {}),
+        };
       }
 
       if (handler === 'wiki_sync') {
@@ -1339,6 +1435,25 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         return { handler, ...r };
       }
 
+      if (handler === 'science_campaign_seed') {
+        // Campaign seeding: top up the science/sports experiment backlog from
+        // real datasets + papers so rotation always has work.
+        const { ensureResearchBacklog } = await import('@/lib/science/campaigns');
+        const r = await ensureResearchBacklog();
+        return { handler, ...r };
+      }
+
+      if (handler === 'benchmark_discovery_loop') {
+        // Autonomous research: run the Benchmark Olympics discovery loop against
+        // the real fleet registry, mature hypotheses, push quick-upgrade
+        // insights to /api/v1/benchmarks, and dispatch the weakest components
+        // to the repair team for auto-fixing.
+        const { runDiscoveryLoopScript } = await import('./discovery-loop-runner');
+        const iterations = Math.max(1, Math.min(4, Number((config as { iterations?: unknown }).iterations) || 1));
+        const res = await runDiscoveryLoopScript({ iterations, repair: process.env.DRAYMOND_REPAIR_BENCHMARK_ENABLED !== '0' });
+        return { handler, iterations, ok: res.ok, duration_ms: res.durationMs, output: (res.stdout || '').trim().slice(-1500), error: res.error };
+      }
+
       console.log(
         `[Draymond Scheduler] Custom job "${job.name}" triggered (handler: ${handler ?? 'none'}). ` +
         `No built-in handler registered — skipping execution.`
@@ -1379,29 +1494,75 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
   // ── 0. Recover stale 'running' locks ───────────────────────────────────
   // If the process crashed while a job was mid-flight, its row stays
   // `last_run_status = 'running'` forever and the atomic claim below (which
-  // filters `.neq('running')`) would permanently skip it. Clear locks older
-  // than the recovery threshold so the job fires on its next slot instead.
+  // filters `.neq('running')`) would permanently skip it. A run is dead when
+  // its lease expired (process died) — marked `recovered`, NOT `failed`, so a
+  // crash doesn't manufacture a failure storm; the job self-heals on its next
+  // slot. Legacy rows without a lease fall back to the old 45-min threshold.
   const staleRunningMs = Number(process.env.DRAYMOND_STALE_RUNNING_MS ?? 45 * 60 * 1000);
-  const staleCutoff = new Date(now.getTime() - staleRunningMs).toISOString();
+  const staleNowMs = now.getTime();
   try {
     const { data: staleRunning, error: staleErr } = await supabase
       .from('draymond_scheduled_jobs')
-      .select('id, name')
-      .eq('last_run_status', 'running')
-      .lt('last_run_at', staleCutoff);
+      .select('id, name, lease_expires_at, last_run_at')
+      .eq('last_run_status', 'running');
     if (staleErr) {
       console.error('[Draymond Scheduler] stale-running scan failed:', staleErr.message);
     } else if (staleRunning && staleRunning.length > 0) {
+      const staleIds: string[] = [];
       for (const s of staleRunning) {
+        if (!isStaleLease(s.lease_expires_at, s.last_run_at, staleNowMs, staleRunningMs)) continue;
+        staleIds.push(s.id);
         await supabase
           .from('draymond_scheduled_jobs')
-          .update({ last_run_status: 'failed', last_error: 'Recovered stale running lock (previous process crashed mid-run)' })
+          .update({
+            last_run_status: 'recovered',
+            lease_expires_at: null,
+            last_error: 'Recovered stale running lock (previous process crashed mid-run)',
+          })
           .eq('id', s.id);
       }
-      console.log(`[Draymond Scheduler] recovered ${staleRunning.length} stale running lock(s): ${staleRunning.map((s: { name?: unknown }) => String(s.name ?? '')).join(', ')}`);
+      if (staleIds.length > 0) {
+        console.log(`[Draymond Scheduler] recovered ${staleIds.length} stale running lock(s): ${staleRunning.filter((s: { id: string; name?: unknown }) => staleIds.includes(s.id)).map((s: { name?: unknown }) => String(s.name ?? '')).join(', ')}`);
+      }
     }
   } catch (err) {
     console.error('[Draymond Scheduler] stale-running recovery failed:', err instanceof Error ? err.message : err);
+  }
+
+  // ── 0b. Recover stale 'running' CHAINS ───────────────────────────────────
+  // Chain instances that crashed mid-run stay `status = 'running'` forever and
+  // block re-execution of that instance (and clutter the chain history with
+  // phantom in-flight rows). A chain is dead when its lease expired (process
+  // died); legacy rows fall back to the updated_at threshold. Marked `failed`
+  // so operators can see and resume them.
+  try {
+    const { data: staleChains, error: chainErr } = await supabase
+      .from('draymond_chains')
+      .select('id, slug, lease_expires_at, updated_at')
+      .eq('status', 'running');
+    if (chainErr) {
+      console.error('[Draymond Scheduler] stale-chain scan failed:', chainErr.message);
+    } else if (staleChains && staleChains.length > 0) {
+      const staleChainIds: string[] = [];
+      for (const c of staleChains) {
+        if (!isStaleLease(c.lease_expires_at, c.updated_at, staleNowMs, staleRunningMs)) continue;
+        staleChainIds.push(c.id);
+        await supabase
+          .from('draymond_chains')
+          .update({
+            status: 'failed',
+            completed_at: new Date().toISOString(),
+            lease_expires_at: null,
+            error_message: 'Recovered stale running chain (previous process crashed mid-run)',
+          })
+          .eq('id', c.id);
+      }
+      if (staleChainIds.length > 0) {
+        console.log(`[Draymond Scheduler] recovered ${staleChainIds.length} stale running chain(s): ${staleChains.filter((c: { id: string; slug?: unknown }) => staleChainIds.includes(c.id)).map((c: { slug?: unknown }) => String(c.slug ?? '')).join(', ')}`);
+      }
+    }
+  } catch (err) {
+    console.error('[Draymond Scheduler] stale-chain recovery failed:', err instanceof Error ? err.message : err);
   }
 
   // 1. Fetch candidate due jobs
@@ -1521,7 +1682,7 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
     // If another worker already claimed this job, the update returns 0 rows.
     const { data: claimed, error: claimError } = await supabase
       .from('draymond_scheduled_jobs')
-      .update({ last_run_status: 'running' })
+      .update({ last_run_status: 'running', lease_expires_at: leaseExpiryIso(now) })
       .eq('id', job.id)
       .neq('last_run_status', 'running')
       .select('id')
@@ -1546,13 +1707,36 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
     }
 
     const startTime = Date.now();
+    const stopHeartbeat = startJobHeartbeat(job.id);
     emitJobStarted(job.id, job.name, job.job_type);
 
-    try {
-      // Execute the job
-      const output = await executeJobByType(job);
+    // Execute with job-level retries (max_retries). The job was claimed above
+    // so a single retry loop owns this slot; failed attempts back off before
+    // the next try and only the FINAL failure is recorded/notified (no spam).
+    // Only transient failures are retried — fatal ones break immediately.
+    let lastError: unknown = null;
+    let output: unknown = null;
+    for (let attempt = 0; attempt <= job.max_retries; attempt++) {
+      try {
+        output = await executeJobByType(job);
+        lastError = null;
+        break;
+      } catch (err) {
+        lastError = err;
+        const errMsg = err instanceof Error ? err.message : String(err);
+        if (attempt >= job.max_retries || classifyRetryable(errMsg) !== 'retryable') {
+          break;
+        }
+        console.log(
+          `[Draymond Scheduler] job "${job.name}" attempt ${attempt + 1}/${job.max_retries + 1} failed, retrying in ${retryDelayMs(attempt)}ms: ${errMsg}`
+        );
+        await new Promise((r) => setTimeout(r, retryDelayMs(attempt)));
+      }
+    }
 
+    if (!lastError) {
       const durationMs = Date.now() - startTime;
+      stopHeartbeat();
 
       // Compute next run
       const nextRunAt = getNextRunTime(job.cron_expression, now).toISOString();
@@ -1567,6 +1751,7 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
           last_run_status: 'success',
           last_run_duration_ms: durationMs,
           last_error: null,
+          lease_expires_at: null,
           run_count: job.run_count + 1,
           next_run_at: nextRunAt,
         })
@@ -1597,14 +1782,16 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
           console.error(`[Draymond Scheduler] Failed to send success notification for "${job.name}":`, notifyErr);
         }
       }
-    } catch (err) {
+    } else {
       const durationMs = Date.now() - startTime;
-      const errorMessage = err instanceof Error ? err.message : String(err);
+      const errorMessage = lastError instanceof Error ? lastError.message : String(lastError);
+      const retried = job.max_retries > 0 ? ` (after ${job.max_retries} retries)` : '';
 
       // Compute next run even on failure
       const nextRunAt = getNextRunTime(job.cron_expression, now).toISOString();
 
       // Update failure state
+      stopHeartbeat();
       await supabase
         .from('draymond_scheduled_jobs')
         .update({
@@ -1612,6 +1799,7 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
           last_run_status: 'failed',
           last_run_duration_ms: durationMs,
           last_error: errorMessage,
+          lease_expires_at: null,
           run_count: job.run_count + 1,
           fail_count: job.fail_count + 1,
           next_run_at: nextRunAt,
@@ -1636,7 +1824,7 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
       }
       try {
         const { captureException } = await import('../sentry');
-        await captureException(err instanceof Error ? err : new Error(errorMessage), {
+        await captureException(lastError instanceof Error ? lastError : new Error(errorMessage), {
           tags: { component: 'scheduler', job: job.name, job_type: job.job_type },
         });
       } catch {
@@ -1658,7 +1846,7 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
           await sendAlertEmail(
             recipient,
             `Scheduled job "${job.name}" FAILED`,
-            `Job "${job.name}" (${job.job_type}) failed after ${durationMs}ms.\n\nError: ${errorMessage}\n\nFail count: ${job.fail_count + 1} / Run count: ${job.run_count + 1}`,
+            `Job "${job.name}" (${job.job_type}) failed after ${durationMs}ms${retried}.\n\nError: ${errorMessage}\n\nFail count: ${job.fail_count + 1} / Run count: ${job.run_count + 1}`,
             'agent_failure',
             { priority: 'high', metadata: { job_id: job.id, duration_ms: durationMs, error: errorMessage } }
           );
@@ -1750,6 +1938,14 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
         channel: 'email',
       },
     },
+    is_enabled: true,
+  },
+  {
+    name: 'Social Publish Drainer',
+    description: 'Drain the SMD publish queue to X/LinkedIn every 30 minutes.',
+    cron_expression: '*/30 * * * *',
+    job_type: 'custom',
+    job_config: { handler: 'publish_social_queue' },
     is_enabled: true,
   },
   {
@@ -2043,6 +2239,14 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     cron_expression: '0 9 * * 6',
     job_type: 'custom',
     job_config: { handler: 'repair_failed_jobs' },
+    is_enabled: true,
+  },
+  {
+    name: 'Benchmark Olympics Discovery Loop',
+    description: 'Every 6h — autonomous research loop: probe the fleet, mature discovery hypotheses, surface quick-upgrade insights, and auto-fix weak components via the repair team.',
+    cron_expression: '0 */6 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'benchmark_discovery_loop', iterations: 2 },
     is_enabled: true,
   },
 ];

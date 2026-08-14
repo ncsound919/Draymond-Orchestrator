@@ -1,0 +1,16 @@
+# ============================================================================
+# generative-video-ai pipeline — consolidated dependencies
+# ============================================================================
+# One requirements file for the whole media pipeline. Each stage's real
+# manifest is included with `-r` so nothing drifts from the folded tools.
+# Install:  pip install -r pipelines/generative-video-ai/requirements.txt
+# ============================================================================
+
+# youtube-shorts — highlight extraction + vertical cropping (Whisper/GPT-4)
+-r ../../agents/AI-Youtube-Shorts-Generator-main/requirements.txt
+
+# content-creation-engine — animated episode rendering (Hood Alchemy)
+-r ../../../04_Integrations/integrations/Content-Creation-Engine-/requirements.txt
+
+# generative-video-ai studio is a Next.js app — npm install in
+# 04_Integrations/integrations/Generative-Video-AI (not pip).

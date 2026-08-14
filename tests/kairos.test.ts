@@ -13,9 +13,13 @@ vi.mock('../src/lib/draymond/treasury-state', () => ({ settledRevenueUsd: vi.fn(
 vi.mock('../src/lib/draymond/mission-strategy', () => ({ readStrategy: vi.fn(), totalMonthlyTarget: vi.fn() }));
 vi.mock('../src/lib/draymond/workflow-budget', () => ({ canCallProvider: vi.fn(), providerBudget: vi.fn() }));
 vi.mock('../src/lib/draymond/llm', () => ({ buildProviderOrder: vi.fn() }));
-vi.mock('../src/lib/draymond/upgrade-queue', () => ({ listUpgradeQueue: vi.fn() }));
+vi.mock('../src/lib/draymond/upgrade-queue', () => ({
+  listUpgradeQueue: vi.fn(),
+  failoverActionFor: () => ({ type: 'monitor', urgency: 'low', action: 'Monitor only.' }),
+}));
 vi.mock('../src/lib/draymond/self-repair', () => ({ detectRepairLoops: vi.fn() }));
 vi.mock('../src/lib/draymond/heartbeat', () => ({ getHeartbeats: vi.fn() }));
+vi.mock('../src/lib/draymond/analytics', () => ({ getCostSummary: vi.fn() }));
 vi.mock('../src/lib/draymond/ntfy', () => ({ publishIssueNotification: vi.fn() }));
 vi.mock('../src/lib/draymond/notifications', () => ({ sendAlertEmail: vi.fn() }));
 vi.mock('../src/lib/draymond/index', () => ({ logEvent: vi.fn(async () => {}) }));
@@ -36,6 +40,7 @@ let llm: { buildProviderOrder: Mock };
 let queue: { listUpgradeQueue: Mock };
 let repair: { detectRepairLoops: Mock };
 let heartbeat: { getHeartbeats: Mock };
+let analytics: { getCostSummary: Mock };
 let ntfy: { publishIssueNotification: Mock };
 let notifications: { sendAlertEmail: Mock };
 let index: { logEvent: Mock };
@@ -59,6 +64,7 @@ beforeEach(async () => {
   queue = (await import('../src/lib/draymond/upgrade-queue')) as unknown as { listUpgradeQueue: Mock };
   repair = (await import('../src/lib/draymond/self-repair')) as unknown as { detectRepairLoops: Mock };
   heartbeat = (await import('../src/lib/draymond/heartbeat')) as unknown as { getHeartbeats: Mock };
+  analytics = (await import('../src/lib/draymond/analytics')) as unknown as { getCostSummary: Mock };
   ntfy = (await import('../src/lib/draymond/ntfy')) as unknown as { publishIssueNotification: Mock };
   notifications = (await import('../src/lib/draymond/notifications')) as unknown as { sendAlertEmail: Mock };
   index = (await import('../src/lib/draymond/index')) as unknown as { logEvent: Mock };
@@ -315,6 +321,24 @@ describe('kairos branch coverage', () => {
     const hits = feed.filter((m) => m.kind === 'weak_agent');
     expect(hits).toHaveLength(1);
     expect(hits[0]!.detail).toContain('coder');
+  });
+
+  it('flags cost_pressure when 24h spend exceeds the cap', async () => {
+    vi.stubEnv('DRAYMOND_DAILY_COST_CAP_CENTS', '100'); // $1/day
+    analytics.getCostSummary.mockResolvedValue({ total_cents: 250, by_type: {}, by_entity: {} });
+    await kairos.kairosScan();
+    const feed = await kairos.kairosFeed();
+    const hits = feed.filter((m) => m.kind === 'cost_pressure');
+    expect(hits).toHaveLength(1);
+    expect(hits[0]!.detail).toContain('$2.50');
+  });
+
+  it('does not flag cost_pressure under the cap', async () => {
+    vi.stubEnv('DRAYMOND_DAILY_COST_CAP_CENTS', '1000');
+    analytics.getCostSummary.mockResolvedValue({ total_cents: 50, by_type: {}, by_entity: {} });
+    await kairos.kairosScan();
+    const feed = await kairos.kairosFeed();
+    expect(feed.filter((m) => m.kind === 'cost_pressure')).toHaveLength(0);
   });
 
   it('emits repair_loop moments only for escalated loops', async () => {

@@ -12,6 +12,8 @@
 // functions in index.ts — it does NOT replace them.
 // ============================================================================
 
+import fs from 'node:fs';
+import path from 'node:path';
 import { createDraymondClient } from './client';
 import { logEvent } from './index';
 import type {
@@ -499,4 +501,212 @@ export async function getMemoryInsights(agentId: string): Promise<MemoryInsight>
     newest_memory_at: createdDates[createdDates.length - 1] ?? null,
     most_accessed_keys: mostAccessed,
   };
+}
+
+// ============================================================================
+// CANONICAL BRAIN-STATE → SEARCH PROJECTIONS
+// ============================================================================
+// `.draymond/*.json` is the canonical WRITABLE store (MEMORY.md). Every other
+// memory backend (mem0, LanceDB, Engram, Memory Core, MemAgent) is a READ-ONLY
+// search projection over it. This function re-indexes the canonical files into
+// the `draymond_memory` search table with `source_event` provenance, so any
+// projection can be dropped and rebuilt losslessly from `.draymond/`.
+//
+// Tier = access method, not importance flag (Letta context hierarchy):
+//   core (system-goals, treasury)  → always in context, never decays
+//   important (lessons, hypotheses) → searchable archival
+//   contextual (kairos, recaps)    → on-demand
+// ============================================================================
+
+const BRAIN_STATE_TIER: Record<string, { tier: MemoryTier; importance: number; decay: number }> = {
+  'system-goals.json': { tier: 'core', importance: 0.9, decay: 0 },
+  'treasury.json': { tier: 'core', importance: 0.9, decay: 0 },
+  'learning-lessons.json': { tier: 'important', importance: 0.7, decay: 0.01 },
+  'hypotheses.json': { tier: 'important', importance: 0.7, decay: 0.01 },
+  'kairos.json': { tier: 'contextual', importance: 0.5, decay: 0.01 },
+  'recaps.json': { tier: 'contextual', importance: 0.5, decay: 0.01 },
+};
+
+function extractBrainStateRows(
+  file: string,
+  parsed: Record<string, unknown>
+): Array<{ key: string; summary: string; value: Record<string, unknown> }> {
+  const rows: Array<{ key: string; summary: string; value: Record<string, unknown> }> = [];
+  const asArray = (arr: unknown): Array<Record<string, unknown>> =>
+    Array.isArray(arr) ? (arr as Array<Record<string, unknown>>) : [];
+  switch (file) {
+    case 'system-goals.json':
+      for (const g of asArray(parsed.goals)) rows.push({ key: `system-goals:${String(g.id ?? g.title)}`, summary: String(g.title ?? 'goal'), value: g });
+      break;
+    case 'learning-lessons.json':
+      for (const l of asArray(parsed.lessons)) rows.push({ key: `learning-lessons:${String(l.id ?? l.pattern)}`, summary: String(l.pattern ?? l.lesson ?? 'lesson'), value: l });
+      break;
+    case 'hypotheses.json':
+      for (const h of asArray(parsed.hypotheses)) rows.push({ key: `hypotheses:${String(h.id ?? h.claim)}`, summary: String(h.claim ?? 'hypothesis'), value: h });
+      break;
+    case 'kairos.json':
+      for (const m of asArray(parsed.moments)) rows.push({ key: `kairos:${String(m.id ?? m.title)}`, summary: String(m.title ?? 'moment'), value: m });
+      break;
+    case 'treasury.json':
+      rows.push({ key: 'treasury:state', summary: 'Treasury revenue pulse', value: parsed });
+      break;
+    case 'recaps.json':
+      for (const r of asArray(parsed.recaps)) rows.push({ key: `recaps:${String(r.id ?? r.session_id)}`, summary: String(r.summary ?? 'recap'), value: r });
+      break;
+    default:
+      break;
+  }
+  return rows;
+}
+
+/**
+ * Rebuild the `draymond_memory` search projections from the canonical
+ * `.draymond/*.json` brain state. Idempotent (upsert on agent/user/key).
+ * Returns how many rows were indexed and how many files were skipped.
+ */
+export async function rebuildProjectionsFromBrainState(
+  opts: { agentId?: string; userId?: string; brainStateDir?: string } = {}
+): Promise<{ indexed: number; skipped: number }> {
+  const agentId = opts.agentId ?? 'draymond';
+  const userId = opts.userId ?? 'fleet';
+  const dir = opts.brainStateDir ?? (process.env.DRAYMOND_REGISTRY_DIR ?? path.join(process.cwd(), '.draymond'));
+  const supabase = await createDraymondClient();
+
+  let indexed = 0;
+  let skipped = 0;
+
+  let files: string[];
+  try {
+    files = await fs.promises.readdir(dir);
+  } catch {
+    return { indexed: 0, skipped: 0 }; // no canonical store → nothing to index
+  }
+
+  for (const file of files) {
+    if (!file.endsWith('.json')) continue;
+    const spec = BRAIN_STATE_TIER[file];
+    if (!spec) continue; // only files with a declared access tier are indexed
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await fs.promises.readFile(path.join(dir, file), 'utf-8'));
+    } catch {
+      skipped++;
+      continue;
+    }
+
+    const rows = extractBrainStateRows(file, (parsed ?? {}) as Record<string, unknown>);
+    for (const row of rows) {
+      const { error } = await supabase.from('draymond_memory').upsert(
+        {
+          agent_id: agentId,
+          user_id: userId,
+          key: row.key,
+          value: row.value,
+          summary: row.summary,
+          tier: spec.tier,
+          importance_score: spec.importance,
+          decay_rate: spec.decay,
+          last_accessed_at: new Date().toISOString(),
+          source_session_id: null,
+          source_event: `brain_state:${file}`,
+          is_active: true,
+        },
+        { onConflict: 'agent_id,user_id,key', ignoreDuplicates: false }
+      );
+      if (error) {
+        skipped++;
+        continue;
+      }
+      indexed++;
+    }
+  }
+
+  if (indexed > 0) {
+    await logEvent({
+      agent_id: agentId,
+      category: 'memory',
+      severity: 'info',
+      event_type: 'projections_rebuilt',
+      message: `Rebuilt memory search projections from ${dir}: ${indexed} rows indexed, ${skipped} skipped`,
+      metadata: { indexed, skipped, dir },
+    }).catch(() => {});
+  }
+
+  return { indexed, skipped };
+}
+
+// ============================================================================
+// BRAIN-STATE SIZE BUDGETS (rethink trigger)
+// ============================================================================
+// Each canonical .draymond file has a size cap. When a file exceeds its cap,
+// kairos raises a `memory_pressure` moment so an agent/operator runs a
+// consolidation ("rethink") pass — condense duplicate lessons, drop superseded
+// entries. Caps are advisory; files over budget still work, they just signal
+// that consolidation is due.
+// ============================================================================
+
+export interface BrainStateBudgetFile {
+  file: string;
+  sizeBytes: number;
+  capBytes: number;
+  overBudget: boolean;
+}
+
+/** Default caps (KB) per canonical brain-state file. Override via DRAYMOND_BRAIN_BUDGET_KB JSON. */
+const BRAIN_STATE_BUDGET_KB: Record<string, number> = {
+  'learning-lessons.json': 500,
+  'learning-outcomes.json': 4000,
+  'kairos.json': 750,
+  'recaps.json': 1000,
+  'hypotheses.json': 250,
+  'registry.json': 2000,
+  'repair-log.json': 2000,
+  'repair-team-log.json': 4000,
+  'system-goals.json': 250,
+  'treasury.json': 250,
+};
+
+function budgetCapsKb(): Record<string, number> {
+  const raw = process.env.DRAYMOND_BRAIN_BUDGET_KB;
+  if (!raw) return BRAIN_STATE_BUDGET_KB;
+  try {
+    const parsed = JSON.parse(raw) as Record<string, number>;
+    return { ...BRAIN_STATE_BUDGET_KB, ...parsed };
+  } catch {
+    return BRAIN_STATE_BUDGET_KB;
+  }
+}
+
+/**
+ * Report the on-disk size of each canonical .draymond file vs its cap.
+ * Returns an empty array when the brain-state dir is absent/unreadable.
+ */
+export async function checkBrainStateBudget(
+  brainStateDirOverride?: string
+): Promise<BrainStateBudgetFile[]> {
+  const dir = brainStateDirOverride ?? (process.env.DRAYMOND_REGISTRY_DIR ?? path.join(process.cwd(), '.draymond'));
+  const caps = budgetCapsKb();
+  const files: BrainStateBudgetFile[] = [];
+
+  let names: string[];
+  try {
+    names = await fs.promises.readdir(dir);
+  } catch {
+    return [];
+  }
+
+  for (const name of names) {
+    if (!name.endsWith('.json')) continue;
+    const capKb = caps[name];
+    if (!capKb) continue;
+    try {
+      const stat = await fs.promises.stat(path.join(dir, name));
+      const capBytes = capKb * 1024;
+      files.push({ file: name, sizeBytes: stat.size, capBytes, overBudget: stat.size > capBytes });
+    } catch {
+      // unreadable file — ignore, it will fail the projection rebuild instead
+    }
+  }
+  return files;
 }

@@ -60,6 +60,11 @@ function agentServiceSlug(agentSlug: string): string {
     'social-media-dashboard': 'social-media-dashboard',
     'indy-music-platform': 'indy-music',
     'overlay-chain': 'overlay-chain',
+    'phoenix': 'phoenix',
+    'generative-video-ai': 'generative-video-ai',
+    'litellm': 'litellm',
+    'open-notebook': 'open-notebook',
+    'stirling-pdf': 'stirling-pdf',
   };
   return map[agentSlug] ?? agentSlug;
 }

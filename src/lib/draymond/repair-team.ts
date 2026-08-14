@@ -23,9 +23,10 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { codingStackSummary, resolveCodingTools } from "./coding-stack";
+import { pipelineSummary } from "./fleet-pipelines";
 import { TOOL_PORTS } from "./ports";
 
-export type FailureKind = 'chain_config' | 'notification_config' | 'missing_env' | 'service_down' | 'code_error' | 'unknown';
+export type FailureKind = 'chain_config' | 'notification_config' | 'missing_env' | 'service_down' | 'code_error' | 'benchmark_weak' | 'unknown';
 
 export interface RepairCrew {
   lead: string;
@@ -67,7 +68,8 @@ export function assembleCrew(kind: FailureKind): RepairCrew {
   switch (kind) {
     case "chain_config":
     case "notification_config":
-    case "code_error": {
+    case "code_error":
+    case "benchmark_weak": {
       // Definitive coding stack: codegen (Uplift Agent primary) + review
       // (RepoRank) + IDE daemon (Mutly), supervised by Big Homie.
       const codegen = resolveCodingTools("codegen");
@@ -83,7 +85,7 @@ export function assembleCrew(kind: FailureKind): RepairCrew {
       return {
         lead,
         members,
-        reason: `master coding stack (${codingStackSummary()}) — coding agents apply the patch, Big Homie supervises`,
+        reason: `master coding stack (${codingStackSummary()}) | folded pipelines (${pipelineSummary()}) — coding agents apply the patch, Big Homie supervises`,
       };
     }
     case "missing_env":
@@ -256,6 +258,141 @@ export async function repairFailedJob(
   return { ...base, action: "handed-off", detail: `handed to ${crew.lead} + ${crew.members.join(", ")}` };
 }
 
+// ============================================================================
+// BENCHMARK WEAKNESS REPAIR — auto-fix components flagged by Benchmark Olympics
+// ============================================================================
+
+export interface BenchmarkWeakEntity {
+  component_slug: string;
+  component_name: string;
+  weakness_score: number;
+  reasons: string[];
+  proposed_action?: string;
+  repo_url?: string | null;
+}
+
+/**
+ * Dispatch the repair team on a weak benchmark component (Benchmark Olympics
+ * discovery loop → /api/ops/repair-benchmark). Two auto-fix channels:
+ *
+ *   1. Failover config fix — reuses the upgrade-queue failover matrix
+ *      (reconfigureEntity, gated by DRAYMOND_FAILOVER_MATRIX) to apply safe,
+ *      reversible invocation changes (retries/timeout) on the component.
+ *   2. Coding crew — opencode (primary) → uplift-agent (fallback) → a
+ *      deterministic terminal plan, so a code/config fix is PROPOSED and
+ *      captured for the crew lead even when no engine is reachable.
+ *
+ * Guardrails: only score >= 50 is dispatched; a per-component cooldown stops
+ * repeated loops from hammering the same slug; the whole path records to the
+ * repair-team log + self-learning and reports deterministically.
+ *
+ * Kill switch: DRAYMOND_REPAIR_BENCHMARK_ENABLED=0 makes this proposal-only
+ * (records a handed-off report without dispatching engines).
+ */
+export async function repairWeakEntity(
+  entity: BenchmarkWeakEntity,
+  options: RepairRepairOptions = {},
+): Promise<RepairReport> {
+  const score = Math.round(entity.weakness_score ?? 0);
+  const reasons = Array.isArray(entity.reasons) ? entity.reasons : [];
+  const proposedAction = entity.proposed_action || 'Reconfigure invocation (model, endpoint, retries) and run a repair pass.';
+  const crew = assembleCrew('benchmark_weak');
+  const base = {
+    jobId: `benchmark:${entity.component_slug}`,
+    jobName: entity.component_name || entity.component_slug,
+    failureKind: 'benchmark_weak' as FailureKind,
+    error: reasons.join('; ').slice(0, 800) || `benchmark weakness score ${score}`,
+    crew,
+    repairedAt: new Date().toISOString(),
+    lessonHints: [],
+  };
+
+  // Monitor band — below the remediation band, nothing to auto-fix.
+  if (score < 50) {
+    const report: RepairReport = {
+      ...base,
+      action: 'handed-off',
+      detail: `weakness ${score} below the remediation band (>=50) — monitor only. ${proposedAction}`,
+    };
+    await recordRepair(report);
+    return report;
+  }
+
+  // Per-component cooldown so a repeated discovery loop can't hammer the same slug.
+  try {
+    const { isOnCooldown } = await import('./workflow-budget');
+    const onCooldown = isOnCooldown(`repair-benchmark:${entity.component_slug}`, 'codegen', Number(process.env.DRAYMOND_REPAIR_DISPATCH_COOLDOWN_MS) || 30 * 60 * 1000);
+    if (onCooldown) {
+      const report: RepairReport = {
+        ...base,
+        action: 'handed-off',
+        detail: `benchmark repair for ${entity.component_slug} dispatched recently (cooldown) — next window`,
+        dispatch: { kind: 'deferred', result: 'cooldown' },
+      };
+      await recordRepair(report);
+      return report;
+    }
+  } catch { /* best-effort */ }
+
+  const autoFixEnabled = process.env.DRAYMOND_REPAIR_BENCHMARK_ENABLED !== '0';
+
+  if (!autoFixEnabled) {
+    const report: RepairReport = {
+      ...base,
+      action: 'handed-off',
+      detail: `benchmark weakness ${score} for ${entity.component_slug} — ${proposedAction}. ` +
+        `Auto-fix disabled (DRAYMOND_REPAIR_BENCHMARK_ENABLED=0); handed to ${crew.lead} for review.`,
+    };
+    await recordRepair(report);
+    return report;
+  }
+
+  // 1. Failover config fix (deterministic, gated by DRAYMOND_FAILOVER_MATRIX).
+  let configDetail: string | null = null;
+  try {
+    const { reconfigureEntity } = await import('./upgrade-queue');
+    const applied = await reconfigureEntity(entity.component_slug, score, reasons);
+    if (applied && applied.type !== 'monitor') {
+      configDetail = `failover config applied: ${applied.action}`;
+    }
+  } catch { /* best-effort — coding crew still runs */ }
+
+  // 2. Coding crew generates a fix for the weak component.
+  const jobLike = {
+    id: `benchmark:${entity.component_slug}`,
+    name: base.jobName,
+    job_type: 'benchmark',
+    job_config: {
+      component_slug: entity.component_slug,
+      weakness_score: score,
+      reasons,
+      proposed_action: proposedAction,
+      repo_url: entity.repo_url ?? null,
+    },
+  };
+  let outcome;
+  try {
+    const { dispatchCodingRepair } = await import("./coding-repair");
+    outcome = await dispatchCodingRepair(jobLike, base.error, [], crew, { timeoutMs: options.dispatchTimeoutMs });
+  } catch (err) {
+    outcome = {
+      action: 'handed-off' as const,
+      detail: `coding repair dispatch failed: ${err instanceof Error ? err.message : String(err)}`,
+      dispatch: { kind: 'codegen' as const, engine: 'dispatch', result: 'threw' },
+    };
+  }
+
+  const detail = [configDetail, outcome.detail].filter(Boolean).join(' | ');
+  const report: RepairReport = {
+    ...base,
+    action: configDetail ? 'fixed' : outcome.action,
+    detail,
+    dispatch: outcome.dispatch,
+  };
+  await recordRepair(report);
+  return report;
+}
+
 async function recordRepair(report: RepairReport): Promise<void> {
   await fs.mkdir(DIR, { recursive: true });
   let log: RepairReport[] = [];
@@ -301,6 +438,7 @@ const FAILURE_LABEL: Record<FailureKind, string> = {
   missing_env: 'Missing env',
   service_down: 'Service down',
   code_error: 'Code error',
+  benchmark_weak: 'Benchmark weakness',
   unknown: 'Unknown',
 };
 

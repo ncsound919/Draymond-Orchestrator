@@ -29,10 +29,10 @@ New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 
 # slug -> { cmd, args, cwd, port, health }
 $TOOLS = @{
-  "agent-browser" = @{ cmd = "npx";      args = @("next", "dev", "-p", "3700");           cwd = "agents\AgentBrowser-main"; port = 3700; health = "/api/health" }
-  "mutly"         = @{ cmd = "npm";      args = @("run", "dev");                           cwd = "agents\Mutly-Daemon-Agent"; port = 4000; health = "/api/health" }
+  "agent-browser" = @{ cmd = "npx";      args = @("next", "dev", "-p", "3700");           cwd = "agents\AgentBrowser-main"; port = 3700; health = "/api/system/health" }
+  "mutly"         = @{ cmd = "npm";      args = @("run", "dev");                           cwd = "agents\Mutly-Daemon-Agent"; port = 4000; health = "/api/agent/public-config" }
   "opencode"      = @{ cmd = "opencode"; args = @("serve", "--port", "4096");              cwd = "."; port = 4096; health = "/" }
-  "reporank"      = @{ cmd = "pnpm";     args = @("dev:local");                            cwd = "agents\reporank"; port = 3200; health = "/api/health" }
+  "reporank"      = @{ cmd = "pnpm";     args = @("dev:local");                            cwd = "agents\reporank"; port = 3200; health = "/health" }
   "grader"        = @{ cmd = "npm";      args = @("run", "dev");                           cwd = "agents\Grader-main"; port = 3201; health = "/api/health" }
   "codegang"      = @{ cmd = "npx";      args = @("next", "dev", "--webpack", "-p", "3204"); cwd = "agents\Codegang"; port = 3204; health = "/api" }
   "deterministic-brain" = @{ cmd = "python"; args = @("main.py", "--serve"); cwd = "agents\deterministic-brain"; port = 3210; health = "/health" }
@@ -43,12 +43,15 @@ $TOOLS = @{
   # by spec). --json-response + --stateless for plain-JSON MCP clients.
   "graphify"      = @{ cmd = "python";   args = @("scripts\serve-graphify.py", "graphify-out\graph.json", "--transport", "http", "--port", "3203", "--host", "127.0.0.1", "--json-response", "--stateless"); cwd = "."; port = 3203; health = "/health" }
   "claw-protect"  = @{ cmd = "npm";      args = @("run", "dev");                           cwd = "agents\Claw-Protect-main"; port = 3300; health = "/api/health" }
+  "system-agent"  = @{ cmd = "node";     args = @("--import", "tsx", "src/server.ts");     cwd = "agents\system-agent"; port = 3405; health = "/api/health" }
   "vibeserve"     = @{ cmd = "python";   args = @("-m", "vibeserve");                      cwd = "agents\VibeServe-main"; port = 3600; health = "/health" }
-  "big-homie"     = @{ cmd = "uvicorn";  args = @("big_homie_web:app", "--port", "3500");  cwd = "agents\AgentBrowser-main\Big-Homie-main"; port = 3500; health = "/health" }
-  "litellm"       = @{ cmd = "litellm";  args = @("--config", "litellm.yaml", "--port", "4100"); cwd = "."; port = 4100; health = "/health" }
+  "big-homie"     = @{ cmd = "uvicorn";  args = @("big_homie_web:app", "--port", "3500");  cwd = "agents\AgentBrowser-main\Big-Homie-main"; port = 3500; health = "/tools/status" }
+  "litellm"       = @{ cmd = "powershell"; args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "scripts\start-litellm.ps1"); cwd = "."; port = 4100; health = "/health" }
   # Ecosystem data/research services
   # BookBridge - self-hosts HTTP on 8777 via main.py (bookbridge.server).
   "bookbridge"    = @{ cmd = "python";   args = @("main.py");                                cwd = "agents\BookBridge--main"; port = 8777; health = "/health" }
+  "openchat"      = @{ cmd = "npm";      args = @("run", "dev", "--", "--port", "5175", "--strictPort"); cwd = "..\Open-Chat"; port = 5175; health = "/" }
+  "aetherdesk"    = @{ cmd = "powershell"; args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "scripts\start-aetherdesk.ps1"); cwd = "."; port = 8002; health = "/api/v1/health" }
   # Hemp-OS / HempForge live in the Uplift repo root (sibling of Draymond-Orchestrator).
   # Hemp-OS is a Node/tsx app (server.ts) — needs `npm install` before first run.
   "hemp-os"       = @{ cmd = "npm";      args = @("run", "dev");                           cwd = "..\potential\Hemp-OS-main"; port = 3100; health = "/health" }

@@ -36,6 +36,7 @@ import { routeAndClassify } from '@/lib/draymond/router';
 import { logExecution } from '@/lib/draymond/confidence';
 import { processEvent } from '@/lib/draymond/reactive';
 import { buildAndExecuteChain } from '@/lib/draymond/chain-builder';
+import { humanizeResponse } from '@/lib/draymond/chat-polish';
 import { getDashboardSummary, submitAction } from '@/lib/draymond/index';
 import {
   AETHERDESK_OPERATIONS,
@@ -376,16 +377,9 @@ export async function POST(request: NextRequest) {
         }
       } else if (auto_route) {
         // ── Intelligent Task Router path ───────────────────────────
-        await write(sseChunk('[Draymond] Routing task...\n'));
         try {
           const routeResult = await routeAndClassify(task, metadata);
           const route = routeResult.route;
-
-          await write(
-            sseChunk(
-              `[Route] ${route.intent} → ${route.entity_slug ?? route.chain_slug ?? 'default'} (confidence: ${route.confidence.toFixed(2)})\n`,
-            ),
-          );
 
           if (routeResult.should_auto_execute && route.intent === 'invoke_entity' && route.entity_slug) {
             const merged = {
@@ -404,23 +398,14 @@ export async function POST(request: NextRequest) {
           } else if (route.intent === 'query_status') {
             const summary = await getDashboardSummary();
             resultText = JSON.stringify(summary);
+          } else if (route.intent === 'casual_chat') {
+            resultText = await handleUpliftDispatch(workflowId, task, metadata);
           } else if (route.intent === 'decompose_goal' || routeResult.needs_decomposition) {
             // Fall through to Uplift for complex decomposition
             resultText = await handleUpliftDispatch(workflowId, task, metadata);
           } else if (routeResult.needs_confirmation) {
-            // Confidence not high enough — return routing info for user confirmation
-            resultText = JSON.stringify({
-              status: 'needs_confirmation',
-              route: {
-                intent: route.intent,
-                entity_slug: route.entity_slug,
-                chain_slug: route.chain_slug,
-                confidence: route.confidence,
-                reasoning: route.reasoning,
-                alternatives: route.alternatives,
-              },
-              message: `I'm ${(route.confidence * 100).toFixed(0)}% confident this should go to "${route.entity_slug ?? route.chain_slug ?? 'unknown'}". Please confirm or provide more details.`,
-            });
+            // Confidence not high enough — ask the user to confirm in plain language
+            resultText = `I think you want me to ${route.entity_slug ? `ask ${route.entity_slug} to handle this` : route.chain_slug ? `run the "${route.chain_slug}" workflow` : 'handle this'}. Is that right? Or tell me a bit more about what you need.`;
           } else {
             // Low confidence or unknown — fall back to Uplift
             resultText = await handleUpliftDispatch(workflowId, task, metadata);
@@ -445,10 +430,14 @@ export async function POST(request: NextRequest) {
         build_chain,
       }).catch(() => {});
 
+      // Humanize structured results before streaming so the phone shows a
+      // conversational reply instead of a raw JSON dump.
+      const polished = await humanizeResponse(resultText, { userTask: task });
+
       // Stream the result in chunks so Open-Chat sees a streaming response
       const CHUNK_SIZE = 20;
-      for (let i = 0; i < resultText.length; i += CHUNK_SIZE) {
-        await write(sseChunk(resultText.slice(i, i + CHUNK_SIZE)));
+      for (let i = 0; i < polished.length; i += CHUNK_SIZE) {
+        await write(sseChunk(polished.slice(i, i + CHUNK_SIZE)));
       }
 
       // Announce workflow completion

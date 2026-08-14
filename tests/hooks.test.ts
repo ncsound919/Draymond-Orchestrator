@@ -46,6 +46,18 @@ describe('registerHook', () => {
     expect(() => mod.registerHook(hookInput({ callback_url: 'http://localhost/hook' }))).toThrow(/private/);
   });
 
+  it('allows an allowlisted localhost callback in production', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('LOCAL_SERVICE_ALLOWLIST', 'localhost,127.0.0.1');
+    expect(() => mod.registerHook(hookInput({ callback_url: 'http://localhost:8777/hook' }))).not.toThrow();
+  });
+
+  it('blocks a non-allowlisted localhost callback in production', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('LOCAL_SERVICE_ALLOWLIST', 'services.internal');
+    expect(() => mod.registerHook(hookInput({ callback_url: 'http://localhost:8777/hook' }))).toThrow(/private/);
+  });
+
   it('rejects invalid max_failures and secret', () => {
     expect(() => mod.registerHook(hookInput({ max_failures: 0 }))).toThrow(/max_failures/);
     expect(() => mod.registerHook(hookInput({ max_failures: Number.NaN }))).toThrow(/max_failures/);

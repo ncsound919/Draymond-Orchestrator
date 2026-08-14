@@ -4,7 +4,7 @@ import fs from 'node:fs';
 
 function repoRoot(): string {
   if (process.env.SPORTS_ROOT) return process.env.SPORTS_ROOT;
-  if (typeof __dirname !== 'undefined') return path.resolve(__dirname, '../../..');
+  if (typeof __dirname !== 'undefined') return path.resolve(/*turbopackIgnore: true*/ __dirname, '../../..');
   return path.resolve(process.cwd());
 }
 

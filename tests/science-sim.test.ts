@@ -11,7 +11,7 @@ describe('science sim shell-out', () => {
     expect(a.series.length).toBeGreaterThan(0);
     expect(a.outputs).toHaveProperty('fatigue');
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
-  }, 30000);
+  }, 90_000);
 
   it('runs an inline model spec', async () => {
     const out = await runModelSpec({
@@ -25,11 +25,11 @@ describe('science sim shell-out', () => {
     });
     expect(out.error).toBeUndefined();
     expect(out.outputs.x).toBe(5);
-  }, 30000);
+  }, 90_000);
 
   it('returns an error-shaped result for an unknown model', async () => {
     const out = await runModelById('does-not-exist-model');
     expect(out.error).toContain('model not found');
     expect(out.evidence_tier).toBe('E4');
-  }, 30000);
+  }, 90_000);
 });

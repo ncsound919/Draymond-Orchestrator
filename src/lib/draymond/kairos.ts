@@ -25,6 +25,8 @@ export const KAIROS_KINDS = [
   'repair_loop',
   'stale_heartbeat',
   'stale_experiment',
+  'memory_pressure',
+  'cost_pressure',
 ] as const;
 export type KairosKind = (typeof KAIROS_KINDS)[number];
 
@@ -169,16 +171,17 @@ export async function detectBudgetPressure(): Promise<DetectorHit[]> {
 }
 
 export async function detectWeakAgent(): Promise<DetectorHit[]> {
-  const { listUpgradeQueue } = await import('./upgrade-queue');
+  const { listUpgradeQueue, failoverActionFor } = await import('./upgrade-queue');
   const queued = await listUpgradeQueue('queued');
   const top = [...queued].sort((a, b) => b.weakness_score - a.weakness_score)[0];
   if (!top || top.weakness_score < WEAK_AGENT_SCORE_FLOOR) return [];
+  const matrix = failoverActionFor(top.weakness_score, top.component_class, top.reasons);
   return [
     {
       kind: 'weak_agent' as const,
       severity: 'warn' as const,
       title: `Weakest agent: ${top.component_name}`,
-      detail: `${top.component_class} ${top.component_slug} — weakness ${top.weakness_score.toFixed(2)}${top.proposed_action ? ` · ${top.proposed_action}` : ''}`,
+      detail: `${top.component_class} ${top.component_slug} — weakness ${top.weakness_score.toFixed(2)} · ${matrix.action}${top.proposed_action ? ` (queue: ${top.proposed_action})` : ''}`,
       source: 'upgrade-queue',
     },
   ];
@@ -240,6 +243,36 @@ export async function detectStaleExperiment(): Promise<DetectorHit[]> {
   return hits;
 }
 
+export async function detectMemoryPressure(): Promise<DetectorHit[]> {
+  const { checkBrainStateBudget } = await import('./memory-intelligence');
+  const over = (await checkBrainStateBudget()).filter((f) => f.overBudget);
+  return over.map((f) => ({
+    kind: 'memory_pressure' as const,
+    severity: 'warn' as const,
+    title: `Brain-state over budget: ${f.file}`,
+    detail: `${f.file} is ${Math.round(f.sizeBytes / 1024)}KB vs ${Math.round(f.capBytes / 1024)}KB cap — run a consolidation (rethink) pass.`,
+    source: 'memory-intelligence',
+  }));
+}
+
+export async function detectCostPressure(): Promise<DetectorHit[]> {
+  const capCents = Number(process.env.DRAYMOND_DAILY_COST_CAP_CENTS ?? 5000); // $50/day
+  if (!Number.isFinite(capCents) || capCents <= 0) return [];
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { getCostSummary } = await import('./analytics');
+  const summary = await getCostSummary(since).catch(() => null);
+  if (!summary || summary.total_cents < capCents) return [];
+  return [
+    {
+      kind: 'cost_pressure' as const,
+      severity: 'warn' as const,
+      title: `Fleet cost over $${(capCents / 100).toFixed(2)}/day`,
+      detail: `Last 24h cost $${(summary.total_cents / 100).toFixed(2)} exceeds cap $${(capCents / 100).toFixed(2)}. Review delegation budgets / provider routing.`,
+      source: 'analytics',
+    },
+  ];
+}
+
 export const DETECTORS: Array<{ kind: KairosKind; run: () => Promise<DetectorHit[]> }> = [
   { kind: 'monitor_down', run: detectMonitorDown },
   { kind: 'job_failed', run: detectJobFailed },
@@ -250,6 +283,8 @@ export const DETECTORS: Array<{ kind: KairosKind; run: () => Promise<DetectorHit
   { kind: 'repair_loop', run: detectRepairLoop },
   { kind: 'stale_heartbeat', run: detectStaleHeartbeat },
   { kind: 'stale_experiment', run: detectStaleExperiment },
+  { kind: 'memory_pressure', run: detectMemoryPressure },
+  { kind: 'cost_pressure', run: detectCostPressure },
 ];
 
 // ============================================================================
@@ -295,6 +330,8 @@ const EVENT_CATEGORY: Record<KairosKind, EventCategory> = {
   repair_loop: 'recovery',
   stale_heartbeat: 'health',
   stale_experiment: 'goal',
+  memory_pressure: 'health',
+  cost_pressure: 'goal',
 };
 
 const EVENT_SEVERITY: Record<KairosSeverity, EventSeverity> = {

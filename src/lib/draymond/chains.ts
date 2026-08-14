@@ -11,6 +11,8 @@ import { logEvent, evaluateConfidence, submitAction, isActionApproved } from './
 import { getEntity, recordInvocation } from './registry';
 import { invokeEntity } from './invoker';
 import { recordChainStepCost } from './cost';
+import { shouldRetryStep, retryDelayMs } from './retry';
+import { validateStepInput, validateInputMapping } from './step-schemas';
 import {
   emitChainStarted,
   emitChainStepCompleted,
@@ -224,6 +226,20 @@ export async function addSteps(
   inputs: DraymondChainStepInsert[]
 ): Promise<DraymondChainStep[]> {
   if (inputs.length === 0) return [];
+
+  // Enqueue-time structural guard: reject chains whose input_mapping misses a
+  // schema-required field before they are stored (Step 3). Best-effort — only
+  // fires for entities with a registered schema.
+  for (const input of inputs) {
+    const check = await validateInputMapping(
+      input.entity_id,
+      input.action,
+      input.input_mapping ?? {}
+    );
+    if (!check.ok) {
+      throw new Error(check.error);
+    }
+  }
 
   const supabase = createDraymondAdminClient();
 
@@ -627,6 +643,31 @@ export async function instantiateChain(
 }
 
 /**
+ * Build a detailed chain error message that surfaces the underlying per-step
+ * errors instead of the opaque "N of N steps failed" summary. This is what
+ * Open-Chat / ntfy notifications and the Schedules UI show, so the actual
+ * failure reason (entity invoke error, timeout, 4xx, etc.) is visible without
+ * opening the step rows.
+ */
+function buildChainErrorMessage(
+  steps: DraymondChainStep[],
+  ctx: ChainExecutionContext,
+  failedSteps: number
+): string {
+  const summary = `${failedSteps} of ${steps.length} steps failed`;
+  const failures: string[] = [];
+  for (const step of steps) {
+    const key = step.output_key || `step_${step.step_order}`;
+    const state = ctx.steps[key];
+    if (state && (state.status === 'failed' || state.status === 'blocked')) {
+      const err = (state.error ?? 'unknown error').slice(0, 160);
+      failures.push(`${step.name}: ${err}`);
+    }
+  }
+  return failures.length > 0 ? `${summary} — ${failures.join('; ')}` : summary;
+}
+
+/**
  * Resolve input data for a step using its input_mapping and the execution context.
  * Supports JSONPath-like references: $.input.X, $.context.X, $.steps.STEP_KEY.output.X
  */
@@ -752,6 +793,8 @@ async function updateChainStatus(
     output_data?: Record<string, unknown>;
     error_message?: string;
     context?: Record<string, unknown>;
+    /** Run lease — when it expires a crashed chain is recovered (see scheduler). */
+    lease_expires_at?: string | null;
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabaseClient?: any
@@ -787,6 +830,7 @@ async function executeStep(
 }> {
   const startTime = Date.now();
   let attempt = 0; // Always start from 0 — retry_count was reset in DB (item 19)
+  let lastStatusCode: number | undefined; // last HTTP status for retry classification
 
   while (true) {
     try {
@@ -808,6 +852,14 @@ async function executeStep(
       const resolvedInput = Object.keys(step.input_mapping).length > 0
         ? resolveInputMapping(step.input_mapping, ctx)
         : ctx.input;
+
+      // Schema-validate the resolved input before any invocation (Step 3).
+      // A violation throws here → classified fatal in the retry policy (see
+      // ./retry) so it is never retried.
+      const inputCheck = validateStepInput(entity.slug, step.action, resolvedInput);
+      if (!inputCheck.ok) {
+        throw new Error(inputCheck.error);
+      }
 
       // Update step with resolved input
       await updateStepStatus(step.id, 'running', {
@@ -934,6 +986,7 @@ async function executeStep(
       emitAgentResult(entity.id, entity.name, invocationResult.success, invocationResult.duration_ms ?? (Date.now() - startTime), invocationResult.error);
 
       if (!invocationResult.success) {
+        lastStatusCode = invocationResult.status_code;
         throw new Error(
           invocationResult.error ||
           `Entity "${entity.name}" invocation failed (${entity.invocation_method})`
@@ -977,8 +1030,9 @@ async function executeStep(
       const errorMessage = err instanceof Error ? err.message : String(err);
       const duration_ms = Date.now() - startTime;
 
-      // Check if we should retry (iterative — no recursion)
-      if (attempt < step.max_retries) {
+      // Retry only transient failures (network/timeout/429/5xx). Fatal errors
+      // (4xx, SSRF, validation, auth) fail immediately — see ./retry.
+      if (shouldRetryStep(attempt, step.max_retries, errorMessage, lastStatusCode)) {
         try {
           await updateStepStatus(step.id, 'retrying', {
             error_message: errorMessage,
@@ -988,8 +1042,8 @@ async function executeStep(
           console.error('[Draymond Chains] Failed to update retry status:', dbErr);
         }
 
-        // Backoff delay before next attempt
-        await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+        // Jittered exponential backoff before next attempt
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs(attempt, 500)));
         attempt++;
         continue; // next iteration of while loop
       }
@@ -1048,6 +1102,38 @@ async function executeStep(
  * 5. Each step's output is stored in the execution context
  * 6. The chain fails if a non-optional step fails (after retries)
  */
+
+// ── Chain run leases ──────────────────────────────────────────────────────────
+// Same lease/heartbeat pattern as the scheduler: a running chain carries a
+// lease_expires_at; the executing process heartbeats it so slow-but-alive chains
+// are never treated as crashed. Only an EXPIRED lease (process died) is
+// recovered by the scheduler's stale-chain scan.
+const CHAIN_LEASE_MS = (() => {
+  const raw = Number(process.env.DRAYMOND_JOB_LEASE_MS ?? 10 * 60 * 1000);
+  return Number.isFinite(raw) && raw > 0 ? raw : 10 * 60 * 1000;
+})();
+
+function chainLeaseExpiryIso(now: Date): string {
+  return new Date(now.getTime() + CHAIN_LEASE_MS).toISOString();
+}
+
+/** Heartbeat a running chain's lease; returns a stop() handle. */
+function startChainHeartbeat(
+  chainId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any
+): () => void {
+  const intervalMs = Math.max(10_000, Math.min(60_000, Math.floor(CHAIN_LEASE_MS / 4)));
+  const timer = setInterval(() => {
+    supabase
+      .from('draymond_chains')
+      .update({ lease_expires_at: new Date(Date.now() + CHAIN_LEASE_MS).toISOString() })
+      .eq('id', chainId)
+      .then(() => {}, () => {});
+  }, intervalMs);
+  return () => clearInterval(timer);
+}
+
 export async function executeChain(
   chainId: string,
   agentId?: string,
@@ -1093,8 +1179,11 @@ export async function executeChain(
   // Mark chain as running
   await updateChainStatus(chainId, 'running', {
     started_at: new Date().toISOString(),
+    lease_expires_at: chainLeaseExpiryIso(new Date()),
     total_duration_ms: undefined,
   }, supabase);
+
+  const stopChainHeartbeat = startChainHeartbeat(chainId, supabase);
 
   if (agentId) {
     await logEvent({
@@ -1112,21 +1201,45 @@ export async function executeChain(
   const completedStepIds = new Set<string>();
 
   // Delegate to the shared step-group execution loop
-  const { completedSteps, failedSteps } = await executeStepGroups(
-    steps,
-    ctx,
-    agentId,
-    supabase,
-    {
-      chainId,
-      chainSlug: chain.slug,
-      chainStartTime,
-      timeoutMs,
-      initialCompletedSteps: 0,
-      initialFailedSteps: 0,
-      completedStepIds,
-    }
-  );
+  let completedSteps = 0;
+  let failedSteps = 0;
+  let stepError: unknown = null;
+  try {
+    const groups = await executeStepGroups(
+      steps,
+      ctx,
+      agentId,
+      supabase,
+      {
+        chainId,
+        chainSlug: chain.slug,
+        chainStartTime,
+        timeoutMs,
+        initialCompletedSteps: 0,
+        initialFailedSteps: 0,
+        completedStepIds,
+      }
+    );
+    completedSteps = groups.completedSteps;
+    failedSteps = groups.failedSteps;
+  } catch (err) {
+    stepError = err;
+  } finally {
+    stopChainHeartbeat();
+  }
+
+  // A catastrophic (non-step) error: record failure + release the lease so the
+  // chain isn't stuck 'running' until the stale scan.
+  if (stepError) {
+    const stepErrorMessage = stepError instanceof Error ? stepError.message : String(stepError);
+    await updateChainStatus(chainId, 'failed', {
+      completed_at: new Date().toISOString(),
+      error_message: `Chain execution aborted: ${stepErrorMessage}`,
+      lease_expires_at: null,
+    }, supabase);
+    emitChainFailed(chainId, chain.name, completedSteps, 1, Date.now() - chainStartTime, stepErrorMessage);
+    throw stepError;
+  }
 
   // Finalize chain
   const totalDuration = Date.now() - chainStartTime;
@@ -1140,9 +1253,10 @@ export async function executeChain(
     total_duration_ms: totalDuration,
     output_data: ctx.context,
     context: ctx.context,
+    lease_expires_at: null,
     error_message:
       failedSteps > 0
-        ? `${failedSteps} of ${steps.length} steps failed`
+        ? buildChainErrorMessage(steps, ctx, failedSteps)
         : undefined,
   }, supabase);
 
@@ -1159,12 +1273,13 @@ export async function executeChain(
         completed_steps: completedSteps,
         failed_steps: failedSteps,
         total_duration_ms: totalDuration,
+        error: failedSteps > 0 ? buildChainErrorMessage(steps, ctx, failedSteps) : undefined,
       },
     });
   }
 
   if (failedSteps > 0) {
-    emitChainFailed(chainId, chain.name, completedSteps, failedSteps, totalDuration, `${failedSteps} of ${steps.length} steps failed`);
+    emitChainFailed(chainId, chain.name, completedSteps, failedSteps, totalDuration, buildChainErrorMessage(steps, ctx, failedSteps));
   } else {
     emitChainCompleted(chainId, chain.name, completedSteps, failedSteps, totalDuration);
   }
@@ -1342,7 +1457,10 @@ export async function resumeChain(
     completed_steps: restoredCompleted,
     failed_steps: 0,
     error_message: undefined,
+    lease_expires_at: chainLeaseExpiryIso(new Date()),
   }, supabase);
+
+  const stopChainHeartbeat = startChainHeartbeat(chainId, supabase);
 
   // Log resume event
   if (agentId) {
@@ -1362,21 +1480,42 @@ export async function resumeChain(
   }
 
   // ── 6. Execute remaining steps via shared loop ─────────────────────────
-  const { completedSteps, failedSteps } = await executeStepGroups(
-    steps,
-    ctx,
-    agentId,
-    supabase,
-    {
-      chainId,
-      chainSlug: chain.slug,
-      chainStartTime,
-      timeoutMs,
-      initialCompletedSteps: restoredCompleted,
-      initialFailedSteps: 0,
-      completedStepIds,
-    }
-  );
+  let completedSteps = 0;
+  let failedSteps = 0;
+  let stepError: unknown = null;
+  try {
+    const groups = await executeStepGroups(
+      steps,
+      ctx,
+      agentId,
+      supabase,
+      {
+        chainId,
+        chainSlug: chain.slug,
+        chainStartTime,
+        timeoutMs,
+        initialCompletedSteps: restoredCompleted,
+        initialFailedSteps: 0,
+        completedStepIds,
+      }
+    );
+    completedSteps = groups.completedSteps;
+    failedSteps = groups.failedSteps;
+  } catch (err) {
+    stepError = err;
+  } finally {
+    stopChainHeartbeat();
+  }
+
+  if (stepError) {
+    const stepErrorMessage = stepError instanceof Error ? stepError.message : String(stepError);
+    await updateChainStatus(chainId, 'failed', {
+      completed_at: new Date().toISOString(),
+      error_message: `Chain execution aborted: ${stepErrorMessage}`,
+      lease_expires_at: null,
+    }, supabase);
+    throw stepError;
+  }
 
   // ── 7. Finalize chain status ───────────────────────────────────────────
   const totalDuration = Date.now() - chainStartTime;
@@ -1390,9 +1529,10 @@ export async function resumeChain(
     total_duration_ms: totalDuration,
     output_data: ctx.context,
     context: ctx.context,
+    lease_expires_at: null,
     error_message:
       failedSteps > 0
-        ? `${failedSteps} of ${steps.length} steps failed`
+        ? buildChainErrorMessage(steps, ctx, failedSteps)
         : undefined,
   }, supabase);
 

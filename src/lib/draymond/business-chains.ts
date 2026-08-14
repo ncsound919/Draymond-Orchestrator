@@ -212,6 +212,8 @@ const ENTITY_DEFS: EntitySeedDef[] = [
         generate_text: '/api/ai/generate-text',
         generate_image: '/api/ai/generate-image',
         generate_video: '/api/ai/generate-video',
+        schedule_posts: '/api/ai/schedule',
+        schedule_post: '/api/ai/schedule',
         podcast_narrate: '/api/ai/podcast/narrate',
         podcast_music: '/api/ai/podcast/music',
         podcast_mix: '/api/ai/podcast/mix',
@@ -654,6 +656,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
         books: '/books',
         add: '/books/add',
         scan: '/scan',
+        bookbridge_ground: '/ground',
         link_activity: '/link_activity',
       },
     },
@@ -713,6 +716,166 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     tags: ['worker', 'open-chat', 'marketing', 'phone'],
     category: 'marketing',
   },
+
+  // ── Folded tool stages (dispatch through parent pipelines) ─────────────
+  // These are the tools absorbed into parent agents. Each is an invocable
+  // entity whose invocation routes THROUGH the parent's fleet pipeline, so
+  // chains/schedulers never call a disjointed one-off tool — the parent owns
+  // the singular pipeline and this entity is just a named stage handle.
+  {
+    name: 'Marketing Tool (stage)',
+    slug: 'marketing-tool',
+    kind: 'tool',
+    description: 'Marketing asset engine — stage of the social-media-dashboard pipeline.',
+    invocation_method: 'pipeline',
+    invocation_config: { pipeline: 'social-media-dashboard', tool: 'marketing-tool' },
+    capabilities: ['marketing_automation', 'creation_studio', 'segmentation'],
+    tags: ['folded', 'marketing', 'pipeline'],
+    category: 'marketing',
+  },
+  {
+    name: 'YouTube Shorts (stage)',
+    slug: 'youtube-shorts',
+    kind: 'tool',
+    description: 'Shorts clipper — stage of the generative-video-ai pipeline.',
+    invocation_method: 'pipeline',
+    invocation_config: { pipeline: 'generative-video-ai', tool: 'youtube-shorts' },
+    capabilities: ['highlight_extraction', 'vertical_cropping', 'speaker_detection'],
+    tags: ['folded', 'media', 'pipeline'],
+    category: 'media',
+  },
+  {
+    name: 'Content Creation Engine (stage)',
+    slug: 'content-creation-engine',
+    kind: 'tool',
+    description: 'Animated episode engine — stage of the generative-video-ai pipeline.',
+    invocation_method: 'pipeline',
+    invocation_config: { pipeline: 'generative-video-ai', tool: 'content-creation-engine' },
+    capabilities: ['episode_rendering', 'commercial_breaks'],
+    tags: ['folded', 'media', 'pipeline'],
+    category: 'media',
+  },
+  {
+    name: 'Book Synthesis (stage)',
+    slug: 'book-synthesis',
+    kind: 'tool',
+    description: 'Multi-book synthesist — stage of the bookbridge pipeline.',
+    invocation_method: 'pipeline',
+    invocation_config: { pipeline: 'bookbridge', tool: 'book-synthesis' },
+    capabilities: ['multi_book_synthesis', 'web_validation', 'report_generation'],
+    tags: ['folded', 'knowledge', 'pipeline'],
+    category: 'research',
+  },
+  {
+    name: 'zvec (stage)',
+    slug: 'zvec',
+    kind: 'tool',
+    description: 'In-process vector index — stage of the bookbridge pipeline.',
+    invocation_method: 'pipeline',
+    invocation_config: { pipeline: 'bookbridge', tool: 'zvec' },
+    capabilities: ['vector_search', 'semantic_index'],
+    tags: ['folded', 'knowledge', 'pipeline'],
+    category: 'research',
+  },
+  {
+    name: 'MemAgent (stage)',
+    slug: 'memagent',
+    kind: 'tool',
+    description: 'Long-term memory framework — stage of the bookbridge pipeline.',
+    invocation_method: 'pipeline',
+    invocation_config: { pipeline: 'bookbridge', tool: 'memagent' },
+    capabilities: ['long_context_memory', 'rl_memory_agent'],
+    tags: ['folded', 'knowledge', 'pipeline'],
+    category: 'research',
+  },
+  {
+    name: 'Open Notebook (stage)',
+    slug: 'open-notebook',
+    kind: 'tool',
+    description: 'NotebookLM-style research workspace — stage of the omniresearch-pro pipeline.',
+    invocation_method: 'pipeline',
+    invocation_config: { pipeline: 'omniresearch-pro', tool: 'open-notebook' },
+    capabilities: ['research_workspace', 'notebook_synthesis'],
+    tags: ['folded', 'research', 'pipeline'],
+    category: 'research',
+  },
+  {
+    name: 'Tap919 Middleman (stage)',
+    slug: 'tap919-middleman',
+    kind: 'tool',
+    description: 'Metered agent-to-agent gateway — stage of the litellm pipeline.',
+    invocation_method: 'pipeline',
+    invocation_config: { pipeline: 'litellm', tool: 'tap919-middleman' },
+    capabilities: ['metered_gateway', 'observability', 'agent_routing'],
+    tags: ['folded', 'gateway', 'pipeline'],
+    category: 'infrastructure',
+  },
+  {
+    name: 'LLMLingua (stage)',
+    slug: 'llmlingua',
+    kind: 'tool',
+    description: 'Prompt/context compression — stage of the litellm pipeline.',
+    invocation_method: 'pipeline',
+    invocation_config: { pipeline: 'litellm', tool: 'llmlingua' },
+    capabilities: ['context_compression', 'prompt_optimization'],
+    tags: ['folded', 'gateway', 'pipeline'],
+    category: 'infrastructure',
+  },
+  {
+    name: 'Browser Use (stage)',
+    slug: 'browser-use',
+    kind: 'tool',
+    description: 'AI browser engine — stage of the agent-browser pipeline.',
+    invocation_method: 'pipeline',
+    invocation_config: { pipeline: 'agent-browser', tool: 'browser-use' },
+    capabilities: ['browser_automation', 'web_extraction'],
+    tags: ['folded', 'web', 'pipeline'],
+    category: 'automation',
+  },
+  {
+    name: 'Scrapling (stage)',
+    slug: 'scrapling',
+    kind: 'tool',
+    description: 'Adaptive web scraping — stage of the agent-browser pipeline.',
+    invocation_method: 'pipeline',
+    invocation_config: { pipeline: 'agent-browser', tool: 'scrapling' },
+    capabilities: ['adaptive_scraping', 'data_collection'],
+    tags: ['folded', 'web', 'pipeline'],
+    category: 'automation',
+  },
+  {
+    name: 'Stirling PDF (stage)',
+    slug: 'stirling-pdf',
+    kind: 'tool',
+    description: 'Local PDF operations — stage of the ufc-mcp pipeline.',
+    invocation_method: 'pipeline',
+    invocation_config: { pipeline: 'ufc-mcp', tool: 'stirling-pdf' },
+    capabilities: ['pdf_operations', 'document_processing'],
+    tags: ['folded', 'conversion', 'pipeline'],
+    category: 'conversion',
+  },
+  {
+    name: 'Supply Chain Health (stage)',
+    slug: 'supply-chain-health',
+    kind: 'tool',
+    description: 'SBOM + deps.dev dependency health — stage of the depscan pipeline.',
+    invocation_method: 'pipeline',
+    invocation_config: { pipeline: 'depscan', tool: 'supply-chain-health' },
+    capabilities: ['sbom', 'dependency_health', 'vulnerability_reports'],
+    tags: ['folded', 'security', 'pipeline'],
+    category: 'security',
+  },
+  {
+    name: 'Super Tool (stage)',
+    slug: 'super-tool',
+    kind: 'tool',
+    description: 'Trading/marketing pipeline utilities — stage of the trading-agents pipeline.',
+    invocation_method: 'pipeline',
+    invocation_config: { pipeline: 'trading-agents', tool: 'super-tool' },
+    capabilities: ['backtesting', 'risk_engine', 'pipeline_utilities'],
+    tags: ['folded', 'trading', 'pipeline'],
+    category: 'finance',
+  },
 ];
 
 // ============================================================================
@@ -757,7 +920,7 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
         name: 'News Research',
         entitySlug: 'omni-research',
         action: 'research_news',
-        input_mapping: { query: '$.input.symbols' },
+        input_mapping: { query: 'equity market news and earnings outlook' },
         output_key: 'news_research',
         step_order: 1,
         parallel_group: 'research',
@@ -1252,10 +1415,10 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
       },
       {
         name: 'Supply Chain Alerts',
-        entitySlug: 'overlay-chain',
-        action: 'anomaly_detection',
+        entitySlug: 'omni-research',
+        action: 'research_news',
         input_mapping: {
-          product_ids: '$.input.product_ids',
+          query: 'supply chain risk and disruption update',
         },
         output_key: 'sc_alerts',
         step_order: 1,
@@ -1267,7 +1430,7 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
         entitySlug: 'uplift-agent',
         action: 'batch',
         input_mapping: {
-          task: 'compile_morning_briefing',
+          description: 'compile_morning_briefing',
           finance: '$.steps.finance_summary.output',
           sports: '$.steps.sports_picks.output',
           supply_chain: '$.steps.sc_alerts.output',
@@ -1522,6 +1685,7 @@ interface JobSeedDef {
   job_type: 'chain' | 'health_check' | 'notification' | 'decay_sweep' | 'custom';
   job_config: Record<string, unknown>;
   notify_on_failure?: boolean;
+  is_enabled?: boolean;
 }
 
 const JOB_DEFS: JobSeedDef[] = [
@@ -1621,6 +1785,8 @@ const JOB_DEFS: JobSeedDef[] = [
       },
     },
     notify_on_failure: true,
+    // bet-buddy backend not provisioned locally — keep disabled across /api/seed
+    is_enabled: false,
   },
 
   // ── Music Business (11AM daily) ─────────────────────────────────────
@@ -1635,6 +1801,8 @@ const JOB_DEFS: JobSeedDef[] = [
         platforms: ['instagram', 'tiktok', 'spotify'],
       },
     },
+    // indy-music-platform service not provisioned locally — keep disabled across /api/seed
+    is_enabled: false,
   },
 
   // ── Supply Chain (8AM weekdays) ─────────────────────────────────────
@@ -1650,6 +1818,8 @@ const JOB_DEFS: JobSeedDef[] = [
       },
     },
     notify_on_failure: true,
+    // overlay-chain service not provisioned locally — keep disabled across /api/seed
+    is_enabled: false,
   },
 
   // ── Full Content Creation (2PM Mon/Wed/Fri) ─────────────────────────
@@ -1681,6 +1851,8 @@ const JOB_DEFS: JobSeedDef[] = [
       },
     },
     notify_on_failure: true,
+    // hemp-os/hempforge backends not provisioned locally — keep disabled across /api/seed
+    is_enabled: false,
   },
 
   // ── IP Portfolio Grading (9AM Mondays) ──────────────────────────────
@@ -1713,6 +1885,8 @@ const JOB_DEFS: JobSeedDef[] = [
       },
     },
     notify_on_failure: true,
+    // kaggle service not provisioned locally — keep disabled across /api/seed
+    is_enabled: false,
   },
 
   // ── Book-Grounded Research + Library Distill (5AM daily) ─────────────
@@ -1809,6 +1983,17 @@ const JOB_DEFS: JobSeedDef[] = [
     cron_expression: '0 6 * * *',
     job_type: 'custom',
     job_config: { handler: 'research_rotation' },
+    notify_on_failure: true,
+  },
+
+  // ── Science Campaign Seed (4PM daily) ───────────────────────────────
+  // Re-fills the science/sports experiment backlog from the real datasets +
+  // research-paper store so Research Rotation never runs dry.
+  {
+    name: 'Science Campaign Seed',
+    cron_expression: '0 16 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'science_campaign_seed' },
     notify_on_failure: true,
   },
 ];
@@ -2010,7 +2195,7 @@ export async function seedBusinessAutomation(): Promise<BusinessSeedResult> {
             cron_expression: def.cron_expression,
             job_type: def.job_type,
             job_config: def.job_config,
-            is_enabled: true,
+            is_enabled: def.is_enabled ?? true,
             notify_on_failure: def.notify_on_failure ?? false,
             notify_on_success: false,
             max_retries: 1,

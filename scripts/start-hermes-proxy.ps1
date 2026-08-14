@@ -1,14 +1,14 @@
 # Boots hermes-proxy on HERMES_PROXY_PORT (default 8648). The chat backend was
 # moved to real Hermes (api_server) on 8642 in Phase 1; this keeps only the
-# media + AetherDesk voice proxy responsibilities.
+# media + voice proxy responsibilities (local edge-tts / faster-whisper bridge,
+# with AetherDesk passthrough when configured).
 #
-# hermes-proxy lives at the Uplift repo ROOT (C:\Users\User\Downloads\Uplift\hermes-proxy).
+# hermes-proxy lives inside the Draymond repo (hermes-proxy/).
 #
 # Run in a dedicated terminal:  powershell -ExecutionPolicy Bypass -File <this>
 
 $ErrorActionPreference = 'Stop'
-$upliftRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$proxyDir = Join-Path $upliftRoot 'hermes-proxy'
+$proxyDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'hermes-proxy'
 if (-not (Test-Path -LiteralPath (Join-Path $proxyDir 'server.js'))) {
     throw "hermes-proxy/server.js not found under $proxyDir"
 }

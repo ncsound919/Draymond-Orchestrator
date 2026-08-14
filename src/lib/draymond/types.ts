@@ -369,7 +369,8 @@ export type InvocationMethod =
   | 'internal'
   | 'manual'
   | 'webhook'
-  | 'message_gateway';
+  | 'message_gateway'
+  | 'pipeline';
 
 export type ChainStatus =
   | 'draft'
@@ -638,6 +639,7 @@ export type RouterIntent =
   | 'manage_memory'
   | 'decompose_goal'
   | 'web_search'
+  | 'casual_chat'
   | 'unknown';
 
 export type RouteResult = {

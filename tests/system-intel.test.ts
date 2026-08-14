@@ -58,8 +58,8 @@ function seed() {
   };
   dbData['draymond_site_monitors'] = {
     data: [
-      { name: 'Uplift Agent', current_status: 'down' },
-      { name: 'Sports Steve', current_status: 'up' },
+      { name: 'Uplift Agent', current_status: 'down', is_enabled: 1 },
+      { name: 'Sports Steve', current_status: 'up', is_enabled: 1 },
     ],
   };
   dbData['draymond_notifications'] = {
@@ -142,6 +142,19 @@ describe('system-intel', () => {
     expect(text).toContain('Grow marketing');
     expect(text).toContain('Repairs & recovery');
     expect(text).toContain('Upgrade queue');
+  });
+
+  it('ignores disabled monitors when counting down (only enabled monitors alert)', async () => {
+    dbData['draymond_site_monitors'] = {
+      data: [
+        { name: 'Uplift Agent', current_status: 'down', is_enabled: 1 },
+        { name: 'Indy Music', current_status: 'down', is_enabled: 0 },
+      ],
+    };
+    const intel = await getSystemIntel();
+    expect(intel.monitors.total).toBe(2);
+    // Disabled monitors still count toward total but not toward down.
+    expect(intel.monitors.down).toEqual(['Uplift Agent']);
   });
 
   it('produces a compact one-line summary', async () => {
