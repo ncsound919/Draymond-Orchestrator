@@ -119,6 +119,13 @@ export function consumeTokens(provider: string, tokens: number): void {
   window.push(Date.now());
   // Every provider token also counts toward the fleet cap.
   consumeFleetTokens(tokens);
+  // Metering rail (fail-soft, fire-and-forget): emit a usage event to the
+  // Tap919 Middleman so every LLM call becomes billable Stripe meter input.
+  if (process.env.MIDDLEMAN_URL) {
+    void import('./meter').then(({ meterProviderCall }) =>
+      meterProviderCall(provider, tokens)
+    ).catch(() => undefined);
+  }
 }
 
 /** Cooldown: skip a repeated op within the window (e.g. don't re-run QA every minute). */
