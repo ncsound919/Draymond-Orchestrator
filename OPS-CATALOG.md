@@ -1,16 +1,16 @@
 # Uplift Lab — Operational Catalog
 
-Generated: 2026-08-13T18:17:34.034Z
+Generated: 2026-08-14T13:34:33.294Z
 
 ## Totals
 
 | Kind | Count |
 | --- | --- |
 | skill | 128 |
-| agent | 60 |
-| tool | 36 |
-| service | 34 |
-| job | 25 |
+| tool | 49 |
+| agent | 42 |
+| service | 37 |
+| job | 27 |
 | extension | 22 |
 | chain | 21 |
 | mcp_server | 10 |
@@ -19,21 +19,17 @@ Generated: 2026-08-13T18:17:34.034Z
 
 ## By Category
 
-### uncategorized (56)
+### uncategorized (38)
 
 | Name | Kind | Slug | Active | Invocation |
 | --- | --- | --- | --- | --- |
 | Aetherdesk Call Center | agent | `aetherdesk` | ✅ | http |
 | Agent Browser | agent | `agent-browser` | ✅ | http |
-| AI YouTube Shorts | agent | `youtube-shorts` | ✅ | subprocess |
 | Big Homie | agent | `big-homie` | ✅ | http |
-| Book Synthesis Engine | agent | `book-synthesis` | ✅ | subprocess |
 | BookBridge | agent | `bookbridge` | ✅ | http |
-| Browser Use | agent | `browser-use` | ✅ | cli |
 | Claw Protect | agent | `claw-protect` | ✅ | http |
 | Composio | agent | `composio` | ✅ | cli |
-| Content Creation Engine | agent | `content-creation-engine` | ✅ | cli |
-| Deterministic Brain | agent | `dca-brain` | ✅ | cli |
+| Deterministic Brain | agent | `deterministic-brain` | ✅ | http |
 | Everything Claude Code | agent | `everything-claude-code` | ✅ | cli |
 | Fetch MCP | mcp_server | `mcp-fetch` | ✅ | mcp_stdio |
 | Filesystem MCP | mcp_server | `mcp-filesystem` | ✅ | mcp_stdio |
@@ -43,42 +39,28 @@ Generated: 2026-08-13T18:17:34.034Z
 | GitHub MCP | mcp_server | `mcp-github` | ✅ | mcp_stdio |
 | Grader | agent | `grader` | ✅ | http |
 | Hermes Agent | agent | `hermes` | ✅ | http |
-| LiteLLM Gateway | agent | `litellm-gateway` | ✅ | http |
-| LLMLingua | agent | `llmlingua` | ✅ | cli |
-| Marketing Tool | agent | `marketing-tool` | ✅ | cli |
+| LiteLLM Gateway | agent | `litellm` | ✅ | http |
 | Megacode | agent | `megacode` | ✅ | cli |
-| MemAgent | agent | `memagent` | ✅ | cli |
 | Memory MCP | mcp_server | `mcp-memory` | ✅ | mcp_stdio |
 | Mutly | agent | `mutly` | ✅ | http |
 | Nuclei | agent | `nuclei-scanner` | ✅ | cli |
 | OmniResearch Pro | agent | `omniresearch-pro` | ✅ | http |
 | Open Chat | agent | `openchat` | ✅ | http |
-| Open Notebook | agent | `open-notebook` | ✅ | cli |
 | OWASP dep-scan | agent | `depscan` | ✅ | cli |
 | Phoenix | agent | `phoenix` | ✅ | http |
 | PostgreSQL MCP | mcp_server | `mcp-postgres` | ✅ | mcp_stdio |
 | RepoRank | agent | `reporank` | ✅ | http |
-| Scrapling | agent | `scrapling` | ✅ | cli |
 | Sequential Thinking MCP | mcp_server | `mcp-sequential-thinking` | ✅ | mcp_stdio |
 | Social Media Dashboard | agent | `social-media-dashboard` | ✅ | http |
 | Sports Steve | agent | `sports-steve` | ✅ | http |
-| Stirling PDF | agent | `stirling-pdf` | ✅ | http |
-| Super Tool | agent | `super-tool` | ✅ | subprocess |
-| Supply Chain Health | agent | `supply-chain-health` | ✅ | cli |
-| Tap919 Middleman | agent | `tap919-middleman` | ✅ | http |
 | The Auditor | agent | `overlay-auditor` | ✅ | cli |
-| The Format Auditor | agent | `overlay-marketing-format` | ✅ | cli |
 | The Guardian | agent | `overlay-guardian` | ✅ | cli |
-| The Scheduler | agent | `overlay-marketing-scheduler` | ✅ | cli |
 | The Strategist | agent | `overlay-strategist` | ✅ | cli |
-| The Tracker | agent | `overlay-marketing-tracker` | ✅ | cli |
 | The Treasurer | agent | `overlay-treasurer` | ✅ | cli |
-| The Voice Keeper | agent | `overlay-marketing-voice` | ✅ | cli |
 | Time MCP | mcp_server | `mcp-time` | ✅ | mcp_stdio |
 | TradingAgents | agent | `trading-agents` | ✅ | subprocess |
 | UFC-MCP | agent | `ufc-mcp` | ✅ | mcp |
 | Uplift Agent | agent | `uplift-agent` | ✅ | http |
-| zvec | agent | `zvec` | ✅ | cli |
 
 ### workflow (37)
 
@@ -122,7 +104,7 @@ Generated: 2026-08-13T18:17:34.034Z
 | Weekly Operations Review | workflow | `wf-weekly-review` | ✅ | steps:3 |
 | Writing Skills | skill | `sp-writing-skills` | ✅ | path:agents/skills/superpowers-main/skills/writing-skills |
 
-### research (26)
+### research (30)
 
 | Name | Kind | Slug | Active | Invocation |
 | --- | --- | --- | --- | --- |
@@ -130,6 +112,7 @@ Generated: 2026-08-13T18:17:34.034Z
 | AutoResearch Extension | extension | `ext-autoresearch` | ✅ | subprocess |
 | BBTech Web App | service | `bbtech-web-app` | ✅ | http_api |
 | Biotech IDE | service | `biotech-ide` | ✅ | internal |
+| Book Synthesis (stage) | tool | `book-synthesis` | ✅ | pipeline |
 | Boxing Sim | tool | `boxing-sim` | ✅ | internal |
 | Codex Metrics | tool | `codex-metrics` | ✅ | internal |
 | ColabFold | tool | `colabfold` | ✅ | cli_command |
@@ -140,10 +123,12 @@ Generated: 2026-08-13T18:17:34.034Z
 | Interview Designer | skill | `interview-designer` | ✅ | path:agents/skills/interview-designer |
 | Market Research Reports | skill | `market-research` | ✅ | path:agents/skills/market-research-reports |
 | math-x | tool | `math-x` | ✅ | internal |
+| MemAgent (stage) | tool | `memagent` | ✅ | pipeline |
 | MolecularGraph.jl | tool | `moleculargraph` | ✅ | internal |
 | Multi Search Engine | skill | `multi-search-engine` | ✅ | path:agents/skills/multi-search-engine |
 | OmniResearch Pro | agent | `omni-research` | ✅ | http_api |
 | Open Notebook | skill | `open-notebook` | ✅ | path:../integrations/open-notebook |
+| Open Notebook (stage) | tool | `open-notebook` | ✅ | pipeline |
 | Overlay Science | service | `overlay-science` | ✅ | internal |
 | playgene | service | `playgene` | ✅ | http_api |
 | Qingyan Research | skill | `qingyan-research` | ✅ | path:agents/skills/qingyan-research |
@@ -152,8 +137,9 @@ Generated: 2026-08-13T18:17:34.034Z
 | Summarize Skill | skill | `skill-summarize` | ✅ | python_module |
 | SynOp | service | `synop` | ✅ | internal |
 | The Lab | extension | `ext-the-lab` | ✅ | http_api |
+| zvec (stage) | tool | `zvec` | ✅ | pipeline |
 
-### schedule (25)
+### schedule (27)
 
 | Name | Kind | Slug | Active | Invocation |
 | --- | --- | --- | --- | --- |
@@ -177,8 +163,10 @@ Generated: 2026-08-13T18:17:34.034Z
 | Memory Decay Sweep | job | `Memory Decay Sweep` | ✅ | 0 * * * * |
 | Morning Briefing | job | `Morning Briefing` | ✅ | 0 9 * * * |
 | Music Business Automation | job | `Music Business Automation` | ✅ | 0 11 * * * |
+| News Outlet Ingest | job | `News Outlet Ingest` | ✅ | 45 2 * * * |
 | Research Data Feed | job | `Research Data Feed` | ✅ | 0 6 * * 3 |
 | Research Rotation | job | `Research Rotation` | ✅ | 0 6 * * * |
+| Science Campaign Seed | job | `Science Campaign Seed` | ✅ | 0 16 * * * |
 | Site Health Checks | job | `Site Health Checks` | ✅ | */5 * * * * |
 | Sports Betting Daily | job | `Sports Betting Daily` | ✅ | 0 12 * * * |
 | Supply Chain Intelligence | job | `Supply Chain Intelligence` | ✅ | 0 8 * * 1-5 |
@@ -187,7 +175,7 @@ Generated: 2026-08-13T18:17:34.034Z
 
 | Name | Kind | Slug | Active | Invocation |
 | --- | --- | --- | --- | --- |
-| Bet Buddy | service | `bet-buddy` | ✅ | cli_command |
+| Bet Buddy | service | `bet-buddy` | ✅ | http_api |
 | Budget Integration Skill | skill | `skill-budget-integration` | ✅ | python_module |
 | CIS Assistant | mcp_server | `mcp-cis-assistant` | ✅ | mcp_stdio |
 | Finance | skill | `finance` | ✅ | path:agents/skills/finance |
@@ -238,7 +226,7 @@ Generated: 2026-08-13T18:17:34.034Z
 | TPC Beats | tool | `tpc-beats` | ✅ | internal |
 | Video Frames Skill | skill | `skill-video-frames` | ✅ | python_module |
 
-### security (14)
+### security (15)
 
 | Name | Kind | Slug | Active | Invocation |
 | --- | --- | --- | --- | --- |
@@ -256,8 +244,9 @@ Generated: 2026-08-13T18:17:34.034Z
 | Sentinel | service | `sentinel-monitor` | ✅ | internal |
 | Sherlock OSINT | skill | `sherlock` | ✅ | path:agents/optional-skills/security/sherlock |
 | Supply Chain Health | skill | `supply-chain-health` | ✅ | path:../integrations/heisenberg-ssc-health-check |
+| Supply Chain Health (stage) | tool | `supply-chain-health` | ✅ | pipeline |
 
-### infrastructure (11)
+### infrastructure (13)
 
 | Name | Kind | Slug | Active | Invocation |
 | --- | --- | --- | --- | --- |
@@ -267,11 +256,28 @@ Generated: 2026-08-13T18:17:34.034Z
 | Cyber Security | extension | `ext-cyber-security` | ✅ | subprocess |
 | Draymond | agent | `draymond` | ✅ | internal |
 | Draymond Supervisor | extension | `ext-draymond-supervisor` | ✅ | http_api |
+| LLMLingua (stage) | tool | `llmlingua` | ✅ | pipeline |
 | Local SQLite | service | `service-local-sqlite` | ✅ | api_call |
 | Overlay Chain Extension | extension | `ext-overlay-chain` | ✅ | python_module |
 | Overlay Chain Skill | skill | `skill-overlay-chain` | ✅ | python_module |
 | Paperclip Extension | extension | `ext-paperclip` | ✅ | python_module |
+| Tap919 Middleman (stage) | tool | `tap919-middleman` | ✅ | pipeline |
 | Vercel | service | `service-vercel` | ✅ | api_call |
+
+### media (10)
+
+| Name | Kind | Slug | Active | Invocation |
+| --- | --- | --- | --- | --- |
+| Content Creation Engine (stage) | tool | `content-creation-engine` | ✅ | pipeline |
+| Generative Video AI | skill | `generative-video` | ✅ | path:../integrations/Generative-Video-AI |
+| Image Edit | skill | `image-edit` | ✅ | path:agents/skills/image-edit |
+| Image Generation | skill | `image-generation` | ✅ | path:agents/skills/image-generation |
+| Image Understanding | skill | `image-understand` | ✅ | path:agents/skills/image-understand |
+| Overlay Global Lens | service | `overlay-global-lens` | ✅ | http_api |
+| Podcast Generate | skill | `podcast-generate` | ✅ | path:agents/skills/podcast-generate |
+| Video Generation | skill | `video-generation` | ✅ | path:agents/skills/video-generation |
+| Video Understanding | skill | `video-understand` | ✅ | path:agents/skills/video-understand |
+| YouTube Shorts (stage) | tool | `youtube-shorts` | ✅ | pipeline |
 
 ### dev-tools (10)
 
@@ -288,13 +294,14 @@ Generated: 2026-08-13T18:17:34.034Z
 | Phaselock | tool | `phaselock` | ✅ | internal |
 | Sub Team | agent | `sub-team` | ✅ | cli_command |
 
-### marketing (8)
+### marketing (9)
 
 | Name | Kind | Slug | Active | Invocation |
 | --- | --- | --- | --- | --- |
 | Marketing Automation | skill | `marketing-automation` | ✅ | path:../integrations/Marketing-Tool |
 | Marketing Extension | extension | `ext-marketing` | ✅ | python_module |
 | Marketing Mode | skill | `marketing-mode` | ✅ | path:agents/skills/marketing-mode |
+| Marketing Tool (stage) | tool | `marketing-tool` | ✅ | pipeline |
 | Marketing Tools Skill | skill | `skill-marketing-tools` | ✅ | python_module |
 | Open-Chat Worker | service | `open-chat-worker` | ✅ | internal |
 | Overlay365 Marketing Team | skill | `overlay-marketing` | ✅ | path:../overlay365/agent-team |
@@ -327,18 +334,6 @@ Generated: 2026-08-13T18:17:34.034Z
 | Memory Core Extension | extension | `ext-memory-core` | ✅ | python_module |
 | Memory Framework | skill | `memory` | ✅ | path:../integrations/MemAgent |
 
-### media (7)
-
-| Name | Kind | Slug | Active | Invocation |
-| --- | --- | --- | --- | --- |
-| Generative Video AI | skill | `generative-video` | ✅ | path:../integrations/Generative-Video-AI |
-| Image Edit | skill | `image-edit` | ✅ | path:agents/skills/image-edit |
-| Image Generation | skill | `image-generation` | ✅ | path:agents/skills/image-generation |
-| Image Understanding | skill | `image-understand` | ✅ | path:agents/skills/image-understand |
-| Podcast Generate | skill | `podcast-generate` | ✅ | path:agents/skills/podcast-generate |
-| Video Generation | skill | `video-generation` | ✅ | path:agents/skills/video-generation |
-| Video Understanding | skill | `video-understand` | ✅ | path:agents/skills/video-understand |
-
 ### engineering (7)
 
 | Name | Kind | Slug | Active | Invocation |
@@ -350,6 +345,17 @@ Generated: 2026-08-13T18:17:34.034Z
 | Mutly | tool | `mutly` | ✅ | http_api |
 | RepoRank | tool | `reporank` | ✅ | http_api |
 | VibeServe | tool | `vibeserve` | ✅ | mcp_stdio |
+
+### automation (6)
+
+| Name | Kind | Slug | Active | Invocation |
+| --- | --- | --- | --- | --- |
+| AgentBrowser | tool | `agent-browser` | ✅ | http_api |
+| Browser Extension | extension | `ext-browser` | ✅ | python_module |
+| Browser Use | tool | `browser-use` | ✅ | python_module |
+| Remote Control Skill | skill | `skill-remote-control` | ✅ | python_module |
+| Scrapling (stage) | tool | `scrapling` | ✅ | pipeline |
+| XURL Skill | skill | `skill-xurl` | ✅ | python_module |
 
 ### docs (5)
 
@@ -370,16 +376,6 @@ Generated: 2026-08-13T18:17:34.034Z
 | BookBridge | service | `bookbridge` | ✅ | http_api |
 | BookBridge Library Bridge | skill | `book-bridge` | ✅ | http_api |
 | Kaggle | tool | `kaggle` | ✅ | http_api |
-
-### automation (5)
-
-| Name | Kind | Slug | Active | Invocation |
-| --- | --- | --- | --- | --- |
-| AgentBrowser | tool | `agent-browser` | ✅ | http_api |
-| Browser Extension | extension | `ext-browser` | ✅ | python_module |
-| Browser Use | tool | `browser-use` | ✅ | python_module |
-| Remote Control Skill | skill | `skill-remote-control` | ✅ | python_module |
-| XURL Skill | skill | `skill-xurl` | ✅ | python_module |
 
 ### ai-provider (5)
 
@@ -590,6 +586,18 @@ Generated: 2026-08-13T18:17:34.034Z
 | --- | --- | --- | --- | --- |
 | UFC-MCP | mcp_server | `ufc-mcp` | ✅ | mcp_stdio |
 
+### strategy (1)
+
+| Name | Kind | Slug | Active | Invocation |
+| --- | --- | --- | --- | --- |
+| Comic Metaphor Engine | service | `comic-metaphor-engine` | ✅ | http_api |
+
+### environment (1)
+
+| Name | Kind | Slug | Active | Invocation |
+| --- | --- | --- | --- | --- |
+| ECOS Environmental Initiatives | service | `ecos-environmental-initiatives` | ✅ | internal |
+
 ### commerce (1)
 
 | Name | Kind | Slug | Active | Invocation |
@@ -626,57 +634,69 @@ Generated: 2026-08-13T18:17:34.034Z
 | --- | --- | --- | --- | --- |
 | Enhanced Skill | skill | `skill-enhanced` | ✅ | python_module |
 
+### conversion (1)
+
+| Name | Kind | Slug | Active | Invocation |
+| --- | --- | --- | --- | --- |
+| Stirling PDF (stage) | tool | `stirling-pdf` | ✅ | pipeline |
+
+### system (1)
+
+| Name | Kind | Slug | Active | Invocation |
+| --- | --- | --- | --- | --- |
+| System Agent | tool | `system-agent` | ✅ | http_api |
+
 ## Capability Index
 
 | Capability | Resources |
 | --- | --- |
-| ANN Indexing | zvec |
-| API Gateway | tap919-middleman |
+| ANN Indexing | bookbridge |
+| API Gateway | litellm |
 | ASCAP / HFA / MLC | agent-browser |
 | Agent Actions | composio |
-| Agent Browsing | browser-use |
+| Agent Browsing | agent-browser |
 | Agent Definitions | everything-claude-code |
-| Agent Routing | tap919-middleman |
-| Animated Episodes | content-creation-engine |
-| Anomaly Detection | overlay-treasurer, overlay-marketing-tracker |
-| Anti-Bot Bypass | scrapling |
+| Agent Routing | litellm |
+| Animated Episodes | generative-video-ai |
+| Anomaly Detection | social-media-dashboard, overlay-treasurer |
+| Anti-Bot Bypass | agent-browser |
 | Architecture Review | grader |
 | Automated Remediation | reporank |
-| Backtesting | super-tool |
+| Backtesting | trading-agents |
 | Bankroll Management | sports-steve |
 | Benchmarking | reporank |
 | Benchmarks | ghostfolio-engine |
 | Book Library Access | agent-browser |
 | Brand Alignment | overlay-strategist |
-| Brand Voice | overlay-marketing-voice |
+| Brand Voice | social-media-dashboard |
 | Broken Link Crawling | overlay-auditor |
-| Browser Automation | browser-use |
+| Browser Automation | agent-browser |
 | CLI Power Tools | megacode |
 | CVE Detection | depscan |
 | Call Handling | aetherdesk |
 | Campaign Analytics | social-media-dashboard |
-| Character Limits | overlay-marketing-format |
+| Character Limits | social-media-dashboard |
 | Citations | bookbridge |
 | Code Quality | grader |
 | Codebase Indexing | mutly |
 | Commands & Hooks | everything-claude-code |
-| Commercial Breaks | content-creation-engine |
+| Commercial Breaks | generative-video-ai |
 | Connectors | composio |
 | Consent Compliance | aetherdesk |
 | Content Compliance | overlay-guardian |
-| Cost Control | litellm-gateway, llmlingua |
-| Creation Studio | marketing-tool |
+| Cost Control | litellm |
+| Creation Studio | social-media-dashboard |
 | Cron Scheduling | hermes |
-| Data Harvesting | scrapling |
+| Data Harvesting | agent-browser |
 | Deep Research | omniresearch-pro |
-| Dependency Health | supply-chain-health |
+| Dependency Health | depscan |
 | Deterministic Checks | overlay-auditor |
-| Deterministic Control | dca-brain |
-| Document Conversion | stirling-pdf |
-| Document Ingestion | open-notebook |
-| Editorial Calendar | overlay-marketing-scheduler |
-| Embeddings | zvec |
-| Engagement Metrics | overlay-marketing-tracker |
+| Deterministic Control | deterministic-brain |
+| Document Conversion | ufc-mcp |
+| Document Ingestion | omniresearch-pro |
+| Editorial Calendar | social-media-dashboard |
+| Embeddings | bookbridge |
+| Engagement Metrics | social-media-dashboard |
 | Engagement Tracking | social-media-dashboard |
 | Evaluation | phoenix |
 | Evidence Auditing | overlay-strategist |
@@ -684,79 +704,79 @@ Generated: 2026-08-13T18:17:34.034Z
 | Exposure Mapping | nuclei-scanner |
 | FFmpeg | ufc-mcp |
 | Fail-Closed Auditing | overlay-guardian |
-| Fail-Closed Evaluation | overlay-marketing-voice |
+| Fail-Closed Evaluation | social-media-dashboard |
 | Feedback Clustering | overlay-strategist |
 | File Conversion | ufc-mcp |
 | Fleet Orchestration | agent-browser |
-| Hashtag Rules | overlay-marketing-format |
-| Highlight Extraction | youtube-shorts |
+| Hashtag Rules | social-media-dashboard |
+| Highlight Extraction | generative-video-ai |
 | Hybrid Search | bookbridge |
 | IDE Integration | mutly |
-| Illustration | book-synthesis |
+| Illustration | bookbridge |
 | Image Generation | generative-video-ai |
 | JetBrains Bridge | megacode |
 | Knowledge Graph | bookbridge |
-| LLM Gateway | litellm-gateway |
+| LLM Gateway | litellm |
 | LLM Observability | phoenix |
 | Learning Loop | hermes |
 | Legal/Health Boundaries | overlay-guardian |
 | License Audit | depscan |
 | Local-First Messaging | openchat |
-| Long-Term Memory | memagent |
+| Long-Term Memory | bookbridge |
 | MCP Server | ufc-mcp |
 | MRR / ARR | overlay-treasurer |
 | Market Analysis | trading-agents |
-| Marketing Automation | marketing-tool |
+| Marketing Automation | social-media-dashboard |
 | Marketing Pulse | social-media-dashboard |
 | Marketing Team Lead | social-media-dashboard |
-| Marketing Workflows | super-tool |
+| Marketing Workflows | trading-agents |
 | Media Processing | ufc-mcp |
-| Metered Billing | tap919-middleman |
-| MoE Routing | dca-brain |
+| Metered Billing | litellm |
+| MoE Routing | deterministic-brain |
 | Model Routing | generative-video-ai |
-| Monte Carlo Planning | dca-brain |
+| Monte Carlo Planning | deterministic-brain |
 | Multi-Agent Chat | openchat |
-| Multi-Book Synthesis | book-synthesis |
+| Multi-Book Synthesis | bookbridge |
 | Multi-LLM | megacode |
 | Multi-Platform Gateway | hermes |
 | Multi-platform Gateway | uplift-agent |
 | Music Registration | agent-browser |
 | Net Worth | ghostfolio-engine |
 | Notion/Drive Sync | omniresearch-pro |
-| Null-Safe Reporting | overlay-marketing-tracker |
-| OCR | stirling-pdf |
-| Observability | tap919-middleman |
+| Null-Safe Reporting | social-media-dashboard |
+| OCR | ufc-mcp |
+| Observability | litellm |
 | Odds Modeling | sports-steve |
-| PDF Processing | stirling-pdf |
+| PDF Processing | ufc-mcp |
 | Payment Flow Integrity | overlay-auditor |
 | Payment Rails | overlay-treasurer |
 | Performance | ghostfolio-engine |
-| Platform Cadence | overlay-marketing-scheduler |
-| Platform Constraints | overlay-marketing-format |
-| Podcast Generation | content-creation-engine |
+| Platform Cadence | social-media-dashboard |
+| Platform Constraints | social-media-dashboard |
+| Podcast Generation | generative-video-ai |
 | Portfolio Tracking | ghostfolio-engine |
-| Prompt Compression | llmlingua |
+| Prompt Compression | litellm |
 | Prompt Injection Defense | claw-protect |
 | Protocol Bridging | openchat |
-| Provider Routing | litellm-gateway |
+| Provider Routing | litellm |
 | Python | uplift-agent |
 | Quality Gates | big-homie |
 | Reading Plans | bookbridge |
-| Recall | memagent |
+| Recall | bookbridge |
 | Refactoring | megacode |
 | Repo Scoring | reporank |
 | Repo Valuation | grader |
-| Report Generation | omniresearch-pro, book-synthesis |
-| Research Notebooks | open-notebook |
+| Report Generation | omniresearch-pro, bookbridge |
+| Research Notebooks | omniresearch-pro |
 | Revenue Reconciliation | overlay-treasurer |
 | Risk Assessment | sports-steve |
-| Risk Engine | super-tool |
+| Risk Engine | trading-agents |
 | Risk Framing | trading-agents |
 | Risk Surfacing | reporank |
 | Roadmap Prioritization | overlay-strategist |
 | Rule Corpus Matching | overlay-guardian |
 | Rules | everything-claude-code |
-| SBOM | supply-chain-health |
+| SBOM | depscan |
 | SCA | depscan |
 | SMB Support | aetherdesk |
 | Sandbox Testing | mutly |
@@ -764,43 +784,45 @@ Generated: 2026-08-13T18:17:34.034Z
 | Secrets Scanning | claw-protect |
 | Security Audit | grader |
 | Security Monitoring | claw-protect |
-| Segmentation | marketing-tool |
+| Segmentation | social-media-dashboard |
 | Self-Improving Agent | hermes |
 | Semantic Analysis | omniresearch-pro |
 | Semantic Search | mutly |
-| Session Context | memagent |
-| Skill Files | dca-brain |
+| Session Context | bookbridge |
+| Skill Files | deterministic-brain |
 | Skill Library | everything-claude-code |
 | Skills System | hermes |
-| Source Grounding | open-notebook |
-| Speaker Detection | youtube-shorts |
+| Source Grounding | omniresearch-pro |
+| Speaker Detection | generative-video-ai |
 | Sports Analytics | sports-steve |
 | Subagent Delegation | hermes |
 | Task Supervision | big-homie |
 | Template Engine | nuclei-scanner |
 | Threat Detection | claw-protect |
-| Token Optimization | llmlingua |
-| Tone Rules | overlay-marketing-voice |
+| Token Optimization | litellm |
+| Tone Rules | social-media-dashboard |
 | Tool Integrations | composio |
 | Tool Orchestration | uplift-agent |
-| Topic Rotation | overlay-marketing-scheduler |
+| Topic Rotation | social-media-dashboard |
 | Tracing | phoenix |
-| Trading Pipelines | super-tool |
+| Trading Pipelines | trading-agents |
 | Trading Strategy | trading-agents |
 | Triage | aetherdesk |
 | TypeScript | uplift-agent |
 | Uptime Monitoring | overlay-auditor |
-| Vector Search | zvec |
-| Vertical Cropping | youtube-shorts |
-| Video Editing | youtube-shorts |
-| Video Generation | marketing-tool, generative-video-ai |
+| Vector Search | bookbridge |
+| Vertical Cropping | generative-video-ai |
+| Video Editing | generative-video-ai |
+| Video Generation | social-media-dashboard, generative-video-ai |
 | Vuln Scanning | nuclei-scanner |
-| Vulnerability Reports | supply-chain-health |
-| Web Extraction | browser-use |
-| Web Scraping | scrapling |
-| Web Validation | book-synthesis |
+| Vulnerability Reports | depscan |
+| Web Extraction | agent-browser |
+| Web Scraping | agent-browser |
+| Web Validation | bookbridge |
+| adaptive_scraping | scrapling |
 | adaptive_therapy | bbtech-web-app |
 | agent_orchestration | cai, paperclip |
+| agent_routing | tap919-middleman |
 | ai-safety | aegis-safety, overlay-safety, clawsafe |
 | alphafold | colabfold |
 | analysis | fs-agent, hemp-os, omni-research, ext-autoresearch, ext-finance, ext-the-lab … |
@@ -845,6 +867,8 @@ Generated: 2026-08-13T18:17:34.034Z
 | business-solutions | overlay-business-solutions, overlay-finance |
 | caching | ext-claw-router |
 | calling | skill-voice-call |
+| carbon_credits | ecos-environmental-initiatives |
+| challenge_management | ecos-environmental-initiatives |
 | chat | lil-homie, ext-deepseek, ext-huggingface, ext-ollama, ext-openai, bet-buddy … |
 | cheminformatics | overlay-science, moleculargraph |
 | cis-contracts | mcp-cis-assistant |
@@ -861,6 +885,7 @@ Generated: 2026-08-13T18:17:34.034Z
 | comic-builder | overlay-writing, comic-book-builder |
 | command_execution_guard | cai |
 | commerce | service-gumroad |
+| commercial_breaks | content-creation-engine |
 | communication | skill-bridge |
 | competition-listing | kaggle |
 | compliance | mcp-cis-assistant, overlay-safety |
@@ -872,6 +897,7 @@ Generated: 2026-08-13T18:17:34.034Z
 | content-ip | overlay-writing |
 | content-production | overlay-content |
 | content_generation | hemp-os |
+| context_compression | llmlingua |
 | continuous_ops | cai |
 | contracts | book-publishing-platform |
 | cost-optimization | ext-claw-router |
@@ -879,35 +905,44 @@ Generated: 2026-08-13T18:17:34.034Z
 | cost_monitoring | paperclip |
 | coverage_delta | codenexus |
 | cpu_rtl_generation | sub-team |
+| creation_studio | marketing-tool |
 | cross_disciplinary_analysis | sub-team |
 | cross_file_impact | codenexus |
 | cross_referencing | hemp-os |
 | curriculum-guidance | ext-the-lab |
 | data-provider | kaggle |
 | data-retrieval | ext-finance, skill-weather |
+| data_collection | scrapling |
 | database | mcp-postgres, service-local-sqlite |
 | dataset-download | kaggle |
 | dataset-search | kaggle |
 | deep-analysis | codegang |
 | demand_forecast | overlay-chain |
 | dependency-pinning | cheetah |
+| dependency_health | supply-chain-health |
 | deployment | service-vercel |
 | design_review | codenexus |
 | deterministic_compilation | cureforge |
 | device-control | skill-remote-control |
 | dfir | cai, ext-cyber-security |
+| discovery_reporting | overlay-global-lens |
 | distribution | service-gumroad, indy-music-platform, overlay-music, sovereign-music-studio, wholesale-marketing-channel |
+| diy_kits | ecos-environmental-initiatives |
 | docker-generation | cheetah |
 | document-access | mcp-filesystem |
 | document-parsing | book-to-skill |
 | document-synthesis | omni-research |
 | document-to-markdown | ufc-mcp |
+| document_processing | stirling-pdf |
 | editing | opencode |
 | education | ext-the-lab |
 | embedding | ext-huggingface, ext-memory-lancedb, ext-openai, service-openai-api |
+| endpoint-protection | system-agent |
 | enforcement | phaselock |
 | engagement | ext-social-agent, social-media-dashboard |
 | enqueue_worker_task | open-chat-worker |
+| environmental_monitoring | ecos-environmental-initiatives |
+| episode_rendering | content-creation-engine |
 | evaluation | llm-safety-benchmark |
 | execution | skill-open-sandbox |
 | experiment-tracking | ext-autoresearch |
@@ -926,7 +961,7 @@ Generated: 2026-08-13T18:17:34.034Z
 | forensics | ext-cyber-security |
 | four_factors | bbtech-web-app |
 | framework-extraction | book-to-skill |
-| gamification | skill-block-hustlers, block-2 |
+| gamification | ecos-environmental-initiatives, skill-block-hustlers, block-2 |
 | generation | hemp-os, otm-agent, omni-research, ext-autoresearch, ext-deepseek, ext-huggingface … |
 | git | mcp-git |
 | github | mcp-github |
@@ -938,6 +973,7 @@ Generated: 2026-08-13T18:17:34.034Z
 | grounding | book-bridge |
 | guardrails | overlay-safety |
 | health-checking | ext-draymond-supervisor |
+| highlight_extraction | youtube-shorts |
 | hosting | service-vercel |
 | hyperparameter-tuning | ext-autoresearch |
 | ide | vibeserve |
@@ -945,9 +981,11 @@ Generated: 2026-08-13T18:17:34.034Z
 | illustration | comic-book-builder |
 | image | ufc-mcp |
 | injury-risk | sports-science, injury-risk |
+| insight-reports | comic-metaphor-engine |
 | intelligence-reports | omni-research |
 | inventory_optimization | overlay-chain |
 | invoicing | service-stripe |
+| iot_telemetry | ecos-environmental-initiatives |
 | ip-builder | ip-builder-platform |
 | ip-portfolio | ip-builder-platform, overlay-finance |
 | ip_comparison | recursive-ip |
@@ -962,20 +1000,28 @@ Generated: 2026-08-13T18:17:34.034Z
 | label-management | nc-sound |
 | learning-paths | ext-the-lab |
 | ledger_integration | bbtech-web-app |
+| lesson-generation | comic-metaphor-engine |
 | library-distillation | book-to-skill-chain |
 | listening | swabble |
 | literature_intelligence | hempforge |
 | llm-safety-benchmark | overlay-safety, llm-safety-benchmark |
 | load-balancing | ext-claw-router |
 | local-scoring | codegang |
+| long_context_memory | memagent |
 | market-analysis | ext-the-bank |
 | marketing | ext-marketing, skill-marketing-tools, super-tool |
+| marketing_automation | marketing-tool |
 | marketing_capture | open-chat-worker |
 | marketing_post | open-chat-worker |
+| marketplace | ecos-environmental-initiatives |
 | math | math-x |
 | mcp | vibeserve |
+| membership_tiers | ecos-environmental-initiatives |
 | memory | draymond, ext-engram, ext-memory-lancedb, ext-mem0, ext-memory-core, mcp-memory … |
 | metacognition | deterministic-brain |
+| metaphor-mapping | comic-metaphor-engine |
+| metaphor_storylines | overlay-global-lens |
+| metered_gateway | tap919-middleman |
 | metric_translation | bbtech-web-app |
 | metrics | codex-metrics |
 | microarchitecture | sub-team |
@@ -990,13 +1036,18 @@ Generated: 2026-08-13T18:17:34.034Z
 | multi-agent | ext-claw-team, ext-draymond-supervisor, ext-paperclip, skill-trading-agents |
 | multi-agent-pipeline | codegang |
 | multi-tool-agent | opencode |
+| multi_book_synthesis | book-synthesis |
 | music | skill-spotify-player |
-| music-production | overlay-music, sovereign-music-studio, skill-sovereign-music, dustcrate |
+| music-production | overlay-music, sovereign-music-studio, skill-sovereign-music, dustcrate, nc-sound |
 | music-publishing | nc-sound |
 | music-rights | overlay-music |
+| narrative-generation | comic-metaphor-engine |
 | network_traffic_analysis | cai |
+| news_aggregation | overlay-global-lens |
 | nft_minting | recursive-ip |
+| notebook_synthesis | open-notebook |
 | novelty-checking | ai-scientist |
+| observability | tap919-middleman |
 | odds-modeling | boxing-sim |
 | onco-metrics | disease-research |
 | opportunity-scanning | otm-agent |
@@ -1007,6 +1058,7 @@ Generated: 2026-08-13T18:17:34.034Z
 | parallel-execution | ext-claw-team |
 | path-tracing | graphify |
 | payments | service-stripe |
+| pdf_operations | stirling-pdf |
 | pen-testing | ext-cyber-security |
 | personalized-notes | book-synthesis-personal |
 | planning | mcp-sequential-thinking, overlay-business-solutions, skill-budget-integration |
@@ -1019,10 +1071,12 @@ Generated: 2026-08-13T18:17:34.034Z
 | prediction | skill-sports-betting |
 | preset-generation | cheetah |
 | preset_marketplace | indy-music-platform |
+| process-monitoring | system-agent |
 | progress-tracking | mutly, reporank |
 | project-management | skill-trello |
 | project-scaffolding | cheetah |
 | prompt_injection_detection | cai |
+| prompt_optimization | llmlingua |
 | property_fuzzing | cureforge |
 | proposals | deterministic-brain |
 | protein-structure | overlay-science, colabfold |
@@ -1049,6 +1103,7 @@ Generated: 2026-08-13T18:17:34.034Z
 | repo-grading | grader |
 | repo-ops | mcp-git |
 | repo-scoring | reporank |
+| report_generation | book-synthesis |
 | reporting | hempforge, social-media-dashboard, ghostfolio |
 | repos | mcp-github |
 | reproducible_traces | cureforge |
@@ -1057,18 +1112,23 @@ Generated: 2026-08-13T18:17:34.034Z
 | research-feed | kaggle |
 | research-orchestration | biotech-ide, overlay-science |
 | research_portal | bbtech-web-app |
+| research_publishing | overlay-global-lens |
+| research_workspace | open-notebook |
 | resource-monitoring | cheetah |
 | resource-pull | github-pull |
 | result-synthesis | ext-claw-team |
 | retrieval | ext-engram, book-bridge, skill-engram |
+| revenue_engine | ecos-environmental-initiatives |
 | reverse_engineering | cai |
 | risk_assessment | overlay-chain |
+| rl_memory_agent | memagent |
 | robo-advisory | ext-the-bank |
 | run-coaching | sports-science, run-coach |
 | sample-management | det-engine-soundbank |
 | sandbox-testing | mutly |
 | sandboxed_execution | cureforge |
 | sandboxing | skill-open-sandbox |
+| sbom | supply-chain-health |
 | scenario_simulation | overlay-chain |
 | scheduling | social-media-dashboard |
 | scientific-engine | biotech-ide |
@@ -1077,9 +1137,11 @@ Generated: 2026-08-13T18:17:34.034Z
 | search | omni-research, ext-mem0, skill-mem0, skill-weather |
 | security-scanning | ext-cyber-security, overlay-safety, sentinel-monitor, cheetah, clawsafe, codegang |
 | security_scanning | codenexus |
+| segmentation | marketing-tool |
 | self-reflection | deterministic-brain |
-| semantic-search | mutly |
+| semantic-search | comic-metaphor-engine, mutly |
 | semantic_analysis | codenexus |
+| semantic_index | zvec |
 | signals | skill-trading |
 | simulation | fs-agent, hemp-os, overlay-science |
 | skill-generation | book-to-skill |
@@ -1092,6 +1154,7 @@ Generated: 2026-08-13T18:17:34.034Z
 | social_scheduling | indy-music-platform |
 | sound-design | det-engine-soundbank, tapsynth |
 | spatial_metrics | bbtech-web-app |
+| speaker_detection | youtube-shorts |
 | specification | sub-team |
 | speech | service-openai-api |
 | speech-recognition | ext-voice |
@@ -1099,6 +1162,7 @@ Generated: 2026-08-13T18:17:34.034Z
 | sports-simulation | playgene |
 | spreadsheet | ufc-mcp |
 | storage | ext-engram, ext-mem0, ext-memory-core, service-local-sqlite, skill-engram, skill-mem0 |
+| strategy-metaphors | comic-metaphor-engine |
 | subcontractor-onboarding | mcp-cis-assistant |
 | subscriptions | service-stripe |
 | summarization | bookbridge, book-bridge, skill-summarize |
@@ -1107,6 +1171,7 @@ Generated: 2026-08-13T18:17:34.034Z
 | sweep | deterministic-brain |
 | symbol-extraction | mutly |
 | synthesis | tapsynth |
+| system-telemetry | system-agent |
 | task-dag | biotech-ide |
 | task-delegation | ext-claw-team |
 | tax-deductions | mcp-cis-assistant |
@@ -1121,14 +1186,17 @@ Generated: 2026-08-13T18:17:34.034Z
 | trading | ext-finance, skill-llm-trading-lab, skill-trading-agents, skill-trading, super-tool |
 | treatment-planning | disease-research |
 | trend_detection | hempforge |
+| trend_intelligence | overlay-global-lens |
 | tutoring | ext-the-lab |
 | ui-component-generation | cheetah |
 | ui_generation | vibeserve |
 | utility | ufc-mcp |
 | validation | mcp-cis-assistant, phaselock |
 | vector-search | ext-memory-lancedb |
+| vector_search | zvec |
 | verification | sub-team |
 | version_history | recursive-ip |
+| vertical_cropping | youtube-shorts |
 | video | ufc-mcp |
 | video-creation | money-printer-turbo |
 | video-processing | skill-video-frames |
@@ -1137,11 +1205,14 @@ Generated: 2026-08-13T18:17:34.034Z
 | voice-activation | swabble |
 | vulnerability-analysis | ext-cyber-security |
 | vulnerability_discovery | cai |
+| vulnerability_reports | supply-chain-health |
 | wealth-analysis | ext-the-bank |
 | web-fetch | mcp-fetch |
 | web-scraping | agent-browser |
 | web-search | omni-research |
 | web_pentesting | cai |
+| web_validation | book-synthesis |
 | wholesale-marketing | overlay-finance, wholesale-marketing-channel |
+| windows-control | system-agent |
 | workflow_management | hempforge |
 | writing | book-writing-assistant |
