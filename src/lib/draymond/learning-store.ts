@@ -211,7 +211,8 @@ export async function distillLessonsFromStore(limit = 200): Promise<Lesson[]> {
   const lessons: Lesson[] = [];
   for (const [key, group] of byPattern.entries()) {
     if (group.length < 2) continue;
-    const [agentId] = key.split(':');
+    const idx = key.lastIndexOf(':');
+    const agentId = key.slice(0, idx);
     const failCount = group.filter((g) => !g.success).length;
     const last = group[group.length - 1]!;
     lessons.push({
