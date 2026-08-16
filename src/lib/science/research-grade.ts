@@ -31,7 +31,8 @@ import {
   readLearningStore,
   saveGradeWeights,
   saveDiscoveries,
-  addOutcome,
+  addOutcomesBatch,
+  markPublicationEventsConsumed,
   type LearningOutcome,
 } from '@/lib/draymond/learning-store';
 
@@ -376,21 +377,26 @@ export async function mirrorDiscoveriesForLearning(grades: ResearchGrade[]): Pro
  * Turn publication events into self-learning outcomes. success = high-grade
  * publication; a low-grade publication is recorded as a negative outcome so the
  * grader learns from over-promising.
+ *
+ * Idempotent: each event is recorded at most once — consumed event ids are
+ * tracked in the store, so repeated runs (e.g. nightly schedule) never
+ * duplicate lessons or corrupt the learning signal.
  */
 export async function recordPublicationOutcomes(limit = 100): Promise<LearningOutcome[]> {
   const store = await readLearningStore();
-  const events = store.publicationEvents.slice(-limit);
-  const outcomes: LearningOutcome[] = [];
-  for (const e of events) {
-    const isHigh = e.outcome === 'success';
-    outcomes.push(await addOutcome({
-      agentId: 'research-grade:published',
-      kind: 'benchmark',
-      summary: `${e.goalId} published (score ${e.gradeScore})`,
-      success: isHigh,
-      detail: `source=${e.source} outcome=${e.outcome} discovery=${e.discoveryId}`,
-    }));
-  }
+  const consumed = new Set(store.consumedPublicationEventIds ?? []);
+  const pending = store.publicationEvents.filter((e) => !consumed.has(e.id)).slice(-limit);
+  if (pending.length === 0) return [];
+
+  const inputs = pending.map((e) => ({
+    agentId: 'research-grade:published',
+    kind: 'benchmark' as const,
+    summary: `${e.goalId} published (score ${e.gradeScore})`,
+    success: e.outcome === 'success',
+    detail: `source=${e.source} outcome=${e.outcome} discovery=${e.discoveryId}`,
+  }));
+  const outcomes = await addOutcomesBatch(inputs);
+  await markPublicationEventsConsumed(pending.map((e) => e.id));
   return outcomes;
 }
 

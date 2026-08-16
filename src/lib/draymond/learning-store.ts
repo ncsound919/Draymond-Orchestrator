@@ -89,6 +89,8 @@ export interface LearningStore {
   driftMetrics: DriftDetectionMetrics | null;
   discoveries: ResearchGrade[];
   publicationEvents: PublicationEvent[];
+  /** Publication event ids already converted into learning outcomes. */
+  consumedPublicationEventIds?: string[];
   updatedAt: string;
 }
 
@@ -98,6 +100,7 @@ export function emptyStore(): LearningStore {
   return {
     outcomes: [], lessons: [], gradeWeights: null, benchmarkWeights: null,
     driftMetrics: null, discoveries: [], publicationEvents: [],
+    consumedPublicationEventIds: [],
     updatedAt: nowIso(),
   };
 }
@@ -210,6 +213,18 @@ export function savePublicationEvent(event: PublicationEvent): Promise<void> {
     const store = await readLearningStore();
     store.publicationEvents.push(event);
     store.publicationEvents = store.publicationEvents.slice(-200);
+    await writeLearningStore(store);
+  });
+}
+
+/** Remember which publication events already produced learning outcomes. */
+export function markPublicationEventsConsumed(ids: string[]): Promise<void> {
+  return enqueueWrite(async () => {
+    const store = await readLearningStore();
+    const consumed = new Set(store.consumedPublicationEventIds ?? []);
+    const fresh = [...new Set(ids)].filter((id) => !consumed.has(id));
+    if (fresh.length === 0) return;
+    store.consumedPublicationEventIds = [...consumed, ...fresh].slice(-500);
     await writeLearningStore(store);
   });
 }

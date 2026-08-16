@@ -55,6 +55,20 @@ describe('learning-store', () => {
     expect(lessons[0].lesson).toMatch(/Repeated failure/i);
   });
 
+  it('marks publication events consumed with dedupe', async () => {
+    const s = await importStore();
+    await s.savePublicationEvent({
+      id: 'pe_1', goalId: 'g1', discoveryId: 'd1', source: 'curemind',
+      publishedAt: new Date().toISOString(), gradeScore: 800, outcome: 'success',
+    });
+    await s.markPublicationEventsConsumed(['pe_1', 'pe_1']);
+    let store = await s.readLearningStore();
+    expect(store.consumedPublicationEventIds).toEqual(['pe_1']);
+    await s.markPublicationEventsConsumed(['pe_2']);
+    store = await s.readLearningStore();
+    expect(store.consumedPublicationEventIds).toEqual(['pe_1', 'pe_2']);
+  });
+
   it('migrates legacy learning-outcomes.json into the store', async () => {
     // Seed a legacy file the way self-learning.ts used to write it.
     await fs.writeFile(
