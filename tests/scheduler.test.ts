@@ -204,9 +204,9 @@ describe('runDueJobs', () => {
       const results = await runDueJobs();
       expect(results[0].status).toBe('failed');
       // The failure was fed to the self-learning loop for nightly distillation.
-      const raw = fs.readFileSync(path.join(tmpDir, 'learning-outcomes.json'), 'utf-8');
-      const outcomes = JSON.parse(raw) as Array<{ agentId: string }>;
-      expect(outcomes.some((o) => o.agentId === 'scheduler:job-fail')).toBe(true);
+      const raw = fs.readFileSync(path.join(tmpDir, 'learning-store.json'), 'utf-8');
+      const store = JSON.parse(raw) as { outcomes: Array<{ agentId: string }> };
+      expect(store.outcomes.some((o) => o.agentId === 'scheduler:job-fail')).toBe(true);
     } finally {
       delete process.env.DRAYMOND_REGISTRY_DIR;
       fs.rmSync(tmpDir, { recursive: true, force: true });

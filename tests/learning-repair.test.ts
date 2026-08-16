@@ -110,9 +110,9 @@ describe('escalateRepairLoops', () => {
     );
 
     // The incident is recorded back into learning → closes the loop.
-    const raw = await fs.readFile(path.join(tempDir, 'learning-outcomes.json'), 'utf-8');
-    const outcomes = JSON.parse(raw) as Array<{ kind: string; agentId: string; success: boolean }>;
-    expect(outcomes.some((o) => o.kind === 'incident' && o.agentId === 'repair-loop:monitor:down' && !o.success)).toBe(true);
+    const raw = await fs.readFile(path.join(tempDir, 'learning-store.json'), 'utf-8');
+    const store = JSON.parse(raw) as { outcomes: Array<{ kind: string; agentId: string; success: boolean }> };
+    expect(store.outcomes.some((o) => o.kind === 'incident' && o.agentId === 'repair-loop:monitor:down' && !o.success)).toBe(true);
   });
 
   it('returns an empty list when no loops exist', async () => {

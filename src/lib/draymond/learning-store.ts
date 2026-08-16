@@ -8,6 +8,8 @@
  * (the same fix self-learning.ts applied to its outcome file).
  */
 
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { readJsonState, writeJsonState, nowIso } from './cognition';
 
 export interface LearningOutcome {
@@ -112,9 +114,34 @@ function enqueueWrite<T>(task: () => Promise<T>): Promise<T> {
 export async function readLearningStore(): Promise<LearningStore> {
   try {
     const s = await readJsonState<LearningStore>(STORE_NAME, emptyStore());
-    return { ...emptyStore(), ...s };
+    const merged = { ...emptyStore(), ...s };
+
+    // Legacy migration: self-learning.ts used separate files.
+    const legacyOutcomes = await readLegacyJson<LearningOutcome[]>('learning-outcomes.json', []);
+    const legacyLessons = await readLegacyJson<{ lessons?: Lesson[] }>('learning-lessons.json', { lessons: [] });
+    if (legacyOutcomes.length > 0) {
+      for (const o of legacyOutcomes) {
+        if (!merged.outcomes.some((m) => m.id === o.id)) merged.outcomes.push(o);
+      }
+    }
+    if (Array.isArray(legacyLessons.lessons)) {
+      for (const l of legacyLessons.lessons) {
+        if (!merged.lessons.some((m) => m.id === l.id)) merged.lessons.push(l);
+      }
+    }
+    return merged;
   } catch {
     return emptyStore();
+  }
+}
+
+async function readLegacyJson<T>(name: string, fallback: T): Promise<T> {
+  const dir = process.env.DRAYMOND_REGISTRY_DIR ?? path.join(process.cwd(), '.draymond');
+  try {
+    const raw = await fs.readFile(path.join(dir, name), 'utf-8');
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
   }
 }
 

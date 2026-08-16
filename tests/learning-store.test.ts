@@ -54,4 +54,16 @@ describe('learning-store', () => {
     expect(lessons.length).toBeGreaterThan(0);
     expect(lessons[0].lesson).toMatch(/Repeated failure/i);
   });
+
+  it('migrates legacy learning-outcomes.json into the store', async () => {
+    // Seed a legacy file the way self-learning.ts used to write it.
+    await fs.writeFile(
+      path.join(tmpDir, 'learning-outcomes.json'),
+      JSON.stringify([{ id: 'lo_legacy', agentId: 'scheduler:x', kind: 'job', summary: 'old failed', success: false, detail: 'legacy', createdAt: new Date().toISOString() }]),
+      'utf-8'
+    );
+    const s = await importStore();
+    const store = await s.readLearningStore();
+    expect(store.outcomes.some((o) => o.id === 'lo_legacy')).toBe(true);
+  });
 });

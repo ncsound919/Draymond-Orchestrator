@@ -377,11 +377,11 @@ describe('ide session manager', () => {
     expect(latest?.runId).toBe(run.runId);
 
     // Self-learning outcomes were recorded (kind 'benchmark', per tool).
-    const outcomesFile = path.join(tmpDir, 'learning-outcomes.json');
-    const raw = await fs.readFile(outcomesFile, 'utf-8');
-    const outcomes = JSON.parse(raw) as Array<{ kind: string; agentId: string; success: boolean }>;
-    expect(outcomes.length).toBeGreaterThan(0);
-    expect(outcomes.every((o) => o.kind === 'benchmark')).toBe(true);
+    const storeFile = path.join(tmpDir, 'learning-store.json');
+    const raw = await fs.readFile(storeFile, 'utf-8');
+    const store = JSON.parse(raw) as { outcomes: Array<{ kind: string; agentId: string; success: boolean }> };
+    expect(store.outcomes.length).toBeGreaterThan(0);
+    expect(store.outcomes.every((o) => o.kind === 'benchmark')).toBe(true);
   }, 60_000);
 
   it('probe classifies a down service and remediation offers a restart action', async () => {

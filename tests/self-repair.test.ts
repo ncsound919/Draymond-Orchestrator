@@ -187,8 +187,8 @@ describe('failure-loop guard', () => {
     const mod = await loadSelfRepair();
     await mod.attemptRepair('qa:fail', 'tests failing');
 
-    const raw = await fs.readFile(path.join(tempDir, 'learning-outcomes.json'), 'utf-8');
-    const outcomes = JSON.parse(raw) as Array<{ kind: string; agentId: string; success: boolean }>;
-    expect(outcomes.some((o) => o.kind === 'repair' && o.agentId === 'repair:qa:fail' && o.success)).toBe(true);
+    const raw = await fs.readFile(path.join(tempDir, 'learning-store.json'), 'utf-8');
+    const store = JSON.parse(raw) as { outcomes: Array<{ kind: string; agentId: string; success: boolean }> };
+    expect(store.outcomes.some((o) => o.kind === 'repair' && o.agentId === 'repair:qa:fail' && o.success)).toBe(true);
   });
 });
