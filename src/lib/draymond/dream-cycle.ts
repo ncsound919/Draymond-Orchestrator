@@ -8,12 +8,11 @@
  * NEVER rejects — every path returns a DreamReport (gated or errored).
  */
 
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import { createDraymondAdminClient } from './client';
 import { storeMemory, logEvent } from './index';
 import { runDecaySweep } from './memory-intelligence';
 import { getLessons } from './self-learning';
+import { readLearningStore } from './learning-store';
 import { readJsonState, writeJsonState, nowIso } from './cognition';
 import type { DraymondMemory } from './types';
 
@@ -136,10 +135,8 @@ interface GatherResult {
 
 async function readOutcomesSince(sinceIso: string): Promise<Array<{ createdAt?: string }>> {
   try {
-    const raw = await fs.readFile(path.join(process.env.DRAYMOND_REGISTRY_DIR ?? path.join(process.cwd(), '.draymond'), 'learning-outcomes.json'), 'utf-8');
-    const parsed = JSON.parse(raw) as Array<{ createdAt?: string }>;
-    const arr = Array.isArray(parsed) ? parsed : [];
-    return arr.filter((o) => (o.createdAt ? new Date(o.createdAt).getTime() >= new Date(sinceIso).getTime() : false));
+    const store = await readLearningStore();
+    return store.outcomes.filter((o) => (o.createdAt ? new Date(o.createdAt).getTime() >= new Date(sinceIso).getTime() : false));
   } catch {
     return [];
   }

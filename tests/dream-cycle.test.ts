@@ -265,7 +265,7 @@ describe('AutoDream branch coverage', () => {
     setTable('draymond_events', []);
   }
 
-  it('gathers outcomes from the learning-outcomes file since the last dream', async () => {
+  it('gathers outcomes from the unified store since the last dream', async () => {
     baseTables();
     // A prior dream yesterday → only newer outcomes are gathered.
     fs.mkdirSync(tmp, { recursive: true });
@@ -280,12 +280,17 @@ describe('AutoDream branch coverage', () => {
       })
     );
     fs.writeFileSync(
-      path.join(tmp, 'learning-outcomes.json'),
-      JSON.stringify([
-        { id: 'o1', createdAt: new Date().toISOString() },
-        { id: 'o2', createdAt: new Date(Date.now() - 30 * 86_400_000).toISOString() },
-        'not-an-object',
-      ])
+      path.join(tmp, 'learning-store.json'),
+      JSON.stringify({
+        outcomes: [
+          { id: 'o1', agentId: 'x', kind: 'job', summary: 's', success: true, detail: '', createdAt: new Date().toISOString() },
+          { id: 'o2', agentId: 'x', kind: 'job', summary: 's', success: true, detail: '', createdAt: new Date(Date.now() - 30 * 86_400_000).toISOString() },
+          'not-an-object',
+        ],
+        lessons: [],
+        discoveries: [],
+        publicationEvents: [],
+      })
     );
     setTable('draymond_memory', []);
     const report = await runDreamCycle();

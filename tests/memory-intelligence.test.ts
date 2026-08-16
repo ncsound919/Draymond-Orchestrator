@@ -73,6 +73,7 @@ beforeEach(async () => {
 afterEach(() => {
   mockClient._tables.clear();
   upsertCalls.length = 0;
+  delete process.env.DRAYMOND_REGISTRY_DIR;
 });
 
 describe('searchMemories', () => {
@@ -157,10 +158,17 @@ describe('memory access', () => {
 describe('rebuildProjectionsFromBrainState', () => {
   it('indexes canonical brain-state files with provenance and tier', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'brain-'));
+    process.env.DRAYMOND_REGISTRY_DIR = dir; // readLearningStore resolves here for learning-store.json
     fs.writeFileSync(path.join(dir, 'system-goals.json'), JSON.stringify({ goals: [{ id: 'g1', title: 'Goal A' }] }));
     fs.writeFileSync(
-      path.join(dir, 'learning-lessons.json'),
-      JSON.stringify({ lessons: [{ id: 'l1', pattern: 'P1' }, { id: 'l2', pattern: 'P2' }] }),
+      path.join(dir, 'learning-store.json'),
+      JSON.stringify({
+        outcomes: [],
+        lessons: [{ id: 'l1', agentId: 'a', pattern: 'P1', lesson: 'L1', evidenceCount: 3, lastSeen: new Date().toISOString() }, { id: 'l2', agentId: 'a', pattern: 'P2', lesson: 'L2', evidenceCount: 2, lastSeen: new Date().toISOString() }],
+        discoveries: [],
+        publicationEvents: [],
+        updatedAt: new Date().toISOString(),
+      }),
     );
     fs.writeFileSync(path.join(dir, 'kairos.json'), JSON.stringify({ moments: [{ id: 'm1', title: 'M1' }] }));
     fs.writeFileSync(path.join(dir, 'treasury.json'), JSON.stringify({ revenueCents: 0 }));
@@ -177,13 +185,13 @@ describe('rebuildProjectionsFromBrainState', () => {
     const memoryUpserts = upsertCalls.filter((c) => c.table === 'draymond_memory');
     const sources = new Set(memoryUpserts.map((c) => (c.payload as Record<string, unknown>).source_event as string));
     expect(sources).toContain('brain_state:system-goals.json');
-    expect(sources).toContain('brain_state:learning-lessons.json');
+    expect(sources).toContain('brain_state:learning-store.json');
     expect(sources).toContain('brain_state:kairos.json');
 
     const core = memoryUpserts.find((c) => (c.payload as Record<string, unknown>).key === 'system-goals:g1');
     expect(core?.payload).toMatchObject({ tier: 'core', decay_rate: 0, importance_score: 0.9 });
 
-    const lesson = memoryUpserts.find((c) => (c.payload as Record<string, unknown>).key === 'learning-lessons:l1');
+    const lesson = memoryUpserts.find((c) => (c.payload as Record<string, unknown>).key === 'learning-store:lessons:l1');
     expect(lesson?.payload).toMatchObject({ tier: 'important', decay_rate: 0.01 });
   });
 
@@ -199,14 +207,19 @@ describe('checkBrainStateBudget', () => {
   it('flags files over their cap and reports sizes', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'brain-budget-'));
     fs.writeFileSync(path.join(dir, 'learning-lessons.json'), Buffer.alloc(600 * 1024, 'x')); // 600KB > 500KB cap
+    fs.writeFileSync(path.join(dir, 'learning-store.json'), Buffer.alloc(100 * 1024, 'x')); // 100KB < 4000KB cap
     fs.writeFileSync(path.join(dir, 'hypotheses.json'), JSON.stringify({ hypotheses: [] })); // tiny
     fs.writeFileSync(path.join(dir, 'unindexed-file.json'), Buffer.alloc(10 * 1024 * 1024)); // no cap → ignored
 
     const files = await mod.checkBrainStateBudget(dir);
     const lessons = files.find((f) => f.file === 'learning-lessons.json');
+    const store = files.find((f) => f.file === 'learning-store.json');
     const hypotheses = files.find((f) => f.file === 'hypotheses.json');
     expect(lessons?.overBudget).toBe(true);
     expect(lessons?.capBytes).toBe(500 * 1024);
+    expect(store).toBeDefined();
+    expect(store?.capBytes).toBe(4000 * 1024);
+    expect(store?.overBudget).toBe(false);
     expect(hypotheses?.overBudget).toBe(false);
     expect(files.some((f) => f.file === 'unindexed-file.json')).toBe(false);
   });

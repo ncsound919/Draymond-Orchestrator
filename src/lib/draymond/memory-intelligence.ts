@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createDraymondClient } from './client';
 import { logEvent } from './index';
+import { readLearningStore } from './learning-store';
 import type {
   DraymondMemory,
   MemorySearchResult,
@@ -521,6 +522,7 @@ export async function getMemoryInsights(agentId: string): Promise<MemoryInsight>
 const BRAIN_STATE_TIER: Record<string, { tier: MemoryTier; importance: number; decay: number }> = {
   'system-goals.json': { tier: 'core', importance: 0.9, decay: 0 },
   'treasury.json': { tier: 'core', importance: 0.9, decay: 0 },
+  'learning-store.json': { tier: 'important', importance: 0.7, decay: 0.01 },
   'learning-lessons.json': { tier: 'important', importance: 0.7, decay: 0.01 },
   'hypotheses.json': { tier: 'important', importance: 0.7, decay: 0.01 },
   'kairos.json': { tier: 'contextual', importance: 0.5, decay: 0.01 },
@@ -537,6 +539,9 @@ function extractBrainStateRows(
   switch (file) {
     case 'system-goals.json':
       for (const g of asArray(parsed.goals)) rows.push({ key: `system-goals:${String(g.id ?? g.title)}`, summary: String(g.title ?? 'goal'), value: g });
+      break;
+    case 'learning-store.json':
+      for (const l of asArray(parsed.lessons)) rows.push({ key: `learning-store:lessons:${String(l.id ?? l.pattern)}`, summary: String(l.pattern ?? l.lesson ?? 'lesson'), value: l });
       break;
     case 'learning-lessons.json':
       for (const l of asArray(parsed.lessons)) rows.push({ key: `learning-lessons:${String(l.id ?? l.pattern)}`, summary: String(l.pattern ?? l.lesson ?? 'lesson'), value: l });
@@ -588,11 +593,17 @@ export async function rebuildProjectionsFromBrainState(
     if (!spec) continue; // only files with a declared access tier are indexed
 
     let parsed: unknown;
-    try {
-      parsed = JSON.parse(await fs.promises.readFile(path.join(dir, file), 'utf-8'));
-    } catch {
-      skipped++;
-      continue;
+    if (file === 'learning-store.json') {
+      // The unified store merges legacy files and fail-softs; read it through
+      // the shared loader so the projection always sees the same brain.
+      parsed = await readLearningStore();
+    } else {
+      try {
+        parsed = JSON.parse(await fs.promises.readFile(path.join(dir, file), 'utf-8'));
+      } catch {
+        skipped++;
+        continue;
+      }
     }
 
     const rows = extractBrainStateRows(file, (parsed ?? {}) as Record<string, unknown>);
@@ -655,6 +666,7 @@ export interface BrainStateBudgetFile {
 
 /** Default caps (KB) per canonical brain-state file. Override via DRAYMOND_BRAIN_BUDGET_KB JSON. */
 const BRAIN_STATE_BUDGET_KB: Record<string, number> = {
+  'learning-store.json': 4000,
   'learning-lessons.json': 500,
   'learning-outcomes.json': 4000,
   'kairos.json': 750,
