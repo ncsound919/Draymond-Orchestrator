@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import type { NextRequest } from 'next/server';
 import { POST as storeWeightsPOST } from '@/app/api/ops/learning/weights/route';
 import { POST as benchmarkPOST } from '@/app/api/ops/learning/benchmark/route';
 import { POST as publishedPOST } from '@/app/api/ops/learning/published/route';
@@ -11,7 +12,7 @@ function mockRequest(body: unknown, headers: Record<string, string> = {}) {
     json: async () => body,
     headers: new Headers(headers),
     url: 'http://localhost/api/ops/learning/store',
-  } as unknown as Request;
+  } as unknown as NextRequest;
 }
 
 beforeEach(() => {
