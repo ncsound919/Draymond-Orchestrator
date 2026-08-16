@@ -523,7 +523,6 @@ const BRAIN_STATE_TIER: Record<string, { tier: MemoryTier; importance: number; d
   'system-goals.json': { tier: 'core', importance: 0.9, decay: 0 },
   'treasury.json': { tier: 'core', importance: 0.9, decay: 0 },
   'learning-store.json': { tier: 'important', importance: 0.7, decay: 0.01 },
-  'learning-lessons.json': { tier: 'important', importance: 0.7, decay: 0.01 },
   'hypotheses.json': { tier: 'important', importance: 0.7, decay: 0.01 },
   'kairos.json': { tier: 'contextual', importance: 0.5, decay: 0.01 },
   'recaps.json': { tier: 'contextual', importance: 0.5, decay: 0.01 },
@@ -542,9 +541,6 @@ function extractBrainStateRows(
       break;
     case 'learning-store.json':
       for (const l of asArray(parsed.lessons)) rows.push({ key: `learning-store:lessons:${String(l.id ?? l.pattern)}`, summary: String(l.pattern ?? l.lesson ?? 'lesson'), value: l });
-      break;
-    case 'learning-lessons.json':
-      for (const l of asArray(parsed.lessons)) rows.push({ key: `learning-lessons:${String(l.id ?? l.pattern)}`, summary: String(l.pattern ?? l.lesson ?? 'lesson'), value: l });
       break;
     case 'hypotheses.json':
       for (const h of asArray(parsed.hypotheses)) rows.push({ key: `hypotheses:${String(h.id ?? h.claim)}`, summary: String(h.claim ?? 'hypothesis'), value: h });
@@ -595,8 +591,9 @@ export async function rebuildProjectionsFromBrainState(
     let parsed: unknown;
     if (file === 'learning-store.json') {
       // The unified store merges legacy files and fail-softs; read it through
-      // the shared loader so the projection always sees the same brain.
-      parsed = await readLearningStore();
+      // the shared loader (threaded with the brainStateDir override) so the
+      // projection always sees the same brain the store writes.
+      parsed = await readLearningStore(dir);
     } else {
       try {
         parsed = JSON.parse(await fs.promises.readFile(path.join(dir, file), 'utf-8'));
@@ -667,8 +664,6 @@ export interface BrainStateBudgetFile {
 /** Default caps (KB) per canonical brain-state file. Override via DRAYMOND_BRAIN_BUDGET_KB JSON. */
 const BRAIN_STATE_BUDGET_KB: Record<string, number> = {
   'learning-store.json': 4000,
-  'learning-lessons.json': 500,
-  'learning-outcomes.json': 4000,
   'kairos.json': 750,
   'recaps.json': 1000,
   'hypotheses.json': 250,

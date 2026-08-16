@@ -158,7 +158,6 @@ describe('memory access', () => {
 describe('rebuildProjectionsFromBrainState', () => {
   it('indexes canonical brain-state files with provenance and tier', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'brain-'));
-    process.env.DRAYMOND_REGISTRY_DIR = dir; // readLearningStore resolves here for learning-store.json
     fs.writeFileSync(path.join(dir, 'system-goals.json'), JSON.stringify({ goals: [{ id: 'g1', title: 'Goal A' }] }));
     fs.writeFileSync(
       path.join(dir, 'learning-store.json'),
@@ -195,6 +194,33 @@ describe('rebuildProjectionsFromBrainState', () => {
     expect(lesson?.payload).toMatchObject({ tier: 'important', decay_rate: 0.01 });
   });
 
+  it('threads the brainStateDir override into the unified store read (env unset)', async () => {
+    // Regression guard: rebuildProjectionsFromBrainState({ brainStateDir }) must
+    // read learning-store.json from that dir even when DRAYMOND_REGISTRY_DIR is
+    // unset — previously the store read ignored the override and indexed nothing.
+    delete process.env.DRAYMOND_REGISTRY_DIR;
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'brain-'));
+    fs.writeFileSync(
+      path.join(dir, 'learning-store.json'),
+      JSON.stringify({
+        outcomes: [],
+        lessons: [{ id: 'l1', agentId: 'a', pattern: 'P1', lesson: 'L1', evidenceCount: 3, lastSeen: new Date().toISOString() }],
+        discoveries: [],
+        publicationEvents: [],
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+
+    const result = await mod.rebuildProjectionsFromBrainState({
+      agentId: 'draymond',
+      userId: 'fleet',
+      brainStateDir: dir,
+    });
+    expect(result.indexed).toBe(1);
+    const lesson = upsertCalls.find((c) => (c.payload as Record<string, unknown>).key === 'learning-store:lessons:l1');
+    expect(lesson).toBeDefined();
+  });
+
   it('returns zeros when the brain-state dir is missing', async () => {
     const result = await mod.rebuildProjectionsFromBrainState({
       brainStateDir: path.join(os.tmpdir(), 'definitely-not-a-real-dir-xyz'),
@@ -206,17 +232,17 @@ describe('rebuildProjectionsFromBrainState', () => {
 describe('checkBrainStateBudget', () => {
   it('flags files over their cap and reports sizes', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'brain-budget-'));
-    fs.writeFileSync(path.join(dir, 'learning-lessons.json'), Buffer.alloc(600 * 1024, 'x')); // 600KB > 500KB cap
+    fs.writeFileSync(path.join(dir, 'kairos.json'), Buffer.alloc(800 * 1024, 'x')); // 800KB > 750KB cap
     fs.writeFileSync(path.join(dir, 'learning-store.json'), Buffer.alloc(100 * 1024, 'x')); // 100KB < 4000KB cap
     fs.writeFileSync(path.join(dir, 'hypotheses.json'), JSON.stringify({ hypotheses: [] })); // tiny
     fs.writeFileSync(path.join(dir, 'unindexed-file.json'), Buffer.alloc(10 * 1024 * 1024)); // no cap → ignored
 
     const files = await mod.checkBrainStateBudget(dir);
-    const lessons = files.find((f) => f.file === 'learning-lessons.json');
+    const kairos = files.find((f) => f.file === 'kairos.json');
     const store = files.find((f) => f.file === 'learning-store.json');
     const hypotheses = files.find((f) => f.file === 'hypotheses.json');
-    expect(lessons?.overBudget).toBe(true);
-    expect(lessons?.capBytes).toBe(500 * 1024);
+    expect(kairos?.overBudget).toBe(true);
+    expect(kairos?.capBytes).toBe(750 * 1024);
     expect(store).toBeDefined();
     expect(store?.capBytes).toBe(4000 * 1024);
     expect(store?.overBudget).toBe(false);

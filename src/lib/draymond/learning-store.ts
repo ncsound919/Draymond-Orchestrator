@@ -114,14 +114,16 @@ function enqueueWrite<T>(task: () => Promise<T>): Promise<T> {
   return next as Promise<T>;
 }
 
-export async function readLearningStore(): Promise<LearningStore> {
+export async function readLearningStore(dir?: string): Promise<LearningStore> {
   try {
-    const s = await readJsonState<LearningStore>(STORE_NAME, emptyStore());
+    const s = dir
+      ? await readJsonStateFromDir(dir, STORE_NAME, emptyStore())
+      : await readJsonState<LearningStore>(STORE_NAME, emptyStore());
     const merged = { ...emptyStore(), ...s };
 
     // Legacy migration: self-learning.ts used separate files.
-    const legacyOutcomes = await readLegacyJson<LearningOutcome[]>('learning-outcomes.json', []);
-    const legacyLessons = await readLegacyJson<{ lessons?: Lesson[] }>('learning-lessons.json', { lessons: [] });
+    const legacyOutcomes = await readLegacyJson<LearningOutcome[]>('learning-outcomes.json', [], dir);
+    const legacyLessons = await readLegacyJson<{ lessons?: Lesson[] }>('learning-lessons.json', { lessons: [] }, dir);
     if (legacyOutcomes.length > 0) {
       for (const o of legacyOutcomes) {
         if (!merged.outcomes.some((m) => m.id === o.id)) merged.outcomes.push(o);
@@ -138,10 +140,22 @@ export async function readLearningStore(): Promise<LearningStore> {
   }
 }
 
-async function readLegacyJson<T>(name: string, fallback: T): Promise<T> {
-  const dir = process.env.DRAYMOND_REGISTRY_DIR ?? path.join(process.cwd(), '.draymond');
+/** Read a registry JSON file from an explicit dir (falls back to the default registry dir when omitted). */
+async function readJsonStateFromDir<T>(dir: string, name: string, fallback: T): Promise<T> {
   try {
-    const raw = await fs.readFile(path.join(dir, name), 'utf-8');
+    const raw = await fs.readFile(path.join(dir, `${name}.json`), 'utf-8');
+    const parsed = JSON.parse(raw) as T;
+    if (parsed && typeof parsed === 'object') return parsed;
+    return fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+async function readLegacyJson<T>(name: string, fallback: T, dir?: string): Promise<T> {
+  const base = dir ?? (process.env.DRAYMOND_REGISTRY_DIR ?? path.join(process.cwd(), '.draymond'));
+  try {
+    const raw = await fs.readFile(path.join(base, name), 'utf-8');
     return JSON.parse(raw) as T;
   } catch {
     return fallback;
