@@ -30,7 +30,7 @@ import { getLessons, recordOutcome, type Lesson } from '@/lib/draymond/self-lear
 import {
   readLearningStore,
   saveGradeWeights,
-  saveDiscoveries,
+  upsertDiscovery,
   addOutcomesBatch,
   markPublicationEventsConsumed,
   type LearningOutcome,
@@ -361,6 +361,12 @@ export async function persistGradeWeightsForLearning(weights: GradeWeights): Pro
 /**
  * Mirror frontier/promising discoveries into the shared store so CureMind and
  * Benchmark Olympics can consume them without re-reading grades.
+ *
+ * Upserts per goalId instead of whole-array replace so discoveries posted by
+ * other producers (the discovery HTTP route, CureMind) survive a grading run —
+ * a route-posted discovery outside the current frontier set is no longer
+ * clobbered. The store's serialized write chain makes the sequential awaits
+ * atomic and safe.
  */
 export async function mirrorDiscoveriesForLearning(grades: ResearchGrade[]): Promise<void> {
   const slim = grades
@@ -370,7 +376,9 @@ export async function mirrorDiscoveriesForLearning(grades: ResearchGrade[]): Pro
       score: g.score, evidenceTier: g.evidenceTier,
       breakthroughClass: g.breakthroughClass, trend: g.trend, gradedAt: g.gradedAt,
     }));
-  await saveDiscoveries(slim);
+  for (const discovery of slim) {
+    await upsertDiscovery(discovery);
+  }
 }
 
 /**

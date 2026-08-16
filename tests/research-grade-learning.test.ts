@@ -88,6 +88,30 @@ describe('research-grade self-learning integration', () => {
     expect(s.discoveries[0]).toHaveProperty('gradedAt');
   });
 
+  it('upserts per-grade so route-posted discoveries survive a mirror run (no clobber)', async () => {
+    const rg = await importResearchGrade();
+    const store = await importStore();
+    // A discovery posted via the discovery HTTP route: non-frontier, and NOT in
+    // the current frontier/promising set — a whole-array replace would delete it.
+    await store.upsertDiscovery({
+      goalId: 'route-seeded',
+      domain: 'biotech', area: 'CureMind', title: 'route-posted candidate',
+      score: 480, evidenceTier: 'E2', breakthroughClass: 'exploratory',
+      trend: 'stable', gradedAt: new Date().toISOString(),
+    });
+
+    await rg.mirrorDiscoveriesForLearning([
+      grade({ goalId: 'frontier-1', score: 880, breakthroughClass: 'frontier' }),
+      grade({ goalId: 'promising-1', score: 640, breakthroughClass: 'promising' }),
+    ]);
+
+    const s = await store.readLearningStore();
+    const ids = s.discoveries.map((d) => d.goalId).sort();
+    // Both the route-posted entry and the freshly graded ones survive.
+    expect(ids).toEqual(['frontier-1', 'promising-1', 'route-seeded']);
+    expect(s.discoveries).toHaveLength(3);
+  });
+
   it('records graded outcomes once per publication event, idempotently', async () => {
     const rg = await importResearchGrade();
     const store = await importStore();
