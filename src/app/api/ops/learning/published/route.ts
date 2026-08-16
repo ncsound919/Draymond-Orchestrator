@@ -18,7 +18,10 @@ export async function POST(request: NextRequest) {
   if (!body.goalId) {
     return NextResponse.json({ error: 'goalId required' }, { status: 400 });
   }
-  const gradeScore = Number(body.gradeScore ?? 0);
+  const gradeScore = body.gradeScore === undefined ? 0 : Number(body.gradeScore);
+  if (!Number.isFinite(gradeScore)) {
+    return NextResponse.json({ error: 'gradeScore must be a finite number' }, { status: 400 });
+  }
   const outcome = gradeScore >= 500 ? 'success' : 'low_grade_published';
   await savePublicationEvent({
     id: `pe_${Date.now()}`,

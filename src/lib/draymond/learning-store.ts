@@ -208,6 +208,20 @@ export function saveDiscoveries(discoveries: ResearchGrade[]): Promise<void> {
   });
 }
 
+/**
+ * Insert-or-replace a single discovery, deduped by goalId.
+ * Atomic and serialized so concurrent producers (research-grade mirror, the
+ * discovery route, CureMind) never clobber each other's entries.
+ */
+export function upsertDiscovery(discovery: ResearchGrade): Promise<void> {
+  return enqueueWrite(async () => {
+    const store = await readLearningStore();
+    store.discoveries = store.discoveries.filter((d) => d.goalId !== discovery.goalId);
+    store.discoveries.push(discovery);
+    await writeLearningStore(store);
+  });
+}
+
 export function savePublicationEvent(event: PublicationEvent): Promise<void> {
   return enqueueWrite(async () => {
     const store = await readLearningStore();

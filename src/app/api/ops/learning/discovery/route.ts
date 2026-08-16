@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeRequest } from '@/lib/draymond/api-auth';
-import { readLearningStore, saveDiscoveries } from '@/lib/draymond/learning-store';
+import { upsertDiscovery } from '@/lib/draymond/learning-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,12 +9,17 @@ export async function POST(request: NextRequest) {
   const authError = authorizeRequest(request);
   if (authError) return authError;
   const body = (await request.json().catch(() => ({}))) as { discovery?: any };
-  if (!body.discovery || typeof body.discovery.goalId !== 'string') {
-    return NextResponse.json({ error: 'discovery.goalId required' }, { status: 400 });
+  const discovery = body.discovery;
+  if (
+    !discovery ||
+    typeof discovery.goalId !== 'string' ||
+    !Number.isFinite(discovery.score)
+  ) {
+    return NextResponse.json(
+      { error: 'discovery.goalId (string) and a finite numeric discovery.score are required' },
+      { status: 400 },
+    );
   }
-  const store = await readLearningStore();
-  const deduped = store.discoveries.filter((d) => d.goalId !== body.discovery.goalId);
-  deduped.push(body.discovery);
-  await saveDiscoveries(deduped);
+  await upsertDiscovery(discovery);
   return NextResponse.json({ ok: true });
 }

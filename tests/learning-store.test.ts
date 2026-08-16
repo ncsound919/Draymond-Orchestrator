@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import type { ResearchGrade } from '@/lib/draymond/learning-store';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
@@ -53,6 +54,28 @@ describe('learning-store', () => {
     const lessons = await s.distillLessonsFromStore();
     expect(lessons.length).toBeGreaterThan(0);
     expect(lessons[0].lesson).toMatch(/Repeated failure/i);
+  });
+
+  it('upserts discoveries atomically, deduped by goalId, preserving other entries', async () => {
+    const s = await importStore();
+    const base: Omit<ResearchGrade, 'goalId' | 'title'> = {
+      domain: 'biotech', area: 'protein', score: 100, evidenceTier: 'experimental',
+      breakthroughClass: 'promising', trend: 'up', gradedAt: new Date().toISOString(),
+    };
+    await s.saveDiscoveries([
+      { ...base, goalId: 'g-a', title: 'existing' },
+    ]);
+    await s.upsertDiscovery({ ...base, goalId: 'g-b', title: 'new', score: 200 });
+    let store = await s.readLearningStore();
+    expect(store.discoveries).toHaveLength(2);
+
+    await s.upsertDiscovery({ ...base, goalId: 'g-b', title: 'replaced', score: 250, breakthroughClass: 'frontier' });
+    store = await s.readLearningStore();
+    expect(store.discoveries).toHaveLength(2);
+    expect(store.discoveries.filter((d) => d.goalId === 'g-b')).toHaveLength(1);
+    const replaced = store.discoveries.find((d) => d.goalId === 'g-b')!;
+    expect(replaced.title).toBe('replaced');
+    expect(replaced.score).toBe(250);
   });
 
   it('marks publication events consumed with dedupe', async () => {
