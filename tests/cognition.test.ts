@@ -118,6 +118,9 @@ describe('cognition base', () => {
     const artifact = await deepenLoop({ system: 'sys', userMessage: 'brief' }, 3);
     expect(artifact.goals).toEqual(['g']);
     expect(mockCallLLM).toHaveBeenCalledTimes(3);
+    // The iterative draft/critique/revise lane is cheap — it should hit the
+    // local Ollama tier first via localFirst.
+    expect(mockCallLLM.mock.calls[0][0]).toMatchObject({ localFirst: true });
   });
 
   it('deepenLoop throws when no round produces a parseable plan', async () => {

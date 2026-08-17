@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { appendAuditLog } from '@/lib/audit';
 import { authorizeRequest, parseJsonBody } from '@/lib/draymond/api-auth';
-import { callLLM } from '@/lib/draymond/llm';
+import { callLLM, callLocalModel } from '@/lib/draymond/llm';
 
 const VALID_AGENTS = new Set([
   'megacode', 'uplift', 'rex', 'maya', 'finn', 'cleo', 'lexa',
@@ -125,9 +125,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
-
     const systemPrompt = [
       'You are Draymond, the orchestrator for a solopreneur OS.',
       'Decompose the goal into specific tasks and assign each to the right agent.',
@@ -144,24 +141,47 @@ export async function POST(request: NextRequest) {
     ].join('\n');
 
     let content: string;
+    // Try the cheap local Ollama tier first; accept it only if it parses into a
+    // valid decomposition (valid JSON + a non-empty tasks array). The local
+    // model often produces sparse/invalid plans, so fall back to paid when the
+    // validation gate rejects it.
     try {
-      content = await callLLM({
-        provider: 'opencode-free',
+      const local = await callLocalModel({
         system: systemPrompt,
         userMessage: `Goal: ${goal}\n<context>${JSON.stringify(context)}</context>`,
         maxTokens: 800,
-        temperature: 0.2,
-        timeoutMs: LLM_TIMEOUT_MS,
-        toonify: true,
-        fallbackKey: 'api.swarm.decompose',
-        fallbackContext: { userMessage: goal },
+        responseFormat: { type: 'json_object' },
       });
+      const localParsed = parseLLMResponse(local);
+      if (localParsed.tasks.length > 0) {
+        content = local;
+      } else {
+        console.warn('[swarm] local decomposition rejected (empty tasks). Using paid provider.');
+        content = '';
+      }
     } catch (err) {
-      if ((err as Error)?.name === 'AbortError')
-        throw new Error('LLM timed out — try again');
-      throw err;
-    } finally {
-      clearTimeout(timer);
+      console.warn(`[swarm] local model unavailable — using paid provider. ${err instanceof Error ? err.message : String(err)}`);
+      content = '';
+    }
+
+    if (!content) {
+      try {
+        content = await callLLM({
+          provider: 'opencode-free',
+          system: systemPrompt,
+          userMessage: `Goal: ${goal}\n<context>${JSON.stringify(context)}</context>`,
+          maxTokens: 800,
+          temperature: 0.2,
+          timeoutMs: LLM_TIMEOUT_MS,
+          toonify: true,
+          fallbackKey: 'api.swarm.decompose',
+          fallbackContext: { userMessage: goal },
+        });
+      } catch (err) {
+        if ((err as Error)?.name === 'AbortError')
+          throw new Error('LLM timed out — try again');
+        throw err;
+      }
     }
 
     if (!content)

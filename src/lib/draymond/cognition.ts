@@ -184,6 +184,7 @@ export async function deepenLoop(
       system: opts.system,
       userMessage: prompt,
       maxTokens: 2048,
+      localFirst: true,
       responseFormat: { type: 'json_object' },
       fallbackKey: 'cognition.deepenLoop',
     });
