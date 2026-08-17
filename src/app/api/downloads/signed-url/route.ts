@@ -13,7 +13,7 @@ const PRODUCT_FILES: Record<string, string> = {
 };
 
 function releasesDir(): string {
-  return process.env.DRAYMOND_RELEASES_DIR ?? path.join(process.cwd(), 'data', 'paid-releases');
+  return process.env.DRAYMOND_RELEASES_DIR ?? path.join(/*turbopackIgnore: true*/ process.cwd(), 'data', 'paid-releases');
 }
 
 export async function POST(request: NextRequest) {

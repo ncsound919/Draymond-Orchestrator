@@ -31,13 +31,17 @@ export async function POST(request: NextRequest) {
 
   // ── Run seed ────────────────────────────────────────────────────────
   try {
+    // Order matters: registerEntities(SEED_ENTITIES) first, then
+    // seedBusinessAutomation() LAST so the business-chain entity configs
+    // (http_api URLs the chains actually invoke) win over the registry seed
+    // for overlapping slugs (e.g. bet-buddy, bookbridge, omni-research).
+    const entityResult = await registerEntities(SEED_ENTITIES);
     const result = await seedBusinessAutomation();
     const monitorResult = await seedAgentMonitors();
     // Flip off monitors for services not checked out / configured on this box,
     // so the fleet doesn't fire "down" forever for agents that can't run here.
     const monitorsDisabled = await disableAbsentServiceMonitors();
     const skillPackResult = await seedSkillPacks();
-    const entityResult = await registerEntities(SEED_ENTITIES);
     const chainTemplatesResult = await seedChainTemplates();
     const missionChainsResult = await seedMissionChains();
     const systemic = await interconnectSystem();

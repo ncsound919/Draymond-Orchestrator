@@ -62,6 +62,29 @@ export async function POST(request: NextRequest) {
 
   const startedAt = Date.now();
 
+  // ── Benign whitelist: record-and-return before any LLM scorers run ────────
+  // Routed through attemptRepair (not a synthetic response) so the skipped
+  // attempt is actually appended to repair-log.json — the audit trail holds
+  // for every entry path, not just the scheduler/monitor callers.
+  const { isIgnoredSignal, attemptRepair } = await import('@/lib/draymond/self-repair');
+  if (isIgnoredSignal(effSignal)) {
+    const repair = await attemptRepair(effSignal, effDetail);
+    await publishIssueNotification({
+      title: 'Draymond · Benign signal recorded',
+      message: `${effSignal} — on the benign whitelist, no diagnosis or repair dispatched.\n\n${String(repair?.detail ?? effDetail ?? '')}`,
+      priority: 1,
+      tags: ['bell', 'information_source'],
+    }).catch(() => {});
+    return NextResponse.json({
+      ok: true,
+      signal: effSignal,
+      kind: effKind,
+      diagnosis: [],
+      repair,
+      duration_ms: Date.now() - startedAt,
+    }, { status: 200 });
+  }
+
   // ── 1. Diagnosis: RepoRank + Grader (best-effort, never blocks repair) ────
   const diagnosis: Array<{ scorer: string; score: number | null; grade?: string; summary: string; error?: string }> = [];
   if (effRepoUrl) {

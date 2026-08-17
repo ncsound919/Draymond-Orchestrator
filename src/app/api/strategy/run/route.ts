@@ -15,7 +15,7 @@ const execAsync = promisify(exec);
 // workspace sibling path (this repo and the agent-team live under Uplift/).
 function agentTeamDir(): string {
   if (process.env.AGENT_TEAM_DIR) return process.env.AGENT_TEAM_DIR;
-  return resolve(process.cwd(), '../01_Platforms/Overlay365/agent-team');
+  return resolve(/*turbopackIgnore: true*/ process.cwd(), '../01_Platforms/Overlay365/agent-team');
 }
 
 const RUN_TIMEOUT_MS = 60_000;

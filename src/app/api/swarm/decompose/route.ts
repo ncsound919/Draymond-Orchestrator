@@ -153,6 +153,8 @@ export async function POST(request: NextRequest) {
         temperature: 0.2,
         timeoutMs: LLM_TIMEOUT_MS,
         toonify: true,
+        fallbackKey: 'api.swarm.decompose',
+        fallbackContext: { userMessage: goal },
       });
     } catch (err) {
       if ((err as Error)?.name === 'AbortError')

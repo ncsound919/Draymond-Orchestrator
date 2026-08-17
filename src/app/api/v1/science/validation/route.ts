@@ -10,7 +10,7 @@ const runFile = promisify(execFile);
 
 function repoRoot(): string {
   if (process.env.SCIENCE_ROOT) return process.env.SCIENCE_ROOT;
-  return path.resolve(process.cwd());
+  return path.resolve(/*turbopackIgnore: true*/ process.cwd());
 }
 
 /**
