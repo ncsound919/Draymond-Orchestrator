@@ -1,0 +1,20 @@
+{
+  "model_id": "enviro-08-everlume",
+  "description": "EverLume centennial-bulb reliability: Bayesian stress model tracks cumulative voltage/thermal-cycle stress vs lumen depreciation, computing hazard rate and expected remaining lifetime for predictive maintenance. Deterministic reliability ticked model.",
+  "state_vars": ["stress_score", "hazard_rate", "lumen_depreciation", "remaining_hours", "reliability"],
+  "params": {"voltage_stress": 0.2, "thermal_cycles": 40.0, "base_lifetime": 87600.0, "stress_growth": 0.003, "lumen_decay": 0.0015, "wear": 0.004},
+  "initial_state": {"stress_score": 0.1, "hazard_rate": 0.0001, "lumen_depreciation": 0.0, "remaining_hours": 87600.0, "reliability": 1.0},
+  "update_rules": {
+    "stress_score": "min(stress_score + stress_growth + voltage_stress*0.001 + thermal_cycles*0.0001, 1.0)",
+    "hazard_rate": "hazard_rate + wear*hazard_rate + stress_score*0.0002",
+    "lumen_depreciation": "min(lumen_depreciation + lumen_decay + stress_score*0.0005, 1.0)",
+    "remaining_hours": "base_lifetime * (1 - stress_score) * max(1 - hazard_rate*10, 0.5)",
+    "reliability": "exp(-hazard_rate*100)"
+  },
+  "events": [
+    {"when": "reliability < 0.5", "action": "flag:reliability_below_half"},
+    {"when": "lumen_depreciation > 0.2", "action": "flag:lumen_depreciation_20pct"}
+  ],
+  "outputs": ["stress_score", "hazard_rate", "lumen_depreciation", "remaining_hours", "reliability"],
+  "ticks": 300
+}

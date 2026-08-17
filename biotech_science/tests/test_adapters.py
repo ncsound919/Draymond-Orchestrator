@@ -7,6 +7,9 @@ from biotech_science.adapters.mathx import (
 from biotech_science.adapters.biotech_ide import BiotechIdeAdapter
 from biotech_science.adapters.colabfold import ColabFoldAdapter
 from biotech_science.adapters.moleculargraph import MolecularGraphAdapter
+from biotech_science.adapters.blackmind import BlackMindAdapter
+from biotech_science.adapters.cureforge import CureForgeAdapter
+from biotech_science.adapters.chemlab import ChemlabAdapter
 
 
 def test_verify_derivation_simple_identity():
@@ -27,28 +30,53 @@ def test_run_monte_carlo_est_same_seed_is_deterministic():
 
 
 def test_mathx_adapter_degrades_to_e3_when_unreachable():
-    adapter = MathXAdapter(base_url="http://localhost:9")
+    adapter = MathXAdapter(base_url="http://127.0.0.1:59999")
     result = adapter.call("/verify", {"a": "x"})
     assert result["evidence_tier"] == "E3"
     assert result["data"]["error"]
 
 
 def test_biotech_ide_adapter_degrades_to_e3_when_unreachable():
-    adapter = BiotechIdeAdapter(base_url="http://localhost:9")
+    adapter = BiotechIdeAdapter(base_url="http://127.0.0.1:59999")
     result = adapter.translate("FG_PCT")
     assert result["evidence_tier"] == "E3"
     assert result["data"]["error"]
 
 
 def test_colabfold_adapter_degrades_to_e3_when_unreachable():
-    adapter = ColabFoldAdapter(base_url="http://localhost:9")
+    adapter = ColabFoldAdapter(base_url="http://127.0.0.1:59999")
     result = adapter.predict("MKTAY")
     assert result["evidence_tier"] == "E3"
     assert result["data"]["error"]
 
 
 def test_moleculargraph_adapter_degrades_to_e3_when_unreachable():
-    adapter = MolecularGraphAdapter(base_url="http://localhost:9")
+    adapter = MolecularGraphAdapter(base_url="http://127.0.0.1:59999")
     result = adapter.descriptors("CCO")
     assert result["evidence_tier"] == "E3"
     assert result["data"]["error"]
+
+
+def test_blackmind_adapter_falls_back_to_local_hypothesis_when_unreachable():
+    adapter = BlackMindAdapter(base_url="http://127.0.0.1:59999")
+    result = adapter.hypothesize("lung cancer", "EGFR", "")
+    assert result["evidence_tier"] == "E3"
+    assert result["hypothesis"]["target"] == "EGFR"
+    assert "proposed_intervention" in result["hypothesis"]
+
+
+def test_cureforge_adapter_falls_back_to_local_bayes_when_unreachable():
+    adapter = CureForgeAdapter(base_url="http://127.0.0.1:59999")
+    result = adapter.bayes_evidence("HER2", 0.5)
+    assert "posterior" in result["evidence"]
+    assert 0.0 <= result["evidence"]["posterior"] <= 1.0
+
+
+def test_chemlab_adapter_falls_back_to_local_risk_when_unreachable():
+    adapter = ChemlabAdapter(base_url="http://127.0.0.1:59999")
+    result = adapter.risk("CCO")
+    assert result["evidence_tier"] == "E2"
+    assert result["risk"]["valid"] is True
+    assert result["risk"]["posterior_risk"] is not None
+
+

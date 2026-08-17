@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { runPythonAnalysis, runPythonTreatment, runPythonTranslate } from '@/lib/biotech/pythonExecutors';
+import {
+  runPythonAnalysis,
+  runPythonTreatment,
+  runPythonTranslate,
+  runPythonHypothesis,
+  runPythonVerification,
+  runPythonChemlab,
+} from '@/lib/biotech/pythonExecutors';
 import { validateOutput } from '@/lib/biotech/validate';
 
 describe('biotech python executors', () => {
@@ -66,4 +73,79 @@ describe('biotech python executors', () => {
     expect(result.data.data[0]).not.toHaveProperty('evidence_tier');
     expect(validateOutput(result.data).valid).toBe(true);
   }, PY_TIMEOUT);
+
+  it('generates a hypothesis from a target through the BlackMind engine', async () => {
+    const result = await runPythonHypothesis({
+      cancer_type: 'breast carcinoma',
+      target: 'HER2',
+      knowledge_base: 'clinical trial phase 3 efficacy survival',
+    });
+    expect(result.success).toBe(true);
+    expect(Array.isArray(result.data.data)).toBe(true);
+    expect(result.data.data[0]).toHaveProperty('target', 'HER2');
+    expect(result.data.data[0]).toHaveProperty('proposed_intervention');
+    expect(result.data.data[0]).toHaveProperty('testable_prediction');
+    expect(result.data.data[0]).toHaveProperty('critic_score');
+    expect(result.data.data[0]).not.toHaveProperty('evidence_tier');
+    expect(validateOutput(result.data).valid).toBe(true);
+  }, PY_TIMEOUT);
+
+  it('requires a target or cancer_type for hypothesis', async () => {
+    const result = await runPythonHypothesis({});
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('target');
+  });
+
+  it('runs a CureForge Bayesian verification with a grounded prediction gate', async () => {
+    const result = await runPythonVerification({
+      target: 'HER2',
+      prior: 0.55,
+      is_success: true,
+      claim: '(2+3)*4',
+      expected: 20,
+      hypothesis: {
+        testable_prediction: 'Reduced proliferation index and increased apoptosis in tumor biopsy within 4 weeks.',
+        mechanism: 'Inhibitory targeting of the dominant oncogenic driver.',
+        confidence: 0.74,
+      },
+    });
+    expect(result.success).toBe(true);
+    expect(Array.isArray(result.data.data)).toBe(true);
+    const row = result.data.data[0];
+    expect(row).toHaveProperty('posterior');
+    expect(row).toHaveProperty('verification');
+    expect(row.verification).toHaveProperty('verified', true);
+    expect(row).toHaveProperty('prediction_gate');
+    expect(row.prediction_gate).toHaveProperty('grounded', true);
+    expect(row).not.toHaveProperty('evidence_tier');
+    expect(validateOutput(result.data).valid).toBe(true);
+  }, PY_TIMEOUT);
+
+  it('requires a target for verification', async () => {
+    const result = await runPythonVerification({});
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('target');
+  });
+
+  it('scores molecular risk through the Chemlab engine', async () => {
+    const result = await runPythonChemlab({ smiles: 'CC(=O)Oc1ccccc1C(=O)O', k: 3 });
+    expect(result.success).toBe(true);
+    expect(Array.isArray(result.data.data)).toBe(true);
+    const row = result.data.data[0] as Record<string, unknown> & {
+      analogues?: Array<{ name?: string }>;
+    };
+    expect(row).toHaveProperty('valid', true);
+    expect(row).toHaveProperty('posterior_risk');
+    expect(typeof row.posterior_risk).toBe('number');
+    expect(row).toHaveProperty('analogues');
+    expect(row.analogues?.[0]).toHaveProperty('name', 'aspirin');
+    expect(row).not.toHaveProperty('evidence_tier');
+    expect(validateOutput(result.data).valid).toBe(true);
+  }, PY_TIMEOUT);
+
+  it('requires smiles for chemlab', async () => {
+    const result = await runPythonChemlab({});
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('smiles');
+  });
 });

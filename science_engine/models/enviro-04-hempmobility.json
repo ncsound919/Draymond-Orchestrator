@@ -1,0 +1,20 @@
+{
+  "model_id": "enviro-04-hempmobility",
+  "description": "HempMobility biocomposite lifecycle: hemp-fiber content raises composite strength-to-weight ratio, lowering vehicle mass and lifecycle CO2 versus conventional composites while fiber volume fraction matures. Deterministic materials-LCA ticked model.",
+  "state_vars": ["fiber_volume", "composite_strength", "weight_reduction", "co2_avoided", "vehicle_mass"],
+  "params": {"fiber_uptake": 0.06, "fiber_cap": 0.45, "strength_per_fiber": 1.6, "mass_base": 1800.0, "co2_per_kg": 2.5, "mass_saving_per_fiber": 900.0},
+  "initial_state": {"fiber_volume": 0.05, "composite_strength": 1.0, "weight_reduction": 0.0, "co2_avoided": 0.0, "vehicle_mass": 1800.0},
+  "update_rules": {
+    "fiber_volume": "min(fiber_volume + fiber_uptake*(fiber_cap - fiber_volume), fiber_cap)",
+    "composite_strength": "composite_strength + strength_per_fiber*fiber_volume*(1 - composite_strength/2.4)",
+    "weight_reduction": "fiber_volume/fiber_cap*mass_saving_per_fiber",
+    "vehicle_mass": "mass_base - weight_reduction",
+    "co2_avoided": "co2_avoided + (mass_base - vehicle_mass)*co2_per_kg*0.002"
+  },
+  "events": [
+    {"when": "fiber_volume > fiber_cap*0.9", "action": "flag:fiber_volume_saturated"},
+    {"when": "weight_reduction > 300", "action": "flag:mass_reduction_300kg"}
+  ],
+  "outputs": ["fiber_volume", "composite_strength", "weight_reduction", "vehicle_mass", "co2_avoided"],
+  "ticks": 200
+}

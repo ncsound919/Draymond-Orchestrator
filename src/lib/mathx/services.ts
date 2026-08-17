@@ -37,6 +37,8 @@ interface MathxLlmOptions {
   images?: Array<{ dataB64: string; mediaType: string }>;
   /** Truncate the input to fit the token budget (safety net for huge context). */
   truncate?: boolean;
+  /** Registry key for a deterministic fallback (see ../draymond/fallbacks). */
+  fallbackKey?: string;
 }
 
 async function mathxLlm(opts: MathxLlmOptions): Promise<string> {
@@ -50,6 +52,7 @@ async function mathxLlm(opts: MathxLlmOptions): Promise<string> {
     images: opts.images,
     truncate: opts.truncate,
     temperature: 0.2,
+    fallbackKey: opts.fallbackKey,
   });
 }
 
@@ -99,6 +102,7 @@ export async function mathChat(input: MathChatInput): Promise<{ text: string }> 
     userMessage,
     maxTokens: maxTokensForMode(mode),
     truncate: true,
+    fallbackKey: 'mathx.mathChat',
   });
   return { text };
 }
@@ -144,6 +148,7 @@ export async function planMath(
       system: PLANNER_SYSTEM,
       userMessage: `Mode: ${mode}${domainCtx}\nHas uploaded files: ${hasFiles}\nQuery: ${query}`,
       maxTokens: 300,
+      fallbackKey: 'mathx.planMath',
     });
     return { ...DEFAULT_PLAN, ...parseJson<Partial<ExecutionPlan>>(raw, {}) };
   } catch {
@@ -207,6 +212,7 @@ export async function generateMathCode(
     system: CODEGEN_SYSTEM,
     userMessage: `Mode: ${mode}${domainCtx}\nTask: ${task}${contextBlock}\n\nGenerate Python code now. Output ONLY the code — no markdown fences, no explanation.`,
     maxTokens: 2048,
+    fallbackKey: 'mathx.generateMathCode',
   });
   return code.trim();
 }
@@ -257,6 +263,7 @@ export async function verifyDerivation(
     system: STEP_EXTRACTION_SYSTEM,
     userMessage: `Mode: ${mode}${domain ? ` Domain: ${domain}` : ''}\n\nDerivation to extract:\n${expression}`,
     maxTokens: 2000,
+    fallbackKey: 'mathx.verifyDerivation',
   });
   const steps = parseJson<Array<{ step: number; description: string; from_expr: string; to_expr: string; operation: string; verifiable: boolean }>>(raw, []);
   const verifiable = steps.filter((s) => s.verifiable && s.from_expr && s.to_expr);
@@ -322,6 +329,7 @@ export async function runHypothesis(
     system: HYPOTHESIS_SYSTEM,
     userMessage: prompt,
     maxTokens: 2000,
+    fallbackKey: 'mathx.runHypothesis',
   });
   return parseJson<Record<string, unknown>>(raw, {
     conjecture: statement,
@@ -343,6 +351,7 @@ export async function refineHypothesis(
     system: REFINEMENT_SYSTEM,
     userMessage: `Conjecture: ${conjecture}\n\nNumerical test result: ${testResult}\n\nVerdict: ${verdict}\n\nPlease refine or confirm this hypothesis.`,
     maxTokens: 1500,
+    fallbackKey: 'mathx.refineHypothesis',
   });
   return { text };
 }
@@ -388,6 +397,7 @@ export async function runAnalogies(
     system: ANALOGIES_SYSTEM,
     userMessage: prompt,
     maxTokens: 3000,
+    fallbackKey: 'mathx.runAnalogies',
   });
   return parseJson<Record<string, unknown>>(raw, {
     inputConcept: concept,
@@ -410,6 +420,7 @@ export async function runDomainExpert(
     system: `${MATHX_SYSTEM}\n\n${systemBase}`,
     userMessage: query,
     maxTokens: 4096,
+    fallbackKey: 'mathx.runDomainExpert',
   });
   return { text };
 }
@@ -464,6 +475,7 @@ export async function exportContent(
     system: FORMAT_SYSTEM[format] ?? FORMAT_SYSTEM.plain,
     userMessage,
     maxTokens: 4000,
+    fallbackKey: 'mathx.exportContent',
   });
 
   const meta = EXPORT_META[format];
@@ -509,6 +521,7 @@ export async function extractLatex(
     userMessage: 'Extract all mathematical content from this image as LaTeX.',
     maxTokens: 1500,
     images: [{ dataB64: data, mediaType }],
+    fallbackKey: 'mathx.extractLatex',
   });
   return { latex: latex.trim() };
 }

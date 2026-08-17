@@ -1,0 +1,20 @@
+{
+  "model_id": "enviro-07-plasticycle",
+  "description": "PlastiCycle plastic-eating bacteria bioprocess: PET plastic mass declines under engineered bacterial degradation, biomass grows, monomer (TPA/EG) is recovered, and degradation rate is pH/temperature-modulated. Deterministic bioprocess ticked model.",
+  "state_vars": ["plastic_mass", "biomass", "monomer_recovered", "degradation_rate", "ph"],
+  "params": {"deg_base": 0.02, "biomass_growth": 0.04, "yield_monomer": 0.8, "ph_opt": 7.0, "ph_sensitivity": 0.05, "plastic_cap": 100.0, "inhib": 0.02},
+  "initial_state": {"plastic_mass": 100.0, "biomass": 2.0, "monomer_recovered": 0.0, "degradation_rate": 0.02, "ph": 7.0},
+  "update_rules": {
+    "degradation_rate": "deg_base * biomass/(1 + biomass) * (1 - ph_sensitivity*abs(ph - ph_opt)) * (1 - inhib*monomer_recovered/plastic_cap)",
+    "plastic_mass": "max(plastic_mass - degradation_rate*plastic_mass, 0.0)",
+    "biomass": "biomass + biomass_growth*biomass*(plastic_mass/plastic_cap) - 0.005*biomass",
+    "monomer_recovered": "monomer_recovered + yield_monomer*degradation_rate*plastic_mass",
+    "ph": "ph + 0.001*(ph_opt - ph) + 0.0005*(monomer_recovered/plastic_cap)"
+  },
+  "events": [
+    {"when": "plastic_mass < plastic_cap*0.5", "action": "flag:plastic_half_degraded"},
+    {"when": "monomer_recovered > 50", "action": "flag:monomer_recovery_50"}
+  ],
+  "outputs": ["plastic_mass", "biomass", "monomer_recovered", "degradation_rate"],
+  "ticks": 300
+}

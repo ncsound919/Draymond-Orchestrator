@@ -42,7 +42,7 @@ export const DATASET_POOLS: Record<'sports' | 'biotech', string[]> = {
 };
 
 function repoRoot(): string {
-  return process.env.SCIENCE_ROOT ?? path.resolve(process.cwd());
+  return process.env.SCIENCE_ROOT ?? path.resolve(/*turbopackIgnore: true*/ process.cwd());
 }
 
 function listProfiles(dir: string, limit: number): string[] {

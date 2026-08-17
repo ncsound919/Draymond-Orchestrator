@@ -1,0 +1,22 @@
+{
+  "model_id": "enviro-03-regenerafarm",
+  "description": "RegeneraFarm closed-loop nutrient cycle: waste-to-nutrient recycling closes the loop, soil organic carbon accretes, crop biomass grows and nitrogen-leaching shrinks. Linear-programming feedback compressed into a deterministic differential-tick model.",
+  "state_vars": ["soil_carbon", "nutrient_n", "nutrient_p", "nutrient_k", "crop_biomass", "waste_recycled", "leaching"],
+  "params": {"recycle_eff": 0.75, "soil_carbon_rate": 0.03, "crop_growth": 0.05, "n_input": 2.0, "n_loss": 0.4, "carbon_per_ha": 1.5, "leach_base": 0.3, "leach_reduction": 0.6},
+  "initial_state": {"soil_carbon": 40.0, "nutrient_n": 20.0, "nutrient_p": 10.0, "nutrient_k": 15.0, "crop_biomass": 5.0, "waste_recycled": 0.0, "leaching": 0.3},
+  "update_rules": {
+    "waste_recycled": "waste_recycled + n_input*recycle_eff",
+    "nutrient_n": "max(nutrient_n + n_input*recycle_eff - n_loss, 5.0)",
+    "nutrient_p": "max(nutrient_p + n_input*recycle_eff*0.4 - n_loss*0.5, 3.0)",
+    "nutrient_k": "max(nutrient_k + n_input*recycle_eff*0.6 - n_loss*0.3, 4.0)",
+    "crop_biomass": "crop_biomass + crop_growth*crop_biomass*(1 - crop_biomass/100)",
+    "soil_carbon": "min(soil_carbon + soil_carbon_rate*(60 - soil_carbon) + 0.2*waste_recycled*0.1, 90)",
+    "leaching": "leach_base*(1 - leach_reduction*(waste_recycled/(waste_recycled + 5)))"
+  },
+  "events": [
+    {"when": "waste_recycled > 20", "action": "flag:closed_loop_active"},
+    {"when": "soil_carbon > 60", "action": "flag:soil_carbon_50pct_gain"}
+  ],
+  "outputs": ["soil_carbon", "nutrient_n", "crop_biomass", "waste_recycled", "leaching"],
+  "ticks": 200
+}

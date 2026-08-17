@@ -1,0 +1,20 @@
+{
+  "model_id": "enviro-06-nucleosim",
+  "description": "NucleoSim fast-reactor digital twin: neutron multiplication k_eff, core temperature and fuel burnup evolve with reactivity feedback and safety margins; validates steady-state safety envelope. Deterministic neutronics surrogate ticked model.",
+  "state_vars": ["keff", "core_temp", "burnup", "reactivity", "safety_margin"],
+  "params": {"keff_target": 1.0, "temp_feedback": 0.0004, "burnup_rate": 0.002, "heat_rate": 0.3, "cooling": 0.25, "temp_band": 0.02, "safety_floor": 0.15},
+  "initial_state": {"keff": 0.995, "core_temp": 300.0, "burnup": 0.0, "reactivity": -0.005, "safety_margin": 0.4},
+  "update_rules": {
+    "reactivity": "max(min(0.005, 0.005 - temp_feedback*(core_temp - 300)), -0.01)",
+    "keff": "min(max(0.99 + reactivity, 0.95), 1.01)",
+    "core_temp": "core_temp + heat_rate*(keff - 0.99)*100 - cooling*(core_temp - 300)",
+    "burnup": "burnup + burnup_rate*keff",
+    "safety_margin": "max(safety_margin - 0.002*abs(keff - keff_target) + 0.001, 0.05)"
+  },
+  "events": [
+    {"when": "core_temp > 320", "action": "flag:thermal_warning"},
+    {"when": "safety_margin < 0.1", "action": "flag:safety_envelope_breach"}
+  ],
+  "outputs": ["keff", "core_temp", "burnup", "reactivity", "safety_margin"],
+  "ticks": 240
+}

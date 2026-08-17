@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import type { EngineName, ExperimentStatus, Task, TaskDAG } from './types';
 import { runDag, topoOrder, type Executor } from './dag';
 import { saveExperiment, getExperimentsMap as readMap } from './store';
-import { runPythonAnalysis, runPythonTreatment, runPythonTranslate } from './pythonExecutors';
+import { runPythonAnalysis, runPythonTreatment, runPythonTranslate, runPythonHypothesis, runPythonVerification, runPythonChemlab } from './pythonExecutors';
 import { validateOutput } from './validate';
 
 // Mirrors the BlackMind SportsScienceAdapter task shape: { id, agent, inputs,
@@ -55,6 +55,15 @@ const makeExecutor: Executor = (task, upstream) => {
     const value = task.inputs?.value !== undefined ? Number(task.inputs.value) : undefined;
     const fromSports = (task.inputs?.from_sports ?? true) as boolean;
     return runPythonTranslate(term, value, fromSports);
+  }
+  if (task.engine === 'hypothesis') {
+    return runPythonHypothesis(task.inputs);
+  }
+  if (task.engine === 'verification') {
+    return runPythonVerification(task.inputs);
+  }
+  if (task.engine === 'chemlab') {
+    return runPythonChemlab(task.inputs);
   }
   return Promise.resolve({
     success: false,

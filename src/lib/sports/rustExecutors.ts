@@ -5,7 +5,7 @@ import fs from 'node:fs';
 function repoRoot(): string {
   if (process.env.SPORTS_ROOT) return process.env.SPORTS_ROOT;
   if (typeof __dirname !== 'undefined') return path.resolve(/*turbopackIgnore: true*/ __dirname, '../../..');
-  return path.resolve(process.cwd());
+  return path.resolve(/*turbopackIgnore: true*/ process.cwd());
 }
 
 // The sports-cli binary is produced by `cargo build --workspace` in core/.

@@ -1,0 +1,20 @@
+{
+  "model_id": "enviro-05-lumifreq",
+  "description": "LumiFreq resonant illumination: tuned light recipes (PPFD + photoperiod + spectrum) drive photosynthetic photon use efficiency (PPUE), boosting plant biomass per joule and cutting energy per gram. Deterministic photobiological ticked model.",
+  "state_vars": ["ppfd", "photoperiod", "biomass", "energy_consumed", "ppue"],
+  "params": {"ppfd_base": 400.0, "ppfd_cap": 900.0, "light_uptake": 0.05, "energy_per_ppfd": 0.2, "biomass_growth": 0.06, "ppue_max": 0.85, "ppue_base": 0.45, "photoperiod_opt": 16.0},
+  "initial_state": {"ppfd": 400.0, "photoperiod": 12.0, "biomass": 5.0, "energy_consumed": 0.0, "ppue": 0.45},
+  "update_rules": {
+    "ppfd": "min(ppfd + light_uptake*(ppfd_cap - ppfd), ppfd_cap)",
+    "photoperiod": "min(photoperiod + 0.02, photoperiod_opt)",
+    "ppue": "ppue_base + (ppue_max - ppue_base)*(ppfd/ppfd_cap)*(photoperiod/photoperiod_opt)",
+    "biomass": "biomass + biomass_growth*biomass*ppue*0.5",
+    "energy_consumed": "energy_consumed + ppfd*energy_per_ppfd*photoperiod*0.01"
+  },
+  "events": [
+    {"when": "ppue > 0.75", "action": "flag:high_ppue"},
+    {"when": "biomass > 15", "action": "flag:biomass_tripled"}
+  ],
+  "outputs": ["ppfd", "photoperiod", "biomass", "energy_consumed", "ppue"],
+  "ticks": 200
+}

@@ -1,0 +1,20 @@
+{
+  "model_id": "enviro-12-solarshare",
+  "description": "SolarShare community-solar array: irradiance drives DC generation, inverter efficiency and grid-injection yield energy credits; each kWh displaces grid-mix CO2. Deterministic PV-energy ticked model.",
+  "state_vars": ["irradiance", "energy_generated_kwh", "grid_credit", "co2_avoided", "capacity_factor"],
+  "params": {"irr_base": 600.0, "irr_amp": 400.0, "panel_eff": 0.21, "inverter_eff": 0.97, "array_kw": 250.0, "co2_grid": 0.386, "credit_per_kwh": 0.12},
+  "initial_state": {"irradiance": 600.0, "energy_generated_kwh": 0.0, "grid_credit": 0.0, "co2_avoided": 0.0, "capacity_factor": 0.0},
+  "update_rules": {
+    "irradiance": "max(irr_base + irr_amp*sin(tick*0.1), 0.0)",
+    "energy_generated_kwh": "energy_generated_kwh + array_kw*panel_eff*inverter_eff*(irradiance/1000.0)*0.1",
+    "grid_credit": "grid_credit + array_kw*panel_eff*inverter_eff*(irradiance/1000.0)*0.1*credit_per_kwh",
+    "co2_avoided": "co2_avoided + array_kw*panel_eff*inverter_eff*(irradiance/1000.0)*0.1*co2_grid",
+    "capacity_factor": "panel_eff*inverter_eff*(irradiance/1000.0)"
+  },
+  "events": [
+    {"when": "irradiance > 900", "action": "flag:peak_irradiance"},
+    {"when": "energy_generated_kwh > 10000", "action": "flag:10mwh_milestone"}
+  ],
+  "outputs": ["irradiance", "energy_generated_kwh", "grid_credit", "co2_avoided", "capacity_factor"],
+  "ticks": 300
+}

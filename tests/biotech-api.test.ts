@@ -20,6 +20,15 @@ const { mockStore, mockPython } = vi.hoisted(() => ({
     runPythonTranslate: vi
       .fn()
       .mockResolvedValue({ success: true, data: { data: [{ target_term: 'Transfection Efficiency' }] }, error: null, evidence_tier: 'E3' }),
+    runPythonHypothesis: vi
+      .fn()
+      .mockResolvedValue({ success: true, data: { data: [{ target: 'HER2', proposed_intervention: 'TKI' }] }, error: null, evidence_tier: 'E3' }),
+    runPythonVerification: vi
+      .fn()
+      .mockResolvedValue({ success: true, data: { data: [{ posterior: 0.9 }] }, error: null, evidence_tier: 'E1' }),
+    runPythonChemlab: vi
+      .fn()
+      .mockResolvedValue({ success: true, data: { data: [{ smiles: 'CCO', posterior_risk: 0.2 }] }, error: null, evidence_tier: 'E2' }),
   },
 }));
 
@@ -60,6 +69,9 @@ describe('biotech api', () => {
     mockPython.runPythonAnalysis.mockClear();
     mockPython.runPythonTreatment.mockClear();
     mockPython.runPythonTranslate.mockClear();
+    mockPython.runPythonHypothesis.mockClear();
+    mockPython.runPythonVerification.mockClear();
+    mockPython.runPythonChemlab.mockClear();
   });
 
   it('submits a run and returns experiment_id + task_count', async () => {
@@ -183,6 +195,51 @@ describe('biotech api', () => {
     expect(mockPython.runPythonTranslate).toHaveBeenCalledWith('FG_PCT', 45.5, true);
   });
 
+  it('dispatches hypothesis / verification / chemlab tasks to their executors', async () => {
+    const tasks: Task[] = [
+      {
+        id: 't1',
+        engine: 'hypothesis',
+        inputs: { cancer_type: 'breast', target: 'HER2' },
+        depends_on: [],
+        is_gate: false,
+        status: 'pending',
+        evidence: { tier: 'E3', lineageParentIds: [] },
+      },
+      {
+        id: 't2',
+        engine: 'verification',
+        inputs: { target: 'HER2', prior: 0.5 },
+        depends_on: ['t1'],
+        is_gate: false,
+        status: 'pending',
+        evidence: { tier: 'E1', lineageParentIds: ['t1'] },
+      },
+      {
+        id: 't3',
+        engine: 'chemlab',
+        inputs: { smiles: 'CCO' },
+        depends_on: ['t2'],
+        is_gate: false,
+        status: 'pending',
+        evidence: { tier: 'E2', lineageParentIds: ['t2'] },
+      },
+    ];
+    await submitExperiment({ cancer_type: 'breast', goal: 'hypothesis -> verify -> risk', tasks });
+    await vi.waitFor(() => {
+      expect(mockStore.saveExperiment.mock.calls.at(-1)?.[0]).toMatchObject({ status: 'completed' });
+    });
+    expect(mockPython.runPythonHypothesis).toHaveBeenCalledWith(
+      expect.objectContaining({ target: 'HER2', cancer_type: 'breast' }),
+    );
+    expect(mockPython.runPythonVerification).toHaveBeenCalledWith(
+      expect.objectContaining({ target: 'HER2', prior: 0.5 }),
+    );
+    expect(mockPython.runPythonChemlab).toHaveBeenCalledWith(
+      expect.objectContaining({ smiles: 'CCO' }),
+    );
+  });
+
   it('persists success:true on completed task results', async () => {
     await submitExperiment({ cancer_type: 'breast', goal: 'assess recurrence risk', tasks });
     await vi.waitFor(() => {
@@ -208,6 +265,9 @@ describe('biotech routes', () => {
     mockPython.runPythonAnalysis.mockClear();
     mockPython.runPythonTreatment.mockClear();
     mockPython.runPythonTranslate.mockClear();
+    mockPython.runPythonHypothesis.mockClear();
+    mockPython.runPythonVerification.mockClear();
+    mockPython.runPythonChemlab.mockClear();
   });
 
   it('rejects unauthenticated requests', async () => {
@@ -265,3 +325,4 @@ describe('biotech routes', () => {
     expect(data.error).toBeTruthy();
   });
 });
+

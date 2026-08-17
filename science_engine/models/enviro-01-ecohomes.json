@@ -1,0 +1,20 @@
+{
+  "model_id": "enviro-01-ecohomes",
+  "description": "EcoHomes OS foam-housing thermal envelope: insulation R-value holds heat, cuts heating energy demand and embodied-carbon payback against a baseline uninsulated envelope. Deterministic discrete-tick thermal-balance model.",
+  "state_vars": ["indoor_delta", "energy_demand", "r_value", "cumulative_saving_kwh", "co2_avoided_kg"],
+  "params": {"baseline_demand": 12.0, "r_value_target": 9.5, "r_degradation": 0.0004, "heat_loss_eff": 0.85, "co2_factor": 0.386, "ticks_per_year": 8760},
+  "initial_state": {"indoor_delta": 0.0, "energy_demand": 12.0, "r_value": 1.0, "cumulative_saving_kwh": 0.0, "co2_avoided_kg": 0.0},
+  "update_rules": {
+    "indoor_delta": "indoor_delta + heat_loss_eff*(r_value/r_value_target)*(12 - indoor_delta)",
+    "energy_demand": "baseline_demand * (1 - 0.72*(r_value - 1.0)/(r_value_target - 1.0))",
+    "r_value": "min(r_value + 0.12, r_value_target) - r_degradation*r_value",
+    "cumulative_saving_kwh": "cumulative_saving_kwh + (baseline_demand - energy_demand)",
+    "co2_avoided_kg": "co2_avoided_kg + (baseline_demand - energy_demand)*co2_factor"
+  },
+  "events": [
+    {"when": "r_value >= r_value_target*0.95", "action": "flag:insulation_reaches_target"},
+    {"when": "cumulative_saving_kwh > 5000", "action": "flag:energy_payback_milestone"}
+  ],
+  "outputs": ["indoor_delta", "energy_demand", "r_value", "cumulative_saving_kwh", "co2_avoided_kg"],
+  "ticks": 240
+}

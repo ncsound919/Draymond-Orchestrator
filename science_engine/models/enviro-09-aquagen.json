@@ -1,0 +1,20 @@
+{
+  "model_id": "enviro-09-aquagen",
+  "description": "AquaGen atmospheric water generator: humidity windows drive Peltier condensation, water is produced with energy cost per liter minimized when humidity is high and dew-point deficit low. Deterministic water-harvest ticked model.",
+  "state_vars": ["humidity", "water_produced_l", "energy_kwh", "dew_deficit", "cost_per_liter"],
+  "params": {"humidity_base": 60.0, "humidity_amp": 15.0, "condens_rate": 0.18, "energy_per_l": 0.5, "target_l": 50.0, "efficiency": 0.7},
+  "initial_state": {"humidity": 60.0, "water_produced_l": 0.0, "energy_kwh": 0.0, "dew_deficit": 25.0, "cost_per_liter": 0.5},
+  "update_rules": {
+    "humidity": "humidity_base + humidity_amp*sin(tick*0.2)",
+    "dew_deficit": "max(30 - humidity*0.3, 2.0)",
+    "water_produced_l": "water_produced_l + condens_rate*(humidity/100.0)*efficiency*(1 - dew_deficit/40.0)",
+    "energy_kwh": "energy_kwh + energy_per_l*condens_rate*(humidity/100.0)*0.2",
+    "cost_per_liter": "max(energy_kwh/max(water_produced_l, 0.001)*0.15, 0.05)"
+  },
+  "events": [
+    {"when": "humidity > 70", "action": "flag:optimal_window_active"},
+    {"when": "water_produced_l > target_l", "action": "flag:target_met"}
+  ],
+  "outputs": ["humidity", "water_produced_l", "energy_kwh", "cost_per_liter"],
+  "ticks": 300
+}

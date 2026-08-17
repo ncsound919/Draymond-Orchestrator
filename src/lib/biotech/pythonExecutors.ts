@@ -15,7 +15,7 @@ function repoRoot(): string {
   if (process.env.BIOTECH_ROOT) return process.env.BIOTECH_ROOT;
   // Next.js sets cwd to the project root; prefer it over __dirname, which
   // under bundling resolves inside .next/server chunks.
-  return path.resolve(process.cwd());
+  return path.resolve(/*turbopackIgnore: true*/ process.cwd());
 }
 
 async function runCli(script: string, args: string[]): Promise<{ stdout: string }> {
@@ -155,4 +155,86 @@ export async function runPythonTranslate(
     const message = errorMessage(err);
     return { success: false, data: failureData(message), error: message, evidence_tier: 'E3' };
   }
+}
+
+/**
+ * Write a payload to a temp file and run a biotech_science CLI runner that
+ * takes a single JSON input path (hypothesis / verification / chemlab).
+ */
+async function runCliWithInput(
+  script: string,
+  payload: Record<string, unknown>,
+): Promise<PythonResult> {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'biotech-'));
+  const file = path.join(dir, 'input.json');
+  try {
+    fs.writeFileSync(file, JSON.stringify(payload));
+    const { stdout } = await runCli(script, ['session', file]);
+    const data = JSON.parse(stdout);
+    if (data.error) {
+      return {
+        success: false,
+        data: failureData(data.error),
+        error: data.error,
+        evidence_tier: 'E1',
+      };
+    }
+    return { success: true, data: wrap(stripInnerEvidenceTier(data)), error: null, evidence_tier: 'E1' };
+  } catch (err) {
+    const message = errorMessage(err);
+    return { success: false, data: failureData(message), error: message, evidence_tier: 'E1' };
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+export async function runPythonHypothesis(inputs?: Record<string, unknown>): Promise<PythonResult> {
+  if (!inputs?.target && !inputs?.cancer_type) {
+    return {
+      success: false,
+      data: failureData('target or cancer_type required'),
+      error: 'target or cancer_type required',
+      evidence_tier: 'E3',
+    };
+  }
+  return runCliWithInput('run_hypothesis.py', {
+    cancer_type: String(inputs.cancer_type ?? ''),
+    target: String(inputs.target ?? ''),
+    knowledge_base: String(inputs.knowledge_base ?? ''),
+    intent: String(inputs.intent ?? ''),
+  });
+}
+
+export async function runPythonVerification(inputs?: Record<string, unknown>): Promise<PythonResult> {
+  if (!inputs?.target) {
+    return {
+      success: false,
+      data: failureData('target required'),
+      error: 'target required',
+      evidence_tier: 'E3',
+    };
+  }
+  return runCliWithInput('run_verify.py', {
+    target: String(inputs.target),
+    prior: Number(inputs.prior ?? 0.5),
+    is_success: Boolean(inputs.is_success ?? true),
+    claim: inputs.claim !== undefined ? String(inputs.claim) : '',
+    expected: inputs.expected !== undefined ? Number(inputs.expected) : undefined,
+    hypothesis: inputs.hypothesis ?? undefined,
+  });
+}
+
+export async function runPythonChemlab(inputs?: Record<string, unknown>): Promise<PythonResult> {
+  if (!inputs?.smiles) {
+    return {
+      success: false,
+      data: failureData('smiles required'),
+      error: 'smiles required',
+      evidence_tier: 'E3',
+    };
+  }
+  return runCliWithInput('run_chemlab.py', {
+    smiles: String(inputs.smiles),
+    k: Number(inputs.k ?? 3),
+  });
 }

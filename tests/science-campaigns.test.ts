@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { ensureResearchBacklog, seedGoalCampaign, QUEUE_FLOOR } from '@/lib/science/campaigns';
 import { listQueuedExperiments, enqueueExperiment } from '@/lib/science/experiments';
+import type { HypothesisStatus } from '@/lib/science/goals';
 
 const { mockStore } = vi.hoisted(() => ({
   mockStore: { from: vi.fn() },
@@ -29,7 +30,7 @@ function makePool(domain: 'sports' | 'biotech', n: number): string {
   return dir;
 }
 
-async function seedOneGoal(domain: 'sports' | 'biotech', id: string, hyps: Array<{ id: string; claim: string; status: string }>) {
+async function seedOneGoal(domain: 'sports' | 'biotech', id: string, hyps: Array<{ id: string; claim: string; status: HypothesisStatus }>) {
   const { saveGoals, saveHypotheses } = await import('@/lib/science/goals');
   await saveGoals([
     { id, domain, area: 'area', title: 'title', opportunity: 'o', rationale: 'r', base_weight: 1, cross_domain_value: 0.8, status: 'active', model_id: `m-${id}`, hypothesis_ids: hyps.map((h) => h.id) },

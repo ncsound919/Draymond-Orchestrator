@@ -1,0 +1,20 @@
+{
+  "model_id": "enviro-02-agriconnect",
+  "description": "AgriConnect plant-fungi symbiosis: mycorrhizal mycelium expands into soil, improves NPK uptake efficiency, raises crop yield and sequesters carbon. Logistic mycelium growth with nutrient-feedback. Deterministic ticked model.",
+  "state_vars": ["mycelium_biomass", "soil_npk", "crop_yield", "carbon_sequestered", "uptake_efficiency"],
+  "params": {"growth_rate": 0.09, "carrying_capacity": 100.0, "nutrient_depletion": 0.004, "npk_regen": 0.02, "yield_base": 1.0, "yield_boost_max": 0.35, "carbon_per_biomass": 0.47, "uptake_base": 0.5, "uptake_max": 0.9},
+  "initial_state": {"mycelium_biomass": 1.0, "soil_npk": 60.0, "crop_yield": 1.0, "carbon_sequestered": 0.0, "uptake_efficiency": 0.5},
+  "update_rules": {
+    "mycelium_biomass": "mycelium_biomass + growth_rate*mycelium_biomass*(1 - mycelium_biomass/carrying_capacity)",
+    "soil_npk": "max(soil_npk - nutrient_depletion*crop_yield + npk_regen*mycelium_biomass, 5.0)",
+    "uptake_efficiency": "min(uptake_base + (uptake_max - uptake_base)*(mycelium_biomass/carrying_capacity), uptake_max)",
+    "crop_yield": "yield_base * (1 + yield_boost_max*(uptake_efficiency - uptake_base)/(uptake_max - uptake_base))",
+    "carbon_sequestered": "carbon_sequestered + carbon_per_biomass*mycelium_biomass*0.01"
+  },
+  "events": [
+    {"when": "mycelium_biomass > carrying_capacity*0.8", "action": "flag:mycelium_established"},
+    {"when": "crop_yield > yield_base*1.25", "action": "flag:yield_boost_25pct"}
+  ],
+  "outputs": ["mycelium_biomass", "soil_npk", "crop_yield", "carbon_sequestered", "uptake_efficiency"],
+  "ticks": 200
+}

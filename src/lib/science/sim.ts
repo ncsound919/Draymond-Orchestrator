@@ -35,7 +35,7 @@ function repoRoot(): string {
   if (process.env.SCIENCE_ROOT) return process.env.SCIENCE_ROOT;
   // Next.js sets cwd to the project root; prefer it over __dirname, which
   // under bundling resolves inside .next/server chunks.
-  return path.resolve(process.cwd());
+  return path.resolve(/*turbopackIgnore: true*/ process.cwd());
 }
 
 function pythonCommand(): string {

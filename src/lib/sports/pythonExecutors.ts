@@ -15,7 +15,7 @@ function repoRoot(): string {
   if (process.env.SPORTS_ROOT) return process.env.SPORTS_ROOT;
   // Next.js sets cwd to the project root; prefer it over __dirname, which
   // under bundling resolves inside .next/server chunks.
-  return path.resolve(process.cwd());
+  return path.resolve(/*turbopackIgnore: true*/ process.cwd());
 }
 
 async function runCli(script: string, args: string[]): Promise<{ stdout: string }> {

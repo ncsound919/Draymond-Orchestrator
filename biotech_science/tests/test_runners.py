@@ -90,3 +90,73 @@ def test_run_treatment(tmp_path):
     assert out["status"] == "ok"
     assert out["risk_tier"] == "high"
     assert "recommendation" in out
+
+
+def test_run_hypothesis_smoke(tmp_path):
+    payload = tmp_path / "hyp.json"
+    payload.write_text(
+        json.dumps({"cancer_type": "breast carcinoma", "target": "HER2", "knowledge_base": "clinical trial phase 3"}),
+        encoding="utf-8",
+    )
+    out = _run("run_hypothesis.py", str(payload))
+    assert out["target"] == "HER2"
+    assert "proposed_intervention" in out
+    assert "testable_prediction" in out
+    assert "evidence_tier" not in out  # stripped at the TS boundary
+
+
+def test_run_hypothesis_missing_input_errors(tmp_path):
+    res = subprocess.run(
+        [sys.executable, str(REPO / "biotech_science" / "run_hypothesis.py"), "session", "nonexistent.json"],
+        capture_output=True,
+        text=True,
+        cwd=REPO,
+        timeout=60,
+    )
+    assert res.returncode != 0
+    assert "error" in json.loads(res.stdout)
+
+
+def test_run_verify_smoke(tmp_path):
+    payload = tmp_path / "verify.json"
+    payload.write_text(
+        json.dumps(
+            {
+                "target": "HER2",
+                "prior": 0.55,
+                "is_success": True,
+                "claim": "(2+3)*4",
+                "expected": 20,
+                "hypothesis": {
+                    "testable_prediction": "Reduced proliferation index and increased apoptosis in tumor biopsy within 4 weeks.",
+                    "mechanism": "Inhibitory targeting of the dominant oncogenic driver.",
+                    "confidence": 0.74,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    out = _run("run_verify.py", str(payload))
+    assert "posterior" in out
+    assert out["verification"]["verified"] is True
+    assert out["prediction_gate"]["grounded"] is True
+    assert "evidence_tier" not in out
+
+
+def test_run_chemlab_smoke(tmp_path):
+    payload = tmp_path / "chem.json"
+    payload.write_text(json.dumps({"smiles": "CC(=O)Oc1ccccc1C(=O)O", "k": 3}), encoding="utf-8")
+    out = _run("run_chemlab.py", str(payload))
+    assert out["valid"] is True
+    assert out["posterior_risk"] is not None
+    assert len(out["analogues"]) == 3
+    assert out["analogues"][0]["name"] == "aspirin"
+    assert "evidence_tier" not in out
+
+
+def test_run_chemlab_invalid_smiles(tmp_path):
+    payload = tmp_path / "chem.json"
+    payload.write_text(json.dumps({"smiles": ""}), encoding="utf-8")
+    out = _run("run_chemlab.py", str(payload))
+    assert out["valid"] is False
+    assert out["posterior_risk"] is None

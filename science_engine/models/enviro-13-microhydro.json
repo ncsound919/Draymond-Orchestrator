@@ -1,0 +1,20 @@
+{
+  "model_id": "enviro-13-microhydro",
+  "description": "MicroHydro containerized hydro unit: stream-flow forecast drives turbine power output against head and flow, generating baseload kWh with flow-dependent capacity factor. Deterministic hydro-power ticked model.",
+  "state_vars": ["stream_flow", "head", "power_kw", "energy_kwh", "capacity_factor"],
+  "params": {"flow_base": 0.8, "flow_amp": 0.3, "head_const": 12.0, "turbine_eff": 0.85, "g": 9.81, "rated_kw": 50.0, "co2_grid": 0.386},
+  "initial_state": {"stream_flow": 0.8, "head": 12.0, "power_kw": 0.0, "energy_kwh": 0.0, "capacity_factor": 0.0},
+  "update_rules": {
+    "stream_flow": "max(flow_base + flow_amp*sin(tick*0.15), 0.1)",
+    "head": "max(head_const - 0.5*(stream_flow - flow_base), 5.0)",
+    "power_kw": "min(g*stream_flow*head*turbine_eff*0.9, rated_kw)",
+    "energy_kwh": "energy_kwh + power_kw*0.1",
+    "capacity_factor": "power_kw/rated_kw"
+  },
+  "events": [
+    {"when": "capacity_factor > 0.8", "action": "flag:high_capacity_factor"},
+    {"when": "stream_flow < 0.3", "action": "flag:low_flow_drought"}
+  ],
+  "outputs": ["stream_flow", "head", "power_kw", "energy_kwh", "capacity_factor"],
+  "ticks": 300
+}

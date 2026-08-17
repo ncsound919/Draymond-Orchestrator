@@ -6,6 +6,9 @@ export type EngineName =
   | 'onco_stat_crew'
   | 'onco_coach'
   | 'translation'
+  | 'hypothesis'
+  | 'verification'
+  | 'chemlab'
   | (string & {});
 
 export type TaskStatus = 'pending' | 'running' | 'awaiting_human' | 'done' | 'failed';

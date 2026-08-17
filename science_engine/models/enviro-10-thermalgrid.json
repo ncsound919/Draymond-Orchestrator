@@ -1,0 +1,21 @@
+{
+  "model_id": "enviro-10-thermalgrid",
+  "description": "ThermalGrid geothermal district network: ground-loop heat extraction balances building demand, coefficient of performance (COP) holds as ground temperature stabilizes, displacing natural-gas combustion. Deterministic district-heat ticked model.",
+  "state_vars": ["heat_supplied", "ground_temp", "building_demand", "cop", "gas_displaced", "co2_avoided"],
+  "params": {"demand_base": 500.0, "ground_base": 12.0, "cop_base": 4.2, "extraction": 0.6, "recharge": 0.5, "gas_per_kwh": 0.34, "co2_per_m3": 2.204, "capacity": 600.0},
+  "initial_state": {"heat_supplied": 0.0, "ground_temp": 12.0, "building_demand": 500.0, "cop": 4.2, "gas_displaced": 0.0, "co2_avoided": 0.0},
+  "update_rules": {
+    "building_demand": "demand_base + 50*sin(tick*0.05)",
+    "heat_supplied": "min(heat_supplied + 0.1*(building_demand - heat_supplied), capacity)",
+    "ground_temp": "max(ground_base + recharge - extraction*heat_supplied/capacity, 6.0)",
+    "cop": "max(cop_base - (ground_base - ground_temp)*0.15, 2.5)",
+    "gas_displaced": "gas_displaced + heat_supplied*gas_per_kwh/3.6",
+    "co2_avoided": "co2_avoided + heat_supplied*gas_per_kwh/3.6*co2_per_m3/1000.0"
+  },
+  "events": [
+    {"when": "ground_temp < 8", "action": "flag:ground_loop_strain"},
+    {"when": "heat_supplied > capacity*0.9", "action": "flag:capacity_high"}
+  ],
+  "outputs": ["heat_supplied", "ground_temp", "cop", "gas_displaced", "co2_avoided"],
+  "ticks": 240
+}

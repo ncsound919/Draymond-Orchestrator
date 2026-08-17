@@ -1,0 +1,20 @@
+{
+  "model_id": "enviro-11-thoriumos",
+  "description": "ThoriumOS molten-salt fuel-cycle twin: thorium breeds to U-233, fissile inventory grows, burnup accumulates and long-lived transuranic waste is suppressed relative to uranium fuel. Deterministic fuel-cycle ticked model.",
+  "state_vars": ["thorium_mass", "fissile_u233", "burnup", "waste_twu", "breeding_ratio"],
+  "params": {"thorium_initial": 100.0, "breed_rate": 0.012, "burn_rate": 0.006, "u233_base": 1.0, "waste_suppress": 0.12, "br_target": 1.05},
+  "initial_state": {"thorium_mass": 100.0, "fissile_u233": 1.0, "burnup": 0.0, "waste_twu": 0.0, "breeding_ratio": 1.0},
+  "update_rules": {
+    "thorium_mass": "max(thorium_mass - breed_rate*thorium_mass, 5.0)",
+    "fissile_u233": "fissile_u233 + breed_rate*thorium_mass*0.01 - burn_rate*fissile_u233",
+    "burnup": "burnup + burn_rate*fissile_u233",
+    "breeding_ratio": "min(br_target, 1.0 + 0.02*breed_rate*thorium_mass/max(fissile_u233, 0.1) - 0.01)",
+    "waste_twu": "waste_twu + burn_rate*fissile_u233*waste_suppress"
+  },
+  "events": [
+    {"when": "breeding_ratio > 1.03", "action": "flag:breeding_sustainable"},
+    {"when": "fissile_u233 > 3", "action": "flag:fissile_inventory_mature"}
+  ],
+  "outputs": ["thorium_mass", "fissile_u233", "burnup", "breeding_ratio", "waste_twu"],
+  "ticks": 300
+}
