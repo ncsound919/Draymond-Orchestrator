@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { mockCallLLM, mockExecuteChain, mockAdmin, mockClient, mockLogEvent } = vi.hoisted(() => {
+const { mockCallLLM, mockCallLocalModel, mockExecuteChain, mockAdmin, mockClient, mockLogEvent } = vi.hoisted(() => {
   const makeChain = (getResult: () => unknown) => {
     const chain = {
       select: vi.fn(() => chain),
@@ -35,6 +35,9 @@ const { mockCallLLM, mockExecuteChain, mockAdmin, mockClient, mockLogEvent } = v
   };
   return {
     mockCallLLM: vi.fn(),
+    mockCallLocalModel: vi.fn(async (): Promise<string> => {
+      throw new Error('local model not configured');
+    }),
     mockExecuteChain: vi.fn(),
     mockLogEvent: vi.fn(async () => {}),
     mockAdmin: admin,
@@ -42,7 +45,7 @@ const { mockCallLLM, mockExecuteChain, mockAdmin, mockClient, mockLogEvent } = v
   };
 });
 
-vi.mock('../src/lib/draymond/llm', () => ({ callLLM: mockCallLLM }));
+vi.mock('../src/lib/draymond/llm', () => ({ callLLM: mockCallLLM, callLocalModel: mockCallLocalModel }));
 vi.mock('../src/lib/draymond/chains', () => ({ executeChain: mockExecuteChain }));
 vi.mock('../src/lib/draymond/client', () => ({
   createDraymondAdminClient: vi.fn(() => mockAdmin),
@@ -103,6 +106,7 @@ afterEach(() => {
   mockAdmin._tables.clear();
   mockClient._tables.clear();
   mockCallLLM.mockReset();
+  mockCallLocalModel.mockReset();
   mockExecuteChain.mockReset();
 });
 
@@ -130,6 +134,37 @@ describe('buildChain', () => {
     const result = await buildChain({ description: 'Send an email to bob' }, false);
     expect(result.auto_created).toBe(false);
     expect(result.chain_id).toBeUndefined();
+    expect(result.validation.valid).toBe(true);
+  });
+
+  it('accepts a valid blueprint from the local model without hitting the paid LLM', async () => {
+    setAdmin('draymond_entities', CATALOG);
+    mockCallLocalModel.mockResolvedValueOnce(validBlueprint());
+    setClient('draymond_entities', [{ id: 'ent-1', slug: 'email-sender' }]);
+    setClient('draymond_chains', { id: 'chain-1' });
+    setClient('draymond_chain_steps', null);
+
+    const result = await buildChain({ description: 'Send an email to bob' }, true);
+
+    expect(mockCallLLM).not.toHaveBeenCalled();
+    expect(mockCallLocalModel).toHaveBeenCalledTimes(1);
+    expect(result.blueprint.steps).toHaveLength(1);
+    expect(result.validation.valid).toBe(true);
+    expect(result.auto_created).toBe(true);
+  });
+
+  it('falls back to the paid LLM when the local model returns an invalid blueprint', async () => {
+    setAdmin('draymond_entities', CATALOG);
+    mockCallLocalModel.mockResolvedValueOnce('not-valid-json');
+    mockCallLLM.mockResolvedValueOnce(validBlueprint());
+    setClient('draymond_entities', [{ id: 'ent-1', slug: 'email-sender' }]);
+    setClient('draymond_chains', { id: 'chain-1' });
+    setClient('draymond_chain_steps', null);
+
+    const result = await buildChain({ description: 'Send an email to bob' }, true);
+
+    expect(mockCallLLM).toHaveBeenCalledTimes(1);
+    expect(result.blueprint.steps).toHaveLength(1);
     expect(result.validation.valid).toBe(true);
   });
 

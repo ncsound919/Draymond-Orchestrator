@@ -32,6 +32,10 @@ const DEFAULT_CONFIG: RouterConfig = {
   timeout_ms: 15_000,
   use_brain_pre_route: true,
   brain_pre_route_confidence: 0.6,
+  // Opt-in local pre-routing via env. Off by default: 0.6B models misclassify,
+  // so local routing stays a paid-failure fallback unless explicitly enabled.
+  // Set ROUTER_USE_LOCAL_MODEL=1 to try the local Ollama tier before paid.
+  use_local_model: process.env.ROUTER_USE_LOCAL_MODEL === '1',
 };
 
 let _config: RouterConfig = { ...DEFAULT_CONFIG };

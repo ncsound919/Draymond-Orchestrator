@@ -16,7 +16,7 @@
 
 import { createDraymondAdminClient, createDraymondClient } from './client';
 import { logEvent } from './index';
-import { callLLM } from './llm';
+import { callLLM, callLocalModel } from './llm';
 import { executeChain } from './chains';
 import type {
   ChainBlueprintStep,
@@ -175,6 +175,26 @@ async function generateBlueprint(
     } catch {
       // bookbridge offline — proceed ungrounded
     }
+  }
+
+  // Try the cheap local Ollama tier first; only accept it if it parses into a
+  // valid blueprint referencing catalog entities. A 0.6B model often produces
+  // incomplete chains, so reject anything that doesn't validate and fall back
+  // to the paid provider. Mirrors the IDE's local-then-validate pattern.
+  try {
+    const local = await callLocalModel({
+      system: systemPrompt,
+      userMessage,
+      maxTokens: 1500,
+      responseFormat: { type: 'json_object' },
+    });
+    try {
+      return parseBlueprintResponse(local, catalog);
+    } catch {
+      console.warn('[chain-builder] local blueprint invalid — using paid provider.');
+    }
+  } catch {
+    console.warn('[chain-builder] local model unavailable — using paid provider.');
   }
 
   const content = await callLLM({

@@ -81,8 +81,7 @@ function cleanText(raw: string): string {
 async function llmSummarize(jsonText: string): Promise<string | null> {
   try {
     const reply = await callLLM({
-      provider: 'opencode',
-      model: 'deepseek-v4-flash',
+      localFirst: true,
       system:
         'You are the friendly voice of an AI business dashboard in a phone chat app. ' +
         'The user asked a question and the system produced the JSON below. Rewrite it as ' +
