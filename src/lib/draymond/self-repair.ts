@@ -56,6 +56,46 @@ const STATIC_REPAIR_MAP: Record<string, RepairAction> = {
 };
 
 /**
+ * Known-benign failure signals that are recorded but never auto-repaired or
+ * escalated — the fleet analogue of the kernel linker's `-IGNORE:<warnings>`
+ * whitelist. A signal on this list means the team has judged it expected noise
+ * (e.g. a monitor for a service intentionally offline, a check already handled
+ * upstream). Ignored signals are still appended to the repair log for the
+ * audit trail, but they never run a command, never escalate to on-call, and
+ * never pollute self-learning with false failures.
+ *
+ * Extend at runtime via `DRAYMOND_IGNORE_SIGNALS` (JSON array or comma list).
+ * Empty by default: the fleet fails closed — only a signal an operator has
+ * explicitly judged benign is ignored.
+ */
+const DEFAULT_IGNORE_SIGNALS: string[] = [];
+
+/** Resolve the benign-signal set: static defaults + env override. */
+export function loadIgnoreSignals(): Set<string> {
+  const out = new Set<string>(DEFAULT_IGNORE_SIGNALS);
+  const raw = process.env.DRAYMOND_IGNORE_SIGNALS;
+  if (raw && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed)) {
+        for (const s of parsed) if (typeof s === 'string' && s.trim()) out.add(s.trim());
+      }
+    } catch {
+      for (const s of raw.split(',')) {
+        const t = s.trim();
+        if (t) out.add(t);
+      }
+    }
+  }
+  return out;
+}
+
+/** True when a signal is on the benign whitelist and should be skipped. */
+export function isIgnoredSignal(signal: string): boolean {
+  return loadIgnoreSignals().has(signal);
+}
+
+/**
  * Extend the repair map with operator-learned repairs from
  * `DRAYMOND_REPAIR_MAP` (JSON: { signal: { name, service, command[], safe } }).
  * This is the "lessons can register repairs" escape hatch: a repair proven by
@@ -152,6 +192,21 @@ export async function detectRepairLoops(limit = 20): Promise<RepairLoopReport[]>
 
 /** Run a repair action. Only `safe` actions are executed; loops are escalated. */
 export async function attemptRepair(signal: string, detail: string): Promise<RepairAttempt> {
+  // Benign whitelist: record the attempt as skipped, never dispatch, escalate,
+  // or run a command. Mirrors the kernel linker's -IGNORE warning whitelist.
+  if (isIgnoredSignal(signal)) {
+    const attempt: RepairAttempt = {
+      id: `rp_${Date.now()}`,
+      detectedAt: new Date().toISOString(),
+      signal,
+      action: { name: 'ignored', service: 'unknown', command: [], safe: false },
+      status: 'skipped',
+      detail: `Signal "${signal}" is on the benign whitelist — ${detail} (recorded, no repair).`,
+    };
+    await appendLog(attempt);
+    return attempt;
+  }
+
   const map = loadRepairMap();
   const action = map[signal];
   const attempt: RepairAttempt = {

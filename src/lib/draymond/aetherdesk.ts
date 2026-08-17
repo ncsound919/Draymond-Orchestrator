@@ -39,6 +39,7 @@ export const AETHERDESK_OPERATIONS: Record<string, AetherDeskOperationDef> = {
   get_call: { method: 'GET', path: '/calls/{call_id}', risk: 'low', tenantQuery: true },
   start_call: { method: 'POST', path: '/calls', risk: 'high', tenantQuery: true },
   call_action: { method: 'POST', path: '/calls/{call_id}/action', risk: 'medium', tenantQuery: true },
+  clone_voice: { method: 'POST', path: '/voice/clone', risk: 'medium', tenantQuery: false },
 };
 
 /** Look up the risk level for an operation. Returns null for unknown ops. */

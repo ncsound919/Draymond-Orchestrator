@@ -62,6 +62,11 @@ export const FLEET_DUTY: DutyAssignment[] = [
     shift: { agentId: 'social-media-dashboard', days: [1, 2, 3, 4, 5], start: '09:00', end: '18:00', timezone: 'America/New_York', label: 'Workday' },
     onCallFor: 'marketing leads',
   },
+  {
+    agentId: 'repair-team', duty: 'shift',
+    shift: { agentId: 'repair-team', days: [], start: '18:00', end: '19:00', timezone: 'America/New_York', label: 'Daily repair shift' },
+    onCallFor: 'failed jobs / weak components / service outages',
+  },
   // On-call — paged on demand
   { agentId: 'overlay-guardian', duty: 'on-call', onCallFor: 'content changes / compliance' },
   { agentId: 'overlay365-qa', duty: 'on-call', onCallFor: 'deploy verification' },

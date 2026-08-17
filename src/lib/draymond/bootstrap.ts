@@ -22,6 +22,8 @@
 import { seedBasicJobs } from './scheduler';
 import { startDownServices, probeService } from './service-manager';
 import { seedAgentMonitors, disableAbsentServiceMonitors } from './monitors';
+import { installFallbackRegistry } from './fallback-registry';
+import { getFallbackCoverage } from './fallbacks';
 
 /** Services that the daily jobs depend on; started automatically at boot.
  * Only slugs with a working start recipe in service-manager.ts AND a real
@@ -40,6 +42,98 @@ export const DEFAULT_CORE_SERVICES = [
 ] as const;
 
 /**
+ * Declarative boot graph — the fleet analogue of the kernel's `dirs` file,
+ * which lists boot stages in dependency order (preldr32 → romdec32 → bldr32).
+ * Each service lists the services that must be up BEFORE it. Start order is a
+ * stable topological sort of this graph, so ordering is data, not sequence:
+ * the repair team can re-order or add edges at runtime without a code change.
+ *
+ * All edges are empty by default (declaration order = current behavior). Add
+ * an edge only when there is evidence one service needs another up first —
+ * otherwise you silently reorder the fleet. Extend at runtime via
+ * `DRAYMOND_BOOT_GRAPH` (JSON: `{ slug: { dependsOn: string[] } }`) — merges
+ * over these defaults.
+ */
+export const BOOT_GRAPH: Record<string, { dependsOn: string[] }> = {
+  'deterministic-brain': { dependsOn: [] }, // the reasoning engine — always first
+  bookbridge: { dependsOn: [] },
+  'omni-research': { dependsOn: [] },
+  'uplift-agent': { dependsOn: [] },
+  opencode: { dependsOn: [] },
+  'sports-steve': { dependsOn: [] },
+  'social-media-dashboard': { dependsOn: [] },
+  'hemp-os': { dependsOn: [] },
+  hempforge: { dependsOn: [] },
+};
+
+/** Load the boot graph, merging operator-defined edges from env. */
+export function loadBootGraph(): Record<string, { dependsOn: string[] }> {
+  const merged: Record<string, { dependsOn: string[] }> = {};
+  for (const [slug, node] of Object.entries(BOOT_GRAPH)) {
+    merged[slug] = { dependsOn: [...node.dependsOn] };
+  }
+  const raw = process.env.DRAYMOND_BOOT_GRAPH;
+  if (raw && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw) as Record<string, { dependsOn?: unknown }>;
+      for (const [slug, node] of Object.entries(parsed)) {
+        if (node && Array.isArray(node.dependsOn)) {
+          merged[slug] = { dependsOn: node.dependsOn.filter((d): d is string => typeof d === 'string') };
+        }
+      }
+    } catch (err) {
+      console.warn('[bootstrap] DRAYMOND_BOOT_GRAPH invalid JSON, ignoring:', err instanceof Error ? err.message : String(err));
+    }
+  }
+  return merged;
+}
+
+/**
+ * Stable topological sort of the boot graph. Services whose dependencies are
+ * all satisfied come first; independent services keep their declaration order
+ * (deterministic). Unknown deps and cycles are logged and skipped rather than
+ * dead-locking the boot.
+ */
+export function orderBootServices(
+  slugs: string[],
+  graph: Record<string, { dependsOn: string[] }> = loadBootGraph(),
+): string[] {
+  const set = new Set(slugs);
+  const ordered: string[] = [];
+  const placed = new Set<string>();
+  const visiting = new Set<string>();
+  const unknown = new Set<string>();
+
+  const visit = (slug: string, stack: string[]): void => {
+    if (placed.has(slug)) return;
+    if (visiting.has(slug) || stack.includes(slug)) {
+      console.warn(`[bootstrap] boot graph cycle detected at "${slug}" — ordering by declaration order`);
+      return;
+    }
+    visiting.add(slug);
+    for (const dep of graph[slug]?.dependsOn ?? []) {
+      if (!set.has(dep)) {
+        unknown.add(dep);
+        continue;
+      }
+      visit(dep, [...stack, slug]);
+    }
+    visiting.delete(slug);
+    placed.add(slug);
+    if (ordered.includes(slug)) return;
+    ordered.push(slug);
+  };
+
+  for (const slug of slugs) visit(slug, []);
+  if (unknown.size > 0) {
+    console.warn(`[bootstrap] boot graph references unknown services: ${[...unknown].join(', ')} (ignored)`);
+  }
+  // Include any slugs the cycle-guard skipped so nothing is silently dropped.
+  for (const slug of slugs) if (!ordered.includes(slug)) ordered.push(slug);
+  return ordered;
+}
+
+/**
  * Full startup bootstrap — seed jobs then bring up the core fleet.
  * Best-effort: never throws, always resolves.
  */
@@ -53,6 +147,17 @@ export async function bootstrapEcosystem(): Promise<{
   const autostart = process.env.DRAYMOND_AUTOSTART !== '0';
   if (!autostart) {
     return { seededJobs: 0, servicesAttempted: 0, servicesUp: 0, servicesStarted: 0, skipped: true };
+  }
+
+  // Install the deterministic-fallback registry so every LLM function has a
+  // declared "what to do when ALL LLMs are down" answer, then surface coverage.
+  installFallbackRegistry();
+  const fbCoverage = getFallbackCoverage();
+  console.log(
+    `[bootstrap] fallback registry: ${fbCoverage.covered}/${fbCoverage.total} LLM functions deterministic-capable (${fbCoverage.pct}%)`
+  );
+  if (fbCoverage.uncovered.length > 0) {
+    console.warn(`[bootstrap] fallback registry uncovered: ${fbCoverage.uncovered.join(', ')}`);
   }
 
   // 1. Seed the default cron set so the scheduler has work on first boot.
@@ -92,11 +197,16 @@ export async function bootstrapEcosystem(): Promise<{
       ? raw.split(',').map((s) => s.trim()).filter(Boolean)
       : [...DEFAULT_CORE_SERVICES];
 
+  // Boot order is the topological sort of the boot graph (dependency edges),
+  // not the raw array — ordering is data, so DRAYMOND_BOOT_GRAPH can re-order
+  // the fleet without a code change.
+  const bootOrder = orderBootServices(core);
+
   let servicesAttempted = 0;
   let servicesUp = 0;
   let servicesStarted = 0;
 
-  for (const slug of core) {
+  for (const slug of bootOrder) {
     // Skip services that are explicitly unconfigured (no start recipe / no
     // working dir). startDownServices already no-ops for unconfigured slugs,
     // but probing first keeps the boot log clean.

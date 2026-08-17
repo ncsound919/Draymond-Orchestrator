@@ -10,6 +10,9 @@
 
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
+import { readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
 import { createDraymondAdminClient } from './client';
 import type { DraymondDashboardSummary } from './types';
 import { emitNotificationSent, emitNotificationFailed } from '@/lib/draymond/event-bridge';
@@ -124,6 +127,129 @@ function getTransporter(): Transporter {
   });
 
   return _transporter;
+}
+
+// ============================================================================
+// GMAIL API (OAuth) — preferred send path
+// ============================================================================
+// The fleet authenticates to Gmail via a Google OAuth refresh token (from the
+// hermes-proxy consent flow, stored at ~/.hermes-gateway/google-token.json).
+// SMTP app passwords were never stable here, so when GMAIL_USE_OAUTH=1 AND a
+// token file exists we send through the Gmail REST API instead. Falls back to
+// SMTP (getTransporter) when OAuth is unavailable.
+
+interface GmailTokenFile {
+  client_id?: string;
+  client_secret?: string;
+  refresh_token?: string;
+  access_token?: string;
+  expires_at?: number;
+}
+
+function gmailTokenFile(): string {
+  return (
+    process.env.GMAIL_OAUTH_TOKEN_FILE ??
+    process.env.GOOGLE_TOKEN_FILE ??
+    path.join(os.homedir(), '.hermes-gateway', 'google-token.json')
+  );
+}
+
+/** True when the Gmail-API OAuth path is enabled AND a token file exists. */
+async function gmailOAuthEnabled(): Promise<boolean> {
+  if (process.env.GMAIL_USE_OAUTH !== '1') return false;
+  try {
+    const raw = await readFile(gmailTokenFile(), 'utf8');
+    const tok = JSON.parse(raw) as GmailTokenFile;
+    return !!(tok && tok.refresh_token);
+  } catch {
+    return false;
+  }
+}
+
+/** Return a fresh Gmail access token, exchanging the refresh token when expired. */
+async function getGmailAccessToken(): Promise<{ access_token: string; token: GmailTokenFile }> {
+  const file = gmailTokenFile();
+  const raw = await readFile(file, 'utf8');
+  const token = JSON.parse(raw) as GmailTokenFile;
+  if (!token.refresh_token) throw new Error('[Gmail OAuth] no refresh_token in token file');
+
+  const clientId = token.client_id ?? process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = token.client_secret ?? process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) throw new Error('[Gmail OAuth] token file missing client_id/client_secret');
+
+  if (token.access_token && token.expires_at && Date.now() < token.expires_at - 60_000) {
+    return { access_token: token.access_token, token };
+  }
+
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: token.refresh_token,
+      grant_type: 'refresh_token',
+    }).toString(),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`[Gmail OAuth] token refresh failed HTTP ${res.status}: ${txt.slice(0, 160)}`);
+  }
+  const data = (await res.json()) as { access_token: string; expires_in?: number };
+  token.access_token = data.access_token;
+  token.expires_at = Date.now() + (data.expires_in || 3600) * 1000;
+  await writeFile(file, JSON.stringify(token, null, 2), 'utf8');
+  return { access_token: data.access_token, token };
+}
+
+/** Send an HTML email through the Gmail REST API (OAuth bearer). */
+async function sendViaGmailApi(opts: { to: string; subject: string; html: string }): Promise<void> {
+  const { access_token } = await getGmailAccessToken();
+  const from = process.env.GMAIL_USER || 'tap4500@gmail.com';
+  const raw = [
+    `To: ${opts.to}`,
+    `From: ${from}`,
+    `Subject: ${opts.subject.replace(/\r?\n/g, ' ')}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/html; charset=utf-8',
+    '',
+    opts.html,
+  ].join('\r\n');
+  const encoded = Buffer.from(raw, 'utf8').toString('base64url');
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ raw: encoded }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`[Gmail API] send failed HTTP ${res.status}: ${txt.slice(0, 160)}`);
+  }
+}
+
+/** Send an HTML email: Gmail API (OAuth) preferred, SMTP fallback. */
+async function sendEmailHtml(opts: { to: string; subject: string; html: string }): Promise<void> {
+  if (await gmailOAuthEnabled()) {
+    try {
+      await sendViaGmailApi(opts);
+      return;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[Draymond Notifications] Gmail API send failed (${message}) — falling back to SMTP`);
+    }
+  }
+  const transporter = getTransporter();
+  await transporter.sendMail({
+    from: `Draymond Orchestrator <${process.env.GMAIL_USER}>`,
+    to: opts.to,
+    subject: opts.subject,
+    html: opts.html,
+  });
 }
 
 // ============================================================================
@@ -448,8 +574,6 @@ export async function sendNotification(
 
   // 2. Send email
   try {
-    const transporter = getTransporter();
-
     const html = renderEmailHtml(
       payload.type,
       payload.subject,
@@ -458,8 +582,7 @@ export async function sendNotification(
       payload.metadata
     );
 
-    await transporter.sendMail({
-      from: `Draymond Orchestrator <${process.env.GMAIL_USER}>`,
+    await sendEmailHtml({
       to: payload.recipient,
       subject: `${(TEMPLATE_CONFIG[payload.type] ?? TEMPLATE_CONFIG.custom).icon} [${(TEMPLATE_CONFIG[payload.type] ?? TEMPLATE_CONFIG.custom).prefix}] ${payload.subject}`,
       html,
@@ -673,11 +796,9 @@ export async function sendHealthDigest(
 
   // 2. Send the digest email with rich HTML
   try {
-    const transporter = getTransporter();
     const html = renderHealthDigestHtml(summary);
 
-    await transporter.sendMail({
-      from: `Draymond Orchestrator <${process.env.GMAIL_USER}>`,
+    await sendEmailHtml({
       to: recipient,
       subject: `\u{1F4CA} [Health Digest] ${subject}`,
       html,

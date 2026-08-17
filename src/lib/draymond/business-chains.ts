@@ -25,6 +25,8 @@ import type { InvocationMethod } from './types';
 //   3001        — Bet Buddy (Express)
 //   3010        — OmniResearch Pro (Express)
 //   3020        — Overlay Chain (Next.js)
+//   3090        — Overlay Global Lens (Express; use PORT=3090 so it never
+//                 collides with Draymond's :3000 in local fleet dev)
 //   8000        — Uplift Agent (batch_server.py)
 //   8010        — Sports Steve (FastAPI)
 //   8020        — Indy Music Platform (FastAPI)
@@ -266,6 +268,31 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     ],
     tags: ['research', 'ollama', 'express'],
     category: 'research',
+    health_endpoint: '/api/health',
+  },
+
+  // ── 6b. Overlay Global Lens ──────────────────────────────────────────
+  // Fleet publishing target: ecosystem news/insights/discoveries ingestion.
+  // POST /api/publish inserts an article that flows through the Global Lens
+  // AI pipeline (reframing, takeaways, backstory) like any RSS item.
+  {
+    name: 'Overlay Global Lens',
+    slug: 'global-lens',
+    kind: 'service',
+    description:
+      'Global Lens publishing endpoint — ingest finished fleet articles/insights (e.g. the Hemp Research & News digest) into the Overlay365 ecosystem news platform.',
+    invocation_method: 'http_api',
+    invocation_config: {
+      url: agentUrl('GLOBAL_LENS_URL', 'http://localhost:3090'),
+      method: 'POST',
+      health_url: `${agentUrl('GLOBAL_LENS_URL', 'http://localhost:3090')}/api/health`,
+      endpoints: {
+        publish: '/api/publish',
+      },
+    },
+    capabilities: ['publishing', 'news_ingest', 'content_syndication'],
+    tags: ['publishing', 'news', 'overlay365'],
+    category: 'marketing',
     health_endpoint: '/api/health',
   },
 
@@ -555,6 +582,48 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     tags: ['hemp', 'compliance', 'literature', 'audit', 'gxp', 'regulatory'],
     category: 'compliance',
     health_endpoint: '/api/health',
+  },
+
+  // ── 12b. AetherDesk Call Center ─────────────────────────────────────
+  // Voice call-center platform: outbound/inbound calls, voice cloning,
+  // campaigns, AI agent orchestration. The ecosystem's phone presence.
+  {
+    name: 'AetherDesk Call Center',
+    slug: 'aetherdesk',
+    kind: 'service',
+    description:
+      'Call-center platform — outbound/inbound calls via Fonoster, AI agent orchestration, voice cloning (personal copy), campaigns, transcripts, and call analytics. Used by the fleet for ecosystem outreach calls.',
+    invocation_method: 'http_api',
+    invocation_config: {
+      url: agentUrl('AETHERDESK_BASE_URL', 'http://127.0.0.1:8000/api/v1'),
+      method: 'POST',
+      health_url: `${agentUrl('AETHERDESK_BASE_URL', 'http://127.0.0.1:8000/api/v1')}/health`,
+      endpoints: {
+        health: '/health',
+        list_agents: '/tenants/{tenant_id}/agents',
+        create_agent: '/tenants/{tenant_id}/agents',
+        list_calls: '/calls',
+        start_call: '/calls',
+        call_action: '/calls/{call_id}/action',
+        list_campaigns: '/campaign/campaigns',
+        create_campaign: '/campaign/campaigns',
+        launch_campaign: '/campaign/launch',
+        clone_voice: '/voice/clone',
+        list_leads: '/campaign/leads',
+      },
+    },
+    capabilities: [
+      'outbound_calls',
+      'inbound_calls',
+      'voice_cloning',
+      'campaigns',
+      'call_transcripts',
+      'call_analytics',
+      'ai_agent_orchestration',
+    ],
+    tags: ['voice', 'calls', 'call-center', 'telephony', 'outreach', 'personal-copy'],
+    category: 'communication',
+    health_endpoint: '/health',
   },
 
   // ── 13. Recursive IP Builder ────────────────────────────────────────
@@ -875,6 +944,44 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     capabilities: ['backtesting', 'risk_engine', 'pipeline_utilities'],
     tags: ['folded', 'trading', 'pipeline'],
     category: 'finance',
+  },
+
+  // ── Overlay Global Lens ─────────────────────────────────────────────
+  // Express/React publication (Global-Lens fork). The public news + research
+  // outlet for Overlay365: news aggregation, research papers, trends,
+  // discoveries, and comic-metaphor storylines. Read + sync endpoints.
+  {
+    name: 'Overlay Global Lens',
+    slug: 'overlay-global-lens',
+    kind: 'service',
+    description:
+      'Overlay365 news & research publication (Express/React, Global-Lens fork). Aggregates global news and publishes evidence-tiered research papers (OpenAlex/PubMed), trends, discoveries, and comic-metaphor storylines. Public-facing outlet for the ecosystem.',
+    invocation_method: 'http_api',
+    invocation_config: {
+      url: agentUrl('OVERLAY_GLOBAL_LENS_URL', 'http://localhost:3090'),
+      method: 'POST',
+      health_url: `${agentUrl('OVERLAY_GLOBAL_LENS_URL', 'http://localhost:3090')}/api/health`,
+      endpoints: {
+        sync_research: { path: '/api/sync/research', method: 'POST' },
+        sync_trends: { path: '/api/sync/trends', method: 'POST' },
+        papers: { path: '/api/papers', method: 'GET' },
+        trends: { path: '/api/trends', method: 'GET' },
+        discoveries: { path: '/api/discoveries', method: 'GET' },
+        feed: { path: '/api/insights/feed', method: 'GET' },
+        metaphors: { path: '/api/metaphors/topic', method: 'POST' },
+        health: { path: '/api/health', method: 'GET' },
+      },
+    },
+    capabilities: [
+      'news_aggregation',
+      'research_publishing',
+      'trend_intelligence',
+      'discovery_reporting',
+      'metaphor_storylines',
+    ],
+    tags: ['news', 'research', 'publication', 'overlay365', 'express'],
+    category: 'media',
+    health_endpoint: '/api/health',
   },
 ];
 
@@ -1443,70 +1550,39 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
   },
 
   // ── Chain 9: Hemp Research & News Pipeline ──────────────────────────
-  // Research front that reports as a news outlet. Runs the Hemp-OS
-  // intelligence cycle in parallel with HempForge literature ingest, then
-  // produces a trend snapshot and publishes a public-education digest.
+  // Research front that reports as a news outlet. Grounds hemp/cannabis
+  // literature via OmniResearch (keyless PubMed/OpenAlex/BookBridge), then
+  // publishes the digest to the Overlay Global Lens platform.
   {
     name: 'Hemp Research & News Pipeline',
     slug: 'hemp-research-news',
     description:
-      'Hemp division research front: Hemp-OS intelligence cycle + HempForge literature ingest (parallel), deterministic production run, trend snapshot, then published as a public news/research digest.',
+      'Hemp division research front: OmniResearch hemp literature sweep, then the digest is published to the Overlay Global Lens news platform.',
     steps: [
       {
-        name: 'Hemp-OS Intelligence Cycle',
-        entitySlug: 'hemp-os',
-        action: 'run_cycle',
-        input_mapping: { scope: '$.input.scope' },
+        name: 'Research Hemp Literature',
+        entitySlug: 'omni-research',
+        action: 'research_news',
+        input_mapping: {
+          query: '$.input.literature_query',
+        },
         output_key: 'insights',
         step_order: 1,
         depends_on_indices: [],
       },
       {
-        name: 'Literature Ingest',
-        entitySlug: 'hempforge',
-        action: 'ingest_defaults',
-        input_mapping: { query: '$.input.literature_query' },
-        output_key: 'papers',
-        step_order: 1,
-        parallel_group: 'hemp_gather',
-        depends_on_indices: [],
-      },
-      {
-        name: 'Literature Production',
-        entitySlug: 'hempforge',
-        action: 'run_production',
-        input_mapping: {
-          papers: '$.steps.papers.output',
-          insights: '$.steps.insights.output',
-        },
-        output_key: 'production_digest',
-        step_order: 2,
-        depends_on_indices: [0, 1],
-      },
-      {
-        name: 'Trend Snapshot',
-        entitySlug: 'hempforge',
-        action: 'trend_snapshot',
-        input_mapping: {
-          digest: '$.steps.production_digest.output',
-        },
-        output_key: 'trends',
-        step_order: 3,
-        depends_on_indices: [2],
-      },
-      {
         name: 'Publish News Digest',
-        entitySlug: 'uplift-agent',
-        action: 'batch',
+        entitySlug: 'global-lens',
+        action: 'publish',
         input_mapping: {
-          task: 'compile_hemp_news_digest',
-          insights: '$.steps.insights.output',
-          digest: '$.steps.production_digest.output',
-          trends: '$.steps.trends.output',
+          title: 'Hemp Research & News Digest',
+          category: 'hemp',
+          source_name: 'Hemp-OS',
+          insights: '$.steps.insights.output.findings',
         },
         output_key: 'published_digest',
-        step_order: 4,
-        depends_on_indices: [3],
+        step_order: 2,
+        depends_on_indices: [0],
       },
     ],
   },
@@ -1670,6 +1746,47 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
         output_key: 'capture_task',
         step_order: 1,
         depends_on_indices: [],
+      },
+    ],
+  },
+
+  // ── Chain 13: News Outlet Ingest ────────────────────────────────────
+  // Feeds the Overlay Global Lens publication with the latest ecosystem
+  // research. Idempotent syncs pull evidence-tiered papers + trends +
+  // discoveries into the outlet's SQLite for public serving, then confirm
+  // the outlet is healthy.
+  {
+    name: 'News Outlet Ingest',
+    slug: 'news-outlet-ingest',
+    description:
+      'Syncs the latest ecosystem research into the Overlay Global Lens publication: research papers (OpenAlex/PubMed store), then trends + discoveries (discovery loop + hypotheses), then confirms outlet health.',
+    steps: [
+      {
+        name: 'Sync Research Papers',
+        entitySlug: 'overlay-global-lens',
+        action: 'sync_research',
+        input_mapping: {},
+        output_key: 'papers_sync',
+        step_order: 1,
+        depends_on_indices: [],
+      },
+      {
+        name: 'Sync Trends & Discoveries',
+        entitySlug: 'overlay-global-lens',
+        action: 'sync_trends',
+        input_mapping: {},
+        output_key: 'insights_sync',
+        step_order: 2,
+        depends_on_indices: [0],
+      },
+      {
+        name: 'Outlet Health Check',
+        entitySlug: 'overlay-global-lens',
+        action: 'health',
+        input_mapping: {},
+        output_key: 'outlet_health',
+        step_order: 3,
+        depends_on_indices: [1],
       },
     ],
   },
@@ -1995,6 +2112,20 @@ const JOB_DEFS: JobSeedDef[] = [
     cron_expression: '0 16 * * *',
     job_type: 'custom',
     job_config: { handler: 'science_campaign_seed' },
+    notify_on_failure: true,
+  },
+
+  // ── News Outlet Ingest (2:45AM daily) ───────────────────────────────
+  // Pushes the latest ecosystem research into Overlay Global Lens so the
+  // public outlet mirrors fresh evidence-tiered papers, trends, discoveries.
+  {
+    name: 'News Outlet Ingest',
+    cron_expression: '45 2 * * *',
+    job_type: 'chain',
+    job_config: {
+      chain_slug: 'news-outlet-ingest',
+      input: {},
+    },
     notify_on_failure: true,
   },
 ];

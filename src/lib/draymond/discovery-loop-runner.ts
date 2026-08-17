@@ -24,6 +24,18 @@ export function resolveDiscoveryLoopScript(): string | null {
   if (process.env.BENCHMARK_OLYMPICS_ROOT) {
     candidates.push(path.join(process.env.BENCHMARK_OLYMPICS_ROOT, "scripts", "discovery-loop-run.ts"));
   }
+  // The standalone Next server runs with cwd = .next/standalone (server.js
+  // chdirs there at boot), so cwd-relative lookups alone can't find the
+  // sibling app. Anchor on the canonical registry dir when it is set (pm2
+  // pins DRAYMOND_REGISTRY_DIR to <root>/.draymond) and derive the ecosystem
+  // root from it.
+  if (process.env.DRAYMOND_REGISTRY_DIR) {
+    const orchRoot = path.resolve(process.env.DRAYMOND_REGISTRY_DIR, "..");
+    candidates.push(
+      path.resolve(orchRoot, "..", "Benchmark Olympics", "scripts", "discovery-loop-run.ts"),
+      path.resolve(orchRoot, "Benchmark Olympics", "scripts", "discovery-loop-run.ts"),
+    );
+  }
   candidates.push(
     path.resolve(process.cwd(), "..", "Benchmark Olympics", "scripts", "discovery-loop-run.ts"),
     path.resolve(process.cwd(), "Benchmark Olympics", "scripts", "discovery-loop-run.ts"),

@@ -186,6 +186,7 @@ async function generateBlueprint(
     temperature: 0.2,
     timeoutMs: BUILDER_TIMEOUT_MS,
     toonify: true,
+    fallbackKey: 'chain-builder.generateBlueprint',
   });
 
   return parseBlueprintResponse(content, catalog);

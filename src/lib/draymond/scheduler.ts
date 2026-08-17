@@ -670,6 +670,8 @@ export const CUSTOM_HANDLERS: CustomHandlerDef[] = [
   { handler: 'research_rotation', label: 'Research Rotation', description: 'Drain the highest-priority ready science experiment from the queue.' },
   { handler: 'science_campaign_seed', label: 'Science Campaign Seed', description: 'Re-seed the science/sports experiment backlog from real datasets + papers when the queue runs low.' },
   { handler: 'benchmark_discovery_loop', label: 'Benchmark Olympics Discovery Loop', description: 'Autonomous research loop: probe the fleet, mature discovery hypotheses, surface quick-upgrade insights, and auto-fix weak components via the repair team.' },
+  { handler: 'repair_shift', label: 'Daily Repair Shift', description: 'Daily fleet shift: code-review audit -> repair/upgrade ecosystem components -> benchmark improvements -> self-learning optimization.' },
+  { handler: 'research_grade_loop', label: 'Research Breakthrough Grading', description: 'Grade CureMind/BB-Tech research output for breakthrough potential, feed trends/insights/discoveries + self-learning.' },
 ];
 
 /**
@@ -1454,6 +1456,53 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         return { handler, iterations, ok: res.ok, duration_ms: res.durationMs, output: (res.stdout || '').trim().slice(-1500), error: res.error };
       }
 
+      if (handler === 'repair_shift') {
+        // Daily fleet repair shift: code-review audit -> repair/upgrade ->
+        // benchmark improvements -> self-learning. The repair team is on shift
+        // every day; the code review team audits; improvements are benchmarked.
+        // Options flow from the job config so operators can tune cost (deep
+        // scoring hits RepoRank/Grader over HTTP).
+        const { runRepairShift } = await import('./repair-shift');
+        const cfg = (config ?? {}) as { skipDeepScore?: unknown; deepScoreLimit?: unknown; maxComponents?: unknown; maxJobs?: unknown };
+        const r = await runRepairShift({
+          skipDeepScore: cfg.skipDeepScore === true || cfg.skipDeepScore === 'true',
+          deepScoreLimit: cfg.deepScoreLimit != null ? Number(cfg.deepScoreLimit) : undefined,
+          maxComponents: cfg.maxComponents != null ? Number(cfg.maxComponents) : undefined,
+          maxJobs: cfg.maxJobs != null ? Number(cfg.maxJobs) : undefined,
+        });
+        return {
+          handler,
+          shiftId: r.shiftId,
+          measured: r.audit.measured,
+          deepScored: r.audit.deepScored,
+          weakest: r.audit.weakest.slice(0, 5),
+          jobsRepaired: r.repair.jobsRepaired,
+          componentsRepaired: r.repair.componentsRepaired,
+          servicesStarted: r.repair.servicesStarted,
+          failures: r.repair.failures.slice(0, 5),
+          improvements: r.improvements.slice(0, 5),
+          lessons: r.lessons,
+          duration_ms: r.durationMs,
+        };
+      }
+
+      if (handler === 'research_grade_loop') {
+        // Breakthrough-potential grading of CureMind/BB-Tech research output.
+        // Feeds the self-learning system + trends/insights/discoveries so the
+        // scientific research system consistently gets smarter.
+        const { gradeResearch } = await import('@/lib/science/research-grade');
+        const r = await gradeResearch();
+        return {
+          handler,
+          graded: r.grades.length,
+          frontier: r.grades.filter((g) => g.breakthroughClass === 'frontier').length,
+          promising: r.grades.filter((g) => g.breakthroughClass === 'promising').length,
+          top: r.grades.slice(0, 5).map((g) => ({ goalId: g.goalId, score: g.score, evidence: g.evidenceTier, class: g.breakthroughClass })),
+          discoveries: r.discoveries.map((g) => ({ goalId: g.goalId, score: g.score })),
+          insights: r.insights.slice(0, 5).map((i) => ({ type: i.type, detail: i.detail })),
+        };
+      }
+
       console.log(
         `[Draymond Scheduler] Custom job "${job.name}" triggered (handler: ${handler ?? 'none'}). ` +
         `No built-in handler registered — skipping execution.`
@@ -1896,7 +1945,11 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
               // still applies when the operator opts out of first-failure
               // dispatch (DRAYMOND_REPAIR_AT_FAILURE=0 stops this entirely).
               immediate: process.env.DRAYMOND_REPAIR_IMMEDIATE !== '0',
-              dispatchTimeoutMs: Number(process.env.DRAYMOND_REPAIR_AT_FAILURE_TIMEOUT_MS) || 30_000,
+              // The codegen repair runs a real LLM call (opencode Go tier via
+              // LiteLLM). It can take 30–90s for a reasoning pass, so the
+              // immediate window must clear it — 30s used to abort mid-repair
+              // and hand everything to the (often dead) fallback engines.
+              dispatchTimeoutMs: Number(process.env.DRAYMOND_REPAIR_AT_FAILURE_TIMEOUT_MS) || 120_000,
             },
           );
         } catch (repairErr) {
@@ -2247,6 +2300,22 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     cron_expression: '0 */6 * * *',
     job_type: 'custom',
     job_config: { handler: 'benchmark_discovery_loop', iterations: 2 },
+    is_enabled: true,
+  },
+  {
+    name: 'Daily Repair Shift',
+    description: 'Daily 6pm — the repair team shift: code-review audit, fix + upgrade weak ecosystem components, benchmark the improvements, and run self-learning so each day starts smarter.',
+    cron_expression: '0 18 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'repair_shift' },
+    is_enabled: true,
+  },
+  {
+    name: 'Research Breakthrough Grading',
+    description: 'Daily 6:30pm — grade CureMind/BB-Tech research output for breakthrough potential, surface trends/insights/discoveries, and feed the self-learning loop so the research system consistently gets smarter.',
+    cron_expression: '30 18 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'research_grade_loop' },
     is_enabled: true,
   },
 ];

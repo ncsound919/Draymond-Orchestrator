@@ -36,7 +36,7 @@ export const MISSION_CHAIN_DEFS: MissionChainDef[] = [
     steps: [
       { name: "Research Trends", entitySlug: "omni-research", action: "trending_topics", input_mapping: { niche: "$.input.niche" }, output_key: "trending", step_order: 1, depends_on: [] },
       { name: "Draft Content", entitySlug: "social-media-dashboard", action: "generate_text", input_mapping: { topics: "$.steps.trending.output", brand: "$.input.brand_voice" }, output_key: "content", step_order: 2, depends_on: ["Research Trends"] },
-      { name: "Generate Assets", entitySlug: "social-media-dashboard", action: "generate_image", input_mapping: { content: "$.steps.content.output", style: "$.input.image_style" }, output_key: "images", step_order: 2, parallel_group: "content_gen", depends_on: ["Research Trends"] },
+      { name: "Generate Assets", entitySlug: "social-media-dashboard", action: "generate_image", input_mapping: { prompt: "$.steps.content.output.content", style: "$.input.image_style" }, output_key: "images", step_order: 2, parallel_group: "content_gen", depends_on: ["Research Trends"] },
       { name: "Format QA", entitySlug: "mutly", action: "analyze", input_mapping: { content: "$.steps.content.output", images: "$.steps.images.output" }, output_key: "qa", step_order: 3, depends_on: ["Draft Content", "Generate Assets"] },
       { name: "Compile Client Package", entitySlug: "uplift-agent", action: "batch", input_mapping: { task: "compile_maas_package", content: "$.steps.content.output", images: "$.steps.images.output", qa: "$.steps.qa.output" }, output_key: "package", step_order: 4, depends_on: ["Format QA"] },
     ],

@@ -277,6 +277,8 @@ async function compressConversation(
       userMessage: olderText.slice(0, 12_000),
       maxTokens: 220,
       temperature: 0.2,
+      fallbackKey: 'chat.compressConversation',
+      localFirst: true,
     });
     return [
       { role: 'assistant' as const, content: `[Earlier in this conversation: ${summary.trim()}]` },
@@ -326,6 +328,8 @@ async function handleGeneralChat(
     images: images.length ? images : undefined,
     maxTokens: 1500,
     temperature: 0.4,
+    fallbackKey: 'chat.handleGeneralChat',
+    localFirst: true,
   });
 
   await streamText(answer, onChunk);
@@ -576,6 +580,8 @@ async function querySystemStatus(
       userMessage: `Question: ${task}\n\n${contextBlock ? `${contextBlock}\n\n` : ''}<system_snapshot>\n${snapshot}\n</system_snapshot>`,
       maxTokens: 2000,
       temperature: 0.2,
+      fallbackKey: 'chat.querySystemStatus',
+      fallbackContext: { snapshot },
     });
     await streamText(answer, onChunk);
     return answer;
@@ -673,6 +679,9 @@ async function handleDiagnostic(
       userMessage: `Report: ${task}\n\n${contextBlock ? `${contextBlock}\n\n` : ''}<diagnostics>\n${snapshot}\n</diagnostics>`,
       maxTokens: 700,
       temperature: 0.2,
+      fallbackKey: 'chat.handleDiagnostic',
+      fallbackContext: { snapshot },
+      localFirst: true,
     });
     await streamText(answer, onChunk);
     return answer;
@@ -732,6 +741,9 @@ async function synthesizeSearchAnswer(
       userMessage: `Query: ${query}\n\nSources:\n${sources}\n\nExtracted content:\n${pageText}`,
       maxTokens: 600,
       temperature: 0.3,
+      fallbackKey: 'chat.synthesizeSearchAnswer',
+      fallbackContext: { sources },
+      localFirst: true,
     });
   } catch {
     return `Top results for "${query}":\n${sources}`;

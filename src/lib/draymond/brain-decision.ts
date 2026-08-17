@@ -61,24 +61,6 @@ export interface BrainDecision {
 
 const BRAIN_URL = () => process.env.BRAIN_URL ?? '';
 
-async function callBrainReason(query: string): Promise<{ consulted: boolean; decision: string | null }> {
-  if (!BRAIN_URL()) return { consulted: false, decision: null };
-  try {
-    const res = await fetch(`${BRAIN_URL().replace(/\/+$/, '')}/reason`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query }),
-      signal: AbortSignal.timeout(45_000),
-    });
-    if (!res.ok) return { consulted: true, decision: null };
-    const data = (await res.json()) as { decision?: unknown; task?: unknown };
-    const decision = data.decision ? JSON.stringify(data.decision).slice(0, 2000) : null;
-    return { consulted: true, decision };
-  } catch {
-    return { consulted: true, decision: null };
-  }
-}
-
 // ============================================================================
 // DETERMINISTIC FALLBACK — agenda + intel → priority ordering (no LLM)
 // ============================================================================
@@ -127,7 +109,7 @@ export async function runBrainDecision(input: BrainDecisionInput = {}): Promise<
   const downMonitors = input.downMonitors ?? intel?.monitors.down ?? [];
   const lessonList = lessons.map((l) => `${l.agentId}: ${l.lesson} (x${l.evidenceCount})`).slice(0, 10);
 
-  // ── 2. Consult the deterministic brain's reasoning engine ───────────────
+  // ── 2. Consult reasoning (local-first) over the agenda + system state ─────
   const brainQuery = [
     'Business operations decision. Agenda:',
     agenda.map((g) => `- ${g.title} (${g.progress}%)`).join('\n') || '- none',
@@ -142,8 +124,12 @@ export async function runBrainDecision(input: BrainDecisionInput = {}): Promise<
     'Recommend the single highest-value focus + the top 3 hiccups to repair first, considering the agenda.',
   ].join('\n');
 
-  const brainResult = await callBrainReason(brainQuery);
-  const brainConsulted = input.brainReachable ?? brainResult.consulted;
+  // Local-first: the brain's local model (fast tier) reasons over the state at
+  // zero token cost. Falls back to the deterministic /reason when the local
+  // harness is unreachable, then null when the brain is down.
+  const { reasonLocal } = await import('./local-reason');
+  const localReason = await reasonLocal(brainQuery);
+  const brainConsulted = input.brainReachable ?? (localReason.source !== null);
 
   // Also trigger a bounded brain sweep when the brain is up (metacognitive
   // observation over the knowledge graph feeds future sweeps).
@@ -256,7 +242,7 @@ export async function runBrainDecision(input: BrainDecisionInput = {}): Promise<
   return {
     generatedAt,
     brainConsulted,
-    brainReasoning: brainResult.decision ? { query: brainQuery.slice(0, 400), decision: brainResult.decision } : null,
+    brainReasoning: localReason.text ? { query: brainQuery.slice(0, 400), decision: localReason.text } : null,
     focusGoal,
     priorities,
     repairQueue,

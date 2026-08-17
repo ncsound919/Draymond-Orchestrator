@@ -140,6 +140,56 @@ describe('repairLog', () => {
   });
 });
 
+describe('benign-signal whitelist (DRAYMOND_IGNORE_SIGNALS)', () => {
+  it('skips an ignored signal without dispatching or escalating', async () => {
+    process.env.DRAYMOND_IGNORE_SIGNALS = 'monitor:maintenance';
+
+    const mod = await loadSelfRepair();
+    const attempt = await mod.attemptRepair('monitor:maintenance', 'expected maintenance window');
+
+    expect(attempt.status).toBe('skipped');
+    expect(attempt.action.name).toBe('ignored');
+    expect(attempt.detail).toBe(
+      'Signal "monitor:maintenance" is on the benign whitelist — expected maintenance window (recorded, no repair).'
+    );
+    expect(mocks.execFile).not.toHaveBeenCalled();
+
+    const log = await readLog();
+    expect(log).toHaveLength(1);
+    expect(log[0].signal).toBe('monitor:maintenance');
+    expect(log[0].status).toBe('skipped');
+  });
+
+  it('parses a comma-separated whitelist', async () => {
+    process.env.DRAYMOND_IGNORE_SIGNALS = 'a:benign, b:noise';
+
+    const mod = await loadSelfRepair();
+    expect(mod.isIgnoredSignal('a:benign')).toBe(true);
+    expect(mod.isIgnoredSignal('b:noise')).toBe(true);
+    expect(mod.isIgnoredSignal('c:other')).toBe(false);
+  });
+
+  it('parses a JSON array whitelist', async () => {
+    process.env.DRAYMOND_IGNORE_SIGNALS = JSON.stringify(['x:quiet', 'y:expected']);
+
+    const mod = await loadSelfRepair();
+    expect(mod.isIgnoredSignal('x:quiet')).toBe(true);
+    expect(mod.isIgnoredSignal('y:expected')).toBe(true);
+    expect(mod.isIgnoredSignal('z:loud')).toBe(false);
+  });
+
+  it('still applies a repair for signals not on the whitelist', async () => {
+    mocks.execFile.mockResolvedValue('ok');
+    process.env.DRAYMOND_IGNORE_SIGNALS = 'monitor:maintenance';
+
+    const mod = await loadSelfRepair();
+    const attempt = await mod.attemptRepair('qa:fail', 'tests failing');
+
+    expect(attempt.status).toBe('applied');
+    expect(mocks.execFile).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('failure-loop guard', () => {
   it('stops re-applying the same repair once the cooldown threshold is hit', async () => {
     mocks.execFile.mockResolvedValue('ok');

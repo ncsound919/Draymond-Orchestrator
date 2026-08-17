@@ -267,6 +267,7 @@ async function decomposeToSteps(goal: string, kind: GoalKind, crew: IdeCrew): Pr
         temperature: 0.2,
         timeoutMs: 30_000,
         responseFormat: { type: 'json_object' },
+        fallbackKey: 'ide.decomposeToSteps',
       });
     }
 
@@ -412,6 +413,7 @@ async function generateCommitMessage(goal: string, diff: string): Promise<string
         '(e.g. "fix(api): handle null tenant on payouts"). No markdown, no quotes, no body.',
       userMessage: `Goal: ${goal}\n\nDiff:\n${diff.slice(0, 4000)}`,
       maxTokens: 120,
+      fallbackKey: 'ide.generateCommitMessage',
     });
     const clean = message.trim().replace(/^`+|`+$/g, '').replace(/\n+/g, ' ').slice(0, 200);
     return clean || `chore(ide): ${goal.slice(0, 80)}`;

@@ -30,7 +30,17 @@ export async function pingUplift(): Promise<boolean> {
       headers: upliftHeaders(),
       signal: AbortSignal.timeout(3000),
     });
-    return res.ok;
+    if (!res.ok) return false;
+    // Identity check: another service may squat the port (the comic-metaphor
+    // engine has taken 8000 before). Only trust the real uplift-agent bridge.
+    try {
+      const body = (await res.json()) as { service?: string };
+      if (body?.service && body.service !== 'uplift-agent') return false;
+    } catch {
+      // Non-JSON health — not the uplift bridge.
+      return false;
+    }
+    return true;
   } catch {
     return false;
   }

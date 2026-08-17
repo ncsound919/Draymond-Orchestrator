@@ -186,3 +186,152 @@ describe('router opencode-free provider', () => {
     expect(r1.chain_slug).toBe('daily-marketing-run');
   });
 });
+
+describe('router deterministic brain pre-route', () => {
+  const fetchMock = vi.fn();
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete process.env.BRAIN_URL;
+    delete process.env.OPENCODE_API_KEY;
+    fetchMock.mockReset();
+  });
+
+  it('skips the paid LLM when the brain classifies with high confidence', async () => {
+    process.env.BRAIN_URL = 'http://localhost:3210';
+    process.env.OPENCODE_API_KEY = 'test-key';
+
+    fetchMock.mockImplementation(async (url: string) => {
+      if (String(url).includes('/reason')) {
+        return new Response(
+          JSON.stringify({
+            decision: { chosen_skill: 'aetherdesk', confidence: 0.88 },
+          }),
+          { status: 200 },
+        );
+      }
+      throw new Error(`unexpected fetch to ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await routeTask('list the agents');
+    expect(result.entity_slug).toBe('aetherdesk');
+    expect(result.confidence).toBe(0.88);
+    expect(result.reasoning).toContain('skipped LLM routing');
+    // Only the brain /reason call happened — the paid LLM endpoint never ran.
+    expect(fetchMock.mock.calls.length).toBe(1);
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/reason');
+  });
+
+  it('falls through to the paid LLM when brain confidence is too low', async () => {
+    process.env.BRAIN_URL = 'http://localhost:3210';
+    process.env.OPENCODE_API_KEY = 'test-key';
+
+    fetchMock.mockImplementation(async (url: string) => {
+      if (String(url).includes('/reason')) {
+        return new Response(
+          JSON.stringify({ decision: { chosen_skill: 'aetherdesk', confidence: 0.3 } }),
+          { status: 200 },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  intent: 'invoke_entity',
+                  confidence: 0.95,
+                  entity_slug: 'aetherdesk',
+                  action: 'list_agents',
+                  input: {},
+                  reasoning: 'low brain conf so used LLM',
+                  alternatives: [],
+                }),
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await routeTask('list agents');
+    expect(result.entity_slug).toBe('aetherdesk');
+    expect(result.action).toBe('list_agents');
+    // brain /reason ran (1st call), then the paid LLM ran (2nd call).
+    expect(fetchMock.mock.calls.length).toBe(2);
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/reason');
+    expect(String(fetchMock.mock.calls[1][0])).toContain('opencode.ai');
+  });
+
+  it('is a no-op when BRAIN_URL is unset (offline installs unchanged)', async () => {
+    process.env.OPENCODE_API_KEY = 'test-key';
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  intent: 'invoke_entity',
+                  confidence: 0.95,
+                  entity_slug: 'aetherdesk',
+                  action: 'list_agents',
+                  input: {},
+                  reasoning: 'no brain configured',
+                  alternatives: [],
+                }),
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await routeTask('list agents');
+    expect(result.entity_slug).toBe('aetherdesk');
+    // No /reason call happened at all — straight to the paid LLM.
+    expect(fetchMock.mock.calls.length).toBe(1);
+    expect(String(fetchMock.mock.calls[0][0])).toContain('opencode.ai');
+  });
+
+  it('falls through when the brain is unreachable (fail-soft)', async () => {
+    process.env.BRAIN_URL = 'http://localhost:3210';
+    process.env.OPENCODE_API_KEY = 'test-key';
+
+    fetchMock.mockImplementation(async (url: string) => {
+      if (String(url).includes('/reason')) {
+        throw new TypeError('fetch failed: brain down');
+      }
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  intent: 'invoke_entity',
+                  confidence: 0.95,
+                  entity_slug: 'aetherdesk',
+                  action: 'list_agents',
+                  input: {},
+                  reasoning: 'brain unreachable',
+                  alternatives: [],
+                }),
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await routeTask('list agents');
+    expect(result.entity_slug).toBe('aetherdesk');
+    expect(fetchMock.mock.calls.length).toBe(2); // /reason (failed) + LLM
+  });
+});

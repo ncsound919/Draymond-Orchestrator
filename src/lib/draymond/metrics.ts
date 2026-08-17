@@ -26,6 +26,13 @@ function buildGauges(register: Registry) {
     repairs: new Gauge({ name: 'draymond_repair_attempts_total', help: 'Repair attempts by status', labelNames: ['status'] as const, registers: [register] }),
     events24h: new Gauge({ name: 'draymond_events_total_24h', help: 'Audit events in the last 24 hours', registers: [register] }),
     lessons: new Gauge({ name: 'draymond_lessons_total', help: 'Distilled self-learning lessons', registers: [register] }),
+    fallbackCovered: new Gauge({ name: 'draymond_llm_fallback_covered_total', help: 'LLM functions with a deterministic fallback registered', registers: [register] }),
+    fallbackTotal: new Gauge({ name: 'draymond_llm_fallback_total', help: 'Known LLM functions in the fallback registry', registers: [register] }),
+    fallbackPct: new Gauge({ name: 'draymond_llm_fallback_coverage_pct', help: 'Deterministic-fallback coverage percentage', registers: [register] }),
+    llmDegraded: new Gauge({ name: 'draymond_llm_degraded', help: '1 when the fleet is in LLM degraded mode', registers: [register] }),
+    brainRouted: new Gauge({ name: 'draymond_llm_brain_routed_total', help: 'Tasks routed via the deterministic brain pre-route (paid LLM skipped)', registers: [register] }),
+    brainTokensSaved: new Gauge({ name: 'draymond_llm_tokens_saved_total', help: 'Estimated LLM tokens saved by deterministic brain routing', registers: [register] }),
+    brainSavingsCents: new Gauge({ name: 'draymond_llm_savings_cents_total', help: 'Estimated LLM cost saved (cents) by deterministic brain routing', registers: [register] }),
   };
 }
 
@@ -117,6 +124,31 @@ async function refresh(): Promise<void> {
     g.events24h.set(count ?? (data ?? []).length);
   } catch {
     /* skip */
+  }
+
+  // Deterministic-fallback coverage — the "how much of the fleet stays
+  // productive when every LLM is down" metric (registry-backed).
+  try {
+    const { getFallbackCoverage } = await import('./fallbacks');
+    const cov = getFallbackCoverage();
+    g.fallbackCovered.set(cov.covered);
+    g.fallbackTotal.set(cov.total);
+    g.fallbackPct.set(cov.pct);
+    g.llmDegraded.set(cov.degraded ? 1 : 0);
+  } catch {
+    /* registry not installed yet — skip */
+  }
+
+  // Deterministic brain routing savings — tokens/cost avoided by pre-LLM
+  // routing (in-memory ledger from router.ts tryBrainPreRoute).
+  try {
+    const { getBrainSavings } = await import('./brain-savings');
+    const s = getBrainSavings();
+    g.brainRouted.set(s.routed);
+    g.brainTokensSaved.set(s.tokens);
+    g.brainSavingsCents.set(s.cents);
+  } catch {
+    /* module unavailable — skip */
   }
 }
 

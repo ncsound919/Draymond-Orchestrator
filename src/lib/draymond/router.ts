@@ -30,6 +30,8 @@ const DEFAULT_CONFIG: RouterConfig = {
   fallback_threshold: 0.4,
   max_tokens: 512,
   timeout_ms: 15_000,
+  use_brain_pre_route: true,
+  brain_pre_route_confidence: 0.6,
 };
 
 let _config: RouterConfig = { ...DEFAULT_CONFIG };
@@ -323,6 +325,17 @@ export async function routeTask(
     return directMatch;
   }
 
+  // Pre-LLM deterministic gate: ask the deterministic brain's /reason to
+  // classify intent. When the brain is confident (>= brain_pre_route_confidence)
+  // and resolves to a known entity/chain, skip the paid LLM entirely — this is
+  // the biggest token saver in the ecosystem (routing fires on every task).
+  if (_config.use_brain_pre_route !== false) {
+    const brainRoute = await tryBrainPreRoute(task, startMs, snapshot);
+    if (brainRoute) {
+      return brainRoute;
+    }
+  }
+
   const systemPrompt = getCachedPrompt() || buildSystemPrompt(snapshot);
 
   const userMessage = context
@@ -350,6 +363,8 @@ export async function routeTask(
       timeoutMs: _config.timeout_ms,
       responseFormat: { type: 'json_object' },
       toonify: true,
+      fallbackKey: 'router.routeTask',
+      fallbackContext: { userMessage: task },
     });
     const latencyMs = Date.now() - startMs;
     const result = parseRouterResponse(raw, snapshot, latencyMs);
@@ -415,6 +430,8 @@ async function tryLocalRoute(
       userMessage,
       maxTokens: 512,
       responseFormat: { type: 'json_object' },
+      fallbackKey: 'router.tryLocalRoute',
+      fallbackContext: { userMessage: task },
     });
     const latencyMs = Date.now() - startMs;
     const result = parseRouterResponse(raw, snapshot, latencyMs);
@@ -453,6 +470,125 @@ async function tryLocalRoute(
     console.warn(`[router] local model failed (${err instanceof Error ? err.message : String(err)}).`);
   }
   return null;
+}
+
+/**
+ * Pre-LLM deterministic routing gate. POSTs the task to the deterministic
+ * brain's `/reason` (zero-LLM reasoning pipeline). When the brain classifies
+ * with confidence >= brain_pre_route_confidence and resolves to a known
+ * entity/chain, return that route WITHOUT spending any LLM tokens.
+ *
+ * Gated on BRAIN_URL (same as brain-task.ts): when unset this is a strict
+ * no-op. Fail-soft — a slow/unreachable brain returns null and routing falls
+ * through to the paid LLM as before.
+ */
+async function tryBrainPreRoute(
+  task: string,
+  startMs: number,
+  snapshot: RegistrySnapshot,
+): Promise<RouteResult | null> {
+  const base = process.env.BRAIN_URL?.replace(/\/+$/, '');
+  if (!base) return null;
+
+  const confThreshold = _config.brain_pre_route_confidence ?? 0.6;
+  const timeoutMs = Number(process.env.BRAIN_PRE_ROUTE_TIMEOUT_MS ?? 4000);
+
+  try {
+    const res = await fetch(`${base}/reason`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: task }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as Record<string, unknown>;
+    const decision = (data?.decision ?? {}) as Record<string, unknown>;
+    const confidence = Number(decision.confidence ?? 0);
+    const chosenSkill = typeof decision.chosen_skill === 'string' ? decision.chosen_skill : '';
+
+    if (confidence < confThreshold || !chosenSkill) return null;
+
+    // Map the brain's chosen skill to a real registry route. Priority:
+    //   1. Exact entity slug (brain classified which entity to invoke).
+    //   2. Exact chain slug / name.
+    //   3. The deterministic-brain entity itself (skill = brain's own skill).
+    const entityBySlug = snapshot.entities.find((e) => e.slug === chosenSkill);
+    const chain = snapshot.chains.find((c) => c.slug === chosenSkill || c.name === chosenSkill);
+    const brainEntity = snapshot.entities.find((e) => e.slug === 'deterministic-brain');
+    const latencyMs = Date.now() - startMs;
+
+    let result: RouteResult;
+    if (entityBySlug) {
+      result = {
+        intent: 'invoke_entity',
+        confidence,
+        entity_slug: entityBySlug.slug,
+        action: chosenSkill,
+        reasoning: `Deterministic brain classified "${task}" → entity ${entityBySlug.slug} (conf ${confidence.toFixed(2)}) — skipped LLM routing`,
+        alternatives: [],
+        resolved_at: new Date().toISOString(),
+        latency_ms: latencyMs,
+      };
+    } else if (chain) {
+      result = {
+        intent: 'execute_chain',
+        confidence,
+        chain_slug: chain.slug,
+        reasoning: `Deterministic brain classified "${task}" → chain ${chain.slug} (conf ${confidence.toFixed(2)}) — skipped LLM routing`,
+        alternatives: [],
+        resolved_at: new Date().toISOString(),
+        latency_ms: latencyMs,
+      };
+    } else if (brainEntity) {
+      result = {
+        intent: 'invoke_entity',
+        confidence,
+        entity_slug: brainEntity.slug,
+        action: chosenSkill,
+        reasoning: `Deterministic brain classified "${task}" → ${chosenSkill} (conf ${confidence.toFixed(2)}) — skipped LLM routing`,
+        alternatives: [],
+        resolved_at: new Date().toISOString(),
+        latency_ms: latencyMs,
+      };
+    } else {
+      return null; // brain confident but no routable target — fall through to LLM
+    }
+
+    // Token savings: the LLM routing call (system prompt + ~512 output tokens)
+    // was avoided. Emit to the savings metric if present.
+    try {
+      const { recordBrainRouteSavings } = await import('./brain-savings');
+      recordBrainRouteSavings(Number(_config.max_tokens ?? 512));
+    } catch {
+      /* metrics module unavailable — routing still succeeds */
+    }
+
+    await logEvent({
+      agent_id: 'draymond-router',
+      category: 'decision',
+      severity: 'info',
+      event_type: 'task_routed',
+      message: `Routed "${task.slice(0, 100)}" → ${result.intent} (deterministic brain)`,
+      metadata: {
+        intent: result.intent,
+        confidence,
+        entity_slug: result.entity_slug,
+        chain_slug: result.chain_slug,
+        latency_ms: latencyMs,
+        alternatives_count: 0,
+        model_tier: 'brain-deterministic',
+      },
+      reasoning: result.reasoning,
+    }).catch(() => {});
+
+    return result;
+  } catch (err) {
+    // Brain unreachable / timed out — fall through to the paid LLM.
+    console.warn(
+      `[router] brain pre-route skipped (${err instanceof Error ? err.message : String(err)}).`
+    );
+    return null;
+  }
 }
 
 /**

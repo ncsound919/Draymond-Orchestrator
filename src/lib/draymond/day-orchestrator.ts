@@ -47,6 +47,8 @@ export const DAY_FLOW: OrchestrationStep[] = [
   { id: 'knowledge', phase: 'night', time: '02:20', job: 'bookbridge', purpose: 'Knowledge pipeline (library → synthesis → vector → memory)' },
   // ── Evening — prepare next day ──────────────────────────────────────────
   { id: 'eve-marketing', phase: 'evening', time: '20:00', job: 'marketing-pulse', purpose: 'Build next-day marketing tools' },
+  { id: 'repair-shift', phase: 'evening', time: '18:00', job: 'repair_shift', purpose: 'Daily repair team shift — code-review audit, fix + upgrade the ecosystem, benchmark improvements, self-learn' },
+  { id: 'research-grade', phase: 'evening', time: '18:30', job: 'research_grade_loop', purpose: 'Breakthrough-potential grading of CureMind/BB-Tech research output' },
   // ── Night — learn + build while idle ────────────────────────────────────
   { id: 'learn', phase: 'night', time: '00:30', job: 'self_learning_loop', purpose: 'Distill lessons from the day' },
   { id: 'rd', phase: 'night', time: '01:00', job: 'rd_night', purpose: 'Overnight research + dev plan' },

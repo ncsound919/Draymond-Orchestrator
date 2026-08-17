@@ -9,6 +9,13 @@
 // ============================================================================
 
 import { truncateToTokens, maxTokensForMode } from '../mathx';
+import {
+  resolveFallbackAsync,
+  isDegraded,
+  recordChainFailure,
+  recordChainSuccess,
+} from './fallbacks';
+import type { FallbackContext } from './fallbacks';
 
 export type LLMProvider =
   | 'opencode-free'
@@ -47,10 +54,22 @@ export interface LLMCallOptions {
    *  templated string instead of throwing, so pipelines never stall on a
    *  total LLM outage. Unset = keep the current throw behaviour. */
   deterministicFallback?: string;
+  /** Registry key for a deterministic fallback (see ./fallbacks). When every
+   *  provider fails — or the fleet is in degraded mode — the registered
+   *  resolver produces the output. Prefer this over inline strings so the
+   *  coverage metric and degraded-mode short-circuit both work. */
+  fallbackKey?: string;
+  /** Extra context passed to the registered fallback resolver. */
+  fallbackContext?: FallbackContext;
   /** Re-encode structured JSON blocks (```json fences, <context>) in the
    *  system/user messages as TOON when that measurably shrinks the payload.
    *  Lossless and length-gated — never corrupts a prompt. */
   toonify?: boolean;
+  /** Try the local Ollama tier FIRST (free, on-device) before any paid
+   *  provider. Falls back to the paid chain when local is unreachable.
+   *  Local-only functions (hiccup reporting, schedule notes, chat polish)
+   *  pass this to keep token spend near zero. */
+  localFirst?: boolean;
 }
 
 const PROVIDER_URLS: Record<LLMProvider, string> = {
@@ -86,7 +105,9 @@ const DEFAULT_MODELS: Record<LLMProvider, string> = {
   anthropic: 'claude-sonnet-4-5',
   qwen: 'qwen-plus',
   litellm: 'gpt-4o-mini',
-  ollama: 'llama3.2:1b',
+  // Local Ollama tier — qwen3:0.6b is the installed fast model (tool-calling
+  // capable, ~34 tok/s on this CPU vs ~7 for the 4.6B workhorse).
+  ollama: process.env.OLLAMA_MODEL ?? 'qwen3:0.6b',
 };
 
 /** Resolution order when no explicit provider is requested. */
@@ -115,14 +136,17 @@ export function hasKey(provider: LLMProvider): boolean {
 /**
  * Build the provider order for a call: the preferred provider first (if its
  * key is configured), then every configured provider in fallback order.
+ * With localFirst, the local Ollama tier is promoted ahead of the paid chain.
  */
-export function buildProviderOrder(preferred?: LLMProvider): LLMProvider[] {
+export function buildProviderOrder(preferred?: LLMProvider, localFirst = false): LLMProvider[] {
   const order: LLMProvider[] = [];
   const add = (p: LLMProvider) => {
     if (!order.includes(p) && hasKey(p)) order.push(p);
   };
   if (preferred) add(preferred);
+  if (localFirst) add('ollama');
   for (const p of FALLBACK_ORDER) add(p);
+  if (localFirst && !order.includes('ollama') && hasKey('ollama')) order.unshift('ollama');
   return order;
 }
 
@@ -236,7 +260,13 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
 
   const apiKey = getApiKey(provider);
   const apiUrl = PROVIDER_URLS[provider];
-  const model = options.model ?? (options.reasoning && provider === 'deepseek' ? 'deepseek-reasoner' : DEFAULT_MODELS[provider]);
+  const model =
+    options.model ??
+    (provider === 'ollama' && options.images?.length
+      ? process.env.OLLAMA_VISION_MODEL ?? 'hf.co/unsloth/gemma-4-E2B-it-GGUF:UD-IQ2_M'
+      : options.reasoning && provider === 'deepseek'
+        ? 'deepseek-reasoner'
+        : DEFAULT_MODELS[provider]);
   const maxTokens = options.maxTokens ?? 1024;
   const temperature = options.temperature ?? 0.2;
   // Reasoning calls get a much longer default timeout; the local Ollama tier
@@ -272,6 +302,34 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
         }),
         signal: controller.signal,
       });
+    } else if (provider === 'ollama' && options.images?.length) {
+      // Ollama's native /api/chat (not OpenAI-compat) reliably accepts base64
+      // images for GGUF vision models. Build the native payload directly.
+      const base = apiUrl.replace(/\/v1\/chat\/completions$/, '');
+      const nativeUrl = `${base}/api/chat`;
+      response = await fetch(nativeUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: options.system },
+            { role: 'user', content: options.userMessage, images: options.images.map((i) => i.dataB64) },
+          ],
+          stream: false,
+          ...(options.responseFormat ? { format: 'json' } : {}),
+          options: { temperature: temperature ?? 0.2, num_predict: maxTokens },
+        }),
+        signal: controller.signal,
+      });
+      const nativeData = (await response.json()) as { message?: { content?: string } };
+      if (!response.ok) {
+        const errText = JSON.stringify(nativeData).slice(0, 200);
+        throw new Error(`Ollama API error ${response.status}: ${errText}`);
+      }
+      const content = nativeData.message?.content ?? '';
+      if (!content) throw new Error('Empty response from Ollama');
+      return content;
     } else {
       const content: unknown = options.images?.length
         ? [
@@ -388,10 +446,14 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
 
   // Vision inputs can only be served by image-capable providers — put them
   // first so OCR-style calls don't waste budget on text-only endpoints.
+  // With localFirst, the local gemma-vision tier leads before any paid model.
   const VISION_FIRST: LLMProvider[] = ['anthropic', 'gemini', 'openai'];
-  const order = options.images?.length
-    ? VISION_FIRST.filter(hasKey).concat(buildProviderOrder(options.provider))
-    : buildProviderOrder(options.provider);
+  const localFirst = options.localFirst === true;
+  const order: LLMProvider[] = options.images?.length
+    ? (localFirst
+        ? (['ollama' as LLMProvider]).concat(VISION_FIRST.filter(hasKey)).concat(buildProviderOrder(options.provider, false))
+        : VISION_FIRST.filter(hasKey).concat(buildProviderOrder(options.provider, false)))
+    : buildProviderOrder(options.provider, localFirst);
   const deduped = [...new Set(order)];
   if (order.length === 0) {
     throw new Error(
@@ -407,13 +469,21 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
     const { canCallFleet } = await import('./workflow-budget');
     const fleetGate = canCallFleet(budget);
     if (!fleetGate.ok) {
-      if (options.deterministicFallback !== undefined) {
-        console.warn(`[llm] ${fleetGate.reason} — returning deterministic fallback.`);
-        return options.deterministicFallback;
-      }
+      const fb = await resolveFallbackValue(options, fleetGate.reason);
+      if (fb !== null) return fb;
       throw new Error(fleetGate.reason);
     }
   }
+
+  // Degraded-mode short-circuit: the circuit breaker has flipped, so skip the
+  // slow provider chain entirely and go straight to the deterministic output.
+  // Only when a fallbackKey is declared — bare `deterministicFallback` is too
+  // cheap to short-circuit for (it costs one check).
+  if (options.fallbackKey && isDegraded()) {
+    const fb = await resolveFallbackValue(options, 'degraded mode active');
+    if (fb !== null) return fb;
+  }
+
   for (const provider of deduped) {
     try {
       // Budget gate: skip a provider whose daily token budget is exhausted or
@@ -434,6 +504,7 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
           : { ...effective, model: undefined };
       const text = await callProvider(provider, perProvider);
       consumeTokens(provider, budget + 512); // approximate cost
+      recordChainSuccess();
       return text;
     } catch (err) {
       lastErr = err;
@@ -442,15 +513,43 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
       );
     }
   }
-  // Deterministic fallback (opt-in): a total LLM outage returns a fixed
-  // templated value so the pipeline keeps moving instead of getting stuck.
+  // Deterministic fallback: a total LLM outage returns a fixed templated value
+  // (from the registry, or the inline string) so the pipeline keeps moving
+  // instead of getting stuck. Failure is also fed to the circuit breaker.
+  const fb = await resolveFallbackValue(options, lastErr);
+  if (fb !== null) return fb;
+  recordChainFailure();
+  throw lastErr ?? new Error('All LLM providers failed');
+}
+
+/**
+ * Resolve the deterministic fallback for a call. Order: inline
+ * `deterministicFallback` (explicit wins), then the registry `fallbackKey`
+ * (which may escalate to the deterministic brain when degraded).
+ * Returns null when neither is configured.
+ */
+async function resolveFallbackValue(options: LLMCallOptions, reason: unknown): Promise<string | null> {
   if (options.deterministicFallback !== undefined) {
     console.warn(
-      `[llm] all providers failed — returning deterministic fallback. Last error: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
+      `[llm] all providers failed — returning deterministic fallback. Reason: ${reason instanceof Error ? reason.message : String(reason)}`,
     );
     return options.deterministicFallback;
   }
-  throw lastErr ?? new Error('All LLM providers failed');
+  if (options.fallbackKey) {
+    const ctx: FallbackContext = {
+      userMessage: options.userMessage,
+      system: options.system,
+      ...options.fallbackContext,
+    };
+    const fb = await resolveFallbackAsync(options.fallbackKey, ctx);
+    if (fb !== null) {
+      console.warn(
+        `[llm] all providers failed — returning registry fallback "${options.fallbackKey}". Reason: ${reason instanceof Error ? reason.message : String(reason)}`,
+      );
+      return fb;
+    }
+  }
+  return null;
 }
 
 /**
@@ -472,6 +571,10 @@ export async function callLocalModel(options: {
   compressRag?: boolean;
   /** Deterministic fallback when even the paid chain is unavailable. */
   deterministicFallback?: string;
+  /** Registry key for a deterministic fallback (see ./fallbacks). */
+  fallbackKey?: string;
+  /** Extra context passed to the registered fallback resolver. */
+  fallbackContext?: FallbackContext;
 }): Promise<string> {
   // Lightweight RAG: pull recent lessons + important memory to augment the
   // small model's context (it can't recall system history itself).

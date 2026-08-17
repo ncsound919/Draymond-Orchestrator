@@ -129,6 +129,7 @@ export async function callDeepLLM(opts: {
     maxTokens: opts.maxTokens ?? 4096,
     timeoutMs: opts.timeoutMs ?? 120_000,
     responseFormat: { type: 'json_object' },
+    fallbackKey: 'cognition.callDeepLLM',
   });
 }
 
@@ -184,6 +185,7 @@ export async function deepenLoop(
       userMessage: prompt,
       maxTokens: 2048,
       responseFormat: { type: 'json_object' },
+      fallbackKey: 'cognition.deepenLoop',
     });
     try {
       lastParsed = parseArtifact(last);

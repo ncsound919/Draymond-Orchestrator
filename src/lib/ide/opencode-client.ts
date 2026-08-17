@@ -21,6 +21,14 @@ const DEFAULT_MODEL = process.env.OPENCODE_MODEL ?? 'opencode/deepseek-v4-flash'
 const SERVER_PASSWORD = process.env.OPENCODE_SERVER_PASSWORD ?? 'ocpass';
 const SERVE_URL = `http://127.0.0.1:${SERVE_PORT}`;
 
+// LiteLLM proxy (localhost:4100) — routes to the funded OpenCode Go tier
+// (zen/go/v1 → deepseek-v4-flash), which the fleet probes as the healthy
+// fallback when the free tier (zen/v1) is rate-limited. The opencode serve
+// process wedges on the free model, so codegen prefers this gateway first.
+const LITELLM_URL = process.env.LITELLM_BASE_URL ?? 'http://localhost:4100/v1/chat/completions';
+const LITELLM_MODEL = process.env.OPENCODE_LITELLM_MODEL ?? 'opencode';
+const LITELLM_KEY = process.env.LITELLM_API_KEY ?? process.env.LITELLM_MASTER_KEY ?? 'sk-1234';
+
 let serverEnsured = false;
 
 function authHeader(): string {
@@ -130,7 +138,8 @@ export function extractCodeBlocks(content: string, language = 'ts'): string[] {
 
 /**
  * Run opencode headless to produce code for a prompt in a workspace.
- * Never throws.
+ * Prefers the LiteLLM gateway (Go tier — funded, reliable) and falls back to
+ * the local opencode serve. Never throws.
  */
 export async function runOpencodeCodegen(input: {
   prompt: string;
@@ -141,6 +150,43 @@ export async function runOpencodeCodegen(input: {
   const started = Date.now();
   const model = input.model ?? DEFAULT_MODEL;
   const timeout = input.timeoutMs ?? 180_000;
+
+  // ── 1. LiteLLM gateway first (Go tier, healthy when free tier is 429) ────
+  try {
+    const res = await fetch(LITELLM_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${LITELLM_KEY}`,
+      },
+      body: JSON.stringify({
+        model: LITELLM_MODEL,
+        messages: [
+          { role: 'system', content: 'You are the Draymond coding agent. Produce concise, correct output for the task.' },
+          { role: 'user', content: input.prompt },
+        ],
+        max_tokens: 4096,
+        temperature: 0.2,
+      }),
+      signal: AbortSignal.timeout(timeout),
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+      const content = data.choices?.[0]?.message?.content?.trim() ?? '';
+      if (content) {
+        return {
+          success: true,
+          content,
+          duration_ms: Date.now() - started,
+          model: `${LITELLM_MODEL} (litellm:go)`,
+        };
+      }
+    }
+  } catch {
+    /* fall through to the local serve */
+  }
+
+  // ── 2. Local opencode serve (fallback) ───────────────────────────────────
   try {
     await ensureServer();
     ensureGitProject(input.workspace);

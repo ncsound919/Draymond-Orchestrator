@@ -677,6 +677,12 @@ export type RouterConfig = {
   timeout_ms: number;
   /** Try the cheap local Ollama model first (opt-in; needs a capable model). */
   use_local_model?: boolean;
+  /** Ask the deterministic brain's /reason BEFORE the paid LLM and skip the
+   *  LLM when the brain classifies with confidence >= brain_pre_route_confidence.
+   *  Only active when BRAIN_URL is configured. Default true. */
+  use_brain_pre_route?: boolean;
+  /** Confidence the brain /reason must reach to skip the paid LLM call. */
+  brain_pre_route_confidence?: number;
 };
 
 // ============================================================================

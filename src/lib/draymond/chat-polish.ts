@@ -94,7 +94,7 @@ async function llmSummarize(jsonText: string): Promise<string | null> {
       maxTokens: 300,
       temperature: 0.4,
       timeoutMs: 20_000,
-      deterministicFallback: '',
+      fallbackKey: 'chat-polish.llmSummarize',
     });
     const trimmed = String(reply ?? '').trim();
     return trimmed ? trimmed : null;
