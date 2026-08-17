@@ -28,6 +28,7 @@ const ALLOWED_PREFIXES = [
   '/api/command-center/crm',
   '/api/command-center/seo',
   '/api/command-center/deploy',
+  '/api/command-center/science',
   '/api/monitors',
   '/api/monitors/check',
   '/api/jobs',
