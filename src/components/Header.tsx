@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
 const navItems = [
+  { name: 'Command Center', href: '/command-center' },
   { name: 'Chat', href: '/chat' },
   { name: 'IDE', href: '/ide' },
   { name: 'Math', href: '/math' },

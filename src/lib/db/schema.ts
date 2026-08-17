@@ -136,6 +136,14 @@ export const COLUMN_MAPS: Record<string, ColumnMap> = {
     json: ['pack'],
     bool: [],
   },
+  command_leads: {
+    json: ['tags', 'notes', 'metadata'],
+    bool: [],
+  },
+  command_seo_tasks: {
+    json: ['metadata'],
+    bool: ['is_done'],
+  },
 };
 
 /** Names of the draymond tables that carry an auto-managed `id` (uuid) column. */
@@ -165,6 +173,8 @@ const TABLES_WITH_ID = new Set([
   'draymond_benchmarks',
   'draymond_upgrade_queue',
   'purchases',
+  'command_leads',
+  'command_seo_tasks',
 ]);
 
 export function tableHasIdColumn(table: string): boolean {
@@ -788,5 +798,48 @@ CREATE TABLE IF NOT EXISTS science_experiments (
 );
 CREATE INDEX IF NOT EXISTS idx_science_experiments_goal ON science_experiments(goal_id);
 CREATE INDEX IF NOT EXISTS idx_science_experiments_status ON science_experiments(status);
+
+-- ============================================================================
+-- Command Center — built-in CRM + SEO task feed
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS command_leads (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT,
+  phone TEXT,
+  company TEXT,
+  stage TEXT NOT NULL DEFAULT 'new',
+  value_cents INTEGER NOT NULL DEFAULT 0,
+  owner TEXT,
+  source TEXT,
+  notes TEXT NOT NULL DEFAULT '[]',
+  tags TEXT NOT NULL DEFAULT '[]',
+  metadata TEXT NOT NULL DEFAULT '{}',
+  next_follow_up_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_command_leads_stage ON command_leads(stage);
+CREATE INDEX IF NOT EXISTS idx_command_leads_owner ON command_leads(owner);
+CREATE INDEX IF NOT EXISTS idx_command_leads_created ON command_leads(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS command_seo_tasks (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  url TEXT,
+  priority TEXT NOT NULL DEFAULT 'medium',
+  status TEXT NOT NULL DEFAULT 'todo',
+  owner TEXT,
+  is_done INTEGER NOT NULL DEFAULT 0,
+  metadata TEXT NOT NULL DEFAULT '{}',
+  due_at TEXT,
+  completed_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_command_seo_tasks_status ON command_seo_tasks(status);
+CREATE INDEX IF NOT EXISTS idx_command_seo_tasks_priority ON command_seo_tasks(priority);
 `;
 
