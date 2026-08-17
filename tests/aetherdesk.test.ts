@@ -7,9 +7,9 @@ import {
 } from '../src/lib/draymond/aetherdesk';
 
 describe('AETHERDESK_OPERATIONS catalog', () => {
-  it('defines all 16 catalog operations', () => {
+  it('defines all 17 catalog operations', () => {
     expect(Object.keys(AETHERDESK_OPERATIONS).sort()).toEqual([
-      'call_action', 'create_agent', 'create_campaign', 'delete_agent',
+      'call_action', 'clone_voice', 'create_agent', 'create_campaign', 'delete_agent',
       'get_agent', 'get_call', 'get_campaign', 'health',
       'launch_campaign', 'list_agents', 'list_calls', 'list_campaigns',
       'list_leads', 'start_call', 'update_agent',
