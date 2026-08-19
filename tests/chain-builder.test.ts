@@ -46,6 +46,10 @@ const { mockCallLLM, mockCallLocalModel, mockExecuteChain, mockAdmin, mockClient
 });
 
 vi.mock('../src/lib/draymond/llm', () => ({ callLLM: mockCallLLM, callLocalModel: mockCallLocalModel }));
+vi.mock('../src/lib/draymond/decomposer', () => ({
+  decomposeGoalToBlueprint: vi.fn(() => null),
+  decomposeGoalToIdeSteps: vi.fn(() => null),
+}));
 vi.mock('../src/lib/draymond/chains', () => ({ executeChain: mockExecuteChain }));
 vi.mock('../src/lib/draymond/client', () => ({
   createDraymondAdminClient: vi.fn(() => mockAdmin),

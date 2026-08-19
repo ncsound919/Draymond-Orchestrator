@@ -1,0 +1,224 @@
+[
+  {
+    "taskId": "aetherdesk-intent",
+    "kind": "json",
+    "provider": "local",
+    "trial": 1,
+    "output": "{\n  \"intent\": \"billing\",\n  \"confidence\": 0.0,\n  \"reason\": \"billing issue\"\n}",
+    "ms": 6930,
+    "validJson": true,
+    "hasExpect": true
+  },
+  {
+    "taskId": "aetherdesk-intent",
+    "kind": "json",
+    "provider": "local",
+    "trial": 2,
+    "output": "{\n  \"intent\": \"billing\",\n  \"confidence\": 0.0,\n  \"reason\": \"The caller is pointing out an",
+    "ms": 12508,
+    "validJson": false,
+    "hasExpect": true
+  },
+  {
+    "taskId": "aetherdesk-intent",
+    "kind": "json",
+    "provider": "local",
+    "trial": 3,
+    "output": "{\"intent\":\"billing\",\"confidence\":0.95,\"reason\":\"Caller is asking about an invoice discrepancy, which is a billing issue.\"}",
+    "ms": 7715,
+    "validJson": true,
+    "hasExpect": true
+  },
+  {
+    "taskId": "aetherdesk-intent",
+    "kind": "json",
+    "provider": "paid",
+    "output": "{\"intent\":\"billing\",\"confidence\":0.95,\"reason\":\"Caller is questioning an invoice amount and plan, indicating billing issue.\"}",
+    "ms": 1607,
+    "validJson": true,
+    "hasExpect": true
+  },
+  {
+    "taskId": "router-classify",
+    "kind": "json",
+    "provider": "local",
+    "trial": 1,
+    "output": "{\"action\":\"system_status\",\"entity\":null}",
+    "ms": 7690,
+    "validJson": true,
+    "hasExpect": true
+  },
+  {
+    "taskId": "router-classify",
+    "kind": "json",
+    "provider": "local",
+    "trial": 2,
+    "output": "{\"action\":\"system_status\",\"entity\":\"servers\"}",
+    "ms": 5691,
+    "validJson": true,
+    "hasExpect": true
+  },
+  {
+    "taskId": "router-classify",
+    "kind": "json",
+    "provider": "local",
+    "trial": 3,
+    "output": "{\"action\":\"system_status\",\"entity\":null}",
+    "ms": 7058,
+    "validJson": true,
+    "hasExpect": true
+  },
+  {
+    "taskId": "router-classify",
+    "kind": "json",
+    "provider": "paid",
+    "output": "{\"action\":\"system_status\",\"entity\":null}",
+    "ms": 1101,
+    "validJson": true,
+    "hasExpect": true
+  },
+  {
+    "taskId": "prompt-injection",
+    "kind": "json",
+    "provider": "local",
+    "trial": 1,
+    "output": "{\"is_injection\":true,\"confidence\":0.99,\"technique\":\"direct_instruction_override\"}",
+    "ms": 7411,
+    "validJson": true,
+    "hasExpect": true
+  },
+  {
+    "taskId": "prompt-injection",
+    "kind": "json",
+    "provider": "local",
+    "trial": 2,
+    "output": "{\"is_injection\":true,\"confidence\":0.99,\"technique\":\"direct_instruction_override\"}",
+    "ms": 7062,
+    "validJson": true,
+    "hasExpect": true
+  },
+  {
+    "taskId": "prompt-injection",
+    "kind": "json",
+    "provider": "local",
+    "trial": 3,
+    "output": "{\"is_injection\":true,\"confidence\":0.99,\"technique\":\"direct_instruction_override\"}",
+    "ms": 7295,
+    "validJson": true,
+    "hasExpect": true
+  },
+  {
+    "taskId": "prompt-injection",
+    "kind": "json",
+    "provider": "paid",
+    "output": "{\"is_injection\":true,\"confidence\":1.0,\"technique\":\"direct_instruction_override\"}",
+    "ms": 993,
+    "validJson": true,
+    "hasExpect": true
+  },
+  {
+    "taskId": "summarize",
+    "kind": "prose",
+    "provider": "local",
+    "trial": 1,
+    "output": "The conversation began with the user requesting password reset. The bot guided them to the account security page and provided the \"reset\" option. Subsequently, the user confirmed their email was incorrect, prompting the bot to use the \"forgot-password\" link. The user thanked the process.",
+    "ms": 6973,
+    "hasExpect": true
+  },
+  {
+    "taskId": "summarize",
+    "kind": "prose",
+    "provider": "local",
+    "trial": 2,
+    "output": "The conversation began with the user requesting password reset. The bot guided them to the account security page and provided the \"reset\" option. The user confirmed the email was incorrect, and the bot offered the \"forgot-password\" link. The user thanked the bot.",
+    "ms": 6604,
+    "hasExpect": true
+  },
+  {
+    "taskId": "summarize",
+    "kind": "prose",
+    "provider": "local",
+    "trial": 3,
+    "output": "The bot guides the user to the account security page and provides the reset link, then directs them to use the forgot-password option when their email is incorrect. The user confirms thanks.",
+    "ms": 6361,
+    "hasExpect": true
+  },
+  {
+    "taskId": "summarize",
+    "kind": "prose",
+    "provider": "paid",
+    "output": "The user asked how to reset their password, and the bot directed them to the account security page and then to the forgot-password link after an email issue. The user acknowledged the help with thanks.",
+    "ms": 2061,
+    "hasExpect": true
+  },
+  {
+    "taskId": "social-caption",
+    "kind": "prose",
+    "provider": "local",
+    "trial": 1,
+    "output": "Step into savings! Turn steps into savings points. #FitnessSavings #StepUp",
+    "ms": 7234,
+    "hasExpect": true
+  },
+  {
+    "taskId": "social-caption",
+    "kind": "prose",
+    "provider": "local",
+    "trial": 2,
+    "output": "Turn your steps into savings! 🚶‍♂️💰 Every stride earns points toward real rewards. Move more, save more—your wallet will thank you. #FitnessRewards #StepUp #SaveWithSteps",
+    "ms": 9900,
+    "hasExpect": true
+  },
+  {
+    "taskId": "social-caption",
+    "kind": "prose",
+    "provider": "local",
+    "trial": 3,
+    "output": "Turn your steps into savings! 🚶‍♂️💰 Every stride earns points toward real rewards. Move more, save more—your wallet will thank you. #FitnessRewards #StepUp #HealthyWealthy",
+    "ms": 9723,
+    "hasExpect": true
+  },
+  {
+    "taskId": "social-caption",
+    "kind": "prose",
+    "provider": "paid",
+    "output": "Turn your steps into serious savings! 🚶‍♂️💰 Every stride earns points, every point adds up. Get fit and fund your future. #FitnessRewards #StepToSave #HealthyWealthy",
+    "ms": 1823,
+    "hasExpect": true
+  },
+  {
+    "taskId": "plan-json",
+    "kind": "json",
+    "provider": "local",
+    "trial": 1,
+    "output": "{\"tasks\":[{\"kind\":\"write\",\"agent\":\"marketing team\",\"prompt\":\"Outline the features and benefits of the AI call-center product, including how it enhances customer service and reduces response time.\"}]}",
+    "ms": 8605,
+    "validJson": true
+  },
+  {
+    "taskId": "plan-json",
+    "kind": "json",
+    "provider": "local",
+    "trial": 2,
+    "output": "{\"tasks\":[{\"kind\":\"research|write|code\",\"agent\":\"<agent>\",\"prompt\":\"Research the AI call-center product's features, benefits, and target audience to create a compelling marketing blog post.\"}]}",
+    "ms": 26040,
+    "validJson": true
+  },
+  {
+    "taskId": "plan-json",
+    "kind": "json",
+    "provider": "local",
+    "trial": 3,
+    "output": "{\"tasks\":[{\"kind\":\"write\",\"agent\":\"marketing_team\",\"prompt\":\"Write a marketing blog post about our new AI call-center product with a focus on its features and benefits.\"}]}",
+    "ms": 10398,
+    "validJson": true
+  },
+  {
+    "taskId": "plan-json",
+    "kind": "json",
+    "provider": "paid",
+    "output": "{\n  \"tasks\": [\n    {\n      \"kind\": \"research\",\n      \"agent\": \"research_agent\",\n      \"prompt\": \"Gather key features, benefits, and differentiators of our new AI call-center product. Also collect customer pain points and market trends for AI in customer service. Provide a summary with bullet points.\"\n    },\n    {\n      \"kind\": \"write\",\n      \"agent\": \"writer_agent\",\n      \"prompt\": \"Using the research summary, write a compelling marketing blog post (800-1000 words) with a catchy headline, engaging introduction, clear value propositions, and a strong call-to-action. Tone should be professional yet approachable.\"\n    },\n    {\n      \"kind\": \"code\",\n      \"agent\": \"code_agent\",\n      \"prompt\": \"Convert the blog post into HTML format with proper semantic tags (h1, h2, p, ul, etc.) and inline CSS for a clean, modern look. Ensure it is ready to be pasted into a CMS.\"\n    }\n  ]\n}",
+    "ms": 2981,
+    "validJson": true
+  }
+]

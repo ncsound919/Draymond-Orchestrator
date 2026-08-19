@@ -17,6 +17,7 @@
 import { createDraymondAdminClient, createDraymondClient } from './client';
 import { logEvent } from './index';
 import { callLLM, callLocalModel } from './llm';
+import { decomposeGoalToBlueprint } from './decomposer';
 import { executeChain } from './chains';
 import type {
   ChainBlueprintStep,
@@ -175,6 +176,22 @@ async function generateBlueprint(
     } catch {
       // bookbridge offline — proceed ungrounded
     }
+  }
+
+  // Tier 0 — deterministic chain blueprint (zero-LLM) referencing real catalog
+  // entities by hint-matching. Rejected downstream when no entity resolves, in
+  // which case we fall through to local/paid.
+  try {
+    const deterministic = decomposeGoalToBlueprint(request.description, catalog);
+    if (deterministic) {
+      try {
+        return parseBlueprintResponse(deterministic, catalog);
+      } catch {
+        console.warn('[chain-builder] deterministic blueprint rejected — using local/paid.');
+      }
+    }
+  } catch {
+    // deterministic unavailable — fall through
   }
 
   // Try the cheap local Ollama tier first; only accept it if it parses into a

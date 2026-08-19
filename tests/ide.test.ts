@@ -25,6 +25,11 @@ vi.mock('../src/lib/draymond/llm', () => ({
   truncateToTokens: vi.fn((t: string) => t),
 }));
 
+vi.mock('../src/lib/draymond/decomposer', () => ({
+  decomposeGoalToIdeSteps: vi.fn(() => null),
+  decomposeGoalToBlueprint: vi.fn(() => null),
+}));
+
 vi.mock('../src/lib/uplift', () => ({
   dispatchTask: vi.fn(async () => {
     throw new Error('uplift offline in tests');

@@ -49,6 +49,7 @@ import { TOOL_PORTS } from '../draymond/ports';
 import { resolveCodingTools, codingStackSummary } from '../draymond/coding-stack';
 import { classifyFailure } from '../draymond/repair-team';
 import { callLLM, callLocalModel } from '../draymond/llm';
+import { decomposeGoalToIdeSteps } from '../draymond/decomposer';
 
 const MAX_EVENTS = 400;
 const MAX_CHAT = 120;
@@ -244,7 +245,26 @@ async function decomposeToSteps(goal: string, kind: GoalKind, crew: IdeCrew): Pr
     // valid kind + agent (llama3.2:1b can emit non-standard kinds). Otherwise
     // fall back to the paid provider, then the deterministic plan.
     let content: string | null = null;
+    // Tier 0 — deterministic decomposer (zero-LLM). Emits valid kinds/agents by
+    // construction, so it can't produce the non-standard output the 0.6B model
+    // sometimes does. Falls through to local/paid when unusable.
     try {
+      const deterministic = decomposeGoalToIdeSteps(goal, ALLOWED_KINDS, ALLOWED_AGENTS);
+      if (deterministic) {
+        const detParsed = JSON.parse(deterministic) as { steps?: Array<{ kind?: string; agent?: string }> };
+        const stepsOk = Array.isArray(detParsed.steps) &&
+          detParsed.steps.length >= 2 &&
+          detParsed.steps.every((s) => ALLOWED_KINDS.has(s.kind as IdeStepKind) && ALLOWED_AGENTS.has(s.agent as IdeStepAgent));
+        if (stepsOk) content = deterministic;
+      }
+    } catch {
+      // deterministic unavailable — fall through
+    }
+
+    // Tier 1 — cheap local model; only accept it if every step uses a valid
+    // kind + agent (llama3.2:1b can emit non-standard kinds). Otherwise fall
+    // back to the paid provider, then the deterministic plan.
+    if (!content) try {
       const local = await callLocalModel({ system: planSystem, userMessage: planUser, maxTokens: 1400 });
       const localParsed = JSON.parse(local.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()) as {
         steps?: Array<{ kind?: string; agent?: string }>;

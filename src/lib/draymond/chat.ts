@@ -580,6 +580,7 @@ async function querySystemStatus(
       userMessage: `Question: ${task}\n\n${contextBlock ? `${contextBlock}\n\n` : ''}<system_snapshot>\n${snapshot}\n</system_snapshot>`,
       maxTokens: 2000,
       temperature: 0.2,
+      localFirst: true,
       fallbackKey: 'chat.querySystemStatus',
       fallbackContext: { snapshot },
     });

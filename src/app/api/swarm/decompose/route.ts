@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { appendAuditLog } from '@/lib/audit';
 import { authorizeRequest, parseJsonBody } from '@/lib/draymond/api-auth';
 import { callLLM, callLocalModel } from '@/lib/draymond/llm';
+import { decomposeGoal } from '@/lib/draymond/decomposer';
 
 const VALID_AGENTS = new Set([
   'megacode', 'uplift', 'rex', 'maya', 'finn', 'cleo', 'lexa',
@@ -141,11 +142,26 @@ export async function POST(request: NextRequest) {
     ].join('\n');
 
     let content: string;
-    // Try the cheap local Ollama tier first; accept it only if it parses into a
+    // Tier 0 — deterministic goal decomposer (zero-LLM). Always valid JSON, free,
+    // goal-aware. Replaces the paid LLM decomposition for the common cases.
+    try {
+      const deterministic = decomposeGoal(goal, AGENT_ROLES);
+      const deterministicParsed = deterministic ? parseLLMResponse(deterministic) : null;
+      if (deterministicParsed && deterministicParsed.tasks.length > 0) {
+        content = deterministic ?? '';
+      } else {
+        content = '';
+      }
+    } catch (err) {
+      console.warn(`[swarm] deterministic decomposition failed — falling back. ${err instanceof Error ? err.message : String(err)}`);
+      content = '';
+    }
+
+    // Tier 1 — cheap local Ollama tier; accept it only if it parses into a
     // valid decomposition (valid JSON + a non-empty tasks array). The local
     // model often produces sparse/invalid plans, so fall back to paid when the
     // validation gate rejects it.
-    try {
+    if (!content) try {
       const local = await callLocalModel({
         system: systemPrompt,
         userMessage: `Goal: ${goal}\n<context>${JSON.stringify(context)}</context>`,

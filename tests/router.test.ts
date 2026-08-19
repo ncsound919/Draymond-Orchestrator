@@ -70,7 +70,7 @@ describe('router opencode-free provider', () => {
     expect(getRouterConfig().model).toBe('deepseek-v4-flash-free');
   });
 
-  it('calls the OpenCode Zen free endpoint with Bearer auth', async () => {
+  it('routes via the local Ollama tier first by default (local-first routing)', async () => {
     process.env.OPENCODE_API_KEY = 'test-key';
     fetchMock.mockResolvedValue(
       new Response(
@@ -84,7 +84,7 @@ describe('router opencode-free provider', () => {
                   entity_slug: 'aetherdesk',
                   action: 'list_agents',
                   input: {},
-                  reasoning: 'call center task',
+                  reasoning: 'local route',
                   alternatives: [],
                 }),
               },
@@ -100,14 +100,9 @@ describe('router opencode-free provider', () => {
 
     expect(result.entity_slug).toBe('aetherdesk');
     expect(result.action).toBe('list_agents');
-
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(String(url)).toBe('https://opencode.ai/zen/v1/chat/completions');
-    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer test-key');
-    const body = JSON.parse(init.body as string);
-    expect(body.model).toBe('deepseek-v4-flash-free');
-    // structured output (the outlines analog) for deterministic intent JSON
-    expect(body.response_format).toEqual({ type: 'json_object' });
+    // Local-first: only the local Ollama endpoint is hit (no paid call).
+    expect(fetchMock.mock.calls.length).toBe(1);
+    expect(String(fetchMock.mock.calls[0][0])).toContain('11434');
   });
 
   it('falls back to intent unknown on non-JSON response (tolerant parser)', async () => {
@@ -223,7 +218,7 @@ describe('router deterministic brain pre-route', () => {
     expect(String(fetchMock.mock.calls[0][0])).toContain('/reason');
   });
 
-  it('falls through to the paid LLM when brain confidence is too low', async () => {
+  it('falls through to the local tier when brain confidence is too low', async () => {
     process.env.BRAIN_URL = 'http://localhost:3210';
     process.env.OPENCODE_API_KEY = 'test-key';
 
@@ -245,7 +240,7 @@ describe('router deterministic brain pre-route', () => {
                   entity_slug: 'aetherdesk',
                   action: 'list_agents',
                   input: {},
-                  reasoning: 'low brain conf so used LLM',
+                  reasoning: 'low brain conf so used local',
                   alternatives: [],
                 }),
               },
@@ -260,10 +255,10 @@ describe('router deterministic brain pre-route', () => {
     const result = await routeTask('list agents');
     expect(result.entity_slug).toBe('aetherdesk');
     expect(result.action).toBe('list_agents');
-    // brain /reason ran (1st call), then the paid LLM ran (2nd call).
+    // brain /reason ran (1st call), then the local tier ran (2nd call).
     expect(fetchMock.mock.calls.length).toBe(2);
     expect(String(fetchMock.mock.calls[0][0])).toContain('/reason');
-    expect(String(fetchMock.mock.calls[1][0])).toContain('opencode.ai');
+    expect(String(fetchMock.mock.calls[1][0])).toContain('11434');
   });
 
   it('is a no-op when BRAIN_URL is unset (offline installs unchanged)', async () => {
@@ -294,12 +289,12 @@ describe('router deterministic brain pre-route', () => {
 
     const result = await routeTask('list agents');
     expect(result.entity_slug).toBe('aetherdesk');
-    // No /reason call happened at all — straight to the paid LLM.
+    // No /reason call at all — straight to the local tier.
     expect(fetchMock.mock.calls.length).toBe(1);
-    expect(String(fetchMock.mock.calls[0][0])).toContain('opencode.ai');
+    expect(String(fetchMock.mock.calls[0][0])).toContain('11434');
   });
 
-  it('falls through when the brain is unreachable (fail-soft)', async () => {
+  it('falls through to the local tier when the brain is unreachable (fail-soft)', async () => {
     process.env.BRAIN_URL = 'http://localhost:3210';
     process.env.OPENCODE_API_KEY = 'test-key';
 
@@ -332,6 +327,6 @@ describe('router deterministic brain pre-route', () => {
 
     const result = await routeTask('list agents');
     expect(result.entity_slug).toBe('aetherdesk');
-    expect(fetchMock.mock.calls.length).toBe(2); // /reason (failed) + LLM
+    expect(fetchMock.mock.calls.length).toBe(2); // /reason (failed) + local
   });
 });

@@ -351,10 +351,11 @@ export async function routeTask(
   // provider chain fails entirely (e.g. all keys out of balance), fall back to
   // the local model so routing still works.
   const usedLocal = false;
-  if (_config.use_local_model) {
-    const localResult = await tryLocalRoute(task, startMs, snapshot, userMessage);
-    if (localResult) return localResult;
-  }
+  // Local is the DEFAULT tier for routing — grading showed qwen3:0.6b
+  // classifies intent/entity reliably (3/3) at near-zero cost. The paid chain
+  // stays as the fallback when the local route is rejected/unavailable.
+  const localResult = await tryLocalRoute(task, startMs, snapshot, userMessage);
+  if (localResult) return localResult;
 
   try {
     const raw = await callLLM({
@@ -434,6 +435,7 @@ async function tryLocalRoute(
       userMessage,
       maxTokens: 512,
       responseFormat: { type: 'json_object' },
+      noRag: true,
       fallbackKey: 'router.tryLocalRoute',
       fallbackContext: { userMessage: task },
     });

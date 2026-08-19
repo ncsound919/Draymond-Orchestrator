@@ -2,8 +2,11 @@
 // DRAYMOND — Shared LLM Call Helper (provider chain with fallback)
 // ============================================================================
 // Provider-agnostic LLM calls. Primary is DeepSeek V4 Flash (0731) served by
-// OpenCode's free tier; if it fails (rate limit, outage, balance), the chain
-// falls back to OpenCode Go (paid), then DeepSeek direct, then Gemini.
+// OpenCode Go (paid); if it fails (rate limit, outage, balance), the chain
+// falls back to DeepSeek direct (api.deepseek.com, deepseek-chat), then the
+// local Ollama tier, then the deterministic fallback. gpt/anthropic/gemini
+// are not in the default chain (not used enough); they remain available when
+// explicitly requested.
 // All OpenAI-compatible providers share one request shape; Anthropic uses the
 // Messages API; Gemini uses the Google Generative Language format.
 // ============================================================================
@@ -99,7 +102,10 @@ const PROVIDER_ENV: Record<LLMProvider, string> = {
 const DEFAULT_MODELS: Record<LLMProvider, string> = {
   'opencode-free': 'deepseek-v4-flash-free',
   opencode: 'deepseek-v4-flash',
-  deepseek: 'deepseek-v4-flash',
+  // Direct api.deepseek.com provider — `deepseek-v4-flash` is an opencode-only
+  // model name; the real DeepSeek API serves `deepseek-chat` / `deepseek-reasoner`.
+  // Using the wrong name made the deepseek fallback return empty and skip.
+  deepseek: 'deepseek-chat',
   gemini: 'gemini-3.5-flash',
   openai: 'gpt-4o-mini',
   anthropic: 'claude-sonnet-4-5',
@@ -112,24 +118,23 @@ const DEFAULT_MODELS: Record<LLMProvider, string> = {
 
 /** Resolution order when no explicit provider is requested. */
 const FALLBACK_ORDER: LLMProvider[] = [
-  // Free tier first (no-cost); falls to Go when quota-limited or failing.
-  'opencode-free',
-  // Go tier — reliable paid models (deepseek-v4-flash etc.) via opencode.
+  // Go tier — the funded deepseek-v4-flash via opencode. Primary.
   'opencode',
-  // DeepSeek direct + Gemini direct.
+  // DeepSeek direct (api.deepseek.com, deepseek-chat). Second.
   'deepseek',
-  'gemini',
   // Local Ollama (free, on-device) — used for cheap/quick calls.
   'ollama',
-  // Remaining providers.
-  'openai',
-  'anthropic',
-  'qwen',
 ];
 
 export function hasKey(provider: LLMProvider): boolean {
-  // ollama is a local model server — no API key needed; enabled when reachable.
-  if (provider === 'ollama') return true;
+  // Ollama is a local model server — no API key needed, but it should only be
+  // treated as an active provider when explicitly enabled. This prevents a
+  // machine without any cloud tokens from being forced through the local tier
+  // when the daemon is absent, and lets the deterministic fallback take over.
+  if (provider === 'ollama') {
+    const enabled = process.env.OLLAMA_ENABLED;
+    return enabled === undefined ? true : enabled !== '0' && enabled !== 'false' && enabled !== 'no';
+  }
   return !!process.env[PROVIDER_ENV[provider]];
 }
 
@@ -456,6 +461,8 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
     : buildProviderOrder(options.provider, localFirst);
   const deduped = [...new Set(order)];
   if (order.length === 0) {
+    const fb = await resolveFallbackValue(options, 'No LLM API key configured');
+    if (fb !== null) return fb;
     throw new Error(
       'No LLM API key configured. Set OPENCODE_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, or QWEN_API_KEY.'
     );
@@ -553,8 +560,29 @@ async function resolveFallbackValue(options: LLMCallOptions, reason: unknown): P
 }
 
 /**
+ * Clean small-model output for downstream parsers: strip fenced code blocks
+ * (```json ... ```) and leading/trailing prose so JSON.parse works. Small
+ * models frequently wrap JSON in fences; callers expect a bare object.
+ */
+function cleanLocalOutput(raw: string): string {
+  const trimmed = raw.trim();
+  const fence = /^```(?:json)?\s*([\s\S]*?)```\s*$/i.exec(trimmed);
+  if (fence) return fence[1].trim();
+  return trimmed;
+}
+
+function isValidJson(text: string): boolean {
+  try {
+    JSON.parse(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Small, cheap local-model call for tool-calling / quick classification.
- * Runs llama3.2:1b via Ollama — near-zero cost, no API keys. Falls back to
+ * Runs qwen3:0.6b via Ollama — near-zero cost, no API keys. Falls back to
  * the normal provider chain when Ollama is unreachable.
  */
 export async function callLocalModel(options: {
@@ -591,17 +619,32 @@ export async function callLocalModel(options: {
       // RAG is best-effort; ignore failures.
     }
   }
+  const wantJson = options.responseFormat?.type === 'json_object';
+  const localOpts = {
+    ...options,
+    system,
+    provider: 'ollama' as const,
+    maxTokens: options.maxTokens ?? 256,
+    temperature: 0.1,
+    // The ollama attempt must still throw on failure so the paid chain runs;
+    // the deterministic fallback only applies after the whole chain is down.
+    deterministicFallback: undefined,
+  };
   try {
-    return await callLLM({
-      ...options,
-      system,
-      provider: 'ollama',
-      maxTokens: options.maxTokens ?? 256,
-      temperature: 0.1,
-      // The ollama attempt must still throw on failure so the paid chain runs;
-      // the deterministic fallback only applies after the whole chain is down.
-      deterministicFallback: undefined,
-    });
+    const raw = await callLLM(localOpts);
+    const cleaned = cleanLocalOutput(raw);
+    if (wantJson && !isValidJson(cleaned)) {
+      // Small models are variable on structured output — one retry with a
+      // sharper "ONLY valid JSON" instruction before falling back to paid.
+      const retryRaw = await callLLM({
+        ...localOpts,
+        system: `${system}\nReturn ONLY a single valid JSON object. No code fences, no markdown, no explanation.`,
+        temperature: 0.0,
+      });
+      const cleanedRetry = cleanLocalOutput(retryRaw);
+      if (isValidJson(cleanedRetry)) return cleanedRetry;
+    }
+    return cleaned;
   } catch (err) {
     console.warn(
       `[llm] local model unavailable (${err instanceof Error ? err.message : String(err)}). Falling back.`
