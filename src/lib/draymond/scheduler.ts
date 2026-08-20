@@ -643,6 +643,7 @@ export const CUSTOM_HANDLERS: CustomHandlerDef[] = [
   { handler: 'evening_call_recap', label: 'Evening Call Recap', description: 'Open-Chat calls you with the day summary via ntfy.' },
   { handler: 'ingest_news', label: 'News Digest Ingest', description: 'Ingest news APIs and cache current items for the fleet.' },
   { handler: 'self_learning_loop', label: 'Self-Learning Loop', description: 'Distill lessons from outcomes (QA/jobs/incidents).' },
+  { handler: 'synthesis_midday', label: 'Synthesis Midday Check', description: 'Midday synthesis pass: evaluate sector thresholds and run synthesis for sectors ready to study combinations.' },
   { handler: 'rd_night', label: 'Night Mode R&D', description: 'Overnight research + dev planning from news + backlog.' },
   { handler: 'fetch_market_data', label: 'Market Data Snapshot', description: 'Daily free-API market/research snapshot.' },
   { handler: 'rotate_tokens', label: 'Token Rotation Check', description: 'Report provider budget/rate health for key rotation.' },
@@ -672,6 +673,13 @@ export const CUSTOM_HANDLERS: CustomHandlerDef[] = [
   { handler: 'benchmark_discovery_loop', label: 'Benchmark Olympics Discovery Loop', description: 'Autonomous research loop: probe the fleet, mature discovery hypotheses, surface quick-upgrade insights, and auto-fix weak components via the repair team.' },
   { handler: 'repair_shift', label: 'Daily Repair Shift', description: 'Daily fleet shift: code-review audit -> repair/upgrade ecosystem components -> benchmark improvements -> self-learning optimization.' },
   { handler: 'research_grade_loop', label: 'Research Breakthrough Grading', description: 'Grade CureMind/BB-Tech research output for breakthrough potential, feed trends/insights/discoveries + self-learning.' },
+  { handler: 'science_paper_refresh', label: 'Science Paper Refresh', description: 'Refresh the OpenAlex/PubMed literature cache for every active science goal.' },
+  { handler: 'science_publication_loop', label: 'Science Publication Loop', description: 'Publish frontier/promising graded discoveries to Overlay Global Lens + drain publication→self-learning.' },
+  { handler: 'nba_stats_ingest', label: 'NBA Stats Ingest', description: 'Run the sports_science metrics pipeline over NBA dataset profiles + optional live game-log fetch.' },
+  { handler: 'bankroll_pulse', label: 'Sports Bankroll Pulse', description: 'Surface Sports Steve bankroll/P&L/bets into Draymond state.' },
+  { handler: 'finance_strategy_brief', label: 'Finance Strategy Brief', description: 'Pull the finance-connect daily strategy brief for the treasurer/strategist.' },
+  { handler: 'finance_goals_sync', label: 'Finance Goals Sync', description: 'Sync capability-grounded finance goals into draymond_goals.' },
+  { handler: 'wf_mission_sync', label: 'Mission Workflow Sync', description: 'Daily mission pipeline + revenue-vs-target sync (the 09:30 agenda step).' },
 ];
 
 /**
@@ -1040,7 +1048,21 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
       if (handler === 'self_learning_loop') {
         const { distillLessons } = await import('./self-learning');
         const lessons = await distillLessons();
-        return { handler, lessons: lessons.length, top: lessons.slice(0, 5).map((l) => l.lesson) };
+        const result: Record<string, unknown> = { handler, lessons: lessons.length, top: lessons.slice(0, 5).map((l) => l.lesson) };
+        // Self-learning now also runs the synthesis phase so sector conclusions
+        // feed the grader + corpus and compound development nightly.
+        const { runSynthesis } = await import('./synthesis');
+        const synth = await runSynthesis();
+        result.synthesis = synth;
+        return result;
+      }
+
+      if (handler === 'synthesis_midday') {
+        // Midday synthesis pass — same engine, more frequent cadence so
+        // breakthroughs schedule faster than once/day.
+        const { runSynthesis } = await import('./synthesis');
+        const synth = await runSynthesis();
+        return { handler, ...synth };
       }
 
       if (handler === 'self_repair_check') {
@@ -1500,6 +1522,77 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
           top: r.grades.slice(0, 5).map((g) => ({ goalId: g.goalId, score: g.score, evidence: g.evidenceTier, class: g.breakthroughClass })),
           discoveries: r.discoveries.map((g) => ({ goalId: g.goalId, score: g.score })),
           insights: r.insights.slice(0, 5).map((i) => ({ type: i.type, detail: i.detail })),
+        };
+      }
+
+      if (handler === 'science_paper_refresh') {
+        // Refresh the literature cache for every active science goal so
+        // research-papers.json never goes stale. Forced (ignores the 24h cache)
+        // so the weekly refresh actually pulls fresh papers.
+        const { refreshSciencePapers } = await import('@/lib/science/publish');
+        const r = await refreshSciencePapers(true);
+        return { handler, ...r };
+      }
+
+      if (handler === 'science_publication_loop') {
+        // Publish frontier/promising discoveries to Overlay Global Lens and
+        // drain the publication→self-learning feed. Fail-soft: an unreachable
+        // Global Lens or a bad item never throws the cron.
+        const { publishFrontierDiscoveries } = await import('@/lib/science/publish');
+        const r = await publishFrontierDiscoveries();
+        return { handler, ...r };
+      }
+
+      if (handler === 'nba_stats_ingest') {
+        // Run the sports_science metrics pipeline over NBA dataset profiles and
+        // optionally pull live game logs. Fail-soft when the python runtime or
+        // dataset is unavailable.
+        const { ingestNbaStats } = await import('./sports-pipeline');
+        const r = await ingestNbaStats();
+        return { handler, ...r };
+      }
+
+      if (handler === 'bankroll_pulse') {
+        // Surface Sports Steve bankroll/P&L/bets into Draymond state. Fail-soft
+        // when Sports Steve is unreachable.
+        const { bankrollPulse } = await import('./sports-pipeline');
+        const r = await bankrollPulse();
+        return { handler, ...r };
+      }
+
+      if (handler === 'finance_strategy_brief') {
+        // Pull the finance-connect daily strategy brief (book-grounded). The
+        // day-orchestrator's 08:15 step; finance-connect may be unconfigured →
+        // returns ok:false, never throws.
+        const { fetchFinanceBrief } = await import('./finance-sync');
+        const r = await fetchFinanceBrief();
+        return { handler, ...r };
+      }
+
+      if (handler === 'finance_goals_sync') {
+        // Sync capability-grounded finance goals into draymond_goals (08:45).
+        const { syncFinanceGoals } = await import('./finance-sync');
+        const { createGoal, updateGoalProgress } = await import('./index');
+        const r = await syncFinanceGoals({ createGoal, updateGoalProgress });
+        return { handler, synced: r.filter((x) => x.ok).length, total: r.length };
+      }
+
+      if (handler === 'wf_mission_sync') {
+        // Daily mission pipeline + revenue-vs-target sync (the 09:30 agenda
+        // step). Mirrors mission_pipeline_sync but runs at the morning slot the
+        // day-orchestrator plans for the mission workflow.
+        const { missionDashboard } = await import('./mission-pipeline');
+        const { listOpportunities } = await import('./business-pipeline');
+        const dash = await missionDashboard();
+        const ops = await listOpportunities();
+        const stale = ops.filter(
+          (o) => o.stage === 'lead' && Date.now() - new Date(o.updatedAt).getTime() > 14 * 86400_000
+        );
+        return {
+          handler,
+          total: dash.opportunities.total,
+          byStage: dash.opportunities.byStage,
+          staleLeads: stale.map((o) => o.id),
         };
       }
 
@@ -2316,6 +2409,78 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     cron_expression: '30 18 * * *',
     job_type: 'custom',
     job_config: { handler: 'research_grade_loop' },
+    is_enabled: true,
+  },
+  {
+    name: 'Synthesis Midday',
+    description: 'Daily 12pm — midday synthesis pass over research sectors: evaluate material-density thresholds and run the combination-study phase for sectors ready, so breakthroughs schedule faster than the nightly self-learning loop alone.',
+    cron_expression: '0 12 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'synthesis_midday' },
+    is_enabled: true,
+  },
+  {
+    name: 'Science Paper Refresh',
+    description: 'Weekly Monday 3am — refresh the OpenAlex/PubMed literature cache for every active science goal so research grounding never goes stale.',
+    cron_expression: '0 3 * * 1',
+    job_type: 'custom',
+    job_config: { handler: 'science_paper_refresh' },
+    is_enabled: true,
+  },
+  {
+    name: 'Science Publication Loop',
+    description: 'Nightly 3:10am — publish frontier/promising graded discoveries to Overlay Global Lens and drain the publication→self-learning feed.',
+    cron_expression: '10 3 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'science_publication_loop' },
+    is_enabled: true,
+  },
+  {
+    name: 'NBA Stats Ingest',
+    description: 'Nightly 4:30am — run the sports_science metrics pipeline over NBA dataset profiles + optional live game-log fetch, and refresh NBA research evidence.',
+    cron_expression: '30 4 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'nba_stats_ingest' },
+    is_enabled: true,
+  },
+  {
+    name: 'Sports Bankroll Pulse',
+    description: 'Daily 8:15am — surface Sports Steve bankroll/P&L/bets into Draymond state so the treasury and business pipeline see real betting revenue.',
+    cron_expression: '15 8 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'bankroll_pulse' },
+    is_enabled: true,
+  },
+  {
+    name: 'Finance Strategy Brief',
+    description: 'Daily 8:15am — pull the finance-connect daily strategy brief for the treasurer/strategist (the 08:15 agenda step).',
+    cron_expression: '15 8 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'finance_strategy_brief' },
+    is_enabled: true,
+  },
+  {
+    name: 'Finance Goals Sync',
+    description: 'Daily 8:45am — sync capability-grounded finance goals into draymond_goals (the 08:45 agenda step).',
+    cron_expression: '45 8 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'finance_goals_sync' },
+    is_enabled: true,
+  },
+  {
+    name: 'Mission Workflow Sync',
+    description: 'Daily 9:30am — mission pipeline + revenue-vs-target sync (the 09:30 agenda step).',
+    cron_expression: '30 9 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'wf_mission_sync' },
+    is_enabled: true,
+  },
+  {
+    name: 'Systemic Consolidate',
+    description: 'Daily 5:30am — distill lessons, persist memory, and align agenda-goal progress (consolidation run separate from the weekly full interconnect).',
+    cron_expression: '30 5 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'systemic_consolidate' },
     is_enabled: true,
   },
 ];

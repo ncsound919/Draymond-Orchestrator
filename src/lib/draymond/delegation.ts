@@ -18,6 +18,8 @@
 // (fleet cap), day-orchestrator.ts (phase budget), and scheduler.ts (timeouts).
 // ============================================================================
 
+import { syncFleetBudget } from "@/lib/command-center/controls";
+
 export type DelegationTier = 'free' | 'local' | 'flash' | 'pro' | 'reasoning';
 
 export type DelegationPhase = 'morning' | 'midday' | 'evening' | 'night';
@@ -62,8 +64,7 @@ export interface DelegationSpec {
 
 /** Fleet-wide daily token cap — the whole ecosystem stays under this. */
 export function fleetDailyBudget(): number {
-  const raw = Number(process.env.DRAYMOND_FLEET_DAILY_BUDGET ?? 5_000_000);
-  return Number.isFinite(raw) && raw > 0 ? raw : 5_000_000;
+  return syncFleetBudget(process.env.DRAYMOND_FLEET_DAILY_BUDGET);
 }
 
 /** Fraction of the fleet daily budget reserved for each phase. */
@@ -151,6 +152,7 @@ export const DELEGATION_PLAN: DelegationSpec[] = [
   { slug: 'systemic_consolidate', label: 'Systemic consolidation', phase: 'night', timeBudgetMs: 600_000, tokenBudgetPerRun: 48_000, tokenBudgetPerDay: 48_000, tier: 'flash', priority: 2, duty: 'night' },
   { slug: 'systemic_interconnect', label: 'Systemic interconnect', phase: 'night', window: { start: '00:00', end: '06:00', days: [7] }, timeBudgetMs: 1_200_000, tokenBudgetPerRun: 96_000, tokenBudgetPerDay: 96_000, tier: 'pro', priority: 2, duty: 'night' },
   { slug: 'self_learning_loop', label: 'Self-learning loop', phase: 'night', timeBudgetMs: 300_000, tokenBudgetPerRun: 32_000, tokenBudgetPerDay: 32_000, tier: 'flash', priority: 2, duty: 'night' },
+  { slug: 'synthesis_midday', label: 'Synthesis midday check', phase: 'midday', timeBudgetMs: 300_000, tokenBudgetPerRun: 32_000, tokenBudgetPerDay: 64_000, tier: 'flash', priority: 2, duty: 'always-on' },
 
   // ── Benchmarks / audits — midday, compressed ────────────────────────────
   { slug: 'benchmark_roster', label: 'Roster benchmark', phase: 'morning', timeBudgetMs: 900_000, tokenBudgetPerRun: 96_000, tokenBudgetPerDay: 96_000, tier: 'flash', priority: 2, duty: 'always-on' },
