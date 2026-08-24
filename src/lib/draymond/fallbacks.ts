@@ -185,6 +185,26 @@ export function isDegraded(): boolean {
   return true;
 }
 
+/**
+ * Operator override — force degraded mode on/off from the command center.
+ * When forced on, the auto-recovery window is pushed far out so the flag
+ * stays until the operator clears it (or the breaker flips from real failures).
+ * Calling `setDegraded(false)` clears both the forced flag and the breaker.
+ */
+export function setDegraded(force: boolean): boolean {
+  if (force) {
+    degraded = true;
+    degradedUntil = Date.now() + Number(process.env.DRAYMOND_DEGRADED_FORCE_MS ?? 24 * 60 * 60 * 1000);
+    console.warn('[fallbacks] degraded mode forced ON by operator.');
+    return true;
+  }
+  degraded = false;
+  consecutiveFailures = 0;
+  degradedUntil = 0;
+  console.warn('[fallbacks] degraded mode cleared by operator.');
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // Coverage metric
 // ---------------------------------------------------------------------------

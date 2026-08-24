@@ -111,6 +111,7 @@ function evidenceTierFor(hypotheses: Hypothesis[]): EvidenceTier {
   const statuses = hypotheses.map((h) => h.status);
   if (statuses.some((s) => s === 'supported' || s === 'refuted')) return 'E1';
   if (statuses.some((s) => s === 'in_progress')) return 'E2';
+  if (statuses.some((s) => s === 'inconclusive')) return 'E3';
   return 'E4';
 }
 

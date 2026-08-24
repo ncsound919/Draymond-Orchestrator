@@ -108,7 +108,7 @@ async function llmSummarize(jsonText: string): Promise<string | null> {
  */
 export async function humanizeResponse(
   raw: string,
-  opts: { userTask?: string } = {},
+  _opts: { userTask?: string } = {},
 ): Promise<string> {
   const text = cleanText(raw);
   if (!text) return 'Done.';

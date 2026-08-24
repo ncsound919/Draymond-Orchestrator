@@ -36,7 +36,16 @@ const ALLOWED_PREFIXES = [
   '/api/agents',
   '/api/ops/day',
   '/api/ops/brain',
+  '/api/ops/brain/sweep',
+  '/api/ops/brain/task',
+  '/api/ops/brain/fallback',
+  '/api/ops/controls',
+  '/api/ops/repair',
+  '/api/ops/repair-triage',
   '/api/ops/heartbeats',
+  '/api/ops/learning',
+  '/api/ops/metrics',
+  '/api/ops/services',
   '/api/research/papers',
   '/api/v1/science',
   '/api/v1/sports',
@@ -56,13 +65,17 @@ export async function ccFetch<T = unknown>(call: BridgeCall): Promise<BridgeResu
   }
 
   const secret = process.env.CRON_SECRET;
-  const baseUrl = process.env.DRAYMOND_INTERNAL_URL || '';
+  const baseUrl =
+    process.env.DRAYMOND_INTERNAL_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    'http://127.0.0.1:3444';
   if (!secret) {
     return { ok: false, status: 503, error: 'CRON_SECRET not configured' };
   }
 
   try {
-    const res = await fetch(`${baseUrl}${call.endpoint}`, {
+    const targetUrl = new URL(call.endpoint, `${baseUrl.replace(/\/$/, '')}/`).toString();
+    const res = await fetch(targetUrl, {
       method: call.method,
       headers: {
         'Content-Type': 'application/json',

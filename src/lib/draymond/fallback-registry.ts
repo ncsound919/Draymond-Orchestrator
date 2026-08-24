@@ -339,6 +339,70 @@ registerFallback(
   )
 );
 
+// ---------------------------------------------------------------------------
+// Chain Task Fallbacks — Deterministic Brain Escalation
+// ---------------------------------------------------------------------------
+// When chains fail due to missing API tokens or service unavailability,
+// escalate to the deterministic brain to complete the task.
+
+import {
+  escalateMorningBriefing,
+  escalateFullContentCreation,
+  escalateHempResearchDigest,
+  escalateOverlay365QA,
+  escalateDailyMarketingRun,
+  escalateResearchDataFeed,
+  escalateSportsBettingDaily,
+} from './brain-task-fallbacks';
+
+const CHAIN_TASK_FALLBACKS: Array<[string, BrainResolver]> = [
+  [
+    'chain.morning-briefing',
+    async (ctx) =>
+      (await escalateMorningBriefing('LLM chain failed', ctx as Record<string, unknown>)).output as string,
+  ],
+  [
+    'chain.full-content-creation',
+    async (ctx) =>
+      (await escalateFullContentCreation('LLM chain failed', ctx as Record<string, unknown>)).output as string,
+  ],
+  [
+    'chain.hemp-research-news',
+    async (ctx) =>
+      (await escalateHempResearchDigest('LLM chain failed', ctx as Record<string, unknown>)).output as string,
+  ],
+  [
+    'chain.overlay365-qa',
+    async (ctx) =>
+      (await escalateOverlay365QA('LLM chain failed', ctx as Record<string, unknown>)).output as string,
+  ],
+  [
+    'chain.daily-marketing-run',
+    async (ctx) =>
+      (await escalateDailyMarketingRun('LLM chain failed', ctx as Record<string, unknown>)).output as string,
+  ],
+  [
+    'chain.research-data-feed',
+    async (ctx) =>
+      (await escalateResearchDataFeed('LLM chain failed', ctx as Record<string, unknown>)).output as string,
+  ],
+  [
+    'chain.sports-betting-daily',
+    async (ctx) =>
+      (await escalateSportsBettingDaily('LLM chain failed', ctx as Record<string, unknown>)).output as string,
+  ],
+];
+
+for (const [key, resolver] of CHAIN_TASK_FALLBACKS) {
+  declareLlmFunction(key);
+  registerFallback(key, {
+    label: `${key} — deterministic brain escalation`,
+    kind: 'brain',
+    resolve: () => 'Escalating to deterministic brain...',
+    brain: resolver,
+  });
+}
+
 // Research-paper generation + Global Lens publishing. In degraded mode this
 // escalates to the brain's /research/publish endpoint, which sources findings
 // (arXiv/news/Wikipedia) deterministically, renders the research-paper skill

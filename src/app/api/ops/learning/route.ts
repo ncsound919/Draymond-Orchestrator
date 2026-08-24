@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeRequest } from '@/lib/draymond/api-auth';
 import { getLessons, recordOutcome } from '@/lib/draymond/self-learning';
+import { listDiscoveries } from '@/lib/draymond/learning-store';
 
 export const dynamic = 'force-dynamic';
 
-/** GET /api/ops/learning?agentId=... — distilled lessons */
+/** GET /api/ops/learning?agentId=... — distilled lessons (+?include=discoveries) */
 export async function GET(request: NextRequest) {
   const authError = authorizeRequest(request);
   if (authError) return authError;
-  const agentId = new URL(request.url).searchParams.get('agentId') ?? undefined;
-  return NextResponse.json({ lessons: await getLessons(agentId) });
+  const url = new URL(request.url);
+  const agentId = url.searchParams.get('agentId') ?? undefined;
+  const include = url.searchParams.get('include') ?? '';
+  const discoveries = include.includes('discoveries') ? await listDiscoveries(20) : undefined;
+  return NextResponse.json({ lessons: await getLessons(agentId), discoveries });
 }
 
 /** POST /api/ops/learning — record an outcome { agentId, kind, summary, success, detail } */

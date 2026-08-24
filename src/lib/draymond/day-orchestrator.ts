@@ -31,6 +31,7 @@ export const DAY_FLOW: OrchestrationStep[] = [
   // ── Morning — data in, then deliver ─────────────────────────────────────
   { id: 'sec-scan', phase: 'morning', time: '05:00', job: 'depscan', purpose: 'Dependency/SCA scan', feedsTo: ['overlay-auditor'] },
   { id: 'news', phase: 'morning', time: '06:00', job: 'ingest_news', purpose: 'Current events into the fleet', feedsTo: ['overlay-strategist', 'omniresearch-pro'] },
+  { id: 'research-rotation', phase: 'morning', time: '06:00', job: 'research_rotation', purpose: 'Drain the highest-priority ready science/sports experiment', feedsTo: ['deterministic-brain', 'overlay-strategist'] },
   { id: 'market', phase: 'morning', time: '07:00', job: 'fetch_market_data', purpose: 'Crypto + papers snapshot', feedsTo: ['overlay-treasurer', 'trading-agents', 'ghostfolio-engine', 'sports-steve'] },
   { id: 'qa', phase: 'morning', time: '07:00', job: 'run_overlay_qa', purpose: 'Site integrity pass', feedsTo: ['overlay-auditor'] },
   { id: 'treasury', phase: 'morning', time: '08:00', job: 'treasury_pulse', purpose: 'Cash pulse with market context', feedsTo: ['mission-pipeline'] },
@@ -41,6 +42,7 @@ export const DAY_FLOW: OrchestrationStep[] = [
   { id: 'duty', phase: 'midday', time: 'hourly', job: 'fleet_duty_sync', purpose: 'On-duty roster check' },
   { id: 'repair', phase: 'midday', time: ':15', job: 'self_repair_check', purpose: 'Auto-repair failures / escalate' },
   { id: 'bmk', phase: 'midday', time: '13:00', job: 'benchmark_chains', purpose: 'Benchmark chain health', feedsTo: ['deterministic-brain'] },
+  { id: 'science-seed', phase: 'midday', time: '16:00', job: 'science_campaign_seed', purpose: 'Top up the science/sports experiment backlog', feedsTo: ['deterministic-brain', 'research-rotation'] },
   { id: 'marketing', phase: 'midday', time: '10:00', job: 'marketing-pulse', purpose: 'Content + pipeline top-of-funnel' },
   { id: 'media', phase: 'midday', time: '10:30', job: 'generative-video-ai', purpose: 'Media pipeline (shorts → episodes → studio)', feedsTo: ['social-media-dashboard'] },
   { id: 'web', phase: 'midday', time: '11:00', job: 'agent-browser', purpose: 'Web automation pipeline (browser → scrape → QA)' },
@@ -237,6 +239,8 @@ export async function runPhase(phase: DayPhase, budgetTokens?: number): Promise<
       return promisify(execFile)('node', ['scripts/sync-wiki-to-sqlite.mjs'], { timeout: 120_000 });
     },
     fleet_duty_sync: async () => (await import('./fleet-duty')).computeFleetDuty(),
+    research_rotation: async () => (await import('@/lib/science/experiments')).researchRotation(),
+    science_campaign_seed: async () => (await import('@/lib/science/campaigns')).ensureResearchBacklog(),
     treasury_pulse: async () => {
       const { runTreasuryPulse } = await import('./treasury');
       const lookbackDays = Number(process.env.TREASURY_LOOKBACK_DAYS ?? 30);

@@ -607,8 +607,11 @@ export async function sendNotification(
 
     return (updated ?? record) as NotificationRecord;
   } catch (err) {
-    // 3b. Record the sending error
     const errorMessage = err instanceof Error ? err.message : String(err);
+
+    console.error(
+      `[Draymond Notifications] Email send failed for ${notificationId}: ${errorMessage}`
+    );
 
     const { error: updateError } = await supabase
       .from('draymond_notifications')
@@ -622,14 +625,9 @@ export async function sendNotification(
       );
     }
 
-    console.error(
-      `[Draymond Notifications] Email send failed for ${notificationId}:`,
-      errorMessage
-    );
-
     emitNotificationFailed(notificationId, payload.type, payload.subject, errorMessage);
 
-    return { ...(record as NotificationRecord), status: 'failed' as const, error_message: errorMessage };
+    return { ...(record as NotificationRecord), status: 'failed', error_message: errorMessage };
   }
 }
 

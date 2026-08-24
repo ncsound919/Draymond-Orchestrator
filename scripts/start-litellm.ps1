@@ -22,6 +22,21 @@ if (Test-Path $envFile) {
   }
 }
 
+# Load the KeyWire-synced LLM pool keys (data/litellm.env, refreshed by
+# scripts/sync-litellm-keys.ps1). Loaded AFTER .env.local so fresh vault values win.
+$poolFile = Join-Path $repoRoot "data\litellm.env"
+if (Test-Path $poolFile) {
+  Get-Content $poolFile | ForEach-Object {
+    $line = $_.Trim()
+    if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
+      $k, $v = $line -split "=", 2
+      if ($k -and $v) { Set-Item -Path "Env:$k" -Value $v }
+    }
+  }
+} else {
+  Write-Warning "data/litellm.env not found — free-account pool will be empty. Run scripts/sync-litellm-keys.ps1 first."
+}
+
 $env:PYTHONIOENCODING = "utf-8"
 $env:PORT = "4100"
 

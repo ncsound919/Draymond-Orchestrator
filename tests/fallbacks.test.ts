@@ -42,6 +42,15 @@ describe('fallbacks registry', () => {
     expect(cov.uncovered).toContain('a.three');
   });
 
+  it('forces degraded mode on/off via the operator override', async () => {
+    const { setDegraded, isDegraded } = await import('../src/lib/draymond/fallbacks');
+    expect(isDegraded()).toBe(false);
+    expect(setDegraded(true)).toBe(true);
+    expect(isDegraded()).toBe(true);
+    expect(setDegraded(false)).toBe(false);
+    expect(isDegraded()).toBe(false);
+  });
+
   it('tracks degraded mode and auto-clears after the window', async () => {
     const { recordChainFailure, recordChainSuccess, isDegraded } = await import('../src/lib/draymond/fallbacks');
     expect(isDegraded()).toBe(false);
@@ -103,6 +112,33 @@ describe('callLLM fallbackKey integration', () => {
     // No network call should have happened.
     expect(fetchMock).not.toHaveBeenCalled();
     delete process.env.OPENCODE_API_KEY;
+  });
+
+  it('uses the registry fallback when no providers are configured', async () => {
+    vi.resetModules();
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    delete process.env.OPENCODE_API_KEY;
+    delete process.env.DEEPSEEK_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.QWEN_API_KEY;
+    process.env.OLLAMA_ENABLED = '0';
+
+    const fb = await import('../src/lib/draymond/fallbacks');
+    fb.registerFallback('test.no-keys', fb.template('test', 'no-key-output'));
+
+    const { callLLM } = await import('../src/lib/draymond/llm');
+    const out = await callLLM({
+      system: 's',
+      userMessage: 'u',
+      fallbackKey: 'test.no-keys',
+    });
+
+    expect(out).toBe('no-key-output');
+    expect(fetchMock).not.toHaveBeenCalled();
+    delete process.env.OLLAMA_ENABLED;
   });
 
   it('throws when no fallback is configured', async () => {

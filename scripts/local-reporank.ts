@@ -1,10 +1,13 @@
 #!/usr/bin/env tsx
 /**
  * Local RepoRank scorer — grades a GitHub repo via RepoRank's GradingService
- * using the OpenCode Zen key (no RepoRank server required). Prints
- * { overallScore, gradeCategory } as JSON on stdout.
+ * through the fleet LLM chain (@overlay365/fleet-client: openrouter ->
+ * opencode Go -> deepseek -> ollama). Prints { overallScore, gradeCategory }
+ * as JSON on stdout.
  *
  * Usage: npx tsx scripts/local-reporank.ts <owner/repo|https://github.com/owner/repo>
+ * Env: OPENROUTER_API_KEY / OPENCODE_API_KEY / DEEPSEEK_API_KEY (first with a
+ * key in the chain order wins); ollama is the keyless floor.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -62,7 +65,7 @@ async function main() {
     // fall through with whatever we got
   }
 
-  const svc = new GradingService(process.env.GEMINI_API_KEY || '', process.env.GEMINI_MODEL || 'gemini-2.5-flash');
+  const svc = new GradingService();
   const report = await svc.gradeRepo({
     repoUrl,
     repoName: repo,

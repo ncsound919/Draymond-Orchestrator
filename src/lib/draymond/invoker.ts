@@ -145,7 +145,7 @@ async function invokePipeline(
     return failResult('invocation_config.pipeline (parent slug) is required for pipeline', Date.now() - start);
   }
 
-  const { pipelineFor, stageFor } = await import('./fleet-pipelines');
+  const { pipelineFor } = await import('./fleet-pipelines');
   const pipeline = pipelineFor(parent);
   if (!pipeline) {
     return failResult(`No fleet pipeline registered for parent "${parent}"`, Date.now() - start);

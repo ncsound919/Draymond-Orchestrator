@@ -29,6 +29,14 @@ export interface SystemAgentHealth {
   quarantineDir: string;
 }
 
+/** Envelope returned by every system-agent HTTP helper. */
+export interface SystemAgentResult<T> {
+  ok: boolean;
+  data: T;
+  status: number;
+  error?: string;
+}
+
 export type SystemControlAction =
   | 'launch'
   | 'kill'
@@ -114,68 +122,68 @@ export async function systemAgentHealth(): Promise<{ ok: boolean; data?: SystemA
   return agentGet<SystemAgentHealth>('/api/health');
 }
 
-export async function systemInfo(): Promise<any> {
+export async function systemInfo(): Promise<SystemAgentResult<unknown>> {
   return agentGet('/api/v1/system/info');
 }
 
-export async function systemProcesses(): Promise<any> {
+export async function systemProcesses(): Promise<SystemAgentResult<unknown>> {
   return agentGet('/api/v1/system/processes');
 }
 
-export async function systemConnections(): Promise<any> {
+export async function systemConnections(): Promise<SystemAgentResult<unknown>> {
   return agentGet('/api/v1/system/connections');
 }
 
-export async function systemUsb(): Promise<any> {
+export async function systemUsb(): Promise<SystemAgentResult<unknown>> {
   return agentGet('/api/v1/system/usb');
 }
 
-export async function systemDefender(): Promise<any> {
+export async function systemDefender(): Promise<SystemAgentResult<unknown>> {
   return agentGet('/api/v1/system/defender');
 }
 
-export async function systemServices(): Promise<any> {
+export async function systemServices(): Promise<SystemAgentResult<unknown>> {
   return agentGet('/api/v1/system/services');
 }
 
-export async function systemTasks(): Promise<any> {
+export async function systemTasks(): Promise<SystemAgentResult<unknown>> {
   return agentGet('/api/v1/system/tasks');
 }
 
-export async function systemSnapshot(): Promise<any> {
+export async function systemSnapshot(): Promise<SystemAgentResult<unknown>> {
   return agentGet('/api/v1/system/snapshot');
 }
 
-export async function systemRecentAudit(limit = 50): Promise<any> {
+export async function systemRecentAudit(limit = 50): Promise<SystemAgentResult<unknown>> {
   return agentGet(`/api/v1/audit/recent?limit=${limit}`);
 }
 
-export async function systemAgentStatus(): Promise<any> {
+export async function systemAgentStatus(): Promise<SystemAgentResult<unknown>> {
   return agentGet('/api/v1/agent/health');
 }
 
 // ── Control actions (require an approval token) ─────────────────────────────
 
-export async function controlLaunch(input: { path: string; args?: string[]; cwd?: string; hidden?: boolean }, approvalToken: string): Promise<any> {
+export async function controlLaunch(input: { path: string; args?: string[]; cwd?: string; hidden?: boolean }, approvalToken: string): Promise<SystemAgentResult<unknown>> {
   return agentPost('/api/v1/control/launch', input, approvalToken);
 }
 
-export async function controlKill(input: { pid?: number; name?: string; force?: boolean }, approvalToken: string): Promise<any> {
+export async function controlKill(input: { pid?: number; name?: string; force?: boolean }, approvalToken: string): Promise<SystemAgentResult<unknown>> {
   return agentPost('/api/v1/control/kill', input, approvalToken);
 }
 
-export async function controlPower(input: { action: 'shutdown' | 'restart' | 'sleep' | 'hibernate' | 'lock' }, approvalToken: string): Promise<any> {
+export async function controlPower(input: { action: 'shutdown' | 'restart' | 'sleep' | 'hibernate' | 'lock' }, approvalToken: string): Promise<SystemAgentResult<unknown>> {
   return agentPost('/api/v1/control/power', input, approvalToken);
 }
 
-export async function controlFile(input: { op: string; path: string; dest?: string }, approvalToken: string): Promise<any> {
+export async function controlFile(input: { op: string; path: string; dest?: string }, approvalToken: string): Promise<SystemAgentResult<unknown>> {
   return agentPost('/api/v1/control/file', input, approvalToken);
 }
 
-export async function controlService(input: { name: string; action: 'start' | 'stop' | 'restart' }, approvalToken: string): Promise<any> {
+export async function controlService(input: { name: string; action: 'start' | 'stop' | 'restart' }, approvalToken: string): Promise<SystemAgentResult<unknown>> {
   return agentPost('/api/v1/control/service', input, approvalToken);
 }
 
-export async function controlPriority(input: { pid: number; priority: string }, approvalToken: string): Promise<any> {
+export async function controlPriority(input: { pid: number; priority: string }, approvalToken: string): Promise<SystemAgentResult<unknown>> {
   return agentPost('/api/v1/control/priority', input, approvalToken);
 }

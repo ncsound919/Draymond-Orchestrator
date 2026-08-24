@@ -9,8 +9,6 @@
  * No LLM, no API keys, no fabrication. Degrades gracefully offline (cache only).
  */
 
-import fs from "node:fs/promises";
-import path from "node:path";
 import { readJsonState, writeJsonState, nowIso } from "@/lib/draymond/cognition";
 import { listGoals, listHypotheses } from "./goals";
 

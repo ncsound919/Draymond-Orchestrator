@@ -13,7 +13,6 @@ import http from 'node:http';
 import { exec } from 'node:child_process';
 import { writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import os from 'node:os';
 import { CLIENT_ID, CLIENT_SECRET, TOKEN_FILE } from './google-auth.js';
 
 const REDIRECT = 'http://localhost:9010/callback';

@@ -983,6 +983,41 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     category: 'media',
     health_endpoint: '/api/health',
   },
+
+  // ── Overlay Oncology ────────────────────────────────────────────────
+  // Cancer research & biotech engines (Next.js on :3070). Runs the cumulative
+  // multi-engine research pipeline (study → simulation → dataset signals →
+  // deconvolution → cross-reference → verification) and the synthesis phase
+  // over research sectors. Calibrated to live public data (CCLE/TCGA).
+  {
+    name: 'Overlay Oncology',
+    slug: 'overlay-oncology',
+    kind: 'service',
+    description:
+      'Cancer research & biotech engines (Next.js on :3070). Runs the cumulative multi-engine research pipeline (hypothesis → simulate → backtest → dataset signals → cell-type deconvolution → cross-reference → verification → publish) and the sector synthesis phase.',
+    invocation_method: 'http_api',
+    invocation_config: {
+      url: agentUrl('OVERLAY_ONCOLOGY_URL', 'http://localhost:3070'),
+      method: 'POST',
+      health_url: `${agentUrl('OVERLAY_ONCOLOGY_URL', 'http://localhost:3070')}/api/calibration/state`,
+      endpoints: {
+        run_pipeline: { path: '/api/research/pipeline', method: 'POST' },
+        run_synthesis: { path: '/api/research/synthesis', method: 'POST' },
+        report: { path: '/api/research/report', method: 'GET' },
+        health: { path: '/api/calibration/state', method: 'GET' },
+      },
+    },
+    capabilities: [
+      'survival_modeling',
+      'potency_calibration',
+      'cell_type_deconvolution',
+      'synthesis_engine',
+      'research_contracts',
+    ],
+    tags: ['oncology', 'cancer', 'biotech', 'research', 'nextjs'],
+    category: 'research',
+    health_endpoint: '/api/calibration/state',
+  },
 ];
 
 // ============================================================================
@@ -1790,6 +1825,67 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
       },
     ],
   },
+
+  // ── Chain 14: Cancer Research Deep-Dive ─────────────────────────────
+  // Orchestrates a multi-engine oncology research study around a given theme
+  // (e.g. in-situ vaccination / cold-to-hot tumor conversion, per the six
+  // Aug 2026 advances). Runs the Overlay Oncology pipeline (with cell-type
+  // deconvolution when an expression matrix is supplied), then synthesizes a
+  // research brief via OmniResearch grounded on the pipeline output, then runs
+  // the Oncology synthesis phase to compound the study into sector thresholds.
+  {
+    name: 'Cancer Research Deep-Dive',
+    slug: 'cancer-research-deep-dive',
+    description:
+      'Runs a cumulative Overlay Oncology research study (pipeline + deconvolution + synthesis) for a given cancer theme, then produces an OmniResearch brief. Inputs: topic, cancerType, target, mechanism, optional expressionMatrix for real cell-type deconvolution.',
+    steps: [
+      {
+        name: 'Run Oncology Pipeline',
+        entitySlug: 'overlay-oncology',
+        action: 'run_pipeline',
+        input_mapping: {
+          topic: '$.input.topic',
+          cancerType: '$.input.cancerType',
+          target: '$.input.target',
+          mechanism: '$.input.mechanism',
+          expressionMatrix: '$.input.expressionMatrix',
+          variantFilter: '$.input.variantFilter',
+          ticks: '$.input.ticks',
+          publish: '$.input.publish',
+        },
+        output_key: 'study',
+        step_order: 1,
+        depends_on_indices: [],
+      },
+      {
+        name: 'Synthesize Research Brief',
+        entitySlug: 'omni-research',
+        action: 'research_news',
+        input_mapping: {
+          query: '$.input.topic',
+          study: '$.steps.study.output',
+          context: '$.input.context',
+        },
+        output_key: 'brief',
+        step_order: 2,
+        depends_on_indices: [0],
+      },
+      {
+        name: 'Run Sector Synthesis',
+        entitySlug: 'overlay-oncology',
+        action: 'run_synthesis',
+        input_mapping: {
+          topic: '$.input.topic',
+          cancerType: '$.input.cancerType',
+          study: '$.steps.study.output',
+          brief: '$.steps.brief.output',
+        },
+        output_key: 'synthesis',
+        step_order: 3,
+        depends_on_indices: [1],
+      },
+    ],
+  },
 ];
 
 // ============================================================================
@@ -2125,6 +2221,30 @@ const JOB_DEFS: JobSeedDef[] = [
     job_config: {
       chain_slug: 'news-outlet-ingest',
       input: {},
+    },
+    notify_on_failure: true,
+  },
+
+  // ── Cancer Research Deep-Dive (5AM daily) ───────────────────────────
+  // Runs a cumulative Overlay Oncology study + synthesis around the current
+  // cancer-theme focus (in-situ vaccination / cold-to-hot conversion per the
+  // six Aug 2026 advances), then produces an OmniResearch brief.
+  {
+    name: 'Cancer Research Deep-Dive',
+    cron_expression: '0 5 * * *',
+    job_type: 'chain',
+    job_config: {
+      chain_slug: 'cancer-research-deep-dive',
+      input: {
+        topic: 'in-situ vaccination and cold-to-hot tumor microenvironment conversion for immunotherapy',
+        cancerType: 'tnbc',
+        target: 'PD-L1',
+        mechanism: 'immunogenic cell death + local immune activation',
+        ticks: 120,
+        publish: true,
+        context:
+          'Six advances (Aug 2026): ASPIRE chemo-free HER2+ breast, Aliya PEF TLS induction, UC Irvine Treg mathematical modeling, intismeran mRNA melanoma vaccine phase 3, lysosomal nanoplatform cold-to-hot prostate, shikonin hydrogel + mild PTT cold TNBC.',
+      },
     },
     notify_on_failure: true,
   },

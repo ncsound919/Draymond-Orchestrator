@@ -35,11 +35,11 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net",
-      "style-src 'self' 'unsafe-inline'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://frontend-cdn.perplexity.ai",
+      "style-src 'self' 'unsafe-inline' https://frontend-cdn.perplexity.ai",
       "img-src 'self' data: blob: https:",
-      "font-src 'self'",
-      "connect-src 'self' https://api.openai.com https://cdn.jsdelivr.net",
+      "font-src 'self' data: https://frontend-cdn.perplexity.ai",
+      "connect-src 'self' http://localhost:3444 http://127.0.0.1:3444 ws://localhost:3444 ws://127.0.0.1:3444 https://api.openai.com https://cdn.jsdelivr.net https://frontend-cdn.perplexity.ai",
       "worker-src 'self' blob:",
       "frame-ancestors 'none'",
     ].join("; "),
@@ -74,6 +74,7 @@ const nextConfig: NextConfig = {
       './**/agents/**',
       './data/**',
       './.next/standalone/**',
+      './**/traces.db*',
     ],
   },
 

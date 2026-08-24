@@ -3,6 +3,11 @@ import { addOutcome, upsertDiscovery } from './learning-store';
 const ONCOLOGY_SYNTHESIS_URL =
   process.env.ONCOLOGY_URL ?? process.env.NEXT_PUBLIC_ONCOLOGY_URL ?? 'http://localhost:3070/api/research/synthesis';
 
+// BioComposable surface that records synthesis insights so research depth flows
+// from the Oncology system into variant-surveillance.
+const BIOCOMPOSABLE_URL =
+  process.env.BIOCOMPOSABLE_URL ?? process.env.NEXT_PUBLIC_BIOCOMPOSABLE_URL ?? 'http://localhost:3000';
+
 export interface SynthesisRunSummary {
   ok: boolean;
   synthesized: string[];
@@ -58,6 +63,30 @@ export async function runSynthesis(): Promise<SynthesisRunSummary> {
         trend: 'synthesis',
         gradedAt: new Date().toISOString(),
       });
+    }
+
+    // Bridge path: push the strongest insights into the BioComposable registry so
+    // research depth reaches the variant-surveillance surface. Fire-and-forget and
+    // fail-soft — a bridge outage must never break the synthesis cron.
+    for (const b of breakthroughs.slice(0, 5)) {
+      try {
+        await fetch(`${BIOCOMPOSABLE_URL}/api/v1/synthesis/insights`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sector: b.sector ?? 'oncology',
+            insight: b.id,
+            outlook: (data.outlooks ?? {})[b.sector]?.status ?? null,
+            breakthrough: b.score,
+            thresholds: data.thresholds ?? null,
+            runId: data.runId ?? null,
+            generatedAt: new Date().toISOString(),
+          }),
+          signal: AbortSignal.timeout(15_000),
+        });
+      } catch {
+        // Non-fatal: bridge unreachable.
+      }
     }
 
     return {

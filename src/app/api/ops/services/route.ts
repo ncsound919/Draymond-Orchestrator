@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeRequest } from '@/lib/draymond/api-auth';
-import { probeAllServices, startDownServices, serviceCatalog } from '@/lib/draymond/service-manager';
+import {
+  probeAllServices,
+  startDownServices,
+  startService,
+  restartService,
+  serviceCatalog,
+} from '@/lib/draymond/service-manager';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,12 +22,29 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/** POST /api/ops/services — probe and auto-start down services */
+/** POST /api/ops/services — start a single service, restart it, or auto-start down services */
 export async function POST(request: NextRequest) {
   const authError = authorizeRequest(request);
   if (authError) return authError;
   try {
-    const body = (await request.json().catch(() => ({}))) as { start?: boolean };
+    const body = (await request.json().catch(() => ({}))) as {
+      start?: boolean;
+      action?: 'start' | 'restart';
+      slug?: string;
+      slugs?: string[];
+    };
+
+    if (typeof body.slug === 'string' && body.slug.trim()) {
+      const slug = body.slug.trim();
+      const result = body.action === 'restart' ? await restartService(slug) : await startService(slug);
+      return NextResponse.json({ ok: result.up, slug: result.slug, service: result, action: body.action ?? 'start' });
+    }
+
+    if (Array.isArray(body.slugs) && body.slugs.length > 0) {
+      const started = await startDownServices(body.slugs.filter(Boolean));
+      return NextResponse.json({ checked: body.slugs.length, up: started.filter((s) => s.up).length, started });
+    }
+
     const all = await probeAllServices();
     const down = all.filter((s) => !s.up).map((s) => s.slug);
     if (body.start !== false) {

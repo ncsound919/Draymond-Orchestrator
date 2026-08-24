@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeRequest } from '@/lib/draymond/api-auth';
-import { saveBenchmarkWeights } from '@/lib/draymond/learning-store';
+import { saveBenchmarkWeights, type DriftDetectionMetrics, type SelfTunedFacetWeights } from '@/lib/draymond/learning-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +9,8 @@ export async function POST(request: NextRequest) {
   const authError = authorizeRequest(request);
   if (authError) return authError;
   const body = (await request.json().catch(() => ({}))) as {
-    benchmarkWeights?: any; driftMetrics?: any;
+    benchmarkWeights?: SelfTunedFacetWeights;
+    driftMetrics?: DriftDetectionMetrics;
   };
   if (!body.benchmarkWeights || typeof body.benchmarkWeights.speedAndLatency !== 'number') {
     return NextResponse.json({ error: 'benchmarkWeights.speedAndLatency required' }, { status: 400 });

@@ -13,6 +13,8 @@ import { sendNotification, sendAlertEmail } from './notifications';
 import { emitJobStarted, emitJobCompleted, emitJobFailed } from '@/lib/draymond/event-bridge';
 import { delegationTimeoutSeconds, delegationFor, isWithinWindow, delegationWindow } from './delegation';
 import { classifyRetryable, retryDelayMs } from './retry';
+import type { BbtechInsightSyncResult } from '@/lib/science/trendsFeed';
+import type { DrainResult as GapDrainResult } from '@/lib/science/researchEscalation';
 
 // ============================================================================
 // RUN LEASES + HEARTBEAT
@@ -644,6 +646,7 @@ export const CUSTOM_HANDLERS: CustomHandlerDef[] = [
   { handler: 'ingest_news', label: 'News Digest Ingest', description: 'Ingest news APIs and cache current items for the fleet.' },
   { handler: 'self_learning_loop', label: 'Self-Learning Loop', description: 'Distill lessons from outcomes (QA/jobs/incidents).' },
   { handler: 'synthesis_midday', label: 'Synthesis Midday Check', description: 'Midday synthesis pass: evaluate sector thresholds and run synthesis for sectors ready to study combinations.' },
+  { handler: 'clinvar_surveillance', label: 'ClinVar Variant Surveillance', description: 'Query real NCBI ClinVar (via BioComposable) for watched variants and flag reclassifications.' },
   { handler: 'rd_night', label: 'Night Mode R&D', description: 'Overnight research + dev planning from news + backlog.' },
   { handler: 'fetch_market_data', label: 'Market Data Snapshot', description: 'Daily free-API market/research snapshot.' },
   { handler: 'rotate_tokens', label: 'Token Rotation Check', description: 'Report provider budget/rate health for key rotation.' },
@@ -793,6 +796,23 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
 
     case 'custom': {
       const handler = config.handler as string | undefined;
+
+      if (handler === 'pool_health') {
+        // Morning LLM free-account entitlement check: probes every pooled
+        // credential, regenerates litellm.yaml to match, restarts the gateway
+        // when routing changed. Writes .draymond/pool-health.json.
+        const { runPoolHealth } = await import('./pool-health');
+        const state = await runPoolHealth();
+        return {
+          handler,
+          checked_at: state.checkedAt,
+          ox_alpha_active: state.oxAlphaActiveKeys.length,
+          zen_free_only: state.zenFreeOnlyKeys.length,
+          openrouter: state.openrouter?.status ?? 'absent',
+          deepseek: state.deepseek?.status ?? 'absent',
+          ollama_alive: `${state.ollamaCloud.filter((o) => o.ok).length}/${state.ollamaCloud.length}`,
+        };
+      }
 
       if (handler === 'benchmark_roster') {
         // Deep-score every pictured roster agent's repo (RepoRank/Grader/
@@ -1063,6 +1083,14 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         const { runSynthesis } = await import('./synthesis');
         const synth = await runSynthesis();
         return { handler, ...synth };
+      }
+
+      if (handler === 'clinvar_surveillance') {
+        // Real NCBI ClinVar variant surveillance via the BioComposable proxy;
+        // reclassifications feed the self-learning loop as discoveries.
+        const { runClinVarSurveillance } = await import('./clinvar-surveillance');
+        const summary = await runClinVarSurveillance();
+        return { handler, ...summary };
       }
 
       if (handler === 'self_repair_check') {
@@ -1514,6 +1542,42 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         // scientific research system consistently gets smarter.
         const { gradeResearch } = await import('@/lib/science/research-grade');
         const r = await gradeResearch();
+        // BBTech science step (keyed like a chain step's output_key, cf.
+        // business-chains 'trends'): synthesize cross-domain InsightReports
+        // over the real NBA dataset profiles and persist them into the
+        // science_insights trends store. Fail-soft — an unavailable python
+        // runtime or dataset dir is recorded, never thrown.
+        let bbtechScience: BbtechInsightSyncResult;
+        try {
+          const { syncBbtechInsights } = await import('@/lib/science/trendsFeed');
+          bbtechScience = await syncBbtechInsights();
+        } catch (err) {
+          bbtechScience = {
+            ok: false,
+            profilesFound: 0,
+            synthesized: 0,
+            persisted: 0,
+            duplicates: 0,
+            errors: [err instanceof Error ? err.message : String(err)],
+            reason: 'bbtech insight sync failed',
+          };
+        }
+        // Research-gap drain step (fail-soft like bbtech_science): push open
+        // science_gaps to OmniResearch so deep-research work never stalls.
+        // Offline OmniResearch degrades honestly — gaps stay open (queued).
+        let gapDrain: GapDrainResult;
+        try {
+          const { drainOpenGaps } = await import('@/lib/science/researchEscalation');
+          gapDrain = await drainOpenGaps();
+        } catch (err) {
+          gapDrain = {
+            ok: false,
+            dispatched: 0,
+            queued: 0,
+            errors: [err instanceof Error ? err.message : String(err)],
+            reason: 'gap drain failed',
+          };
+        }
         return {
           handler,
           graded: r.grades.length,
@@ -1522,6 +1586,22 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
           top: r.grades.slice(0, 5).map((g) => ({ goalId: g.goalId, score: g.score, evidence: g.evidenceTier, class: g.breakthroughClass })),
           discoveries: r.discoveries.map((g) => ({ goalId: g.goalId, score: g.score })),
           insights: r.insights.slice(0, 5).map((i) => ({ type: i.type, detail: i.detail })),
+          bbtech_science: {
+            ok: bbtechScience.ok,
+            profiles_found: bbtechScience.profilesFound,
+            synthesized: bbtechScience.synthesized,
+            persisted: bbtechScience.persisted,
+            duplicates: bbtechScience.duplicates,
+            errors: bbtechScience.errors.slice(0, 5),
+            ...(bbtechScience.reason ? { reason: bbtechScience.reason } : {}),
+          },
+          gap_escalation: {
+            ok: gapDrain.ok,
+            dispatched: gapDrain.dispatched,
+            queued: gapDrain.queued,
+            errors: gapDrain.errors.slice(0, 5),
+            ...(gapDrain.reason ? { reason: gapDrain.reason } : {}),
+          },
         };
       }
 
@@ -2417,6 +2497,14 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     cron_expression: '0 12 * * *',
     job_type: 'custom',
     job_config: { handler: 'synthesis_midday' },
+    is_enabled: true,
+  },
+  {
+    name: 'ClinVar Variant Surveillance',
+    description: 'Daily 8am — query real NCBI ClinVar (via BioComposable) for watched variants, flag reclassifications, and feed consensus discoveries into the self-learning loop.',
+    cron_expression: '0 8 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'clinvar_surveillance' },
     is_enabled: true,
   },
   {

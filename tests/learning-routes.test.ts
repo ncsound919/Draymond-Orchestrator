@@ -102,7 +102,7 @@ describe('learning HTTP surface', () => {
     expect(second.status).toBe(200);
 
     const body = await readStore();
-    const matches = body.discoveries.filter((d: any) => d.goalId === 'dg1');
+    const matches = body.discoveries.filter((d: { goalId?: string }) => d.goalId === 'dg1');
     expect(matches).toHaveLength(1);
     expect(matches[0].title).toBe('second title');
     expect(matches[0].score).toBe(260);

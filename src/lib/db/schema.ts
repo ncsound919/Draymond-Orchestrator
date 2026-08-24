@@ -136,6 +136,14 @@ export const COLUMN_MAPS: Record<string, ColumnMap> = {
     json: ['pack'],
     bool: [],
   },
+  science_insights: {
+    json: ['report'],
+    bool: [],
+  },
+  science_gaps: {
+    json: ['payload'],
+    bool: [],
+  },
   command_leads: {
     json: ['tags', 'notes', 'metadata'],
     bool: [],
@@ -823,6 +831,43 @@ CREATE TABLE IF NOT EXISTS command_leads (
 CREATE INDEX IF NOT EXISTS idx_command_leads_stage ON command_leads(stage);
 CREATE INDEX IF NOT EXISTS idx_command_leads_owner ON command_leads(owner);
 CREATE INDEX IF NOT EXISTS idx_command_leads_created ON command_leads(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS science_insights (
+  id TEXT PRIMARY KEY,
+  source TEXT NOT NULL DEFAULT 'bbtech',
+  session_id TEXT NOT NULL DEFAULT '',
+  domain TEXT NOT NULL DEFAULT 'sports',
+  report TEXT NOT NULL DEFAULT '{}',
+  evidence_tier TEXT NOT NULL DEFAULT 'E3',
+  generated_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_science_insights_source ON science_insights(source);
+CREATE INDEX IF NOT EXISTS idx_science_insights_generated ON science_insights(generated_at DESC);
+-- Idempotency key: a re-persisted report (same source+session+generatedAt)
+-- upserts over the original row instead of duplicating it.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_science_insights_key
+  ON science_insights(source, session_id, generated_at);
+
+CREATE TABLE IF NOT EXISTS science_gaps (
+  gap_id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  title TEXT NOT NULL,
+  detail TEXT,
+  source_ref TEXT,
+  evidence_tier TEXT NOT NULL DEFAULT 'E3',
+  severity INTEGER NOT NULL DEFAULT 3,
+  status TEXT NOT NULL DEFAULT 'open',
+  payload TEXT NOT NULL DEFAULT '{}',
+  dispatched_at TEXT,
+  detected_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_science_gaps_status ON science_gaps(status);
+CREATE INDEX IF NOT EXISTS idx_science_gaps_kind ON science_gaps(kind);
+CREATE INDEX IF NOT EXISTS idx_science_gaps_severity ON science_gaps(severity DESC);
 
 CREATE TABLE IF NOT EXISTS command_seo_tasks (
   id TEXT PRIMARY KEY,

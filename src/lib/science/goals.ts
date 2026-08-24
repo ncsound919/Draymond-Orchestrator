@@ -12,7 +12,7 @@ import path from 'node:path';
 
 export type ScienceDomain = 'biotech' | 'sports';
 export type GoalStatus = 'active' | 'paused' | 'completed' | 'archived';
-export type HypothesisStatus = 'untested' | 'in_progress' | 'supported' | 'refuted';
+export type HypothesisStatus = 'untested' | 'in_progress' | 'inconclusive' | 'supported' | 'refuted';
 
 export interface ScienceGoal {
   id: string;

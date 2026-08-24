@@ -54,6 +54,7 @@ export default function Header() {
                 <Link
                   key={item.name}
                   href={item.href}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                     isActive
                       ? 'text-white bg-white/10'
@@ -72,6 +73,7 @@ export default function Header() {
             <span className="text-xs text-white/40 hidden sm:block">System Online</span>
             {pathname !== '/login' && (
               <button
+                type="button"
                 onClick={logout}
                 className="text-xs font-medium text-white/50 hover:text-white transition-colors"
               >

@@ -5,6 +5,13 @@ import path from 'node:path';
 import { runPythonMetrics, runPythonCoach, runPythonTranslate, runPythonInsights } from '@/lib/sports/pythonExecutors';
 import { validateOutput } from '@/lib/sports/validate';
 
+// Insight runs now auto-persist into the trends store; keep that in-memory so
+// the regression suite never writes rows into the dev draymond.db. The gap
+// escalation choke point likewise must never touch the REAL .draymond brain
+// state, so pin the registry dir to a throwaway temp dir for this suite.
+process.env.DRAYMOND_DB_PATH = ':memory:';
+process.env.DRAYMOND_REGISTRY_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'sports-exec-brain-'));
+
 describe('sports python executors', () => {
   const PY_TIMEOUT = 30_000;
 

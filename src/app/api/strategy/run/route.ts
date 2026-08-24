@@ -53,8 +53,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Unparseable output from strategy runner' }, { status: 500 });
     }
     return NextResponse.json(parsed);
-  } catch (err: any) {
-    const isTimeout = err && typeof err === 'object' && err.killed === true;
+  } catch (err) {
+    const isTimeout =
+      err && typeof err === 'object' && (err as { killed?: unknown }).killed === true;
     console.error('[strategy/run] runner failed:', err);
     return NextResponse.json(
       { ok: false, error: isTimeout ? 'Strategy run timed out' : 'Strategy runner failed to execute' },

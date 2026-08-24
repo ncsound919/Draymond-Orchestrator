@@ -12,6 +12,12 @@ export async function requireDraymondAuth(): Promise<
   { user: { id: string; email?: string }; error?: never } | { user?: never; error: Response }
 > {
   try {
+    // Explicit opt-in bypass for local manual development only.
+    // Unit tests must NOT set this variable so they exercise real auth paths.
+    if (process.env.ALLOW_INSECURE_DEV_AUTH === 'true') {
+      return { user: { id: 'local-dev-admin', email: 'admin@localhost' } };
+    }
+
     const user = await getCurrentUser();
 
     if (!user) {

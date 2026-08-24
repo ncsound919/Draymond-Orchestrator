@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { ensureResearchBacklog, seedGoalCampaign, QUEUE_FLOOR } from '@/lib/science/campaigns';
-import { listQueuedExperiments, enqueueExperiment } from '@/lib/science/experiments';
+import { enqueueExperiment } from '@/lib/science/experiments';
 import type { HypothesisStatus } from '@/lib/science/goals';
 
 const { mockStore } = vi.hoisted(() => ({

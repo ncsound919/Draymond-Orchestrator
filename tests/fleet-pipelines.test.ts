@@ -1,4 +1,6 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   FLEET_PIPELINES,
   pipelineFor,
@@ -71,8 +73,6 @@ describe('fleet pipelines', () => {
       expect(pipelineRequirements(parent)).toBe(requirements);
     }
     // Every manifest exists on disk next to the repo root.
-    const fs = require('node:fs');
-    const path = require('node:path');
     for (const { requirements } of withReqs) {
       expect(fs.existsSync(path.join(process.cwd(), requirements)), `${requirements} missing`).toBe(true);
     }

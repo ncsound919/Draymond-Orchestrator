@@ -27,7 +27,13 @@ function startNextServer() {
   //   1. `.next/standalone/server.js` (stock Next standalone build output)
   //   2. `<app>/server.js` (portable layout with standalone at app root)
   const nodeBin = findNodeBin();
-  const appRoot = path.join(__dirname, '..');
+  // In a packaged app the standalone output is unpacked to
+  // resources/app.asar.unpacked/ so the spawned system node (which cannot read
+  // asar archives) can actually load it. In dev the standalone sits next to
+  // electron/ at the project root.
+  const appRoot = app.isPackaged
+    ? path.join(process.resourcesPath, 'app.asar.unpacked')
+    : path.join(__dirname, '..');
   const standaloneCandidates = [
     path.join(appRoot, '.next/standalone/server.js'),
     path.join(appRoot, 'server.js'),

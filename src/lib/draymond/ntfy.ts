@@ -103,9 +103,12 @@ export async function publishIssueNotification(input: {
   const topic = process.env.NTFY_TOPIC_RESULTS;
   if (!baseUrl || !topic) return false;
 
-  const publicUrl = process.env.DRAYMOND_PUBLIC_URL;
+  const publicUrl =
+    process.env.DRAYMOND_PUBLIC_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    null;
   const actions: Array<Record<string, unknown>> = [];
-  if (publicUrl && input.repair) {
+  if (input.repair && publicUrl) {
     const { token } = issueRepairToken(input.repair);
     actions.push({
       action: 'http',

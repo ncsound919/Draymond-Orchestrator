@@ -13,6 +13,12 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
+import {
+  syncRepairCooldownMs,
+  syncRepairMaxInCooldown,
+  syncRepairLoopWindowMs,
+  syncRepairLoopThreshold,
+} from "@/lib/command-center/controls";
 
 export interface RepairAction {
   /** e.g. "restart:overlay-auditor", "reseed:registry" */
@@ -129,11 +135,13 @@ export function loadRepairMap(): Record<string, RepairAction> {
   }
 }
 
-// ── Failure-loop guard thresholds (env-overridable) ──────────────────────────
-const cooldownMs = () => Number(process.env.DRAYMOND_REPAIR_COOLDOWN_MS ?? 30 * 60 * 1000);
-const maxInCooldown = () => Number(process.env.DRAYMOND_REPAIR_MAX_IN_COOLDOWN ?? 3);
-const loopWindowMs = () => Number(process.env.DRAYMOND_REPAIR_LOOP_WINDOW_MS ?? 7 * 24 * 60 * 60 * 1000);
-const loopThreshold = () => Number(process.env.DRAYMOND_REPAIR_LOOP_THRESHOLD ?? 3);
+// ── Failure-loop guard thresholds (controls > env > default) ────────────────
+// The operator's Command Center knobs (stored via controls.json) win over the
+// env vars; falling back to env, then the built-in default. Never throws.
+const cooldownMs = () => syncRepairCooldownMs(process.env.DRAYMOND_REPAIR_COOLDOWN_MS);
+const maxInCooldown = () => syncRepairMaxInCooldown(process.env.DRAYMOND_REPAIR_MAX_IN_COOLDOWN);
+const loopWindowMs = () => syncRepairLoopWindowMs(process.env.DRAYMOND_REPAIR_LOOP_WINDOW_MS);
+const loopThreshold = () => syncRepairLoopThreshold(process.env.DRAYMOND_REPAIR_LOOP_THRESHOLD);
 
 const DIR = process.env.DRAYMOND_REGISTRY_DIR ?? path.join(process.cwd(), ".draymond");
 const LOG_FILE = path.join(DIR, "repair-log.json");

@@ -499,6 +499,13 @@ export type DraymondChain = {
   updated_at: string;
 };
 
+export type DraymondChainResult = {
+  success: boolean;
+  error?: string;
+  output?: unknown;
+  input_data?: Record<string, unknown>;
+};
+
 export type DraymondChainInsert = {
   name: string;
   slug: string;

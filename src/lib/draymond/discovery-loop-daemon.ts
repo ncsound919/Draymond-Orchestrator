@@ -17,22 +17,22 @@
 //   DRAYMOND_DISCOVERY_LOOP_ENABLED   = "0" disables the daemon (default on)
 //   DRAYMOND_DISCOVERY_LOOP_INTERVAL_MS = cadence in ms (default 30 min)
 //   DRAYMOND_DISCOVERY_LOOP_ITERATIONS  = loop iterations per run (default 1)
+// Command Center controls (controls.json) override the env vars at call-time.
 // ============================================================================
 
 import { runDiscoveryLoopScript } from "./discovery-loop-runner";
+import {
+  syncDiscoveryIntervalMs,
+  syncDiscoveryIterations,
+  syncDiscoveryEnabled,
+} from "@/lib/command-center/controls";
 
 let _timer: ReturnType<typeof setInterval> | null = null;
 let _running = false;
 
-const daemonEnabled = (): boolean => process.env.DRAYMOND_DISCOVERY_LOOP_ENABLED !== "0";
-const intervalMs = (): number => {
-  const raw = Number(process.env.DRAYMOND_DISCOVERY_LOOP_INTERVAL_MS ?? 30 * 60 * 1000);
-  return Number.isFinite(raw) && raw > 0 ? raw : 30 * 60 * 1000;
-};
-const iterations = (): number => {
-  const raw = Number(process.env.DRAYMOND_DISCOVERY_LOOP_ITERATIONS ?? 1);
-  return Math.max(1, Math.min(3, Number.isFinite(raw) ? Math.round(raw) : 1));
-};
+const daemonEnabled = (): boolean => syncDiscoveryEnabled(process.env.DRAYMOND_DISCOVERY_LOOP_ENABLED);
+const intervalMs = (): number => syncDiscoveryIntervalMs(process.env.DRAYMOND_DISCOVERY_LOOP_INTERVAL_MS);
+const iterations = (): number => syncDiscoveryIterations(process.env.DRAYMOND_DISCOVERY_LOOP_ITERATIONS);
 
 async function tick(): Promise<void> {
   if (_running) return;

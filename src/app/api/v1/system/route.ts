@@ -102,7 +102,10 @@ export async function POST(request: NextRequest) {
       }
       const token = mintSystemApproval('power', action);
       if (!token) return NextResponse.json({ error: 'approval secret not configured' }, { status: 500 });
-      const result = await controlPower({ action: action as any }, token);
+      const result = await controlPower(
+        { action: action as 'shutdown' | 'restart' | 'sleep' | 'hibernate' | 'lock' },
+        token,
+      );
       return NextResponse.json(result, { status: result.status === 0 ? 502 : result.status });
     }
     case 'file': {
@@ -122,7 +125,10 @@ export async function POST(request: NextRequest) {
       }
       const token = mintSystemApproval('service', name);
       if (!token) return NextResponse.json({ error: 'approval secret not configured' }, { status: 500 });
-      const result = await controlService({ name, action: action as any }, token);
+      const result = await controlService(
+        { name, action: action as 'start' | 'stop' | 'restart' },
+        token,
+      );
       return NextResponse.json(result, { status: result.status === 0 ? 502 : result.status });
     }
     case 'priority': {

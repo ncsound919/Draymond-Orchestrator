@@ -153,6 +153,7 @@ export const DELEGATION_PLAN: DelegationSpec[] = [
   { slug: 'systemic_interconnect', label: 'Systemic interconnect', phase: 'night', window: { start: '00:00', end: '06:00', days: [7] }, timeBudgetMs: 1_200_000, tokenBudgetPerRun: 96_000, tokenBudgetPerDay: 96_000, tier: 'pro', priority: 2, duty: 'night' },
   { slug: 'self_learning_loop', label: 'Self-learning loop', phase: 'night', timeBudgetMs: 300_000, tokenBudgetPerRun: 32_000, tokenBudgetPerDay: 32_000, tier: 'flash', priority: 2, duty: 'night' },
   { slug: 'synthesis_midday', label: 'Synthesis midday check', phase: 'midday', timeBudgetMs: 300_000, tokenBudgetPerRun: 32_000, tokenBudgetPerDay: 64_000, tier: 'flash', priority: 2, duty: 'always-on' },
+  { slug: 'clinvar_surveillance', label: 'ClinVar variant surveillance', phase: 'morning', timeBudgetMs: 120_000, tokenBudgetPerRun: 16_000, tokenBudgetPerDay: 16_000, tier: 'flash', priority: 3, duty: 'always-on' },
 
   // ── Benchmarks / audits — midday, compressed ────────────────────────────
   { slug: 'benchmark_roster', label: 'Roster benchmark', phase: 'morning', timeBudgetMs: 900_000, tokenBudgetPerRun: 96_000, tokenBudgetPerDay: 96_000, tier: 'flash', priority: 2, duty: 'always-on' },

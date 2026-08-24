@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeRequest, parseJsonBody } from '@/lib/draymond/api-auth';
-import { mintSystemApproval } from '@/lib/draymond/system-agent';
+import { mintSystemApproval, type SystemControlAction } from '@/lib/draymond/system-agent';
 
 export const dynamic = 'force-dynamic';
 
-const VALID_ACTIONS = ['launch', 'kill', 'power', 'file', 'service', 'priority'];
+const VALID_ACTIONS: readonly string[] = [
+  'launch', 'kill', 'power', 'file', 'service', 'priority',
+];
 
 /**
  * POST /api/v1/system/approve — mint a short-lived approval token for a
@@ -29,7 +31,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'target (string) required' }, { status: 400 });
   }
 
-  const token = mintSystemApproval(action as any, target);
+  const token = mintSystemApproval(action as SystemControlAction, target);
   if (!token) {
     return NextResponse.json({ error: 'SYSTEM_AGENT_APPROVAL_SECRET not configured' }, { status: 500 });
   }

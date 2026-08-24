@@ -25,6 +25,7 @@ import path from "node:path";
 import { codingStackSummary, resolveCodingTools } from "./coding-stack";
 import { pipelineSummary } from "./fleet-pipelines";
 import { TOOL_PORTS } from "./ports";
+import { executeChainWithBrainFallback } from "./chain-execution-fallback";
 
 export type FailureKind = 'chain_config' | 'notification_config' | 'missing_env' | 'service_down' | 'code_error' | 'benchmark_weak' | 'unknown';
 
@@ -167,6 +168,62 @@ export async function repairFailedJob(
   const kind = classifyFailure(error);
   const crew = assembleCrew(kind);
   const base = { jobId: job.id, jobName: job.name, failureKind: kind, error, crew, repairedAt: new Date().toISOString(), lessonHints };
+
+  if (job.job_type === 'chain' || typeof job.job_config?.chain_slug === 'string' || typeof job.job_config?.trigger_type === 'string') {
+    const chainResult = await executeChainWithBrainFallback({
+      chain: {
+        id: job.id,
+        name: job.name,
+        slug: job.name,
+        trigger_type: typeof job.job_config.trigger_type === 'string' ? job.job_config.trigger_type : 'manual',
+        trigger_config: {},
+        input_data: (job.job_config as Record<string, unknown>) ?? {},
+        output_data: {},
+        context: {},
+        description: null,
+        version: '1.0.0',
+        is_template: false,
+        template_id: null,
+        created_by: null,
+        agent_id: null,
+        status: 'failed',
+        started_at: null,
+        completed_at: null,
+        total_steps: 0,
+        completed_steps: 0,
+        failed_steps: 0,
+        total_duration_ms: null,
+        error_message: error,
+        retry_count: 0,
+        max_retries: 0,
+        session_id: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as any,
+      error: new Error(error),
+      inputData: job.job_config as Record<string, unknown>,
+    });
+
+    if (chainResult.fallback_used) {
+      const detail = chainResult.success
+        ? `deterministic brain completed failed chain ${job.name} after token/service outage`
+        : `deterministic brain attempted fallback for ${job.name}: ${chainResult.error ?? 'unknown failure'}`;
+
+      await recordRepair({
+        ...base,
+        action: chainResult.success ? 'fixed' : 'escalated',
+        detail,
+        dispatch: { kind: 'deterministic-brain', result: chainResult.success ? 'completed' : 'failed' },
+      });
+
+      return {
+        ...base,
+        action: chainResult.success ? 'fixed' : 'escalated',
+        detail,
+        dispatch: { kind: 'deterministic-brain', result: chainResult.success ? 'completed' : 'failed' },
+      };
+    }
+  }
 
   // Known config fixes (deterministic, safe).
   if (kind === "chain_config" && typeof job.job_config.chain === "string") {

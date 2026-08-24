@@ -18,9 +18,12 @@ interface AgentLane {
 }
 
 const PROVIDER_DAILY_BUDGETS: Record<string, number> = {
-  'opencode-free': 500_000,   // tokens/day
-  opencode: 500_000,
-  deepseek: 1_000_000,
+  'ox-alpha': 800_000,        // ecosystem primary — Ox Alpha free (zen/v1)
+  'opencode-free': 800_000,   // alias of ox-alpha (same zen/v1 tier, shared quota)
+  opencode: 500_000,          // Go tier — fallback only
+  deepseek: 1_000_000,        // first fallback (api.deepseek.com)
+  'deepseek-direct': 1_000_000,
+  dsh: 800_000,               // DSH harness gateway (ox-alpha via harness seam)
   gemini: 1_000_000,
   openai: 1_000_000,
   anthropic: 1_000_000,

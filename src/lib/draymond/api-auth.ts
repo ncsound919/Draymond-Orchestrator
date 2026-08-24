@@ -43,9 +43,14 @@ function safeCompare(a: string, b: string): boolean {
  * ```
  */
 export function authorizeRequest(request: NextRequest | Request): NextResponse | null {
+  // Explicit opt-in bypass for local manual development only.
+  // Tests must NOT set this variable — they exercise the real auth path.
+  if (process.env.ALLOW_INSECURE_DEV_AUTH === 'true') {
+    return null;
+  }
+
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
-    // Log the real issue server-side, but return a generic error to the caller
     console.error('[API Auth] CRON_SECRET env var is not set');
     return NextResponse.json(
       { error: 'Internal server error' },

@@ -59,8 +59,6 @@ export interface BrainDecision {
 // BRAIN CLIENT — /reason (deterministic reasoning) + agenda alignment
 // ============================================================================
 
-const BRAIN_URL = () => process.env.BRAIN_URL ?? '';
-
 // ============================================================================
 // DETERMINISTIC FALLBACK — agenda + intel → priority ordering (no LLM)
 // ============================================================================

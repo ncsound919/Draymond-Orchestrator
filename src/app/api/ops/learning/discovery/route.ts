@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeRequest } from '@/lib/draymond/api-auth';
-import { upsertDiscovery } from '@/lib/draymond/learning-store';
+import { upsertDiscovery, type ResearchGrade } from '@/lib/draymond/learning-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   const authError = authorizeRequest(request);
   if (authError) return authError;
-  const body = (await request.json().catch(() => ({}))) as { discovery?: any };
+  const body = (await request.json().catch(() => ({}))) as { discovery?: ResearchGrade };
   const discovery = body.discovery;
   if (
     !discovery ||

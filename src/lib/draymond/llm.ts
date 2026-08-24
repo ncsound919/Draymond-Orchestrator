@@ -1,12 +1,14 @@
 // ============================================================================
 // DRAYMOND — Shared LLM Call Helper (provider chain with fallback)
 // ============================================================================
-// Provider-agnostic LLM calls. Primary is DeepSeek V4 Flash (0731) served by
-// OpenCode Go (paid); if it fails (rate limit, outage, balance), the chain
-// falls back to DeepSeek direct (api.deepseek.com, deepseek-chat), then the
-// local Ollama tier, then the deterministic fallback. gpt/anthropic/gemini
-// are not in the default chain (not used enough); they remain available when
-// explicitly requested.
+// Provider-agnostic LLM calls. Ecosystem routing (DSH-aware):
+//   Primary: Ox Alpha free via OpenCode Zen free (https://opencode.ai/zen/v1,
+//            model ox-alpha-free) — routed through the DeepSeek Harness llm
+//            seam when the harness is running (port 3080, see ecosystem.patch.yml).
+//   Fallback: DeepSeek direct (api.deepseek.com, deepseek-chat), then the
+//            funded Go tier (zen/go/v1, deepseek-v4-flash), then local Ollama,
+//            then the deterministic fallback. gpt/anthropic/gemini remain
+//            available when explicitly requested.
 // All OpenAI-compatible providers share one request shape; Anthropic uses the
 // Messages API; Gemini uses the Google Generative Language format.
 // ============================================================================
@@ -21,14 +23,17 @@ import {
 import type { FallbackContext } from './fallbacks';
 
 export type LLMProvider =
+  | 'ox-alpha'
   | 'opencode-free'
   | 'opencode'
   | 'deepseek'
+  | 'deepseek-direct'
   | 'gemini'
   | 'openai'
   | 'anthropic'
   | 'qwen'
   | 'litellm'
+  | 'dsh'
   | 'ollama';
 
 export interface LLMCallOptions {
@@ -76,52 +81,72 @@ export interface LLMCallOptions {
 }
 
 const PROVIDER_URLS: Record<LLMProvider, string> = {
+  // Ox Alpha free — ecosystem primary, via OpenCode Zen free tier. Same wire as opencode-free
+  // but with the ecosystem model id ox-alpha-free. Routed via DSH harness when DSH is up.
+  'ox-alpha': 'https://opencode.ai/zen/v1/chat/completions',
   'opencode-free': 'https://opencode.ai/zen/v1/chat/completions',
   opencode: 'https://opencode.ai/zen/go/v1/chat/completions',
   deepseek: 'https://api.deepseek.com/v1/chat/completions',
+  'deepseek-direct': 'https://api.deepseek.com/v1/chat/completions',
   gemini: 'https://generativelanguage.googleapis.com/v1beta/models',
   openai: 'https://api.openai.com/v1/chat/completions',
   anthropic: 'https://api.anthropic.com/v1/messages',
   qwen: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions',
   litellm: 'http://localhost:4100/v1/chat/completions',
+  // DSH harness gateway — OpenAI-compatible endpoint proxied through the harness llm seam
+  // (attributionHeaders, retryPolicy, credential seam). Env OPENCODE_VIA_DSH=1 prefers this.
+  dsh: 'http://localhost:3080/v1/chat/completions',
   ollama: 'http://localhost:11434/v1/chat/completions',
 };
 
 const PROVIDER_ENV: Record<LLMProvider, string> = {
+  'ox-alpha': 'OPENCODE_API_KEY',
   'opencode-free': 'OPENCODE_API_KEY',
   opencode: 'OPENCODE_API_KEY',
   deepseek: 'DEEPSEEK_API_KEY',
+  'deepseek-direct': 'DEEPSEEK_API_KEY',
   gemini: 'GEMINI_API_KEY',
   openai: 'OPENAI_API_KEY',
   anthropic: 'ANTHROPIC_API_KEY',
   qwen: 'QWEN_API_KEY',
   litellm: 'LITELLM_API_KEY',
+  dsh: 'OPENCODE_API_KEY',
   ollama: 'OLLAMA_ENABLED',
 };
 
 const DEFAULT_MODELS: Record<LLMProvider, string> = {
-  'opencode-free': 'deepseek-v4-flash-free',
+  // Ox Alpha free — ecosystem primary (zen/v1). Wire alias deepseek-v4-flash-free kept for
+  // compat where upstream still expects the DeepSeek name; harness adapter advertises both.
+  'ox-alpha': 'ox-alpha-free',
+  'opencode-free': 'ox-alpha-free',
   opencode: 'deepseek-v4-flash',
   // Direct api.deepseek.com provider — `deepseek-v4-flash` is an opencode-only
   // model name; the real DeepSeek API serves `deepseek-chat` / `deepseek-reasoner`.
   // Using the wrong name made the deepseek fallback return empty and skip.
   deepseek: 'deepseek-chat',
+  'deepseek-direct': 'deepseek-chat',
   gemini: 'gemini-3.5-flash',
   openai: 'gpt-4o-mini',
   anthropic: 'claude-sonnet-4-5',
   qwen: 'qwen-plus',
   litellm: 'gpt-4o-mini',
+  dsh: 'ox-alpha-free',
   // Local Ollama tier — qwen3:0.6b is the installed fast model (tool-calling
   // capable, ~34 tok/s on this CPU vs ~7 for the 4.6B workhorse).
   ollama: process.env.OLLAMA_MODEL ?? 'qwen3:0.6b',
 };
 
-/** Resolution order when no explicit provider is requested. */
+/** Resolution order when no explicit provider is requested. Ecosystem: Ox Alpha free primary, DeepSeek direct fallback. */
 const FALLBACK_ORDER: LLMProvider[] = [
-  // Go tier — the funded deepseek-v4-flash via opencode. Primary.
-  'opencode',
-  // DeepSeek direct (api.deepseek.com, deepseek-chat). Second.
+  // Ox Alpha free via OpenCode Zen free (https://opencode.ai/zen/v1) — ecosystem primary.
+  // Routed through DSH harness llm seam when harness is running (see ecosystem.patch.yml).
+  'ox-alpha',
+  // Wire-compatible alias — same zen/v1 endpoint, same key, alternative model id.
+  'opencode-free',
+  // DeepSeek direct (api.deepseek.com, deepseek-chat) — first fallback when free tier 429s.
   'deepseek',
+  // Funded Go tier (zen/go/v1, deepseek-v4-flash) — second fallback, keeps fleet moving when free quota exhausted.
+  'opencode',
   // Local Ollama (free, on-device) — used for cheap/quick calls.
   'ollama',
 ];

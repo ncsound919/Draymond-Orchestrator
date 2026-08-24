@@ -245,6 +245,21 @@ export function savePublicationEvent(event: PublicationEvent): Promise<void> {
   });
 }
 
+/**
+ * List the latest discoveries (newest gradedAt first), capped to `limit`.
+ * Never throws — returns [] when the store is unreadable.
+ */
+export async function listDiscoveries(limit = 20): Promise<ResearchGrade[]> {
+  try {
+    const store = await readLearningStore();
+    return [...store.discoveries]
+      .sort((a, b) => (b.gradedAt ?? '').localeCompare(a.gradedAt ?? ''))
+      .slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
 /** Remember which publication events already produced learning outcomes. */
 export function markPublicationEventsConsumed(ids: string[]): Promise<void> {
   return enqueueWrite(async () => {

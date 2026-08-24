@@ -164,6 +164,23 @@ const FLEET_SERVICES = [
     memory: "1G",
     env: { ...D, NODE_ENV: "production" },
   }),
+  // OmniResearch Pro — deep-research analyst (Gemini / Ollama / SearXNG).
+  // Research-squad lead. Runs on :3010 (OMNI_RESEARCH_URL) so KeyWire keeps :3000.
+  pm2App({
+    name: "omniresearch",
+    script: O("agents/OmniResearch-Pro-main/node_modules/tsx/dist/cli.mjs"),
+    args: "server.ts",
+    cwd: O("agents/OmniResearch-Pro-main"),
+    interpreter: NODE,
+    memory: "768M",
+    env: {
+      ...D,
+      NODE_ENV: "production",
+      PORT: "3010",
+      OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434",
+      BOOKBRIDGE_URL: "http://127.0.0.1:8777",
+    },
+  }),
   pm2App({
     name: "uplift-agent",
     script: "server.js",
@@ -239,6 +256,22 @@ const FLEET_SERVICES = [
     env: { PORT: "3061", NODE_ENV: "production", ...D },
   }),
   pm2App({
+    name: "overlay-oncology",
+    script: "node_modules/next/dist/bin/next",
+    args: "dev -p 3070",
+    cwd: P("02_Pillars/Overlay Science/Overlay Oncology"),
+    interpreter: NODE,
+    memory: "1G",
+    env: {
+      PORT: "3070",
+      NODE_ENV: "development",
+      NEXT_PUBLIC_BRAIN_URL: D.NEXT_PUBLIC_BRAIN_URL || "http://localhost:3210",
+      NEXT_PUBLIC_DRAYMOND_URL: D.NEXT_PUBLIC_DRAYMOND_URL || "http://localhost:3444",
+      GEMINI_API_KEY: D.GEMINI_API_KEY || "",
+      ...D,
+    },
+  }),
+  pm2App({
     name: "system-agent",
     script: O("agents/system-agent/node_modules/tsx/dist/cli.mjs"),
     args: "src/server.ts",
@@ -285,7 +318,7 @@ const FLEET_SERVICES = [
       GEMINI_API_KEY: D.GEMINI_API_KEY || "",
       COMIC_ENGINE_URL: process.env.COMIC_ENGINE_URL || "http://localhost:8100",
       HEMPFORGE_URL: "",
-      OMNIRESEARCH_URL: "",
+      OMNIRESEARCH_URL: process.env.OMNI_RESEARCH_URL || "http://localhost:3010",
     },
   }),
 
@@ -303,31 +336,107 @@ const FLEET_SERVICES = [
 ];
 
 // ── Marketing / coding stack (ecosystem.marketing.config.js) ────────────────
+
+const REDIS_BIN =
+  process.env.REDIS_BIN ||
+  "C:\\Program Files\\Redis\\redis-server.exe";
+
+const SMD_DIR = O("agents/Social-Media-Dashboard--main");
+
+const SMD_ENV = {
+  AI_BACKEND: "remote",
+  AI_IMAGE_BACKEND: "local",
+  AI_DEVICE: "cpu",
+  SD_MODEL: "stabilityai/sd-turbo",
+  REMOTE_LLM_MODEL: "opencode",
+  REMOTE_LLM_URL: "http://localhost:4100/chat/completions",
+  REMOTE_LLM_API_KEY: D.LITELLM_MASTER_KEY || D.DEEPSEEK_API_KEY || "",
+  GEMINI_API_KEY: D.GEMINI_API_KEY || "",
+  GEMINI_MODEL: "gemini-3.5-flash",
+  REDIS_URL: "redis://127.0.0.1:6379/0",
+  X_API_KEY: D.X_API_KEY || "",
+  X_API_SECRET: D.X_API_SECRET || "",
+  X_ACCESS_TOKEN: D.X_ACCESS_TOKEN || "",
+  X_ACCESS_TOKEN_SECRET: D.X_ACCESS_TOKEN_SECRET || "",
+  LINKEDIN_ACCESS_TOKEN: D.LINKEDIN_ACCESS_TOKEN || "",
+  LINKEDIN_AUTHOR_URN: D.LINKEDIN_AUTHOR_URN || "",
+  INSTAGRAM_ACCESS_TOKEN: D.INSTAGRAM_ACCESS_TOKEN || "",
+  TIKTOK_ACCESS_TOKEN: D.TIKTOK_ACCESS_TOKEN || "",
+  YOUTUBE_ACCESS_TOKEN: D.YOUTUBE_ACCESS_TOKEN || "",
+  FACEBOOK_ACCESS_TOKEN: D.FACEBOOK_ACCESS_TOKEN || "",
+  PINTEREST_ACCESS_TOKEN: D.PINTEREST_ACCESS_TOKEN || "",
+  PUBLISH_DRY_RUN: D.PUBLISH_DRY_RUN || "1",
+  BROWSER_SERVICE_URL: "http://127.0.0.1:8040",
+  BROWSER_SERVICE_API_KEY: D.BROWSER_SERVICE_API_KEY || "",
+};
+
 const MARKETING_SERVICES = [
+  // Redis — message broker and result backend for Celery.
+  // The Windows service exists but is stopped by default; PM2 manages it here
+  // so the whole SMD stack starts and stops together.
+  pm2App({
+    name: "smd-redis",
+    script: REDIS_BIN,
+    args: "--port 6379 --bind 127.0.0.1",
+    memory: "256M",
+    restart_delay: 2000,
+    logPrefix: "smd-redis",
+  }),
+
   pm2App({
     name: "smd",
     script: PYTHON,
     args: "-m uvicorn src.ai.api:app --host 127.0.0.1 --port 8030",
-    cwd: O("agents/Social-Media-Dashboard--main"),
+    cwd: SMD_DIR,
     memory: "1G",
+    env: SMD_ENV,
+  }),
+
+  // Celery worker — executes video generation, campaign sends, and AI copy tasks.
+  // Runs in the ai_tasks + default queues. Requires smd-redis to be healthy first.
+  pm2App({
+    name: "smd-celery",
+    script: PYTHON,
+    args: "-m celery -A celery_worker worker --loglevel=info --concurrency=2 -Q celery,ai_tasks",
+    cwd: SMD_DIR,
+    memory: "1G",
+    restart_delay: 5000,
+    logPrefix: "smd-celery",
+    env: SMD_ENV,
+  }),
+
+  // Celery beat — triggers recurring tasks: campaign scheduler (every 5 min)
+  // and analytics sync (every 60 min), as defined in celeryconfig.py.
+  pm2App({
+    name: "smd-beat",
+    script: PYTHON,
+    args: "-m celery -A celery_worker beat --loglevel=info --scheduler celery.beat:PersistentScheduler",
+    cwd: SMD_DIR,
+    memory: "256M",
+    restart_delay: 5000,
+    logPrefix: "smd-beat",
+    env: SMD_ENV,
+  }),
+
+  // Browser automation micro-service — Playwright-powered posting for Instagram,
+  // TikTok, YouTube, LinkedIn, and X. Port 8040. Sessions persisted to disk.
+  // Requires: `playwright install chromium` run once in the SMD virtualenv.
+  pm2App({
+    name: "smd-browser",
+    script: PYTHON,
+    args: "-m uvicorn browser_service.main:app --host 127.0.0.1 --port 8040",
+    cwd: SMD_DIR,
+    memory: "1G",
+    restart_delay: 5000,
+    logPrefix: "smd-browser",
     env: {
-      AI_BACKEND: "remote",
-      AI_IMAGE_BACKEND: "remote",
-      REMOTE_LLM_MODEL: "opencode",
-      REMOTE_LLM_URL: "http://localhost:4100/chat/completions",
-      REMOTE_LLM_API_KEY: D.LITELLM_MASTER_KEY || D.DEEPSEEK_API_KEY || "",
-      GEMINI_API_KEY: D.GEMINI_API_KEY || "",
-      GEMINI_MODEL: "gemini-3.5-flash",
-      SD_MODEL: "remote-disabled",
-      X_API_KEY: D.X_API_KEY || "",
-      X_API_SECRET: D.X_API_SECRET || "",
-      X_ACCESS_TOKEN: D.X_ACCESS_TOKEN || "",
-      X_ACCESS_TOKEN_SECRET: D.X_ACCESS_TOKEN_SECRET || "",
-      LINKEDIN_ACCESS_TOKEN: D.LINKEDIN_ACCESS_TOKEN || "",
-      LINKEDIN_AUTHOR_URN: D.LINKEDIN_AUTHOR_URN || "",
-      PUBLISH_DRY_RUN: D.PUBLISH_DRY_RUN || "1",
+      ...SMD_ENV,
+      BROWSER_SERVICE_API_KEY: D.BROWSER_SERVICE_API_KEY || "",
+      // Set PLAYWRIGHT_BROWSERS_PATH if chromium is installed to a custom location
+      PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH || "",
     },
   }),
+
   pm2App({
     name: "opencode",
     script: OPENCODE_BIN,
@@ -408,6 +517,36 @@ const MARKETING_SERVICES = [
   }),
 ];
 
+// ── DeepSeek Harness — ecosystem-aware LLM router (dsh web, port 3080) ───────
+// Routes OpenCode (Ox Alpha free primary → DeepSeek fallback) through the harness llm seam.
+// Ecosystem overlay: C:/Users/User/Downloads/Deepseek Harness/ecosystem.patch.yml
+// Harness home: %DSH_HOME% (default ~/.dsh) or UPLIFT_ROOT-adjacent .dsh-home
+const DSH_DIR = process.env.DSH_DIR || "C:\\Users\\User\\Downloads\\Deepseek Harness\\deepseek-harness-master";
+const DSH_SERVICES = [
+  pm2App({
+    name: "dsh-harness",
+    script: NODE,
+    // NOTE: --patch must come directly after `web`; once the parser sees an
+    // unknown option (--port) everything after is passed to the web app.
+    args: "--import tsx apps/cli/src/bin.ts web --patch \"C:/Users/User/Downloads/Deepseek Harness/ecosystem.patch.yml\" --port 3080",
+    cwd: DSH_DIR,
+    memory: "1G",
+    env: {
+      ...D,
+      NODE_ENV: "production",
+      PORT: "3080",
+      DSH_HOME: process.env.DSH_HOME || path.join(UPLIFT_ROOT, ".dsh-home"),
+      UPLIFT_ROOT,
+      DRAYMOND_REGISTRY_DIR: path.join(ORCH_DIR, ".draymond"),
+      // LLM routing — Ox Alpha free primary, DeepSeek direct fallback
+      OPENCODE_API_KEY: D.OPENCODE_API_KEY || "",
+      DEEPSEEK_API_KEY: D.DEEPSEEK_API_KEY || "",
+      DEEPSEEK_BASE_URL: D.DEEPSEEK_BASE_URL || "https://api.deepseek.com",
+      OPENCODE_VIA_DSH: process.env.OPENCODE_VIA_DSH || "0",
+    },
+  }),
+];
+
 // ── Deterministic brain (ecosystem.brain.config.js) ─────────────────────────
 const BRAIN_DIR = O("agents/deterministic-brain");
 const BRAIN_SERVICES = [
@@ -436,5 +575,6 @@ module.exports = {
   CORE_APP,
   FLEET_SERVICES,
   MARKETING_SERVICES,
+  DSH_SERVICES,
   BRAIN_SERVICES,
 };

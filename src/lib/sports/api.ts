@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import type { EngineName, ExperimentStatus, Task, TaskDAG } from './types';
 import { runDag, topoOrder, type Executor } from './dag';
 import { saveExperiment, getExperimentsMap as readMap } from './store';
-import { runPythonMetrics, runPythonCoach, runPythonTranslate, runPythonInsights, runPythonFormula, runPythonLayers } from './pythonExecutors';
+import { runPythonMetrics, runPythonCoach, runPythonTranslate, runPythonInsights, runPythonFormula, runPythonLayers, runPythonDerive } from './pythonExecutors';
 import { runRustSimPlay, runRustSimBatch } from './rustExecutors';
 import { validateOutput } from './validate';
 
@@ -84,6 +84,16 @@ const makeExecutor: Executor = (task, upstream) => {
     const layer = String(task.inputs?.layer ?? 'all');
     const fromSports = (task.inputs?.from_sports ?? true) as boolean;
     return runPythonLayers(terms, layer, fromSports);
+  }
+  if (task.engine === 'derive') {
+    const sessionId = String(task.inputs?.session_id ?? '');
+    const profile = task.inputs?.profile;
+    const domain = task.inputs?.domain !== undefined ? String(task.inputs.domain) : undefined;
+    return runPythonDerive(
+      sessionId,
+      profile as string | Record<string, unknown> | undefined,
+      domain,
+    );
   }
   return Promise.resolve({
     success: false,

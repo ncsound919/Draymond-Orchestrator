@@ -34,8 +34,10 @@ describe('fleet-manifest (single source of truth for PM2)', () => {
     expect(names).toContain('draymond');
     expect(names).toContain('deterministic-brain');
     expect(names).toContain('opencode');
-    // The full fleet: 1 core + 17 fleet + 7 marketing + 1 brain = 26 apps.
-    expect(all).toHaveLength(26);
+    // The full fleet: 1 core + 19 fleet + 11 marketing + 1 brain = 32 apps.
+    // (omniresearch, overlay-oncology, comic-engine and the smd stack joined the
+    // manifest — bump this pin deliberately whenever the fleet grows.)
+    expect(all).toHaveLength(32);
   });
 
   it('gives every app the self-healing restart policy', () => {

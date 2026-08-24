@@ -1846,9 +1846,9 @@ const services: DraymondEntityInsert[] = [
     sector: 'justice',
     invocation_method: 'http_api',
     invocation_config: {
-      url: 'http://localhost:8000', // RECURSIVE_IP_URL at runtime — do not hardcode
+      url: 'http://localhost:3410', // RECURSIVE_IP_URL at runtime — port map = 3410 (moved off 8000; Uplift Agent owns 8000)
       method: 'POST',
-      health_url: 'http://localhost:8000/api/v1/health',
+      health_url: 'http://localhost:3410/api/v1/health',
       endpoints: {
         create: '/api/v1/ip',
         list: '/api/v1/ip',
@@ -2368,6 +2368,35 @@ const services: DraymondEntityInsert[] = [
       'research_portal',
     ],
     download_path: '02_Pillars/Overlay Science/Shared/bb_tech_core/bbtech-web-app',
+    is_integrated: true,
+    risk_level_default: 'low',
+  },
+  {
+    name: 'Overlay Oncology',
+    slug: 'overlay-oncology',
+    kind: 'service',
+    description: 'Cancer research & biotech engines (Next.js) — survival (hazard-risk vs Cox parity), potency (CCLE IC50), calibration registry, benchmarks, cross-domain tracker, equity audit, research contracts. Engines calibrated to live public data (cBioPortal CCLE/TCGA). Calibration state exposed at /api/calibration/state and consumed by the Overlay Global Lens publication.',
+    version: '1.0.0',
+    tags: ['oncology', 'cancer', 'biotech', 'calibration', 'research', 'nextjs'],
+    category: 'research',
+    sector: 'science',
+    invocation_method: 'http_api',
+    invocation_config: {
+      url: 'http://localhost:3070',
+      method: 'POST',
+      health_url: 'http://localhost:3070/api/calibration/state',
+      requires_env: ['GEMINI_API_KEY'],
+    },
+    capabilities: [
+      'survival_modeling',
+      'potency_calibration',
+      'benchmark_harness',
+      'cross_domain_tracker',
+      'equity_audit',
+      'research_contracts',
+      'calibration_registry',
+    ],
+    download_path: '02_Pillars/Overlay Science/Overlay Oncology',
     is_integrated: true,
     risk_level_default: 'low',
   },

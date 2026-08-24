@@ -208,6 +208,7 @@ export const server = http.createServer(async (req, res) => {
       body.input && typeof body.input === 'object' && !Array.isArray(body.input)
         ? body.input
         : (() => {
+            // Strip control fields from the forwarded input payload.
             const { action: _a, session_id: _s, ...rest } = body;
             return rest;
           })();
