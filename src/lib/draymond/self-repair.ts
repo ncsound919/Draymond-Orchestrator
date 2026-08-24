@@ -1,5 +1,6 @@
+﻿import { writeBrainFile } from './journal';
 /**
- * Self-repair — detect failure signals and attempt automated recovery.
+ * Self-repair â€” detect failure signals and attempt automated recovery.
  *
  * Uses Draymond's monitors + the QA tool as failure signals, then applies a
  * known repair action (restart a service, re-run a job, clear a cache). Every
@@ -48,7 +49,7 @@ export interface RepairLoopReport {
 /** Known safe repairs keyed by failure signal (service + check). */
 const STATIC_REPAIR_MAP: Record<string, RepairAction> = {
   "monitor:down": {
-    name: "restart:service", service: "unknown", command: [], safe: false, // escalated — no blind restart
+    name: "restart:service", service: "unknown", command: [], safe: false, // escalated â€” no blind restart
   },
   "qa:fail": {
     name: "reindex:qa", service: "agent-browser", command: ["npx", "tsx", "agents/AgentBrowser-main/scripts/run-site-tests.ts", "all"], safe: true,
@@ -63,7 +64,7 @@ const STATIC_REPAIR_MAP: Record<string, RepairAction> = {
 
 /**
  * Known-benign failure signals that are recorded but never auto-repaired or
- * escalated — the fleet analogue of the kernel linker's `-IGNORE:<warnings>`
+ * escalated â€” the fleet analogue of the kernel linker's `-IGNORE:<warnings>`
  * whitelist. A signal on this list means the team has judged it expected noise
  * (e.g. a monitor for a service intentionally offline, a check already handled
  * upstream). Ignored signals are still appended to the repair log for the
@@ -71,7 +72,7 @@ const STATIC_REPAIR_MAP: Record<string, RepairAction> = {
  * never pollute self-learning with false failures.
  *
  * Extend at runtime via `DRAYMOND_IGNORE_SIGNALS` (JSON array or comma list).
- * Empty by default: the fleet fails closed — only a signal an operator has
+ * Empty by default: the fleet fails closed â€” only a signal an operator has
  * explicitly judged benign is ignored.
  */
 const DEFAULT_IGNORE_SIGNALS: string[] = [];
@@ -135,7 +136,7 @@ export function loadRepairMap(): Record<string, RepairAction> {
   }
 }
 
-// ── Failure-loop guard thresholds (controls > env > default) ────────────────
+// â”€â”€ Failure-loop guard thresholds (controls > env > default) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // The operator's Command Center knobs (stored via controls.json) win over the
 // env vars; falling back to env, then the built-in default. Never throws.
 const cooldownMs = () => syncRepairCooldownMs(process.env.DRAYMOND_REPAIR_COOLDOWN_MS);
@@ -158,7 +159,7 @@ async function readLog(): Promise<RepairAttempt[]> {
 async function appendLog(attempt: RepairAttempt): Promise<void> {
   const log = await readLog();
   log.push(attempt);
-  await fs.writeFile(LOG_FILE, JSON.stringify(log.slice(-200), null, 2), "utf-8");
+  await writeBrainFile(LOG_FILE, JSON.stringify(log.slice(-200), null, 2), "append", "self-repair");
 }
 
 /** Applied repairs for a signal within the last `sinceMs` milliseconds. */
@@ -170,7 +171,7 @@ export async function appliedRepairs(signal: string, sinceMs: number): Promise<R
 
 /**
  * Detect repair loops: the same signal auto-repaired repeatedly within the
- * loop window. A loop means the blind repair is NOT working — escalate.
+ * loop window. A loop means the blind repair is NOT working â€” escalate.
  */
 export async function detectRepairLoops(limit = 20): Promise<RepairLoopReport[]> {
   const log = await readLog();
@@ -209,7 +210,7 @@ export async function attemptRepair(signal: string, detail: string): Promise<Rep
       signal,
       action: { name: 'ignored', service: 'unknown', command: [], safe: false },
       status: 'skipped',
-      detail: `Signal "${signal}" is on the benign whitelist — ${detail} (recorded, no repair).`,
+      detail: `Signal "${signal}" is on the benign whitelist â€” ${detail} (recorded, no repair).`,
     };
     await appendLog(attempt);
     return attempt;
@@ -228,14 +229,14 @@ export async function attemptRepair(signal: string, detail: string): Promise<Rep
 
   if (!action) {
     attempt.status = "escalated";
-    attempt.detail = `No known repair for "${signal}" — ${detail} (on-call).`;
+    attempt.detail = `No known repair for "${signal}" â€” ${detail} (on-call).`;
     await appendLog(attempt);
     return attempt;
   }
 
   if (!action.safe || action.command.length === 0) {
     attempt.status = "escalated";
-    attempt.detail = `Repair "${action.name}" not safe to auto-run — ${detail} (on-call).`;
+    attempt.detail = `Repair "${action.name}" not safe to auto-run â€” ${detail} (on-call).`;
     await appendLog(attempt);
     return attempt;
   }
@@ -244,7 +245,7 @@ export async function attemptRepair(signal: string, detail: string): Promise<Rep
   const recent = await appliedRepairs(signal, cooldownMs());
   if (recent.length >= maxInCooldown()) {
     attempt.status = "escalated";
-    attempt.detail = `Repair loop detected for "${signal}" — ${recent.length} auto-repairs within the cooldown window. Cooling down; on-call. ${detail}`;
+    attempt.detail = `Repair loop detected for "${signal}" â€” ${recent.length} auto-repairs within the cooldown window. Cooling down; on-call. ${detail}`;
     await appendLog(attempt);
     await recordRepairOutcome(attempt);
     return attempt;

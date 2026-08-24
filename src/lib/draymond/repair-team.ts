@@ -1,22 +1,23 @@
+﻿import { writeBrainFile } from './journal';
 /**
- * Repair Team — when a job fails, Draymond deploys coding/skill agents to fix it.
+ * Repair Team â€” when a job fails, Draymond deploys coding/skill agents to fix it.
  *
- * Flow: detect failed jobs → classify the failure → assemble a repair crew
- * (coding agents for config/code, skill agents for skill issues) → apply a
- * known deterministic repair (config patches) or hand off to a coding agent →
- * supervised by Big Homie → outcome recorded to self-learning so lessons drive
+ * Flow: detect failed jobs â†’ classify the failure â†’ assemble a repair crew
+ * (coding agents for config/code, skill agents for skill issues) â†’ apply a
+ * known deterministic repair (config patches) or hand off to a coding agent â†’
+ * supervised by Big Homie â†’ outcome recorded to self-learning so lessons drive
  * future repairs. Every real outcome is ALSO reported to the operator + the
  * repair/coding team via a deterministic (templated, LLM-free) report.
  *
  * Fixing, not reporting: this module ACTUALLY dispatches repairs:
- *   - service_down  → attempts to START the real service (service-manager).
- *   - code_error    → dispatches the coding crew (opencode) to generate a patch
+ *   - service_down  â†’ attempts to START the real service (service-manager).
+ *   - code_error    â†’ dispatches the coding crew (opencode) to generate a patch
  *                     IMMEDIATELY on the first failure (bounded by a per-job
  *                     cooldown so tokens aren't burned on identical repeats).
- *   - missing_env   → escalates with a concrete provisioning instruction.
+ *   - missing_env   â†’ escalates with a concrete provisioning instruction.
  *
  * Determinism for token savings: reports and info-passing between the repair
- * team, the coding crew, and the operator are rendered from fixed templates —
+ * team, the coding crew, and the operator are rendered from fixed templates â€”
  * no LLM in the reporting path.
  */
 
@@ -44,7 +45,7 @@ export interface RepairReport {
   action: 'fixed' | 'handed-off' | 'escalated';
   detail: string;
   repairedAt: string;
-  /** Lessons distilled from prior outcomes of this job (learning → repair feedback). */
+  /** Lessons distilled from prior outcomes of this job (learning â†’ repair feedback). */
   lessonHints?: string[];
   /** When a real agent/process was dispatched, what happened. */
   dispatch?: { kind: string; result: string; duration_ms?: number; engine?: string };
@@ -86,20 +87,20 @@ export function assembleCrew(kind: FailureKind): RepairCrew {
       return {
         lead,
         members,
-        reason: `master coding stack (${codingStackSummary()}) | folded pipelines (${pipelineSummary()}) — coding agents apply the patch, Big Homie supervises`,
+        reason: `master coding stack (${codingStackSummary()}) | folded pipelines (${pipelineSummary()}) â€” coding agents apply the patch, Big Homie supervises`,
       };
     }
     case "missing_env":
       return {
         lead: "uplift-agent",
         members: ["skill-vetter", "big-homie"],
-        reason: "env/config gap — verify + document the required key",
+        reason: "env/config gap â€” verify + document the required key",
       };
     case "service_down":
       return {
         lead: "overlay-auditor",
         members: ["agent-browser", "big-homie"],
-        reason: "service reachability — audit + restart",
+        reason: "service reachability â€” audit + restart",
       };
     default:
       return { lead: "omniresearch-pro", members: ["megacode", "big-homie"], reason: "investigate unknown failure" };
@@ -161,7 +162,7 @@ export async function repairFailedJob(
   deps: {
     updateJobConfig: (id: string, config: Record<string, unknown>) => Promise<unknown>;
   },
-  /** Distilled lessons for this job — the repair crew consults them. */
+  /** Distilled lessons for this job â€” the repair crew consults them. */
   lessonHints: string[] = [],
   options: RepairRepairOptions = {},
 ): Promise<RepairReport> {
@@ -243,16 +244,16 @@ export async function repairFailedJob(
   }
 
   if (kind === "missing_env") {
-    await recordRepair({ ...base, action: "escalated", detail: `env gap — assign ${crew.lead} to provision the missing key` });
-    return { ...base, action: "escalated", detail: `env gap — assign ${crew.lead} to provision the missing key` };
+    await recordRepair({ ...base, action: "escalated", detail: `env gap â€” assign ${crew.lead} to provision the missing key` });
+    return { ...base, action: "escalated", detail: `env gap â€” assign ${crew.lead} to provision the missing key` };
   }
 
   if (kind === "service_down") {
     // ACTUALLY try to start the service the job depends on.
     const targets = serviceForFailure(job.name, error);
     if (targets.length === 0) {
-      await recordRepair({ ...base, action: "escalated", detail: `service_down but no service mapped for "${job.name}" — escalate` });
-      return { ...base, action: "escalated", detail: `service_down but no service mapped for "${job.name}" — escalate` };
+      await recordRepair({ ...base, action: "escalated", detail: `service_down but no service mapped for "${job.name}" â€” escalate` });
+      return { ...base, action: "escalated", detail: `service_down but no service mapped for "${job.name}" â€” escalate` };
     }
     try {
       const { startDownServices } = await import("./service-manager");
@@ -276,7 +277,7 @@ export async function repairFailedJob(
     }
   }
 
-  // code_error / unknown → dispatch the coding crew to GENERATE a fix. With
+  // code_error / unknown â†’ dispatch the coding crew to GENERATE a fix. With
   // immediate mode (default) the FIRST failure dispatches so fixes start now;
   // the per-job cooldown stops repeated identical failures from re-dispatching
   // and burning tokens. Legacy mode (DRAYMOND_REPAIR_IMMEDIATE=0) keeps the
@@ -289,13 +290,13 @@ export async function repairFailedJob(
       const cooldownKey = `repair:${job.id}`;
       const onCooldown = isOnCooldown(cooldownKey, "codegen", Number(process.env.DRAYMOND_REPAIR_DISPATCH_COOLDOWN_MS) || 30 * 60 * 1000);
       if (onCooldown) {
-        const detail = `coding repair dispatched recently (cooldown) — ${crew.lead} on the next window`;
+        const detail = `coding repair dispatched recently (cooldown) â€” ${crew.lead} on the next window`;
         const action: RepairReport["action"] = "handed-off";
         await recordRepair({ ...base, action, detail, dispatch: { kind: "deferred", result: detail } });
         return { ...base, action, detail, dispatch: { kind: "deferred", result: detail } };
       }
       if (!immediate && !hasEvidence) {
-        const detail = `no repeated-failure evidence yet — ${crew.lead} will repair after 2+ failures (token-saving)`;
+        const detail = `no repeated-failure evidence yet â€” ${crew.lead} will repair after 2+ failures (token-saving)`;
         const action: RepairReport["action"] = "handed-off";
         await recordRepair({ ...base, action, detail, dispatch: { kind: "deferred", result: detail } });
         return { ...base, action, detail, dispatch: { kind: "deferred", result: detail } };
@@ -316,7 +317,7 @@ export async function repairFailedJob(
 }
 
 // ============================================================================
-// BENCHMARK WEAKNESS REPAIR — auto-fix components flagged by Benchmark Olympics
+// BENCHMARK WEAKNESS REPAIR â€” auto-fix components flagged by Benchmark Olympics
 // ============================================================================
 
 export interface BenchmarkWeakEntity {
@@ -330,12 +331,12 @@ export interface BenchmarkWeakEntity {
 
 /**
  * Dispatch the repair team on a weak benchmark component (Benchmark Olympics
- * discovery loop → /api/ops/repair-benchmark). Two auto-fix channels:
+ * discovery loop â†’ /api/ops/repair-benchmark). Two auto-fix channels:
  *
- *   1. Failover config fix — reuses the upgrade-queue failover matrix
+ *   1. Failover config fix â€” reuses the upgrade-queue failover matrix
  *      (reconfigureEntity, gated by DRAYMOND_FAILOVER_MATRIX) to apply safe,
  *      reversible invocation changes (retries/timeout) on the component.
- *   2. Coding crew — opencode (primary) → uplift-agent (fallback) → a
+ *   2. Coding crew â€” opencode (primary) â†’ uplift-agent (fallback) â†’ a
  *      deterministic terminal plan, so a code/config fix is PROPOSED and
  *      captured for the crew lead even when no engine is reachable.
  *
@@ -364,12 +365,12 @@ export async function repairWeakEntity(
     lessonHints: [],
   };
 
-  // Monitor band — below the remediation band, nothing to auto-fix.
+  // Monitor band â€” below the remediation band, nothing to auto-fix.
   if (score < 50) {
     const report: RepairReport = {
       ...base,
       action: 'handed-off',
-      detail: `weakness ${score} below the remediation band (>=50) — monitor only. ${proposedAction}`,
+      detail: `weakness ${score} below the remediation band (>=50) â€” monitor only. ${proposedAction}`,
     };
     await recordRepair(report);
     return report;
@@ -383,7 +384,7 @@ export async function repairWeakEntity(
       const report: RepairReport = {
         ...base,
         action: 'handed-off',
-        detail: `benchmark repair for ${entity.component_slug} dispatched recently (cooldown) — next window`,
+        detail: `benchmark repair for ${entity.component_slug} dispatched recently (cooldown) â€” next window`,
         dispatch: { kind: 'deferred', result: 'cooldown' },
       };
       await recordRepair(report);
@@ -397,7 +398,7 @@ export async function repairWeakEntity(
     const report: RepairReport = {
       ...base,
       action: 'handed-off',
-      detail: `benchmark weakness ${score} for ${entity.component_slug} — ${proposedAction}. ` +
+      detail: `benchmark weakness ${score} for ${entity.component_slug} â€” ${proposedAction}. ` +
         `Auto-fix disabled (DRAYMOND_REPAIR_BENCHMARK_ENABLED=0); handed to ${crew.lead} for review.`,
     };
     await recordRepair(report);
@@ -412,7 +413,7 @@ export async function repairWeakEntity(
     if (applied && applied.type !== 'monitor') {
       configDetail = `failover config applied: ${applied.action}`;
     }
-  } catch { /* best-effort — coding crew still runs */ }
+  } catch { /* best-effort â€” coding crew still runs */ }
 
   // 2. Coding crew generates a fix for the weak component.
   const jobLike = {
@@ -458,7 +459,7 @@ async function recordRepair(report: RepairReport): Promise<void> {
     log = JSON.parse(raw) as RepairReport[];
   } catch { /* fresh log */ }
   log.push(report);
-  await fs.writeFile(REPAIR_LOG, JSON.stringify(log.slice(-200), null, 2), "utf-8");
+  await writeBrainFile(REPAIR_LOG, JSON.stringify(log.slice(-200), null, 2), "append", "repair-team");
 
   // Feed self-learning with the outcome.
   try {
@@ -486,7 +487,7 @@ async function recordRepair(report: RepairReport): Promise<void> {
 }
 
 // ============================================================================
-// DETERMINISTIC REPAIR REPORT — templated, no LLM (token-saving by design)
+// DETERMINISTIC REPAIR REPORT â€” templated, no LLM (token-saving by design)
 // ============================================================================
 
 const FAILURE_LABEL: Record<FailureKind, string> = {
@@ -533,7 +534,7 @@ export async function sendRepairReport(report: RepairReport): Promise<boolean> {
   const text = renderRepairReport(report);
   let sent = false;
 
-  // ntfy → the repair/coding team + the phone (Open-Chat auto-speaks).
+  // ntfy â†’ the repair/coding team + the phone (Open-Chat auto-speaks).
   try {
     const base = process.env.NTFY_URL;
     const topic = process.env.NTFY_TOPIC_REPAIR ?? process.env.NTFY_TOPIC_RESULTS;
@@ -543,7 +544,7 @@ export async function sendRepairReport(report: RepairReport): Promise<boolean> {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           topic,
-          title: `Draymond repair — ${report.jobName} (${report.action})`,
+          title: `Draymond repair â€” ${report.jobName} (${report.action})`,
           message: text.slice(0, 1500),
           tags: report.action === 'fixed' ? ['white_check_mark'] : ['wrench'],
           priority: report.action === 'escalated' ? 5 : 3,
@@ -554,14 +555,14 @@ export async function sendRepairReport(report: RepairReport): Promise<boolean> {
     }
   } catch { /* best-effort */ }
 
-  // Email → the operator. Deduped so identical job outcomes don't spam.
+  // Email â†’ the operator. Deduped so identical job outcomes don't spam.
   try {
     const recipient = process.env.DRAYMOND_ALERT_EMAIL ?? process.env.GMAIL_USER;
     if (recipient) {
       const { isOnCooldown } = await import('./workflow-budget');
       if (!isOnCooldown(`report:${report.jobId}`, report.action, reportCooldownMs())) {
         const { sendMemo } = await import('./notifications');
-        await sendMemo(`Draymond repair — ${report.jobName} (${report.action})`, text, recipient);
+        await sendMemo(`Draymond repair â€” ${report.jobName} (${report.action})`, text, recipient);
         sent = true;
       }
     }

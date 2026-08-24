@@ -1,5 +1,6 @@
+﻿import { writeBrainFile } from './journal';
 /**
- * Night mode — overnight Research & Development.
+ * Night mode â€” overnight Research & Development.
  *
  * While the user sleeps, the fleet works a night shift: pick research topics
  * (from the news digest + a backlog) and dev tasks, queue them, and produce a
@@ -40,8 +41,7 @@ async function readTasks(): Promise<RdTask[]> {
 }
 
 async function writeTasks(tasks: RdTask[]): Promise<void> {
-  await fs.mkdir(DIR, { recursive: true });
-  await fs.writeFile(FILE, JSON.stringify({ tasks, updatedAt: new Date().toISOString() }, null, 2), "utf-8");
+  await writeBrainFile(FILE, JSON.stringify({ tasks, updatedAt: new Date().toISOString() }, null, 2), "write", "rd-night");
 }
 
 /** Build the night shift plan: research topics from news + dev backlog. */

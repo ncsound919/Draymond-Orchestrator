@@ -1,5 +1,7 @@
-// ============================================================================
-// DRAYMOND ORCHESTRATION SYSTEM — Delegation Plan
+﻿// ============================================================================
+import { writeBrainFile } from './journal';
+
+// DRAYMOND ORCHESTRATION SYSTEM â€” Delegation Plan
 // ============================================================================
 // Single source of truth for HOW the fleet is delegated: which component
 // (handler / agent / chain) runs at what time of day, for how long, and with
@@ -54,7 +56,7 @@ export interface DelegationSpec {
   tier: DelegationTier;
   /** 1 = critical, 2 = standard, 3 = best-effort. */
   priority: 1 | 2 | 3;
-  /** Duty class — mirrors fleet-duty.ts. */
+  /** Duty class â€” mirrors fleet-duty.ts. */
   duty: DelegationDuty;
 }
 
@@ -62,7 +64,7 @@ export interface DelegationSpec {
 // FLEET DAILY BUDGET
 // ============================================================================
 
-/** Fleet-wide daily token cap — the whole ecosystem stays under this. */
+/** Fleet-wide daily token cap â€” the whole ecosystem stays under this. */
 export function fleetDailyBudget(): number {
   return syncFleetBudget(process.env.DRAYMOND_FLEET_DAILY_BUDGET);
 }
@@ -101,7 +103,7 @@ const PHASE_WINDOW: Record<DelegationPhase, DelegationWindow> = {
 // ============================================================================
 
 export const DELEGATION_PLAN: DelegationSpec[] = [
-  // ── Draymond core — always-on, cheapest tier ────────────────────────────
+  // â”€â”€ Draymond core â€” always-on, cheapest tier â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { slug: 'draymond', label: 'Draymond core', phase: 'morning', window: { start: '00:00', end: '23:59' }, timeBudgetMs: 60_000, tokenBudgetPerRun: 8_000, tokenBudgetPerDay: 200_000, tier: 'free', priority: 1, duty: 'always-on' },
   { slug: 'brain_decision_cycle', label: 'Brain decision cycle', phase: 'midday', window: { start: '00:00', end: '23:59' }, timeBudgetMs: 120_000, tokenBudgetPerRun: 24_000, tokenBudgetPerDay: 120_000, tier: 'free', priority: 1, duty: 'always-on' },
   { slug: 'agent_heartbeat_sweep', label: 'Agent heartbeat sweep', phase: 'morning', window: { start: '00:00', end: '23:59' }, timeBudgetMs: 30_000, tokenBudgetPerRun: 4_000, tokenBudgetPerDay: 40_000, tier: 'free', priority: 2, duty: 'always-on' },
@@ -110,7 +112,7 @@ export const DELEGATION_PLAN: DelegationSpec[] = [
   { slug: 'repair_failed_jobs', label: 'Repair team', phase: 'midday', window: { start: '00:00', end: '23:59' }, timeBudgetMs: 600_000, tokenBudgetPerRun: 80_000, tokenBudgetPerDay: 300_000, tier: 'flash', priority: 1, duty: 'always-on' },
   { slug: 'kairos_scan', label: 'Kairos proactive scan', phase: 'midday', window: { start: '00:00', end: '23:59' }, timeBudgetMs: 120_000, tokenBudgetPerRun: 24_000, tokenBudgetPerDay: 150_000, tier: 'free', priority: 1, duty: 'always-on' },
 
-  // ── Business — morning, higher priority ─────────────────────────────────
+  // â”€â”€ Business â€” morning, higher priority â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { slug: 'ingest_news', label: 'News digest ingest', phase: 'morning', timeBudgetMs: 120_000, tokenBudgetPerRun: 24_000, tokenBudgetPerDay: 24_000, tier: 'free', priority: 2, duty: 'always-on' },
   { slug: 'fetch_market_data', label: 'Market data snapshot', phase: 'morning', timeBudgetMs: 90_000, tokenBudgetPerRun: 16_000, tokenBudgetPerDay: 16_000, tier: 'free', priority: 2, duty: 'always-on' },
   { slug: 'run_overlay_qa', label: 'Overlay365 QA pass', phase: 'morning', timeBudgetMs: 600_000, tokenBudgetPerRun: 64_000, tokenBudgetPerDay: 64_000, tier: 'free', priority: 2, duty: 'shift' },
@@ -125,19 +127,19 @@ export const DELEGATION_PLAN: DelegationSpec[] = [
   { slug: 'social-media-dashboard', label: 'Social media dashboard', phase: 'midday', window: { start: '09:00', end: '18:00', days: [1, 2, 3, 4, 5] }, timeBudgetMs: 900_000, tokenBudgetPerRun: 64_000, tokenBudgetPerDay: 160_000, tier: 'flash', priority: 2, duty: 'shift' },
   { slug: 'aetherdesk', label: 'Aetherdesk call center', phase: 'midday', window: { start: '09:00', end: '17:00' }, timeBudgetMs: 600_000, tokenBudgetPerRun: 48_000, tokenBudgetPerDay: 120_000, tier: 'flash', priority: 2, duty: 'shift' },
 
-  // ── Trading / finance — market hours ────────────────────────────────────
+  // â”€â”€ Trading / finance â€” market hours â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { slug: 'trading-agents', label: 'TradingAgents (+ super-tool risk engine)', phase: 'midday', window: { start: '09:30', end: '16:00', days: [1, 2, 3, 4, 5] }, timeBudgetMs: 1_500_000, tokenBudgetPerRun: 120_000, tokenBudgetPerDay: 320_000, tier: 'pro', priority: 1, duty: 'shift' },
   { slug: 'ghostfolio-engine', label: 'Ghostfolio wealth engine', phase: 'morning', timeBudgetMs: 300_000, tokenBudgetPerRun: 32_000, tokenBudgetPerDay: 64_000, tier: 'flash', priority: 2, duty: 'always-on' },
   { slug: 'overlay-treasurer', label: 'Overlay treasurer', phase: 'morning', timeBudgetMs: 300_000, tokenBudgetPerRun: 32_000, tokenBudgetPerDay: 64_000, tier: 'flash', priority: 1, duty: 'always-on' },
   { slug: 'litellm', label: 'LiteLLM gateway (+ tap919 middleware, llmlingua)', phase: 'morning', window: { start: '00:00', end: '23:59' }, timeBudgetMs: 60_000, tokenBudgetPerRun: 8_000, tokenBudgetPerDay: 40_000, tier: 'free', priority: 1, duty: 'always-on' },
   { slug: 'deterministic-brain', label: 'Deterministic brain', phase: 'midday', window: { start: '00:00', end: '23:59' }, timeBudgetMs: 120_000, tokenBudgetPerRun: 24_000, tokenBudgetPerDay: 120_000, tier: 'free', priority: 1, duty: 'always-on' },
 
-  // ── Sports — daily + events ─────────────────────────────────────────────
+  // â”€â”€ Sports â€” daily + events â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { slug: 'sports-steve', label: 'Sports Steve', phase: 'morning', window: { start: '06:00', end: '23:00' }, timeBudgetMs: 600_000, tokenBudgetPerRun: 48_000, tokenBudgetPerDay: 160_000, tier: 'flash', priority: 2, duty: 'shift' },
   { slug: 'editorial_push', label: 'Editorial morning push', phase: 'morning', timeBudgetMs: 300_000, tokenBudgetPerRun: 32_000, tokenBudgetPerDay: 32_000, tier: 'flash', priority: 2, duty: 'shift' },
   { slug: 'sports-betting-daily', label: 'Sports betting daily', phase: 'morning', timeBudgetMs: 600_000, tokenBudgetPerRun: 64_000, tokenBudgetPerDay: 64_000, tier: 'flash', priority: 2, duty: 'shift' },
 
-  // ── Science / research — deep work at night ─────────────────────────────
+  // â”€â”€ Science / research â€” deep work at night â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { slug: 'omniresearch-pro', label: 'OmniResearch Pro (+ open-notebook)', phase: 'night', window: { start: '20:00', end: '06:00' }, timeBudgetMs: 1_800_000, tokenBudgetPerRun: 120_000, tokenBudgetPerDay: 300_000, tier: 'pro', priority: 2, duty: 'night' },
   { slug: 'bookbridge', label: 'BookBridge (+ synthesis, zvec, memagent)', phase: 'night', window: { start: '00:00', end: '06:00' }, timeBudgetMs: 600_000, tokenBudgetPerRun: 48_000, tokenBudgetPerDay: 96_000, tier: 'flash', priority: 2, duty: 'night' },
   { slug: 'generative-video-ai', label: 'Generative Video AI (+ shorts, content engine)', phase: 'midday', window: { start: '10:00', end: '20:00' }, timeBudgetMs: 900_000, tokenBudgetPerRun: 64_000, tokenBudgetPerDay: 160_000, tier: 'flash', priority: 2, duty: 'always-on' },
@@ -155,7 +157,7 @@ export const DELEGATION_PLAN: DelegationSpec[] = [
   { slug: 'synthesis_midday', label: 'Synthesis midday check', phase: 'midday', timeBudgetMs: 300_000, tokenBudgetPerRun: 32_000, tokenBudgetPerDay: 64_000, tier: 'flash', priority: 2, duty: 'always-on' },
   { slug: 'clinvar_surveillance', label: 'ClinVar variant surveillance', phase: 'morning', timeBudgetMs: 120_000, tokenBudgetPerRun: 16_000, tokenBudgetPerDay: 16_000, tier: 'flash', priority: 3, duty: 'always-on' },
 
-  // ── Benchmarks / audits — midday, compressed ────────────────────────────
+  // â”€â”€ Benchmarks / audits â€” midday, compressed â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { slug: 'benchmark_roster', label: 'Roster benchmark', phase: 'morning', timeBudgetMs: 900_000, tokenBudgetPerRun: 96_000, tokenBudgetPerDay: 96_000, tier: 'flash', priority: 2, duty: 'always-on' },
   { slug: 'benchmark_entities', label: 'Benchmark: entities', phase: 'midday', timeBudgetMs: 600_000, tokenBudgetPerRun: 64_000, tokenBudgetPerDay: 64_000, tier: 'flash', priority: 3, duty: 'always-on' },
   { slug: 'benchmark_sites', label: 'Benchmark: sites', phase: 'midday', timeBudgetMs: 600_000, tokenBudgetPerRun: 64_000, tokenBudgetPerDay: 64_000, tier: 'flash', priority: 3, duty: 'always-on' },
@@ -167,7 +169,7 @@ export const DELEGATION_PLAN: DelegationSpec[] = [
   { slug: 'api_key_audit', label: 'Free-API key audit', phase: 'morning', window: { start: '00:00', end: '23:59' }, timeBudgetMs: 60_000, tokenBudgetPerRun: 8_000, tokenBudgetPerDay: 8_000, tier: 'free', priority: 3, duty: 'always-on' },
   { slug: 'code_review_check', label: 'Code review scan', phase: 'midday', timeBudgetMs: 300_000, tokenBudgetPerRun: 32_000, tokenBudgetPerDay: 32_000, tier: 'flash', priority: 3, duty: 'always-on' },
 
-  // ── Security — Monday morning ───────────────────────────────────────────
+  // â”€â”€ Security â€” Monday morning â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { slug: 'depscan', label: 'Dep-scan (+ supply-chain health)', phase: 'morning', window: { start: '05:00', end: '10:00', days: [1] }, timeBudgetMs: 900_000, tokenBudgetPerRun: 48_000, tokenBudgetPerDay: 80_000, tier: 'free', priority: 1, duty: 'always-on' },
   { slug: 'nuclei-scanner', label: 'Nuclei scanner', phase: 'morning', window: { start: '05:00', end: '10:00', days: [1] }, timeBudgetMs: 900_000, tokenBudgetPerRun: 48_000, tokenBudgetPerDay: 48_000, tier: 'free', priority: 1, duty: 'always-on' },
   { slug: 'overlay-auditor', label: 'Overlay auditor', phase: 'morning', timeBudgetMs: 600_000, tokenBudgetPerRun: 48_000, tokenBudgetPerDay: 96_000, tier: 'flash', priority: 1, duty: 'always-on' },
@@ -267,9 +269,7 @@ function persistConsumption(): void {
     const file = consumptionFile();
     mkdirSync(dirname(file), { recursive: true });
     const payload: PersistedConsumption = { consumed, updatedAt: new Date().toISOString() };
-    const tmp = `${file}.tmp`;
-    writeFileSync(tmp, JSON.stringify(payload, null, 2), 'utf-8');
-    renameSync(tmp, file);
+    writeBrainFile(file, JSON.stringify(payload, null, 2), 'write', 'delegation');
   } catch (err) {
     console.warn(`[Delegation] failed to persist consumption: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -305,7 +305,7 @@ export function delegationRemaining(slug: string): number {
 /** True when the component can run right now (window + daily budget). */
 export function canDelegate(slug: string, now = new Date()): { ok: boolean; reason?: string } {
   const spec = delegationFor(slug);
-  if (!spec) return { ok: true, reason: 'unplanned — no delegation spec' };
+  if (!spec) return { ok: true, reason: 'unplanned â€” no delegation spec' };
   if (!isWithinWindow(spec, now)) {
     return { ok: false, reason: `outside ${spec.label} window (${spec.window?.start ?? PHASE_WINDOW[spec.phase].start}-${spec.window?.end ?? PHASE_WINDOW[spec.phase].end})` };
   }

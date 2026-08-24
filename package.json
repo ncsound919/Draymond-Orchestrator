@@ -29,6 +29,8 @@
         "type-check": "tsc --noEmit",
         "test": "vitest run",
         "memory:rebuild": "tsx scripts/rebuild-memory-projections.ts",
+        "brain:journal": "tsx scripts/brain-journal.ts",
+        "brain:recover": "tsx scripts/brain-journal.ts recover --",
         "seed:mcp": "tsx scripts/seed-reference-mcp-servers.ts",
         "audit:skills": "tsx scripts/audit-skill-frontmatter.ts",
         "gate": "npm run type-check && npm run lint && npm test",

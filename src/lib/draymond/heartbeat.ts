@@ -1,5 +1,6 @@
+﻿import { writeBrainFile } from './journal';
 // ============================================================================
-// DRAYMOND AGENT HEARTBEAT SWEEP — liveness for the whole fleet
+// DRAYMOND AGENT HEARTBEAT SWEEP â€” liveness for the whole fleet
 // ============================================================================
 // Every registered agent/tool in the roster is expected to answer a health
 // probe. This module pings each catalogued service (ports.ts) and records the
@@ -91,7 +92,7 @@ export async function runHeartbeatSweep(): Promise<{
   for (const agent of agents) {
     const serviceSlug = agentServiceSlug(agent.slug);
     const svc = byService.get(serviceSlug);
-    if (!svc) continue; // no canonical probe for this agent — leave status as-is
+    if (!svc) continue; // no canonical probe for this agent â€” leave status as-is
     const rec: HeartbeatRecord = {
       slug: agent.slug,
       name: agent.name,
@@ -108,8 +109,7 @@ export async function runHeartbeatSweep(): Promise<{
 
   // Persist heartbeat file.
   try {
-    await fs.mkdir(DIR, { recursive: true });
-    await fs.writeFile(HEARTBEAT_FILE, JSON.stringify(heartbeats, null, 2), 'utf-8');
+    await writeBrainFile(HEARTBEAT_FILE, JSON.stringify(heartbeats, null, 2), 'write', 'heartbeat');
   } catch { /* best-effort */ }
 
   const up = services.filter((s) => s.up).length;

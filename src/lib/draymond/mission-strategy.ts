@@ -1,5 +1,6 @@
+﻿import { writeBrainFile } from './journal';
 /**
- * Mission strategy — configured financial model for the 4 service lines.
+ * Mission strategy â€” configured financial model for the 4 service lines.
  *
  * State lives in .draymond/mission-strategy.json (JSON-state pattern, no DB).
  * Every service maps to live Stripe products/prices (see .draymond/stripe-pricing.json).
@@ -155,9 +156,8 @@ export async function readStrategy(): Promise<MissionStrategy> {
 }
 
 export async function writeStrategy(s: MissionStrategy): Promise<void> {
-  await fs.mkdir(registryDir(), { recursive: true });
   const toWrite = { ...s, updatedAt: new Date().toISOString() };
-  await fs.writeFile(FILE(), JSON.stringify(toWrite, null, 2), "utf-8");
+  await writeBrainFile(FILE(), JSON.stringify(toWrite, null, 2), "write", "mission-strategy");
 }
 
 export function getService(s: MissionStrategy, id: ServiceId): ServiceLine | undefined {

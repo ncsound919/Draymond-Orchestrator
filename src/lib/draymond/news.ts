@@ -1,5 +1,6 @@
+﻿import { writeBrainFile } from './journal';
 /**
- * News ingestion — current information + happenings across the fleet.
+ * News ingestion â€” current information + happenings across the fleet.
  *
  * Pulls from the configured news APIs (NEWSAPI_KEY, GNEWS_API_KEY,
  * WORLDNEWS_API_KEY), normalizes into one shape, tags by Overlay365 engine
@@ -60,8 +61,7 @@ async function readCache(): Promise<NewsItem[]> {
 }
 
 async function writeCache(items: NewsItem[]): Promise<void> {
-  await fs.mkdir(DIR, { recursive: true });
-  await fs.writeFile(FILE, JSON.stringify({ items, updatedAt: new Date().toISOString() }, null, 2), "utf-8");
+  await writeBrainFile(FILE, JSON.stringify({ items, updatedAt: new Date().toISOString() }, null, 2), "write", "news");
 }
 
 async function fetchJson(url: string): Promise<unknown> {
