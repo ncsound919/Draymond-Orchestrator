@@ -1,23 +1,180 @@
 # Uplift Lab — Operational Catalog
 
-Generated: 2026-08-14T13:34:33.294Z
+Generated: 2026-08-25T06:15:52.967Z
 
 ## Totals
 
 | Kind | Count |
 | --- | --- |
-| skill | 128 |
+| skill | 227 |
 | tool | 49 |
 | agent | 42 |
-| service | 37 |
-| job | 27 |
+| service | 38 |
+| job | 28 |
+| chain | 22 |
 | extension | 22 |
-| chain | 21 |
 | mcp_server | 10 |
 | workflow | 6 |
-| **Total** | **342** |
+| **Total** | **444** |
 
 ## By Category
+
+### marketing (109)
+
+| Name | Kind | Slug | Active | Invocation |
+| --- | --- | --- | --- | --- |
+| ab-testing | skill | `ab-testing` | ✅ | path:agents/skills/skills/ab-testing |
+| ad-creative | skill | `ad-creative` | ✅ | path:agents/skills/skills/ad-creative |
+| ads | skill | `ads` | ✅ | path:agents/skills/skills/ads |
+| agency-aeo-foundations | skill | `agency-aeo-foundations` | ✅ | path:agents/skills/skills/agency-aeo-foundations |
+| agency-agentic-search-optimizer | skill | `agency-agentic-search-optimizer` | ✅ | path:agents/skills/skills/agency-agentic-search-optimizer |
+| agency-ai-citation-strategist | skill | `agency-ai-citation-strategist` | ✅ | path:agents/skills/skills/agency-ai-citation-strategist |
+| agency-app-store-optimizer | skill | `agency-app-store-optimizer` | ✅ | path:agents/skills/skills/agency-app-store-optimizer |
+| agency-baidu-seo-specialist | skill | `agency-baidu-seo-specialist` | ✅ | path:agents/skills/skills/agency-baidu-seo-specialist |
+| agency-bilibili-content-strategist | skill | `agency-bilibili-content-strategist` | ✅ | path:agents/skills/skills/agency-bilibili-content-strategist |
+| agency-book-co-author | skill | `agency-book-co-author` | ✅ | path:agents/skills/skills/agency-book-co-author |
+| agency-carousel-growth-engine | skill | `agency-carousel-growth-engine` | ✅ | path:agents/skills/skills/agency-carousel-growth-engine |
+| agency-china-ecommerce-operator | skill | `agency-china-ecommerce-operator` | ✅ | path:agents/skills/skills/agency-china-ecommerce-operator |
+| agency-china-market-localization-strategist | skill | `agency-china-market-localization-strategist` | ✅ | path:agents/skills/skills/agency-china-market-localization-strategist |
+| agency-content-creator | skill | `agency-content-creator` | ✅ | path:agents/skills/skills/agency-content-creator |
+| agency-cross-border-ecommerce | skill | `agency-cross-border-ecommerce` | ✅ | path:agents/skills/skills/agency-cross-border-ecommerce |
+| agency-douyin-strategist | skill | `agency-douyin-strategist` | ✅ | path:agents/skills/skills/agency-douyin-strategist |
+| agency-email-strategist | skill | `agency-email-strategist` | ✅ | path:agents/skills/skills/agency-email-strategist |
+| agency-global-podcast-strategist | skill | `agency-global-podcast-strategist` | ✅ | path:agents/skills/skills/agency-global-podcast-strategist |
+| agency-growth-hacker | skill | `agency-growth-hacker` | ✅ | path:agents/skills/skills/agency-growth-hacker |
+| agency-instagram-curator | skill | `agency-instagram-curator` | ✅ | path:agents/skills/skills/agency-instagram-curator |
+| agency-kuaishou-strategist | skill | `agency-kuaishou-strategist` | ✅ | path:agents/skills/skills/agency-kuaishou-strategist |
+| agency-linkedin-content-creator | skill | `agency-linkedin-content-creator` | ✅ | path:agents/skills/skills/agency-linkedin-content-creator |
+| agency-livestream-commerce-coach | skill | `agency-livestream-commerce-coach` | ✅ | path:agents/skills/skills/agency-livestream-commerce-coach |
+| agency-multi-platform-publisher | skill | `agency-multi-platform-publisher` | ✅ | path:agents/skills/skills/agency-multi-platform-publisher |
+| agency-podcast-strategist | skill | `agency-podcast-strategist` | ✅ | path:agents/skills/skills/agency-podcast-strategist |
+| agency-pr-communications-manager | skill | `agency-pr-communications-manager` | ✅ | path:agents/skills/skills/agency-pr-communications-manager |
+| agency-private-domain-operator | skill | `agency-private-domain-operator` | ✅ | path:agents/skills/skills/agency-private-domain-operator |
+| agency-reddit-community-builder | skill | `agency-reddit-community-builder` | ✅ | path:agents/skills/skills/agency-reddit-community-builder |
+| agency-seo-specialist | skill | `agency-seo-specialist` | ✅ | path:agents/skills/skills/agency-seo-specialist |
+| agency-short-video-editing-coach | skill | `agency-short-video-editing-coach` | ✅ | path:agents/skills/skills/agency-short-video-editing-coach |
+| agency-social-media-strategist | skill | `agency-social-media-strategist` | ✅ | path:agents/skills/skills/agency-social-media-strategist |
+| agency-tiktok-strategist | skill | `agency-tiktok-strategist` | ✅ | path:agents/skills/skills/agency-tiktok-strategist |
+| agency-twitter-engager | skill | `agency-twitter-engager` | ✅ | path:agents/skills/skills/agency-twitter-engager |
+| agency-video-optimization-specialist | skill | `agency-video-optimization-specialist` | ✅ | path:agents/skills/skills/agency-video-optimization-specialist |
+| agency-wechat-official-account | skill | `agency-wechat-official-account` | ✅ | path:agents/skills/skills/agency-wechat-official-account |
+| agency-weibo-strategist | skill | `agency-weibo-strategist` | ✅ | path:agents/skills/skills/agency-weibo-strategist |
+| agency-x-twitter-intelligence-analyst | skill | `agency-x-twitter-intelligence-analyst` | ✅ | path:agents/skills/skills/agency-x-twitter-intelligence-analyst |
+| agency-xiaohongshu-specialist | skill | `agency-xiaohongshu-specialist` | ✅ | path:agents/skills/skills/agency-xiaohongshu-specialist |
+| agency-zhihu-strategist | skill | `agency-zhihu-strategist` | ✅ | path:agents/skills/skills/agency-zhihu-strategist |
+| ai-seo | skill | `ai-seo` | ✅ | path:agents/skills/skills/ai-seo |
+| algorithmic-art | skill | `algorithmic-art` | ✅ | path:agents/skills/skills/algorithmic-art |
+| analytics | skill | `analytics` | ✅ | path:agents/skills/skills/analytics |
+| aso | skill | `aso` | ✅ | path:agents/skills/skills/aso |
+| attribution | skill | `attribution` | ✅ | path:agents/skills/skills/attribution |
+| brand-guidelines | skill | `brand-guidelines` | ✅ | path:agents/skills/skills/brand-guidelines |
+| canvas-design | skill | `canvas-design` | ✅ | path:agents/skills/skills/canvas-design |
+| churn-prevention | skill | `churn-prevention` | ✅ | path:agents/skills/skills/churn-prevention |
+| claude-api | skill | `claude-api` | ✅ | path:agents/skills/skills/claude-api |
+| co-marketing | skill | `co-marketing` | ✅ | path:agents/skills/skills/co-marketing |
+| cold-email | skill | `cold-email` | ✅ | path:agents/skills/skills/cold-email |
+| community-marketing | skill | `community-marketing` | ✅ | path:agents/skills/skills/community-marketing |
+| competitor-profiling | skill | `competitor-profiling` | ✅ | path:agents/skills/skills/competitor-profiling |
+| competitors | skill | `competitors` | ✅ | path:agents/skills/skills/competitors |
+| copy-editing | skill | `copy-editing` | ✅ | path:agents/skills/skills/copy-editing |
+| copywriting | skill | `copywriting` | ✅ | path:agents/skills/skills/copywriting |
+| cro | skill | `cro` | ✅ | path:agents/skills/skills/cro |
+| customer-research | skill | `customer-research` | ✅ | path:agents/skills/skills/customer-research |
+| directory-submissions | skill | `directory-submissions` | ✅ | path:agents/skills/skills/directory-submissions |
+| doc-coauthoring | skill | `doc-coauthoring` | ✅ | path:agents/skills/skills/doc-coauthoring |
+| docx | skill | `docx` | ✅ | path:agents/skills/skills/docx |
+| emails | skill | `emails` | ✅ | path:agents/skills/skills/emails |
+| events | skill | `events` | ✅ | path:agents/skills/skills/events |
+| free-tools | skill | `free-tools` | ✅ | path:agents/skills/skills/free-tools |
+| frontend-design | skill | `frontend-design` | ✅ | path:agents/skills/skills/frontend-design |
+| image | skill | `image` | ✅ | path:agents/skills/skills/image |
+| influencer-marketing | skill | `influencer-marketing` | ✅ | path:agents/skills/skills/influencer-marketing |
+| internal-comms | skill | `internal-comms` | ✅ | path:agents/skills/skills/internal-comms |
+| launch | skill | `launch` | ✅ | path:agents/skills/skills/launch |
+| lead-magnets | skill | `lead-magnets` | ✅ | path:agents/skills/skills/lead-magnets |
+| Marketing Automation | skill | `marketing-automation` | ✅ | path:../integrations/Marketing-Tool |
+| Marketing Extension | extension | `ext-marketing` | ✅ | python_module |
+| Marketing Mode | skill | `marketing-mode` | ✅ | path:agents/skills/marketing-mode |
+| Marketing Tool (stage) | tool | `marketing-tool` | ✅ | pipeline |
+| Marketing Tools Skill | skill | `skill-marketing-tools` | ✅ | python_module |
+| marketing-council | skill | `marketing-council` | ✅ | path:agents/skills/skills/marketing-council |
+| marketing-ideas | skill | `marketing-ideas` | ✅ | path:agents/skills/skills/marketing-ideas |
+| marketing-loops | skill | `marketing-loops` | ✅ | path:agents/skills/skills/marketing-loops |
+| marketing-plan | skill | `marketing-plan` | ✅ | path:agents/skills/skills/marketing-plan |
+| marketing-psychology | skill | `marketing-psychology` | ✅ | path:agents/skills/skills/marketing-psychology |
+| mcp-builder | skill | `mcp-builder` | ✅ | path:agents/skills/skills/mcp-builder |
+| offers | skill | `offers` | ✅ | path:agents/skills/skills/offers |
+| onboarding | skill | `onboarding` | ✅ | path:agents/skills/skills/onboarding |
+| Open-Chat Worker | service | `open-chat-worker` | ✅ | internal |
+| Overlay Global Lens | service | `global-lens` | ✅ | http_api |
+| Overlay365 Marketing Team | skill | `overlay-marketing` | ✅ | path:../overlay365/agent-team |
+| paywalls | skill | `paywalls` | ✅ | path:agents/skills/skills/paywalls |
+| popups | skill | `popups` | ✅ | path:agents/skills/skills/popups |
+| pptx | skill | `pptx` | ✅ | path:agents/skills/skills/pptx |
+| pricing | skill | `pricing` | ✅ | path:agents/skills/skills/pricing |
+| product-marketing | skill | `product-marketing` | ✅ | path:agents/skills/skills/product-marketing |
+| programmatic-seo | skill | `programmatic-seo` | ✅ | path:agents/skills/skills/programmatic-seo |
+| prospecting | skill | `prospecting` | ✅ | path:agents/skills/skills/prospecting |
+| public-relations | skill | `public-relations` | ✅ | path:agents/skills/skills/public-relations |
+| referrals | skill | `referrals` | ✅ | path:agents/skills/skills/referrals |
+| revops | skill | `revops` | ✅ | path:agents/skills/skills/revops |
+| sales-enablement | skill | `sales-enablement` | ✅ | path:agents/skills/skills/sales-enablement |
+| schema | skill | `schema` | ✅ | path:agents/skills/skills/schema |
+| seo-audit | skill | `seo-audit` | ✅ | path:agents/skills/skills/seo-audit |
+| signup | skill | `signup` | ✅ | path:agents/skills/skills/signup |
+| site-architecture | skill | `site-architecture` | ✅ | path:agents/skills/skills/site-architecture |
+| slack-gif-creator | skill | `slack-gif-creator` | ✅ | path:agents/skills/skills/slack-gif-creator |
+| sms | skill | `sms` | ✅ | path:agents/skills/skills/sms |
+| social | skill | `social` | ✅ | path:agents/skills/skills/social |
+| Social Agent Extension | extension | `ext-social-agent` | ✅ | python_module |
+| Social Media Dashboard | service | `social-media-dashboard` | ✅ | http_api |
+| theme-factory | skill | `theme-factory` | ✅ | path:agents/skills/skills/theme-factory |
+| video | skill | `video` | ✅ | path:agents/skills/skills/video |
+| web-artifacts-builder | skill | `web-artifacts-builder` | ✅ | path:agents/skills/skills/web-artifacts-builder |
+| webapp-testing | skill | `webapp-testing` | ✅ | path:agents/skills/skills/webapp-testing |
+
+### workflow (38)
+
+| Name | Kind | Slug | Active | Invocation |
+| --- | --- | --- | --- | --- |
+| Audit Delivery | chain | `audit-delivery` | ✅ | steps:4 |
+| Book-Grounded Research | chain | `book-grounded-research` | ✅ | steps:3 |
+| Book-to-Skill Chain | chain | `tpl-book-to-skill-chain` | ✅ | steps:3 |
+| Brainstorming | skill | `sp-brainstorming` | ✅ | path:agents/skills/superpowers-main/skills/brainstorming |
+| Cheetah Scaffold Pipeline | chain | `cheetah-scaffold-pipeline` | ✅ | steps:4 |
+| CIS Contract Workflow | chain | `tpl-cis-contract-workflow` | ✅ | steps:4 |
+| Code Automation Pipeline | chain | `code-automation-pipeline` | ✅ | steps:3 |
+| Code Review | skill | `sp-code-review` | ✅ | path:agents/skills/superpowers-main/skills/requesting-code-review |
+| CPU RTL Generation Pipeline | chain | `cpu-rtl-generation` | ✅ | steps:4 |
+| Daily Finance Analysis | chain | `daily-finance-analysis` | ✅ | steps:3 |
+| Daily Fleet Health Check | workflow | `wf-daily-health` | ✅ | steps:3 |
+| Daily Market & News Digest | workflow | `wf-daily-news` | ✅ | steps:3 |
+| Daily Marketing Run | chain | `daily-marketing-run` | ✅ | steps:4 |
+| Executing Plans | skill | `sp-executing-plans` | ✅ | path:agents/skills/superpowers-main/skills/executing-plans |
+| Full Content Creation | chain | `full-content-creation` | ✅ | steps:4 |
+| Git Worktrees | skill | `sp-git-worktrees` | ✅ | path:agents/skills/superpowers-main/skills/using-git-worktrees |
+| Hemp Research & News Pipeline | chain | `hemp-research-news` | ✅ | steps:2 |
+| IP Portfolio Grading & Protection | chain | `ip-portfolio-grading` | ✅ | steps:3 |
+| MaaS Monthly Cycle | chain | `maas-monthly-cycle` | ✅ | steps:5 |
+| Marketing Content Capture | chain | `marketing-content-capture` | ✅ | steps:1 |
+| Marketing Pulse (weekly) | workflow | `wf-marketing-pulse` | ✅ | steps:5 |
+| Mission Control â€” Weekly Pipeline Sync | workflow | `wf-mission-sync` | ✅ | steps:5 |
+| ML Research Loop | chain | `tpl-ml-research-loop` | ✅ | steps:5 |
+| Morning Briefing | chain | `morning-briefing` | ✅ | steps:4 |
+| Music Business Automation | chain | `music-business-automation` | ✅ | steps:3 |
+| News Outlet Ingest | chain | `news-outlet-ingest` | ✅ | steps:3 |
+| Overlay365 Weekly Founder Sync | workflow | `wf-overlay-founder-sync` | ✅ | steps:5 |
+| Parallel Agents | skill | `sp-parallel-agents` | ✅ | path:agents/skills/superpowers-main/skills/dispatching-parallel-agents |
+| Research Brief Delivery | chain | `research-brief-delivery` | ✅ | steps:4 |
+| Research Data Pipeline | chain | `research-data-pipeline` | ✅ | steps:2 |
+| Sports Betting Daily | chain | `sports-betting-daily` | ✅ | steps:3 |
+| Subagent-Driven Development | skill | `sp-subagent-dev` | ✅ | path:agents/skills/superpowers-main/skills/subagent-driven-development |
+| Superpowers TDD | skill | `sp-tdd` | ✅ | path:agents/skills/superpowers-main/skills/test-driven-development |
+| Supply Chain Intelligence | chain | `supply-chain-intelligence` | ✅ | steps:4 |
+| Systematic Debugging | skill | `sp-debugging` | ✅ | path:agents/skills/superpowers-main/skills/systematic-debugging |
+| Verification Before Completion | skill | `sp-verification` | ✅ | path:agents/skills/superpowers-main/skills/verification-before-completion |
+| Weekly Operations Review | workflow | `wf-weekly-review` | ✅ | steps:3 |
+| Writing Skills | skill | `sp-writing-skills` | ✅ | path:agents/skills/superpowers-main/skills/writing-skills |
 
 ### uncategorized (38)
 
@@ -62,48 +219,6 @@ Generated: 2026-08-14T13:34:33.294Z
 | UFC-MCP | agent | `ufc-mcp` | ✅ | mcp |
 | Uplift Agent | agent | `uplift-agent` | ✅ | http |
 
-### workflow (37)
-
-| Name | Kind | Slug | Active | Invocation |
-| --- | --- | --- | --- | --- |
-| Audit Delivery | chain | `audit-delivery` | ✅ | steps:4 |
-| Book-Grounded Research | chain | `book-grounded-research` | ✅ | steps:3 |
-| Book-to-Skill Chain | chain | `tpl-book-to-skill-chain` | ✅ | steps:3 |
-| Brainstorming | skill | `sp-brainstorming` | ✅ | path:agents/skills/superpowers-main/skills/brainstorming |
-| Cheetah Scaffold Pipeline | chain | `cheetah-scaffold-pipeline` | ✅ | steps:4 |
-| CIS Contract Workflow | chain | `tpl-cis-contract-workflow` | ✅ | steps:4 |
-| Code Automation Pipeline | chain | `code-automation-pipeline` | ✅ | steps:3 |
-| Code Review | skill | `sp-code-review` | ✅ | path:agents/skills/superpowers-main/skills/requesting-code-review |
-| CPU RTL Generation Pipeline | chain | `cpu-rtl-generation` | ✅ | steps:4 |
-| Daily Finance Analysis | chain | `daily-finance-analysis` | ✅ | steps:3 |
-| Daily Fleet Health Check | workflow | `wf-daily-health` | ✅ | steps:3 |
-| Daily Market & News Digest | workflow | `wf-daily-news` | ✅ | steps:3 |
-| Daily Marketing Run | chain | `daily-marketing-run` | ✅ | steps:4 |
-| Executing Plans | skill | `sp-executing-plans` | ✅ | path:agents/skills/superpowers-main/skills/executing-plans |
-| Full Content Creation | chain | `full-content-creation` | ✅ | steps:4 |
-| Git Worktrees | skill | `sp-git-worktrees` | ✅ | path:agents/skills/superpowers-main/skills/using-git-worktrees |
-| Hemp Research & News Pipeline | chain | `hemp-research-news` | ✅ | steps:5 |
-| IP Portfolio Grading & Protection | chain | `ip-portfolio-grading` | ✅ | steps:3 |
-| MaaS Monthly Cycle | chain | `maas-monthly-cycle` | ✅ | steps:5 |
-| Marketing Content Capture | chain | `marketing-content-capture` | ✅ | steps:1 |
-| Marketing Pulse (weekly) | workflow | `wf-marketing-pulse` | ✅ | steps:5 |
-| Mission Control â€” Weekly Pipeline Sync | workflow | `wf-mission-sync` | ✅ | steps:5 |
-| ML Research Loop | chain | `tpl-ml-research-loop` | ✅ | steps:5 |
-| Morning Briefing | chain | `morning-briefing` | ✅ | steps:4 |
-| Music Business Automation | chain | `music-business-automation` | ✅ | steps:3 |
-| Overlay365 Weekly Founder Sync | workflow | `wf-overlay-founder-sync` | ✅ | steps:5 |
-| Parallel Agents | skill | `sp-parallel-agents` | ✅ | path:agents/skills/superpowers-main/skills/dispatching-parallel-agents |
-| Research Brief Delivery | chain | `research-brief-delivery` | ✅ | steps:4 |
-| Research Data Pipeline | chain | `research-data-pipeline` | ✅ | steps:2 |
-| Sports Betting Daily | chain | `sports-betting-daily` | ✅ | steps:3 |
-| Subagent-Driven Development | skill | `sp-subagent-dev` | ✅ | path:agents/skills/superpowers-main/skills/subagent-driven-development |
-| Superpowers TDD | skill | `sp-tdd` | ✅ | path:agents/skills/superpowers-main/skills/test-driven-development |
-| Supply Chain Intelligence | chain | `supply-chain-intelligence` | ✅ | steps:4 |
-| Systematic Debugging | skill | `sp-debugging` | ✅ | path:agents/skills/superpowers-main/skills/systematic-debugging |
-| Verification Before Completion | skill | `sp-verification` | ✅ | path:agents/skills/superpowers-main/skills/verification-before-completion |
-| Weekly Operations Review | workflow | `wf-weekly-review` | ✅ | steps:3 |
-| Writing Skills | skill | `sp-writing-skills` | ✅ | path:agents/skills/superpowers-main/skills/writing-skills |
-
 ### research (30)
 
 | Name | Kind | Slug | Active | Invocation |
@@ -139,7 +254,7 @@ Generated: 2026-08-14T13:34:33.294Z
 | The Lab | extension | `ext-the-lab` | ✅ | http_api |
 | zvec (stage) | tool | `zvec` | ✅ | pipeline |
 
-### schedule (27)
+### schedule (28)
 
 | Name | Kind | Slug | Active | Invocation |
 | --- | --- | --- | --- | --- |
@@ -153,6 +268,7 @@ Generated: 2026-08-14T13:34:33.294Z
 | Benchmark: Upgrade Review | job | `Benchmark: Upgrade Review` | ✅ | 0 7 * * 5 |
 | Book-Grounded Research | job | `Book-Grounded Research` | ✅ | 0 5 * * * |
 | Brain Wiki Sync | job | `Brain Wiki Sync` | ✅ | 0 3 * * * |
+| Cancer Research Deep-Dive | job | `Cancer Research Deep-Dive` | ✅ | 0 5 * * * |
 | Daily Finance Analysis | job | `Daily Finance Analysis` | ✅ | 30 9 * * 1-5 |
 | Daily Health Digest | job | `Daily Health Digest` | ✅ | 0 20 * * * |
 | Daily Marketing Run | job | `Daily Marketing Run` | ✅ | 0 10 * * * |
@@ -175,7 +291,7 @@ Generated: 2026-08-14T13:34:33.294Z
 
 | Name | Kind | Slug | Active | Invocation |
 | --- | --- | --- | --- | --- |
-| Bet Buddy | service | `bet-buddy` | ✅ | http_api |
+| Bet Buddy | service | `bet-buddy` | ✅ | cli_command |
 | Budget Integration Skill | skill | `skill-budget-integration` | ✅ | python_module |
 | CIS Assistant | mcp_server | `mcp-cis-assistant` | ✅ | mcp_stdio |
 | Finance | skill | `finance` | ✅ | path:agents/skills/finance |
@@ -261,7 +377,7 @@ Generated: 2026-08-14T13:34:33.294Z
 | Overlay Chain Extension | extension | `ext-overlay-chain` | ✅ | python_module |
 | Overlay Chain Skill | skill | `skill-overlay-chain` | ✅ | python_module |
 | Paperclip Extension | extension | `ext-paperclip` | ✅ | python_module |
-| Tap919 Middleman (stage) | tool | `tap919-middleman` | ✅ | pipeline |
+| Tap919 Middleman (metered gateway) | tool | `tap919-middleman` | ✅ | http_api |
 | Vercel | service | `service-vercel` | ✅ | api_call |
 
 ### media (10)
@@ -293,20 +409,6 @@ Generated: 2026-08-14T13:34:33.294Z
 | OpenSandbox Skill | skill | `skill-open-sandbox` | ✅ | python_module |
 | Phaselock | tool | `phaselock` | ✅ | internal |
 | Sub Team | agent | `sub-team` | ✅ | cli_command |
-
-### marketing (9)
-
-| Name | Kind | Slug | Active | Invocation |
-| --- | --- | --- | --- | --- |
-| Marketing Automation | skill | `marketing-automation` | ✅ | path:../integrations/Marketing-Tool |
-| Marketing Extension | extension | `ext-marketing` | ✅ | python_module |
-| Marketing Mode | skill | `marketing-mode` | ✅ | path:agents/skills/marketing-mode |
-| Marketing Tool (stage) | tool | `marketing-tool` | ✅ | pipeline |
-| Marketing Tools Skill | skill | `skill-marketing-tools` | ✅ | python_module |
-| Open-Chat Worker | service | `open-chat-worker` | ✅ | internal |
-| Overlay365 Marketing Team | skill | `overlay-marketing` | ✅ | path:../overlay365/agent-team |
-| Social Agent Extension | extension | `ext-social-agent` | ✅ | python_module |
-| Social Media Dashboard | service | `social-media-dashboard` | ✅ | http_api |
 
 ### dev (8)
 
@@ -672,6 +774,7 @@ Generated: 2026-08-14T13:34:33.294Z
 | Broken Link Crawling | overlay-auditor |
 | Browser Automation | agent-browser |
 | CLI Power Tools | megacode |
+| CRO | social-media-dashboard |
 | CVE Detection | depscan |
 | Call Handling | aetherdesk |
 | Campaign Analytics | social-media-dashboard |
@@ -684,6 +787,7 @@ Generated: 2026-08-14T13:34:33.294Z
 | Connectors | composio |
 | Consent Compliance | aetherdesk |
 | Content Compliance | overlay-guardian |
+| Copywriting | social-media-dashboard |
 | Cost Control | litellm |
 | Creation Studio | social-media-dashboard |
 | Cron Scheduling | hermes |
@@ -708,6 +812,7 @@ Generated: 2026-08-14T13:34:33.294Z
 | Feedback Clustering | overlay-strategist |
 | File Conversion | ufc-mcp |
 | Fleet Orchestration | agent-browser |
+| Growth Engineering | social-media-dashboard |
 | Hashtag Rules | social-media-dashboard |
 | Highlight Extraction | generative-video-ai |
 | Hybrid Search | bookbridge |
@@ -778,6 +883,7 @@ Generated: 2026-08-14T13:34:33.294Z
 | Rules | everything-claude-code |
 | SBOM | depscan |
 | SCA | depscan |
+| SEO/AEO | social-media-dashboard |
 | SMB Support | aetherdesk |
 | Sandbox Testing | mutly |
 | Scenario Modeling | trading-agents |
@@ -822,7 +928,6 @@ Generated: 2026-08-14T13:34:33.294Z
 | adaptive_scraping | scrapling |
 | adaptive_therapy | bbtech-web-app |
 | agent_orchestration | cai, paperclip |
-| agent_routing | tap919-middleman |
 | ai-safety | aegis-safety, overlay-safety, clawsafe |
 | alphafold | colabfold |
 | analysis | fs-agent, hemp-os, omni-research, ext-autoresearch, ext-finance, ext-the-lab … |
@@ -897,11 +1002,13 @@ Generated: 2026-08-14T13:34:33.294Z
 | content-ip | overlay-writing |
 | content-production | overlay-content |
 | content_generation | hemp-os |
+| content_syndication | global-lens |
 | context_compression | llmlingua |
 | continuous_ops | cai |
 | contracts | book-publishing-platform |
 | cost-optimization | ext-claw-router |
 | cost-tracking | ext-claw-router |
+| cost_governance | tap919-middleman |
 | cost_monitoring | paperclip |
 | coverage_delta | codenexus |
 | cpu_rtl_generation | sub-team |
@@ -1038,16 +1145,16 @@ Generated: 2026-08-14T13:34:33.294Z
 | multi-tool-agent | opencode |
 | multi_book_synthesis | book-synthesis |
 | music | skill-spotify-player |
-| music-production | overlay-music, sovereign-music-studio, skill-sovereign-music, dustcrate, nc-sound |
+| music-production | nc-sound, overlay-music, sovereign-music-studio, skill-sovereign-music, dustcrate |
 | music-publishing | nc-sound |
 | music-rights | overlay-music |
 | narrative-generation | comic-metaphor-engine |
 | network_traffic_analysis | cai |
 | news_aggregation | overlay-global-lens |
+| news_ingest | global-lens |
 | nft_minting | recursive-ip |
 | notebook_synthesis | open-notebook |
 | novelty-checking | ai-scientist |
-| observability | tap919-middleman |
 | odds-modeling | boxing-sim |
 | onco-metrics | disease-research |
 | opportunity-scanning | otm-agent |
@@ -1083,7 +1190,7 @@ Generated: 2026-08-14T13:34:33.294Z
 | prototyping | skill-digital-lab |
 | provenance | bookbridge, book-bridge |
 | prs | mcp-github |
-| publishing | book-publishing-platform, overlay-writing |
+| publishing | book-publishing-platform, global-lens, overlay-writing |
 | purple_teaming | cai |
 | qa-testing | agent-browser |
 | quality-gates | reporank |
@@ -1163,6 +1270,7 @@ Generated: 2026-08-14T13:34:33.294Z
 | spreadsheet | ufc-mcp |
 | storage | ext-engram, ext-mem0, ext-memory-core, service-local-sqlite, skill-engram, skill-mem0 |
 | strategy-metaphors | comic-metaphor-engine |
+| stripe_rail | tap919-middleman |
 | subcontractor-onboarding | mcp-cis-assistant |
 | subscriptions | service-stripe |
 | summarization | bookbridge, book-bridge, skill-summarize |
@@ -1190,6 +1298,7 @@ Generated: 2026-08-14T13:34:33.294Z
 | tutoring | ext-the-lab |
 | ui-component-generation | cheetah |
 | ui_generation | vibeserve |
+| usage_events | tap919-middleman |
 | utility | ufc-mcp |
 | validation | mcp-cis-assistant, phaselock |
 | vector-search | ext-memory-lancedb |
