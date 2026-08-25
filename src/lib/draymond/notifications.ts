@@ -16,6 +16,7 @@ import os from 'node:os';
 import { createDraymondAdminClient } from './client';
 import type { DraymondDashboardSummary } from './types';
 import { emitNotificationSent, emitNotificationFailed } from '@/lib/draymond/event-bridge';
+import { dispatchNotification } from '@/notify/dispatcher';
 
 // ============================================================================
 // TYPES
@@ -572,7 +573,7 @@ export async function sendNotification(
 
   const notificationId = (record as NotificationRecord).id;
 
-  // 2. Send email
+  // 2. Deliver through the S10 dispatcher cascade (ntfy -> Apprise -> email).
   try {
     const html = renderEmailHtml(
       payload.type,
@@ -582,11 +583,23 @@ export async function sendNotification(
       payload.metadata
     );
 
-    await sendEmailHtml({
-      to: payload.recipient,
-      subject: `${(TEMPLATE_CONFIG[payload.type] ?? TEMPLATE_CONFIG.custom).icon} [${(TEMPLATE_CONFIG[payload.type] ?? TEMPLATE_CONFIG.custom).prefix}] ${payload.subject}`,
-      html,
-    });
+    const result = await dispatchNotification(
+      {
+        subject: `${(TEMPLATE_CONFIG[payload.type] ?? TEMPLATE_CONFIG.custom).icon} [${(TEMPLATE_CONFIG[payload.type] ?? TEMPLATE_CONFIG.custom).prefix}] ${payload.subject}`,
+        body: payload.body,
+        priority,
+        recipient: payload.recipient,
+      },
+      async (p) =>
+        sendEmailHtml({
+          to: p.recipient ?? payload.recipient,
+          subject: p.subject,
+          html,
+        })
+    );
+    if (!result.delivered) {
+      throw new Error(`all notification channels failed: ${result.attempts.map((a) => `${a.channel}: ${a.error}`).join(' | ')}`);
+    }
 
     // 3a. Mark as sent
     const { data: updated, error: updateError } = await supabase
@@ -792,15 +805,27 @@ export async function sendHealthDigest(
 
   const notificationId = (record as NotificationRecord).id;
 
-  // 2. Send the digest email with rich HTML
+  // 2. Send the digest email with rich HTML (via S10 dispatcher cascade)
   try {
     const html = renderHealthDigestHtml(summary);
 
-    await sendEmailHtml({
-      to: recipient,
-      subject: `\u{1F4CA} [Health Digest] ${subject}`,
-      html,
-    });
+    const result = await dispatchNotification(
+      {
+        subject: `\u{1F4CA} [Health Digest] ${subject}`,
+        body: `Health digest for ${recipient} — see email for the full report.`,
+        priority: 'normal',
+        recipient,
+      },
+      async (p) =>
+        sendEmailHtml({
+          to: p.recipient ?? recipient,
+          subject: p.subject,
+          html,
+        })
+    );
+    if (!result.delivered) {
+      throw new Error(`all notification channels failed: ${result.attempts.map((a) => `${a.channel}: ${a.error}`).join(' | ')}`);
+    }
 
     // 3a. Mark as sent
     const { data: updated, error: updateError } = await supabase
