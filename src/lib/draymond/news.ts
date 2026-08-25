@@ -1,6 +1,6 @@
-﻿import { writeBrainFile } from './journal';
+import { writeBrainFile } from './journal';
 /**
- * News ingestion â€” current information + happenings across the fleet.
+ * News ingestion — current information + happenings across the fleet.
  *
  * Pulls from the configured news APIs (NEWSAPI_KEY, GNEWS_API_KEY,
  * WORLDNEWS_API_KEY), normalizes into one shape, tags by Overlay365 engine

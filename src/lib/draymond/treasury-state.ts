@@ -1,6 +1,6 @@
-﻿import { writeBrainFile } from './journal';
+import { writeBrainFile } from './journal';
 /**
- * Treasury state â€” shared ledger for settled revenue.
+ * Treasury state — shared ledger for settled revenue.
  *
  * Both the daily `treasury_pulse` pull (treasury.ts) and the real-time Stripe
  * webhook (app/api/business/stripe-webhook) write to the SAME ledger so push and
@@ -31,7 +31,7 @@ export interface SettledCharge {
 export interface TreasuryState {
   /** Sum of settled, non-refunded charges (cents). */
   revenueCents: number;
-  /** id â†’ settled charge ledger (dedupe + refund tracking). */
+  /** id → settled charge ledger (dedupe + refund tracking). */
   charges: Record<string, SettledCharge>;
   /** Charge ids that already fired a sale alert (so each sale alerts once). */
   alertedChargeIds: string[];

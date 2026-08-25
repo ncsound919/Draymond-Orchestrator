@@ -1,6 +1,6 @@
-﻿import { writeBrainFile } from './journal';
+import { writeBrainFile } from './journal';
 /**
- * Night mode â€” overnight Research & Development.
+ * Night mode — overnight Research & Development.
  *
  * While the user sleeps, the fleet works a night shift: pick research topics
  * (from the news digest + a backlog) and dev tasks, queue them, and produce a

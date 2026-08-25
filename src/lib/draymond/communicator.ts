@@ -1,6 +1,6 @@
-﻿import { writeBrainFile } from './journal';
+import { writeBrainFile } from './journal';
 /**
- * Workplace communicator â€” keeps Open-Chat (and email/call) updated on the
+ * Workplace communicator — keeps Open-Chat (and email/call) updated on the
  * ongoing state of the workplace: money made, issues, insights, upgrades.
  *
  * Each day phase produces a recap; recaps are pushed to Open-Chat + emailed,
@@ -42,7 +42,7 @@ export async function buildRecap(phase: PhaseRecap["phase"]): Promise<PhaseRecap
   const insights: string[] = [];
   const upgrades: string[] = [];
 
-  // Money â€” from the business pipeline + treasury.
+  // Money — from the business pipeline + treasury.
   try {
     const { pipelineSummary } = await import("./business-pipeline");
     const { settledRevenueUsd } = await import("./treasury-state");
@@ -51,7 +51,7 @@ export async function buildRecap(phase: PhaseRecap["phase"]): Promise<PhaseRecap
     money.push(`Settled revenue: $${revenueToDate}. Pipeline: $${p.opportunities.activePipelineValue} active, $${p.opportunities.wonMonthlyValue} won/mo. Target $${p.monthlyTarget}/mo.`);
   } catch { /* pipeline unavailable */ }
 
-  // Issues â€” from self-learning lessons + repair log.
+  // Issues — from self-learning lessons + repair log.
   try {
     const { getLessons } = await import("./self-learning");
     const lessons = await getLessons();
@@ -59,14 +59,14 @@ export async function buildRecap(phase: PhaseRecap["phase"]): Promise<PhaseRecap
     else issues.push("No recurring issues.");
   } catch { /* n/a */ }
 
-  // Insights â€” from the news digest + R&D.
+  // Insights — from the news digest + R&D.
   try {
     const { newsDigest } = await import("./news");
     const digest = await newsDigest();
     if (digest.items.length) insights.push(`News: ${digest.items.slice(0, 3).map((i) => i.title).join(" | ")}`);
   } catch { /* n/a */ }
 
-  // Upgrades â€” from the R&D dev queue.
+  // Upgrades — from the R&D dev queue.
   try {
     const { rdNightReport } = await import("./rd-night");
     const rd = await rdNightReport();
@@ -84,7 +84,7 @@ export async function buildRecap(phase: PhaseRecap["phase"]): Promise<PhaseRecap
 }
 
 export function renderRecap(recap: PhaseRecap): string {
-  const lines = [`# ${recap.phase[0].toUpperCase()}${recap.phase.slice(1)} Recap â€” ${recap.generatedAt.slice(0, 10)}`, ""];
+  const lines = [`# ${recap.phase[0].toUpperCase()}${recap.phase.slice(1)} Recap — ${recap.generatedAt.slice(0, 10)}`, ""];
   for (const [label, text] of Object.entries(recap.sections)) {
     if (text) lines.push(`**${label}:** ${text}`, "");
   }
@@ -158,7 +158,7 @@ export async function sendRecap(recap: PhaseRecap): Promise<{ channels: string[]
   if (process.env.GMAIL_USER || process.env.DRAYMOND_ALERT_EMAIL) {
     try {
       const { sendMemo } = await import("./notifications");
-      await sendMemo(`Overlay365 ${recap.phase} recap â€” ${recap.generatedAt.slice(0, 10)}`, markdown);
+      await sendMemo(`Overlay365 ${recap.phase} recap — ${recap.generatedAt.slice(0, 10)}`, markdown);
       channels.push("email");
       detail.push("email sent");
     } catch (err) {

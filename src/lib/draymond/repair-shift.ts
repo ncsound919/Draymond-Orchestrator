@@ -1,6 +1,6 @@
-﻿import { writeBrainFile } from './journal';
+import { writeBrainFile } from './journal';
 /**
- * Repair Shift â€” the daily fleet repair/upgrade shift.
+ * Repair Shift — the daily fleet repair/upgrade shift.
  *
  * One coherent daily shift across the ecosystem, mirroring the user's operating
  * model: the CODE REVIEW team audits, then the REPAIR team fixes and upgrades
@@ -8,16 +8,16 @@
  * self-learning system drives consistent optimization.
  *
  * Shift phases (deterministic, bounded, best-effort per phase):
- *   1. AUDIT  â€” code-review team pass: run benchmark cycles across entity/site/
+ *   1. AUDIT  — code-review team pass: run benchmark cycles across entity/site/
  *               cron/chain and deep-score (RepoRank/Grader/Vibe-Reality) the
  *               weakest components. This is the "code review team auditing".
- *   2. REPAIR â€” repair team pass: repair failed scheduler jobs and weak
+ *   2. REPAIR — repair team pass: repair failed scheduler jobs and weak
  *               benchmark components (repairWeakEntity), and start down
  *               services. Fixed per-run bounds so tokens stay sane.
- *   3. BENCHMARK IMPROVEMENTS â€” for every component the shift acted on, compare
+ *   3. BENCHMARK IMPROVEMENTS — for every component the shift acted on, compare
  *               its weakness trend before/after and record the gain (or
  *               regression) to self-learning (recordBenchmarkGain).
- *   4. SELF-LEARNING â€” distill the day's outcomes into lessons so the next
+ *   4. SELF-LEARNING — distill the day's outcomes into lessons so the next
  *               shift starts smarter (the "consistent optimization" loop).
  *
  * Every phase is guarded (try/catch) so one offline engine can't sink the
@@ -98,7 +98,7 @@ export async function runRepairShift(options: RepairShiftOptions = {}): Promise<
     durationMs: 0,
   };
 
-  // â”€â”€ Phase 1: AUDIT (code-review team) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Phase 1: AUDIT (code-review team) ─────────────────────────────────────
   const weakTargets: Array<{ slug: string; score: number; componentClass: string; reasons: string[] }> = [];
   try {
     const { runBenchmarkCycle } = await import("./run-benchmark");
@@ -133,7 +133,7 @@ export async function runRepairShift(options: RepairShiftOptions = {}): Promise<
   }
   result.audit.weakest = result.audit.weakest.slice(0, maxComponents);
 
-  // â”€â”€ Phase 2: REPAIR (repair team) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Phase 2: REPAIR (repair team) ─────────────────────────────────────────
   // 2a. Failed scheduler jobs.
   try {
     const { listJobs, updateJob } = await import("./scheduler");
@@ -186,11 +186,11 @@ export async function runRepairShift(options: RepairShiftOptions = {}): Promise<
     result.repair.failures.push(`services: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  // â”€â”€ Phase 3: BENCHMARK IMPROVEMENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Phase 3: BENCHMARK IMPROVEMENTS ───────────────────────────────────────
   // Compare each acted-on component's weakness score in THIS run vs its last
   // run. The audit phase already recorded this run's scores into the benchmark
   // history, so `getTrend`'s last value is the current score and the
-  // second-to-last is the pre-shift baseline â€” a true shift-over-shift delta,
+  // second-to-last is the pre-shift baseline — a true shift-over-shift delta,
   // not a self-comparison.
   try {
     const { getTrend } = await import("./benchmarking");
@@ -223,7 +223,7 @@ export async function runRepairShift(options: RepairShiftOptions = {}): Promise<
     result.repair.failures.push(`improvements: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  // â”€â”€ Phase 4: SELF-LEARNING (consistent optimization) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Phase 4: SELF-LEARNING (consistent optimization) ──────────────────────
   try {
     const { distillLessons } = await import("./self-learning");
     const lessons = await distillLessons();

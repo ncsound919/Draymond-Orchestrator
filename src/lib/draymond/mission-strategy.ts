@@ -1,6 +1,6 @@
-﻿import { writeBrainFile } from './journal';
+import { writeBrainFile } from './journal';
 /**
- * Mission strategy â€” configured financial model for the 4 service lines.
+ * Mission strategy — configured financial model for the 4 service lines.
  *
  * State lives in .draymond/mission-strategy.json (JSON-state pattern, no DB).
  * Every service maps to live Stripe products/prices (see .draymond/stripe-pricing.json).
