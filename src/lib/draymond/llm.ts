@@ -293,7 +293,7 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
   const model =
     options.model ??
     (provider === 'ollama' && options.images?.length
-      ? process.env.OLLAMA_VISION_MODEL ?? 'hf.co/unsloth/gemma-4-E2B-it-GGUF:UD-IQ2_M'
+      ? process.env.OLLAMA_VISION_MODEL ?? 'qwen3.5:4b'
       : options.reasoning && provider === 'deepseek'
         ? 'deepseek-reasoner'
         : DEFAULT_MODELS[provider]);
