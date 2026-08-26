@@ -2211,12 +2211,14 @@ const JOB_DEFS: JobSeedDef[] = [
     notify_on_failure: true,
   },
 
-  // ── News Outlet Ingest (2:45AM daily) ───────────────────────────────
+  // ── News Outlet Ingest (2:45AM Monday + Friday) ──────────────────────
   // Pushes the latest ecosystem research into Overlay Global Lens so the
   // public outlet mirrors fresh evidence-tiered papers, trends, discoveries.
+  // Twice a week (Mon 1 + Fri 5) — the outlet's own crons + daily domain
+  // repopulation keep it fresh the rest of the week.
   {
     name: 'News Outlet Ingest',
-    cron_expression: '45 2 * * *',
+    cron_expression: '45 2 * * 1,5',
     job_type: 'chain',
     job_config: {
       chain_slug: 'news-outlet-ingest',

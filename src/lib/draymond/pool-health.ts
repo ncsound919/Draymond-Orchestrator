@@ -1,17 +1,18 @@
 // ============================================================================
 // DRAYMOND POOL HEALTH — daily LLM free-account entitlement check
 // ============================================================================
-// Probes every pooled LLM credential (opencode/Ox Alpha, OpenRouter, Ollama
-// Cloud, DeepSeek), classifies what each account may use TODAY, persists the
-// result to data/pool-health.json + .draymond/pool-health.json, and
+// Probes every pooled LLM credential (opencode Zen accounts, OpenRouter, Ollama
+// Cloud, DeepSeek), classifies which accounts may serve which FREE models TODAY,
+// persists the result to data/pool-health.json + .draymond/pool-health.json, and
 // regenerates litellm.yaml so routing always matches live entitlements:
 //
-//   - opencode key that answers ox-alpha-free  -> routed in the ox-alpha-free
-//     pool (the ecosystem primary model)
-//   - opencode key rejected there but valid on zen free models -> routed to
-//     the zen-free pool (hy3-free / muse-spark-1.2-contributor-free)
+//   - opencode key that answers muse-spark-1.2-contributor-free -> routed into
+//     the `opencode-free` pool (the ecosystem primary free model)
+//   - opencode key valid on any zen free model -> routed to the `zen-free` pool
 //   - dead upstream keys -> dropped from pools entirely
 //
+// Free model ids rotate upstream — the probe list below is the current set and
+// should track the opencode Zen catalog (https://opencode.ai/zen/v1/models).
 // Zero-cost probes where possible (GET endpoints); tiny max_tokens=1 calls
 // only where a chat probe is the only truth.
 // ============================================================================
@@ -37,18 +38,25 @@ export interface PoolProbeResult {
 
 export interface PoolState {
   checkedAt: string;
-  oxAlphaActiveKeys: string[]; // env var names entitled to ox-alpha-free
-  zenFreeOnlyKeys: string[]; // env var names limited to zen free promo models
+  museFreeActiveKeys: string[];          // env var names entitled to the primary free model
+  freeActiveKeys: string[];              // env var names valid on ≥1 zen free model
+  freeModelAvailability: Record<string, string[]>; // model id -> env var names that serve it
   openrouter: PoolProbeResult | null;
   deepseek: PoolProbeResult | null;
   ollamaCloud: { credential: string; ok: boolean }[];
   probes: PoolProbeResult[];
 }
 
-const ZEN_FREE_MODELS = ['hy3-free', 'muse-spark-1.2-contributor-free'];
-// Current Ox Alpha Free model id on OpenCode Zen (docs/zen list it as
-// x-preview-f-free; the legacy alias ox-alpha-free returns 401 upstream).
-const OX_ALPHA_MODEL_ID = 'x-preview-f-free';
+// Current Zen free models (opencode.ai/zen/v1/models). Ordered — primary first.
+// muse is the current assignee; upstream rotates these, keep in sync.
+const FREE_MODELS = [
+  'muse-spark-1.2-contributor-free',
+  'hy3-free',
+  'mimo-v2.5-free',
+  'big-pickle',
+  'nemotron-3-ultra-free',
+  'nemotron-3.5-lightning-free',
+];
 const PROBE_TIMEOUT_MS = 25_000;
 
 // ── env loading (data/litellm.env first = freshest vault sync, then .env.local)
@@ -108,8 +116,8 @@ async function getJson(url: string, apiKey?: string): Promise<{ http: number | n
 }
 
 const OPENCODE_KEYS = [
-  'OPENCODE_KEY_JOHNREDD', 'OPENCODE_KEY_TAP919BEATS', 'OPENCODE_KEY_NCSOUND919',
-  'OPENCODE_KEY_TAP4500', 'OPENCODE_API_KEY',
+  'OPENCODE_KEY_TAP919BEATS', 'OPENCODE_KEY_NCSOUND919', 'OPENCODE_KEY_TAP4500',
+  'OPENCODE_API_KEY', 'OPENCODE_KEY_JOHNREDD', // johnredd last — operator's personal account
 ];
 const OLLAMA_KEYS = [
   'OLLAMA_KEY_PRIMARY', 'OLLAMA_KEY_TAP919BEATS', 'OLLAMA_KEY_TAP4500',
@@ -121,32 +129,33 @@ const OLLAMA_KEYS = [
 export async function runPoolHealth(opts: { restartLitellm?: boolean } = {}): Promise<PoolState> {
   const env = loadEnvMap();
   const probes: PoolProbeResult[] = [];
-  const oxAlphaActiveKeys: string[] = [];
-  const zenFreeOnlyKeys: string[] = [];
+  const museFreeActiveKeys: string[] = [];
+  const freeActiveKeys: string[] = [];
+  const freeModelAvailability: Record<string, string[]> = {};
+  for (const m of FREE_MODELS) freeModelAvailability[m] = [];
 
-  // 1) opencode accounts: who may use ox-alpha today?
+  // 1) opencode accounts: which free models may each account serve today?
   for (const name of OPENCODE_KEYS) {
     const key = env[name];
     if (!key) continue;
-    const primary = await postChat('https://opencode.ai/zen/v1/chat/completions', key, OX_ALPHA_MODEL_ID);
-    if (primary.ok || primary.http === 429) {
-      // 200 or 429 both prove entitlement (429 = valid key, quota window busy)
-      oxAlphaActiveKeys.push(name);
-      probes.push({ provider: 'opencode', credential: name, status: primary.ok ? 'ok' : 'rate_limited', models: ['ox-alpha-free'] });
-      continue;
-    }
-    // Not entitled to ox-alpha: check zen free promo models.
-    const freeOk: string[] = [];
-    for (const m of ZEN_FREE_MODELS) {
+    const serving: string[] = [];
+    let anyOk = false;
+    for (const m of FREE_MODELS) {
       const r = await postChat('https://opencode.ai/zen/v1/chat/completions', key, m);
-      if (r.ok || r.http === 429) freeOk.push(m);
+      // 200 or 429 both prove entitlement (429 = valid key, quota window busy)
+      if (r.ok || r.http === 429) {
+        serving.push(m);
+        freeModelAvailability[m].push(name);
+        anyOk = true;
+      }
     }
-    if (freeOk.length > 0) {
-      zenFreeOnlyKeys.push(name);
-      probes.push({ provider: 'opencode', credential: name, status: 'ok', models: freeOk });
+    if (serving.length > 0) {
+      freeActiveKeys.push(name);
+      probes.push({ provider: 'opencode', credential: name, status: 'ok', models: serving });
     } else {
-      probes.push({ provider: 'opencode', credential: name, status: primary.http === 401 ? 'unauthorized' : 'error', detail: `http=${primary.http}` });
+      probes.push({ provider: 'opencode', credential: name, status: 'error', detail: 'no free model entitled' });
     }
+    if (serving.includes(FREE_MODELS[0])) museFreeActiveKeys.push(name);
   }
 
   // 2) OpenRouter: balance/key status without burning a request
@@ -191,8 +200,9 @@ export async function runPoolHealth(opts: { restartLitellm?: boolean } = {}): Pr
 
   const state: PoolState = {
     checkedAt: new Date().toISOString(),
-    oxAlphaActiveKeys,
-    zenFreeOnlyKeys,
+    museFreeActiveKeys,
+    freeActiveKeys,
+    freeModelAvailability,
     openrouter,
     deepseek,
     ollamaCloud,
@@ -212,8 +222,9 @@ export async function runPoolHealth(opts: { restartLitellm?: boolean } = {}): Pr
       JSON.stringify({
         checkedAt: state.checkedAt,
         summary: {
-          oxAlphaActive: oxAlphaActiveKeys.length,
-          zenFreeOnly: zenFreeOnlyKeys.length,
+          museFreeActive: museFreeActiveKeys.length,
+          freeActive: freeActiveKeys.length,
+          freeModelAvailability,
           openrouter: openrouter?.status ?? 'absent',
           deepseek: deepseek?.status ?? 'absent',
           ollamaAlive: ollamaCloud.filter((o) => o.ok).length + '/' + ollamaCloud.length,
@@ -255,42 +266,34 @@ export async function runPoolHealth(opts: { restartLitellm?: boolean } = {}): Pr
 
 // ── deterministic config builder (pure — unit tested) ───────────────────────
 
-export function buildLitellmConfig(state: Pick<PoolState, 'oxAlphaActiveKeys' | 'zenFreeOnlyKeys'>): string {
+export function buildLitellmConfig(state: Pick<PoolState, 'museFreeActiveKeys' | 'freeActiveKeys'>): string {
   // NOTE: model ids verified against https://opencode.ai/docs/zen/
-  // (Ox Alpha Free, Hy3 Free, Muse Spark 1.2 Contributor Free).
+  // (Muse Spark 1.2 Contributor Free, Hy3 Free, MiMo-V2.5 Free, Big Pickle,
+  //  Nemotron 3 Ultra Free, Nemotron 3.5 Lightning Free). Free ids rotate —
+  // keep in sync with the Zen catalog probe list above.
   const lines: string[] = [];
   lines.push('# LiteLLM proxy config — GENERATED by src/lib/draymond/pool-health.ts');
   lines.push(`# Generated: ${new Date().toISOString()} from the latest KeyWire-vault pool health run.`);
   lines.push('# Edit scripts/template instead of this file — it is overwritten each morning.');
   lines.push('model_list:');
 
-  // Primary: ox-alpha-free ONLY on entitled (active Go) accounts.
-  // Wire name stays `ox-alpha-free` for fleet compatibility; upstream model
-  // id is the current Zen id (x-preview-f-free).
-  for (const k of state.oxAlphaActiveKeys) {
-    lines.push(`  - model_name: ox-alpha-free`);
+  // Primary free pool: muse (current assignee) on accounts entitled to it.
+  for (const k of state.museFreeActiveKeys) {
+    lines.push(`  - model_name: opencode-free`);
     lines.push(`    litellm_params:`);
-    lines.push(`      model: openai/${OX_ALPHA_MODEL_ID}`);
+    lines.push(`      model: openai/${FREE_MODELS[0]}`);
     lines.push(`      api_key: os.environ/${k}`);
     lines.push(`      api_base: https://opencode.ai/zen/v1`);
   }
-  // Zen free promo pool: every non-active-but-valid account, two models.
-  for (const k of [...state.zenFreeOnlyKeys, ...state.oxAlphaActiveKeys]) {
-    for (const m of ['hy3-free', 'muse-spark-1.2-contributor-free']) {
+  // Zen free pool: every valid account × every current free model.
+  for (const k of state.freeActiveKeys) {
+    for (const m of FREE_MODELS) {
       lines.push(`  - model_name: zen-free`);
       lines.push(`    litellm_params:`);
       lines.push(`      model: openai/${m}`);
       lines.push(`      api_key: os.environ/${k}`);
       lines.push(`      api_base: https://opencode.ai/zen/v1`);
     }
-  }
-  // Alias kept wire-compatible for older callers.
-  for (const k of state.oxAlphaActiveKeys.slice(0, 1)) {
-    lines.push(`  - model_name: opencode-free`);
-    lines.push(`    litellm_params:`);
-    lines.push(`      model: openai/${OX_ALPHA_MODEL_ID}`);
-    lines.push(`      api_key: os.environ/${k}`);
-    lines.push(`      api_base: https://opencode.ai/zen/v1`);
   }
   // Overflow pools: OpenRouter free variants + Ollama Cloud. Model ids come
   // from env so they can be updated without code changes:
@@ -324,18 +327,12 @@ export function buildLitellmConfig(state: Pick<PoolState, 'oxAlphaActiveKeys' | 
   lines.push(`      model: openai/deepseek-v4-flash`);
   lines.push(`      api_key: os.environ/OPENCODE_API_KEY`);
   lines.push(`      api_base: https://opencode.ai/zen/go/v1`);
-  lines.push(`  - model_name: dsh-ox-alpha-free`);
-  lines.push(`    litellm_params:`);
-  lines.push(`      model: openai/ox-alpha-free`);
-  lines.push(`      api_key: os.environ/OPENCODE_API_KEY`);
-  lines.push(`      api_base: http://localhost:3080/v1`);
   lines.push('');
   lines.push('router_settings:');
   lines.push('  cooldown_time: 600');
   lines.push('  allowed_fails: 2');
   lines.push('  num_retries: 2');
   lines.push('  fallbacks:');
-  lines.push('    - ox-alpha-free: ["opencode-free", "deepseek"]');
   lines.push('    - opencode-free: ["zen-free", "deepseek"]');
   lines.push('    - zen-free: ["deepseek"]');
   lines.push('');

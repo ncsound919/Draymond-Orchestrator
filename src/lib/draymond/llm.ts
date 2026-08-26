@@ -2,11 +2,17 @@
 // DRAYMOND — Shared LLM Call Helper (provider chain with fallback)
 // ============================================================================
 // Provider-agnostic LLM calls. Ecosystem routing (DSH-aware):
-//   Primary: Ox Alpha free via OpenCode Zen free (https://opencode.ai/zen/v1,
-//            model ox-alpha-free) — routed through the DeepSeek Harness llm
-//            seam when the harness is running (port 3080, see ecosystem.patch.yml).
-//   Fallback: DeepSeek direct (api.deepseek.com, deepseek-chat), then the
-//            funded Go tier (zen/go/v1, deepseek-v4-flash), then local Ollama,
+//   Primary: OpenCode Zen free tier (https://opencode.ai/zen/v1). The free
+//            model list is DATA-DRIVEN — the Keywire-synced catalog
+//            (.draymond/model-routing.json, refreshed by pool-health + free
+//            catalog sync) owns the current model set and the per-account
+//            opencode key pool. The runtime cycles accounts (round-robin) and
+//            free models (on 429/401/404) so quota spreads across every
+//            account. muse-spark-1.2-contributor-free is only the bootstrap
+//            default until the catalog says otherwise — never hard-married.
+//   Fallback: OpenRouter free (OPENROUTER_API_KEY), then local Ollama, then
+//            the funded Go tier (zen/go/v1, deepseek-v4-flash), then DeepSeek
+//            direct (api.deepseek.com — PAID, no longer free) as last resort,
 //            then the deterministic fallback. gpt/anthropic/gemini remain
 //            available when explicitly requested.
 // All OpenAI-compatible providers share one request shape; Anthropic uses the
@@ -21,11 +27,13 @@ import {
   recordChainSuccess,
 } from './fallbacks';
 import type { FallbackContext } from './fallbacks';
+import { readFileSync, statSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
 export type LLMProvider =
-  | 'ox-alpha'
   | 'opencode-free'
   | 'opencode'
+  | 'openrouter'
   | 'deepseek'
   | 'deepseek-direct'
   | 'gemini'
@@ -78,14 +86,17 @@ export interface LLMCallOptions {
    *  Local-only functions (hiccup reporting, schedule notes, chat polish)
    *  pass this to keep token spend near zero. */
   localFirst?: boolean;
+  /** Skill identifier for skill→model-tier routing (consults skill-model-map.json). */
+  skillId?: string;
 }
 
 const PROVIDER_URLS: Record<LLMProvider, string> = {
-  // Ox Alpha free — ecosystem primary, via OpenCode Zen free tier. Same wire as opencode-free
-  // but with the ecosystem model id ox-alpha-free. Routed via DSH harness when DSH is up.
-  'ox-alpha': 'https://opencode.ai/zen/v1/chat/completions',
+  // OpenCode Zen free tier — ecosystem primary. Data-driven model + key pool
+  // (see freeModelList()/opencodeKeyPool()). Routed via DSH harness when DSH is up.
   'opencode-free': 'https://opencode.ai/zen/v1/chat/completions',
   opencode: 'https://opencode.ai/zen/go/v1/chat/completions',
+  // OpenRouter free (:free) models — second free tier, unlimited-ish daily quota.
+  openrouter: 'https://openrouter.ai/api/v1/chat/completions',
   deepseek: 'https://api.deepseek.com/v1/chat/completions',
   'deepseek-direct': 'https://api.deepseek.com/v1/chat/completions',
   gemini: 'https://generativelanguage.googleapis.com/v1beta/models',
@@ -100,9 +111,9 @@ const PROVIDER_URLS: Record<LLMProvider, string> = {
 };
 
 const PROVIDER_ENV: Record<LLMProvider, string> = {
-  'ox-alpha': 'OPENCODE_API_KEY',
-  'opencode-free': 'OPENCODE_API_KEY',
+  'opencode-free': 'OPENCODE_API_KEY', // pool fallback; see opencodeKeyPool()
   opencode: 'OPENCODE_API_KEY',
+  openrouter: 'OPENROUTER_API_KEY',
   deepseek: 'DEEPSEEK_API_KEY',
   'deepseek-direct': 'DEEPSEEK_API_KEY',
   gemini: 'GEMINI_API_KEY',
@@ -114,12 +125,17 @@ const PROVIDER_ENV: Record<LLMProvider, string> = {
   ollama: 'OLLAMA_ENABLED',
 };
 
+/** Bootstrap default until the Keywire-maintained catalog publishes the list. */
+const DEFAULT_FREE_MODEL = 'muse-spark-1.2-contributor-free';
+const OPENROUTER_DEFAULT_MODEL = 'nvidia/nemotron-3.5-lightning:free';
+
 const DEFAULT_MODELS: Record<LLMProvider, string> = {
-  // Ox Alpha free — ecosystem primary (zen/v1). Wire alias deepseek-v4-flash-free kept for
-  // compat where upstream still expects the DeepSeek name; harness adapter advertises both.
-  'ox-alpha': 'ox-alpha-free',
-  'opencode-free': 'ox-alpha-free',
+  // Zen free tier — current catalog winner by default; callProvider() resolves
+  // the live model set from model-routing.json when present.
+  'opencode-free': DEFAULT_FREE_MODEL,
   opencode: 'deepseek-v4-flash',
+  // OpenRouter free variant — override via OPENROUTER_FREE_MODEL.
+  openrouter: process.env.OPENROUTER_FREE_MODEL ?? OPENROUTER_DEFAULT_MODEL,
   // Direct api.deepseek.com provider — `deepseek-v4-flash` is an opencode-only
   // model name; the real DeepSeek API serves `deepseek-chat` / `deepseek-reasoner`.
   // Using the wrong name made the deepseek fallback return empty and skip.
@@ -130,25 +146,24 @@ const DEFAULT_MODELS: Record<LLMProvider, string> = {
   anthropic: 'claude-sonnet-4-5',
   qwen: 'qwen-plus',
   litellm: 'gpt-4o-mini',
-  dsh: 'ox-alpha-free',
+  dsh: DEFAULT_FREE_MODEL,
   // Local Ollama tier — qwen3:0.6b is the installed fast model (tool-calling
   // capable, ~34 tok/s on this CPU vs ~7 for the 4.6B workhorse).
   ollama: process.env.OLLAMA_MODEL ?? 'qwen3:0.6b',
 };
 
-/** Resolution order when no explicit provider is requested. Ecosystem: Ox Alpha free primary, DeepSeek direct fallback. */
+/** Resolution order when no explicit provider is requested. Free + local tiers first, paid last. */
 const FALLBACK_ORDER: LLMProvider[] = [
-  // Ox Alpha free via OpenCode Zen free (https://opencode.ai/zen/v1) — ecosystem primary.
-  // Routed through DSH harness llm seam when harness is running (see ecosystem.patch.yml).
-  'ox-alpha',
-  // Wire-compatible alias — same zen/v1 endpoint, same key, alternative model id.
+  // OpenCode Zen free (zen/v1) — ecosystem primary, cycling accounts × free models.
   'opencode-free',
-  // DeepSeek direct (api.deepseek.com, deepseek-chat) — first fallback when free tier 429s.
-  'deepseek',
-  // Funded Go tier (zen/go/v1, deepseek-v4-flash) — second fallback, keeps fleet moving when free quota exhausted.
-  'opencode',
-  // Local Ollama (free, on-device) — used for cheap/quick calls.
+  // OpenRouter free (:free) models — second free tier (OPENROUTER_API_KEY).
+  'openrouter',
+  // Local Ollama (free, on-device) — used for cheap/quick calls before paying.
   'ollama',
+  // Funded Go tier (zen/go/v1, deepseek-v4-flash) — paid, keeps fleet moving.
+  'opencode',
+  // DeepSeek direct (api.deepseek.com, deepseek-chat) — PAID (no longer free); last resort.
+  'deepseek',
 ];
 
 export function hasKey(provider: LLMProvider): boolean {
@@ -160,7 +175,129 @@ export function hasKey(provider: LLMProvider): boolean {
     const enabled = process.env.OLLAMA_ENABLED;
     return enabled === undefined ? true : enabled !== '0' && enabled !== 'false' && enabled !== 'no';
   }
+  if (provider === 'opencode-free') return opencodeKeyPool().length > 0;
   return !!process.env[PROVIDER_ENV[provider]];
+}
+
+// ============================================================================
+// Free-tier catalog (Keywire-owned): model list + per-account opencode key pool.
+// Data-driven — the runtime NEVER hard-marries a single free model id. The daily
+// pool-health/free-catalog sync probes the live Zen + OpenRouter catalogs and
+// writes .draymond/model-routing.json; Keywire vault sync writes the account
+// keys to data/litellm.env. muse-spark-1.2-contributor-free is only the default
+// until the catalog publishes otherwise.
+// ============================================================================
+
+const OPENCODE_KEY_NAMES = [
+  'OPENCODE_KEY_TAP919BEATS',
+  'OPENCODE_KEY_NCSOUND919',
+  'OPENCODE_KEY_TAP4500',
+  'OPENCODE_API_KEY', // default account
+  'OPENCODE_KEY_JOHNREDD', // operator's personal account — last resort only
+];
+
+let _keyPoolLoaded = false;
+
+/** Load the Keywire-synced vault env (data/litellm.env) into process.env. */
+function loadKeyPoolIntoEnv(): void {
+  if (_keyPoolLoaded) return;
+  _keyPoolLoaded = true;
+  // Never read real vault keys during test runs (vitest sets VITEST=true,
+  // NODE_ENV=test). Tests drive llm.ts purely via process.env.
+  if (process.env.VITEST === 'true' || process.env.NODE_ENV === 'test') return;
+  const root = process.env.DRAYMOND_REGISTRY_DIR
+    ? resolve(process.env.DRAYMOND_REGISTRY_DIR, '..')
+    : process.cwd();
+  for (const rel of ['data/litellm.env', '.env.local']) {
+    let raw: string;
+    try {
+      raw = readFileSync(join(root, rel), 'utf8');
+    } catch {
+      continue; // file absent — try the next candidate
+    }
+    for (const line of raw.split(/\r?\n/)) {
+      const t = line.trim();
+      if (!t || t.startsWith('#') || !t.includes('=')) continue;
+      const i = t.indexOf('=');
+      const k = t.slice(0, i).trim();
+      const v = t.slice(i + 1).trim().replace(/^"(.*)"$/, '$1');
+      if (k && v && process.env[k] === undefined) process.env[k] = v;
+    }
+  }
+}
+
+/** Env var names in the opencode account pool (catalog wins; static default otherwise). */
+function opencodeKeyNames(): string[] {
+  loadKeyPoolIntoEnv();
+  const c = readFreeCatalog();
+  const names = c.opencodeKeyPool;
+  return Array.isArray(names) && names.length > 0 ? names : OPENCODE_KEY_NAMES;
+}
+
+/** Actual opencode API key values available for free-tier calls. */
+function opencodeKeyPool(): string[] {
+  const values = opencodeKeyNames()
+    .map((n) => process.env[n])
+    .filter((v): v is string => !!v && v.trim() !== '');
+  return values;
+}
+
+let _catalog: Record<string, any> | null | undefined;
+let _catalogMtime = 0;
+
+/** Read .draymond/model-routing.json (fail-soft: {} when absent). */
+function readFreeCatalog(): Record<string, any> {
+  try {
+    const p = join(registryDir(), 'model-routing.json');
+    const mtime = statSync(p).mtimeMs;
+    if (_catalog === undefined || mtime !== _catalogMtime) {
+      _catalog = JSON.parse(readFileSync(p, 'utf8')) as Record<string, any>;
+      _catalogMtime = mtime;
+    }
+  } catch {
+    _catalog = {};
+  }
+  return _catalog ?? {};
+}
+
+function registryDir(): string {
+  return process.env.DRAYMOND_REGISTRY_DIR ?? join(process.cwd(), '.draymond');
+}
+
+/**
+ * Ordered free-model list for Zen. Assigned model first (catalog/env), then any
+ * remaining catalog free models. Env overrides let a standalone process pin the
+ * list without the catalog. Always falls back to the bootstrap default.
+ */
+function freeModelList(): string[] {
+  const c = readFreeCatalog();
+  const assigned = process.env.ASSIGNED_FREE_MODEL || c.assignedFreeModel || DEFAULT_FREE_MODEL;
+  const envList = (process.env.FREE_MODEL_LIST || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const catalogList = Array.isArray(c.freeModelList) ? (c.freeModelList as string[]) : [];
+  const list = envList.length > 0 ? envList : catalogList;
+  return [...new Set([assigned, ...list])];
+}
+
+let _freeCursor = 0;
+let _keyCursor = 0;
+
+/** Round-robin cursor for account rotation across calls. */
+function nextKeyIndex(len: number): number {
+  if (len <= 0) return 0;
+  const i = _keyCursor % len;
+  _keyCursor = (i + 1) % len;
+  return i;
+}
+
+/** Round-robin cursor for free-model rotation across calls. */
+function nextModelIndex(len: number): number {
+  if (len <= 0) return 0;
+  const i = _freeCursor % len;
+  _freeCursor = (i + 1) % len;
+  return i;
 }
 
 /**
@@ -287,6 +424,9 @@ function buildImageParts(images: NonNullable<LLMCallOptions['images']>, provider
 /** Single-provider request. Throws on any non-success so the chain can retry. */
 async function callProvider(provider: LLMProvider, options: LLMCallOptions): Promise<string> {
   if (provider === 'gemini') return callGemini(options);
+  // OpenCode Zen free tier is data-driven: it cycles the Keywire account pool
+  // and the catalog free-model list instead of using a single key/model.
+  if (provider === 'opencode-free') return callOpenCodeFree(options);
 
   const apiKey = getApiKey(provider);
   const apiUrl = PROVIDER_URLS[provider];
@@ -448,12 +588,115 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
   }
 }
 
+// ── OpenCode Zen free tier: account × free-model cycling ─────────────────────
+// Data-driven: the Keywire-maintained catalog (.draymond/model-routing.json)
+// owns the free-model list and the account key pool. The runtime rotates the
+// STARTING account/model round-robin per call and retries across accounts then
+// models on retryable statuses (429/401/404/5xx/network), so quota spreads over
+// every opencode account and survives a model being rotated out upstream.
+
+function isRetryableFreeStatus(status: number | null): boolean {
+  if (status === null) return true; // network/timeout — try the next account
+  return status === 429 || status === 401 || status === 404 || status >= 500;
+}
+
+async function callOpenCodeFree(options: LLMCallOptions): Promise<string> {
+  const keys = opencodeKeyPool();
+  if (!keys.length) throw new Error('No opencode free key configured');
+  const models = freeModelList();
+  if (!models.length) throw new Error('No free model configured');
+
+  const apiUrl = PROVIDER_URLS['opencode-free'];
+  const maxTokens = options.maxTokens ?? 1024;
+  const temperature = options.temperature ?? 0.2;
+  const timeoutMs = options.timeoutMs ?? 15_000;
+
+  const startKey = nextKeyIndex(keys.length);
+  const startModel = nextModelIndex(models.length);
+  let lastErr: unknown;
+
+  for (let mi = 0; mi < models.length; mi++) {
+    const model = models[(startModel + mi) % models.length];
+    for (let ki = 0; ki < keys.length; ki++) {
+      const key = keys[(startKey + ki) % keys.length];
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          const payload = (maxTokensValue: number) =>
+            JSON.stringify({
+              model,
+              max_tokens: maxTokensValue,
+              temperature,
+              messages: [
+                { role: 'system', content: options.system },
+                { role: 'user', content: options.userMessage },
+              ],
+              ...(options.responseFormat ? { response_format: options.responseFormat } : {}),
+            });
+          const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` };
+
+          const res = await fetch(apiUrl, {
+            method: 'POST',
+            headers,
+            body: payload(maxTokens),
+            signal: controller.signal,
+          });
+          if (!res.ok) {
+            const errText = await res.text().catch(() => '');
+            throw new Error(`LLM API error ${res.status}: ${errText.slice(0, 200)}`);
+          }
+          const data = (await res.json()) as Record<string, unknown>;
+          const choices = data.choices as Array<{ message?: { content?: string } }>;
+          let content = choices?.[0]?.message?.content ?? '';
+          // Some free models return empty `content` with `reasoning_content`
+          // when max_tokens is small — retry once with a bigger budget.
+          if (!content) {
+            const retryRes = await fetch(apiUrl, {
+              method: 'POST',
+              headers,
+              body: payload(Math.max(maxTokens, 512)),
+              signal: controller.signal,
+            });
+            if (!retryRes.ok) {
+              const errText = await retryRes.text().catch(() => '');
+              throw new Error(`LLM API error ${retryRes.status}: ${errText.slice(0, 200)}`);
+            }
+            const retryData = (await retryRes.json()) as Record<string, unknown>;
+            content =
+              (retryData.choices as Array<{ message?: { content?: string } }>)?.[0]?.message?.content ?? '';
+          }
+          if (!content) throw new Error('Empty response from LLM');
+          return content;
+        } finally {
+          clearTimeout(timer);
+        }
+      } catch (err) {
+        lastErr = err;
+        const status = err instanceof Error
+          ? (Number(/LLM API error (\d+)/.exec(err.message)?.[1] ?? 0) || null)
+          : null;
+        // Hard client errors (400/403/422) mean the payload is bad — don't rotate.
+        if (status !== null && !isRetryableFreeStatus(status)) throw err;
+      }
+    }
+  }
+  throw lastErr ?? new Error('All opencode free accounts/models failed');
+}
+
 /**
  * Call the LLM across the provider chain and return the text content.
  * Tries the preferred provider first, then every configured provider in
  * fallback order. Throws only when all providers fail.
  */
 export async function callLLM(options: LLMCallOptions): Promise<string> {
+  // Skill-aware routing: if a skillId is provided and skill-model-map.json exists,
+  // the skill's tier overrides the default provider order.
+  const skillOverride = options.skillId ? await consultSkillMap(options.skillId) : undefined;
+  if (skillOverride) {
+    return callLLM({ ...options, provider: skillOverride.provider as LLMProvider, model: skillOverride.model, skillId: undefined });
+  }
+
   // Normalize the token budget: explicit maxTokens wins, else the mode's budget
   // (mathx MODE_MAX_TOKENS), else the 1024 default. Opt-in truncation keeps
   // oversized context within budget before any provider is hit.
@@ -474,17 +717,19 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
     effective.userMessage = truncateToTokens(prepared.userMessage, budget, 'prose');
   }
 
-  // Vision inputs can only be served by image-capable providers — put them
-  // first so OCR-style calls don't waste budget on text-only endpoints.
-  // With localFirst, the local gemma-vision tier leads before any paid model.
-  const VISION_FIRST: LLMProvider[] = ['anthropic', 'gemini', 'openai'];
+  // Vision provider order: fleet policy is local-first (VISION_ROUTING != '0') so
+  // qwen3.5:4b handles screenshots/images without spending cloud tokens.
+  // Set VISION_ROUTING=0 to revert to cloud-first (legacy behaviour).
+  const CLOUD_VISION: LLMProvider[] = ['anthropic', 'gemini', 'openai'];
+  const visionLocalFirst = process.env.VISION_ROUTING !== '0';
   const localFirst = options.localFirst === true;
   const order: LLMProvider[] = options.images?.length
-    ? (localFirst
-        ? (['ollama' as LLMProvider]).concat(VISION_FIRST.filter(hasKey)).concat(buildProviderOrder(options.provider, false))
-        : VISION_FIRST.filter(hasKey).concat(buildProviderOrder(options.provider, false)))
+    ? (visionLocalFirst
+        ? (['ollama' as LLMProvider]).concat(CLOUD_VISION.filter(hasKey)).concat(buildProviderOrder(options.provider, false))
+        : CLOUD_VISION.filter(hasKey).concat(buildProviderOrder(options.provider, false)))
     : buildProviderOrder(options.provider, localFirst);
   const deduped = [...new Set(order)];
+
   if (order.length === 0) {
     const fb = await resolveFallbackValue(options, 'No LLM API key configured');
     if (fb !== null) return fb;
@@ -547,10 +792,22 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
   }
   // Deterministic fallback: a total LLM outage returns a fixed templated value
   // (from the registry, or the inline string) so the pipeline keeps moving
-  // instead of getting stuck. Failure is also fed to the circuit breaker.
-  const fb = await resolveFallbackValue(options, lastErr);
-  if (fb !== null) return fb;
+  // instead of getting stuck.
+  //
+  // Count the chain failure BEFORE resolving the fallback. With full registry
+  // coverage (34/34) the old order — resolve first, count only when null —
+  // meant the circuit breaker could never trip organically and degraded-mode
+  // escalation never activated: broken primaries were masked forever. The
+  // breaker auto-clears after its window and provider successes still call
+  // recordChainSuccess(), so this only fires on genuine total-chain failures.
   recordChainFailure();
+  const fb = await resolveFallbackValue(options, lastErr);
+  if (fb !== null) {
+    console.warn(
+      `[llm] DEGRADED-SUCCESS: deterministic fallback served the call — primary LLM chain is down (last error: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}).`,
+    );
+    return fb;
+  }
   throw lastErr ?? new Error('All LLM providers failed');
 }
 
@@ -684,3 +941,61 @@ export async function callLocalModel(options: {
     });
   }
 }
+
+/**
+ * Consult .draymond/skill-model-map.json for a skill's assigned model tier.
+ * Returns null when the map is absent or the skill is unmapped — callers fall
+ * through to the normal provider chain (fail-soft, never throws).
+ */
+let _skillMap: Record<string, { provider: string; model: string }> | null | undefined;
+let _skillMapMtime = 0;
+async function consultSkillMap(skillId: string): Promise<{ provider: string; model: string } | null> {
+  try {
+    const { readFileSync, statSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const registryDir = process.env.DRAYMOND_REGISTRY_DIR ?? join(process.cwd(), '.draymond');
+    const mapPath = join(registryDir, 'skill-model-map.json');
+    const mtime = statSync(mapPath).mtimeMs;
+    if (_skillMap === undefined || mtime !== _skillMapMtime) {
+      const raw = JSON.parse(readFileSync(mapPath, 'utf8')) as {
+        skills?: Record<string, { provider: string; model: string }>;
+      };
+      _skillMap = raw.skills ?? {};
+      _skillMapMtime = mtime;
+    }
+    return _skillMap?.[skillId] ?? null;
+  } catch {
+    return null; // map absent or unreadable — fail soft
+  }
+}
+
+/**
+ * Route a vision subtask to the local Ollama lane (qwen3.5:4b by default).
+ * Always uses the local lane first; falls back to cloud vision providers when
+ * Ollama is unreachable. Results come back as plain text — callers continue
+ * on their own primary model after receiving the result (swap-back pattern).
+ */
+export async function callVisionSubtask(options: LLMCallOptions & { images: NonNullable<LLMCallOptions['images']> }): Promise<string> {
+  const visionModel = process.env.OLLAMA_VISION_MODEL ?? 'qwen3.5:4b';
+  try {
+    const result = await callLLM({
+      ...options,
+      provider: 'ollama',
+      model: visionModel,
+      localFirst: true,
+      timeoutMs: options.timeoutMs ?? 120_000,
+      skillId: undefined,
+    });
+    console.info(`[llm] vision subtask completed on ${visionModel}; caller resumes on primary model`);
+    return result;
+  } catch (err) {
+    console.warn(`[llm] local vision lane failed (${err instanceof Error ? err.message : String(err)}); falling back to cloud vision providers`);
+    return callLLM({
+      ...options,
+      provider: undefined,
+      localFirst: false,
+      skillId: undefined,
+    });
+  }
+}
+

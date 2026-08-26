@@ -18,12 +18,12 @@ interface AgentLane {
 }
 
 const PROVIDER_DAILY_BUDGETS: Record<string, number> = {
-  'ox-alpha': 800_000,        // ecosystem primary — Ox Alpha free (zen/v1)
-  'opencode-free': 800_000,   // alias of ox-alpha (same zen/v1 tier, shared quota)
-  opencode: 500_000,          // Go tier — fallback only
-  deepseek: 1_000_000,        // first fallback (api.deepseek.com)
+  'opencode-free': 800_000,       // Zen free tier — account pool shares this quota
+  openrouter: 800_000,            // OpenRouter free (:free) tier
+  opencode: 500_000,              // Go tier — fallback only
+  deepseek: 1_000_000,            // first paid fallback (api.deepseek.com)
   'deepseek-direct': 1_000_000,
-  dsh: 800_000,               // DSH harness gateway (ox-alpha via harness seam)
+  dsh: 800_000,                   // DSH harness gateway (free tier via harness seam)
   gemini: 1_000_000,
   openai: 1_000_000,
   anthropic: 1_000_000,
@@ -195,4 +195,129 @@ export function resetBudget(): void {
   lanes.clear();
   fleetTokens = 0;
   fleetDay = '';
+}
+
+// ── S4 Budget Engine ─────────────────────────────────────────────────────────
+//
+// Per-task model assignment based on treasury balance, system-goals weights,
+// and the free catalog mapping. Invariant: revenueCents === 0 means free/ollama
+// only — never assign the Go (paid) tier when treasury is empty.
+//
+// IMPORTANT: treasury.json is Treasurer-owned. This module READS it only; it
+// NEVER writes. Only treasury.ts / treasury-state.ts may write that file.
+
+import { readFileSync as _readFileSync, existsSync as _existsSync } from 'node:fs';
+import { join as _join } from 'node:path';
+
+export type ModelTier = 'free' | 'go' | 'ollama';
+
+export interface AssignedModel {
+  provider: string;
+  model: string;
+  tier: ModelTier;
+}
+
+const TIER_DEFAULTS: Record<ModelTier, AssignedModel> = {
+  free:   { provider: 'opencode-free', model: 'muse-spark-1.2-contributor-free', tier: 'free' },
+  go:     { provider: 'opencode',  model: 'deepseek-v4-flash', tier: 'go'    },
+  ollama: { provider: 'ollama',    model: 'qwen3:0.6b',        tier: 'ollama' },
+};
+
+/**
+ * Read the current treasury balance in revenue cents (READ-ONLY).
+ * Returns 0 when the file is absent or unreadable — defaults to all-free path.
+ * IMPORTANT: Do NOT write to treasury.json here. Treasurer role owns all writes.
+ */
+export function readTreasuryBalance(): number {
+  try {
+    const registryDir =
+      process.env.DRAYMOND_REGISTRY_DIR ?? _join(process.cwd(), '.draymond');
+    const p = _join(registryDir, 'treasury.json');
+    if (!_existsSync(p)) return 0;
+    const data = JSON.parse(_readFileSync(p, 'utf8')) as { revenueCents?: number };
+    return typeof data.revenueCents === 'number' ? Math.max(0, data.revenueCents) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Read the daily-assigned free model from model-routing.json.
+ * Falls back to the bootstrap default when the file is absent or sync hasn't run.
+ */
+function readAssignedFreeModel(): string {
+  const fallback = 'muse-spark-1.2-contributor-free';
+  try {
+    const registryDir =
+      process.env.DRAYMOND_REGISTRY_DIR ?? _join(process.cwd(), '.draymond');
+    const p = _join(registryDir, 'model-routing.json');
+    if (!_existsSync(p)) return process.env.ASSIGNED_FREE_MODEL || fallback;
+    const data = JSON.parse(_readFileSync(p, 'utf8')) as { assignedFreeModel?: string };
+    return process.env.ASSIGNED_FREE_MODEL || (typeof data.assignedFreeModel === 'string' ? data.assignedFreeModel : fallback);
+  } catch {
+    return process.env.ASSIGNED_FREE_MODEL || fallback;
+  }
+}
+
+/**
+ * Assign a model tier for a task, respecting budget and skill tier.
+ *
+ * Invariants enforced:
+ *   - treasury.revenueCents === 0 → tier is 'free' or 'ollama', NEVER 'go'.
+ *   - BUDGET_AWARE_ROUTING=0 → always return static free-tier default (feature flag).
+ *   - Go tier only when revenue > GO_TIER_MIN_CENTS AND task is 'critical' priority.
+ *   - Local-only skill tiers (vision/biomed/ocr/chem/fast) always go to Ollama.
+ *
+ * @param taskId    Human-readable task identifier (for logging only).
+ * @param skillTier From skill-model-map.json tier field.
+ * @param priority  Optional task priority hint.
+ */
+export function assignModelForTask(
+  taskId: string,
+  skillTier: 'fast' | 'code' | 'vision' | 'biomed' | 'ocr' | 'chem' | string = 'code',
+  priority: 'normal' | 'critical' = 'normal',
+): AssignedModel {
+  // Feature flag — fall back to static free-tier chain
+  if (process.env.BUDGET_AWARE_ROUTING === '0') {
+    return { ...TIER_DEFAULTS.free, model: readAssignedFreeModel() };
+  }
+
+  // Local-only skills always route to Ollama regardless of budget
+  const ollamaSkills = new Set(['vision', 'biomed', 'ocr', 'chem', 'fast']);
+  if (ollamaSkills.has(skillTier)) {
+    const ollamaModels: Record<string, string> = {
+      vision: process.env.OLLAMA_VISION_MODEL ?? 'qwen3.5:4b',
+      biomed: 'medgemma:4b',
+      ocr:    'deepseek-ocr:3b',
+      chem:   'txgemma-2b',
+      fast:   'qwen3:0.6b',
+    };
+    const model = ollamaModels[skillTier] ?? 'qwen3:0.6b';
+    _assignmentCounts.ollama += 1;
+    return { provider: 'ollama', model, tier: 'ollama' };
+  }
+
+  // Code / general tasks: treasury gates Go-tier access
+  const revenueCents = readTreasuryBalance();
+  const GO_TIER_MIN_CENTS = Number(process.env.GO_TIER_MIN_CENTS ?? 500);
+  const goAllowed = revenueCents > GO_TIER_MIN_CENTS && priority === 'critical';
+
+  if (goAllowed) {
+    console.info(`[budget] task=${taskId} tier=go (revenue=${revenueCents}¢, priority=${priority})`);
+    _assignmentCounts.go += 1;
+    return { ...TIER_DEFAULTS.go };
+  }
+
+  const assignedFree = readAssignedFreeModel();
+  console.info(`[budget] task=${taskId} tier=free model=${assignedFree} (revenue=${revenueCents}¢)`);
+  _assignmentCounts.free += 1;
+  return { provider: 'opencode-free', model: assignedFree, tier: 'free' };
+}
+
+// Counters for Prometheus gauges (read by metrics.ts; reset on process restart)
+const _assignmentCounts: Record<ModelTier, number> = { free: 0, go: 0, ollama: 0 };
+
+/** Snapshot assignment counts for metrics scrape (never mutates). */
+export function getAssignmentCounts(): Readonly<Record<ModelTier, number>> {
+  return { ..._assignmentCounts };
 }

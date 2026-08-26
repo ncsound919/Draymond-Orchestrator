@@ -794,8 +794,13 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
       return sweepResult;
     }
 
-    case 'custom': {
+        case 'custom': {
       const handler = config.handler as string | undefined;
+
+      if (handler === 'free_model_daily_assignment') {
+        const { runDailyAssignment } = await import('./freeModelDailyAssignment');
+        return await runDailyAssignment();
+      }
 
       if (handler === 'pool_health') {
         // Morning LLM free-account entitlement check: probes every pooled
@@ -806,8 +811,8 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         return {
           handler,
           checked_at: state.checkedAt,
-          ox_alpha_active: state.oxAlphaActiveKeys.length,
-          zen_free_only: state.zenFreeOnlyKeys.length,
+          muse_free_active: state.museFreeActiveKeys.length,
+          free_active: state.freeActiveKeys.length,
           openrouter: state.openrouter?.status ?? 'absent',
           deepseek: state.deepseek?.status ?? 'absent',
           ollama_alive: `${state.ollamaCloud.filter((o) => o.ok).length}/${state.ollamaCloud.length}`,
@@ -2569,6 +2574,14 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     cron_expression: '30 5 * * *',
     job_type: 'custom',
     job_config: { handler: 'systemic_consolidate' },
+    is_enabled: true,
+  },
+  {
+    name: 'Free Model Daily Assignment',
+    description: 'Daily 4:00am UTC — probe openrouter + opencode free models, update model-routing.json, patch ecosystem patch config, and log assignment.',
+    cron_expression: '0 4 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'free_model_daily_assignment' },
     is_enabled: true,
   },
 ];
