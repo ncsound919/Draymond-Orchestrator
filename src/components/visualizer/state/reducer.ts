@@ -58,7 +58,7 @@ export function simReducer(state: SimState, action: SimAction): SimState {
       };
     }
     case 'JOB_STARTED': {
-      const vehicle: Vehicle = { id: action.jobId, jobName: action.jobName, from: 'scheduler', to: action.to, progress: 0, status: 'transit' };
+      const vehicle: Vehicle = { id: action.jobId, jobName: action.jobName, from: 'scheduler', to: action.to, progress: 0, status: 'transit', startedAt: Date.now() };
       return {
         ...state,
         vehicles: { ...state.vehicles, [action.jobId]: vehicle },

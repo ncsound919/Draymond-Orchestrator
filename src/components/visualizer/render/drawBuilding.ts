@@ -39,6 +39,12 @@ export function drawBuilding(b: Building): Container {
   prism.lineTo(0, topY - TILE_H / 2);
   prism.closePath();
   prism.endFill();
+  // roof beacon for tall buildings
+  if (b.height >= 4) {
+    prism.beginFill(0xffffff, 0.85);
+    prism.drawCircle(0, topY - TILE_H / 2, 1.8);
+    prism.endFill();
+  }
   g.addChild(prism);
   return g;
 }

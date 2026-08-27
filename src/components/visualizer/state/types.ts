@@ -22,6 +22,7 @@ export interface Vehicle {
   to: string;
   progress: number; // 0..1 along road path
   status: VehicleStatus;
+  startedAt: number; // epoch ms — renderer interpolates progress from this
 }
 
 export interface Effect {
