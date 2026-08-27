@@ -37,7 +37,7 @@ export function categoryHeight(category: string): number {
 
 export function buildBuildings(
   snapshot: SnapshotPayload,
-  extra: { degraded?: boolean } = {},
+  _extra: { degraded?: boolean } = {},
 ): Record<string, Building> {
   const buildings: Record<string, Building> = {};
   const taken = new Set<string>();

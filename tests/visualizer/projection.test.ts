@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { projectToScreen, screenToGrid, TILE_W, TILE_H } from '../../src/components/visualizer/render/projection';
 
 describe('iso projection', () => {
+  it('exports sane tile constants', () => {
+    expect(TILE_W).toBe(64);
+    expect(TILE_H).toBe(32);
+  });
   it('projects city hall center to origin', () => {
     const p = projectToScreen(0, 0, 0);
     expect(p.x).toBe(0);

@@ -1,5 +1,4 @@
 import { describe, test, expect } from 'vitest';
-import { describe, test, expect } from 'vitest';
 import { analyzePlanetaryData } from '../../src/agents/planetary-analyzer';
 
 describe('planetary-analyzer', () => {
@@ -40,7 +39,7 @@ describe('planetary-analyzer', () => {
       planet: 'Mars',
       mass: 6.39e23
       // Missing radius, orbitalPeriod, atmosphere
-    };
+    } as Parameters<typeof analyzePlanetaryData>[0];
 
     expect(() => analyzePlanetaryData(input)).toThrow('Invalid planetary data: missing required fields');
   });
