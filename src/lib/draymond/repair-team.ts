@@ -26,7 +26,7 @@ import path from "node:path";
 import { codingStackSummary, resolveCodingTools } from "./coding-stack";
 import { pipelineSummary } from "./fleet-pipelines";
 import { TOOL_PORTS } from "./ports";
-import { executeChainWithBrainFallback } from "./chain-execution-fallback";
+import { executeChainWithBrainFallback, TokenErrorType } from "./chain-execution-fallback";
 
 export type FailureKind = 'chain_config' | 'notification_config' | 'missing_env' | 'service_down' | 'code_error' | 'benchmark_weak' | 'unknown';
 
@@ -206,20 +206,33 @@ export async function repairFailedJob(
     });
 
     if (chainResult.fallback_used) {
-      const detail = chainResult.success
-        ? `deterministic brain completed failed chain ${job.name} after token/service outage`
-        : `deterministic brain attempted fallback for ${job.name}: ${chainResult.error ?? 'unknown failure'}`;
+      // Credential-class failures are NEVER "fixed" by a deterministic-brain
+      // stopgap: the brain can produce output, but the expired/invalid token
+      // that caused the failure is still broken and will fail the next run.
+      // Recording 'fixed' here masked dead credentials indefinitely (the
+      // Aug-2026 research-brief-delivery 401 loop). The brain result is
+      // recorded as an ESCALATION with an explicit credential-repair ask.
+      const credentialClass =
+        chainResult.errorType === TokenErrorType.EXPIRED_TOKEN ||
+        chainResult.errorType === TokenErrorType.INVALID_CREDENTIALS;
+      const detail = credentialClass
+        ? `brain stopgap produced output for ${job.name}, but root cause is UNREPAIRED (${chainResult.errorType}) — credential rotation required for this chain's entity`
+        : chainResult.success
+          ? `deterministic brain completed failed chain ${job.name} after service outage`
+          : `deterministic brain attempted fallback for ${job.name}: ${chainResult.error ?? 'unknown failure'}`;
+
+      const action = credentialClass ? 'escalated' : chainResult.success ? 'fixed' : 'escalated';
 
       await recordRepair({
         ...base,
-        action: chainResult.success ? 'fixed' : 'escalated',
+        action,
         detail,
         dispatch: { kind: 'deterministic-brain', result: chainResult.success ? 'completed' : 'failed' },
       });
 
       return {
         ...base,
-        action: chainResult.success ? 'fixed' : 'escalated',
+        action,
         detail,
         dispatch: { kind: 'deterministic-brain', result: chainResult.success ? 'completed' : 'failed' },
       };

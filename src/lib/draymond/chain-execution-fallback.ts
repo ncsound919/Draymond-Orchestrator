@@ -32,6 +32,9 @@ export interface ChainExecutionResult {
   fallback_used: boolean;
   brain_result?: BrainTaskFallbackResult;
   error?: string;
+  /** Classified root-cause of the original failure (survives the fallback so
+   *  the repair team can distinguish "brain stopgap" from "actually fixed"). */
+  errorType?: TokenErrorType;
 }
 
 // ============================================================================
@@ -45,6 +48,8 @@ export enum TokenErrorType {
   INVALID_CREDENTIALS = 'invalid_credentials',
   RATE_LIMITED = 'rate_limited',
   SERVICE_UNAVAILABLE = 'service_unavailable',
+  /** Chain/entity misconfiguration: missing template, missing URL, SSRF block. */
+  CONFIG_ERROR = 'config_error',
   UNKNOWN = 'unknown',
 }
 
@@ -74,10 +79,23 @@ export function classifyTokenError(err: Error | string): TokenErrorType {
     return TokenErrorType.SERVICE_UNAVAILABLE;
   }
 
+  // Configuration failures used to fall through to UNKNOWN and bypass brain
+  // escalation entirely — the exact chains that kept failing ("template not
+  // found", "invocation_config.url is required", SSRF blocks) are in this
+  // class, and the deterministic brain has task-specific handlers for them.
+  if (
+    msg.includes('not found') ||
+    msg.includes('is required') ||
+    msg.includes('ssrf blocked') ||
+    msg.includes('blocked private')
+  ) {
+    return TokenErrorType.CONFIG_ERROR;
+  }
+
   return TokenErrorType.UNKNOWN;
 }
 
-/** True when the error indicates token/credential issues or service unavailability. */
+/** True when the error indicates token/credential issues, service unavailability, or config errors. */
 export function isTokenOrServiceError(errorType: TokenErrorType): boolean {
   return (
     errorType === TokenErrorType.MISSING_API_KEY ||
@@ -85,7 +103,8 @@ export function isTokenOrServiceError(errorType: TokenErrorType): boolean {
     errorType === TokenErrorType.EXPIRED_TOKEN ||
     errorType === TokenErrorType.INVALID_CREDENTIALS ||
     errorType === TokenErrorType.SERVICE_UNAVAILABLE ||
-    errorType === TokenErrorType.RATE_LIMITED
+    errorType === TokenErrorType.RATE_LIMITED ||
+    errorType === TokenErrorType.CONFIG_ERROR
   );
 }
 
@@ -144,6 +163,7 @@ export async function executeChainWithBrainFallback(
       output: brainResult.output,
       fallback_used: true,
       brain_result: brainResult,
+      errorType,
     };
   } else {
     return {
@@ -153,6 +173,7 @@ export async function executeChainWithBrainFallback(
       fallback_used: true,
       brain_result: brainResult,
       error: brainResult.error ?? 'Deterministic brain failed',
+      errorType,
     };
   }
 }
