@@ -1,0 +1,41 @@
+{
+  "experiment_id": "d9679b1c-a26b-4ed3-9ae4-6c86f4412488",
+  "goal_id": "sports-08",
+  "hypothesis_id": "sports-08-h1",
+  "type": "analysis",
+  "domain": "sports",
+  "model_id": "sports-08-unified-ai",
+  "inputs": {
+    "dataset": "C:\\Users\\User\\Downloads\\Uplift\\Draymond-Orchestrator\\datasets\\sports\\nba\\profiles\\2010-11_101107.json"
+  },
+  "status": "completed",
+  "elapsed_s": 0.22,
+  "detail": "analysis",
+  "result": {
+    "sport": "basketball",
+    "ter": 7.000353928194709,
+    "ter_evidence": "E2",
+    "four_factors": {
+      "proliferation": 50.0,
+      "clearance": 33.33333333333333,
+      "resource": 50.0,
+      "metastasis": 50.0
+    },
+    "gravity": 0.23977622377622376,
+    "flow": 0.25,
+    "fatigue": 0.23904487179487177,
+    "fatigue_evidence": "E2",
+    "injury_risk": 11.95,
+    "injury_risk_evidence": "E2",
+    "recovery_priority": "normal",
+    "baseline_form": 0.6974,
+    "baseline_form_evidence": "E2",
+    "availability": 0.8566,
+    "availability_evidence": "E2",
+    "availability_tier": "normal",
+    "acute_chronic": 1.0,
+    "evidence_tier": "E1"
+  },
+  "error": null,
+  "ranAt": "2026-08-27T18:03:30Z"
+}

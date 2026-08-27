@@ -1,0 +1,523 @@
+{
+  "experiment_id": "d470ea7d-8453-4606-ab2e-ccf43319dd8b",
+  "goal_id": "sports-08",
+  "hypothesis_id": "sports-08-h1",
+  "type": "simulation",
+  "domain": "sports",
+  "model_id": "sports-08-unified-ai",
+  "inputs": {
+    "ticks": 48
+  },
+  "status": "completed",
+  "elapsed_s": 2.51,
+  "detail": "simulation",
+  "result": {
+    "model_id": "sports-08-unified-ai",
+    "ticks": 48,
+    "series": [
+      {
+        "tick": 0,
+        "data_coverage": 0.4,
+        "universal_model_maturity": 0.3,
+        "sport_specific_accuracy": 0.5,
+        "integration_score": 0.4
+      },
+      {
+        "tick": 1,
+        "data_coverage": 0.45,
+        "universal_model_maturity": 0.324,
+        "sport_specific_accuracy": 0.521,
+        "integration_score": 0.32
+      },
+      {
+        "tick": 2,
+        "data_coverage": 0.5,
+        "universal_model_maturity": 0.351,
+        "sport_specific_accuracy": 0.54368,
+        "integration_score": 0.3468
+      },
+      {
+        "tick": 3,
+        "data_coverage": 0.55,
+        "universal_model_maturity": 0.381,
+        "sport_specific_accuracy": 0.56825,
+        "integration_score": 0.374723
+      },
+      {
+        "tick": 4,
+        "data_coverage": 0.6,
+        "universal_model_maturity": 0.414,
+        "sport_specific_accuracy": 0.59492,
+        "integration_score": 0.40382
+      },
+      {
+        "tick": 5,
+        "data_coverage": 0.65,
+        "universal_model_maturity": 0.45,
+        "sport_specific_accuracy": 0.6239,
+        "integration_score": 0.434141
+      },
+      {
+        "tick": 6,
+        "data_coverage": 0.7,
+        "universal_model_maturity": 0.489,
+        "sport_specific_accuracy": 0.6554,
+        "integration_score": 0.465736
+      },
+      {
+        "tick": 7,
+        "data_coverage": 0.75,
+        "universal_model_maturity": 0.531,
+        "sport_specific_accuracy": 0.68963,
+        "integration_score": 0.498656
+      },
+      {
+        "tick": 8,
+        "data_coverage": 0.8,
+        "universal_model_maturity": 0.576,
+        "sport_specific_accuracy": 0.7268,
+        "integration_score": 0.532951
+      },
+      {
+        "tick": 9,
+        "data_coverage": 0.85,
+        "universal_model_maturity": 0.624,
+        "sport_specific_accuracy": 0.76712,
+        "integration_score": 0.568672
+      },
+      {
+        "tick": 10,
+        "data_coverage": 0.9,
+        "universal_model_maturity": 0.675,
+        "sport_specific_accuracy": 0.8108,
+        "integration_score": 0.605869
+      },
+      {
+        "tick": 11,
+        "data_coverage": 0.95,
+        "universal_model_maturity": 0.729,
+        "sport_specific_accuracy": 0.85805,
+        "integration_score": 0.644592
+      },
+      {
+        "tick": 12,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 0.786,
+        "sport_specific_accuracy": 0.90908,
+        "integration_score": 0.684892
+      },
+      {
+        "tick": 13,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 0.846,
+        "sport_specific_accuracy": 0.9641,
+        "integration_score": 0.726819
+      },
+      {
+        "tick": 14,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 0.906,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.754424
+      },
+      {
+        "tick": 15,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 0.966,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.77744
+      },
+      {
+        "tick": 16,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.79184
+      },
+      {
+        "tick": 17,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 18,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 19,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 20,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 21,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 22,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 23,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 24,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 25,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 26,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 27,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 28,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 29,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 30,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 31,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 32,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 33,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 34,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 35,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 36,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 37,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 38,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 39,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 40,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 41,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 42,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 43,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 44,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 45,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 46,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 47,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      },
+      {
+        "tick": 48,
+        "data_coverage": 1.0,
+        "universal_model_maturity": 1.0,
+        "sport_specific_accuracy": 1.0,
+        "integration_score": 0.8
+      }
+    ],
+    "events_triggered": [
+      {
+        "tick": 13,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 14,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 15,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 16,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 17,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 18,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 19,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 20,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 21,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 22,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 23,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 24,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 25,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 26,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 27,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 28,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 29,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 30,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 31,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 32,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 33,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 34,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 35,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 36,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 37,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 38,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 39,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 40,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 41,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 42,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 43,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 44,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 45,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 46,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 47,
+        "action": "flag:unified_sports_ai"
+      },
+      {
+        "tick": 48,
+        "action": "flag:unified_sports_ai"
+      }
+    ],
+    "final_state": {
+      "data_coverage": 1.0,
+      "universal_model_maturity": 1.0,
+      "sport_specific_accuracy": 1.0,
+      "integration_score": 0.8
+    },
+    "outputs": {
+      "integration_score": 0.8,
+      "sport_specific_accuracy": 1.0
+    },
+    "evidence_tier": "E1",
+    "error": null
+  },
+  "error": null,
+  "ranAt": "2026-08-27T18:03:30Z"
+}

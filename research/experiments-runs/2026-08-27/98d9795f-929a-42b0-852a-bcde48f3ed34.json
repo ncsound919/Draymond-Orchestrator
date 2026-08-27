@@ -1,0 +1,41 @@
+{
+  "experiment_id": "98d9795f-929a-42b0-852a-bcde48f3ed34",
+  "goal_id": "sports-03",
+  "hypothesis_id": "sports-03-h2",
+  "type": "analysis",
+  "domain": "sports",
+  "model_id": "sports-03-biological-load",
+  "inputs": {
+    "dataset": "C:\\Users\\User\\Downloads\\Uplift\\Draymond-Orchestrator\\datasets\\sports\\nba\\profiles\\2010-11_101106.json"
+  },
+  "status": "completed",
+  "elapsed_s": 0.2,
+  "detail": "analysis",
+  "result": {
+    "sport": "basketball",
+    "ter": 3.689495697698528,
+    "ter_evidence": "E2",
+    "four_factors": {
+      "proliferation": 50.0,
+      "clearance": 33.33333333333333,
+      "resource": 50.0,
+      "metastasis": 50.0
+    },
+    "gravity": 0.3969230769230769,
+    "flow": 0.25,
+    "fatigue": 0.29453632478632474,
+    "fatigue_evidence": "E2",
+    "injury_risk": 14.73,
+    "injury_risk_evidence": "E2",
+    "recovery_priority": "normal",
+    "baseline_form": 0.7367,
+    "baseline_form_evidence": "E2",
+    "availability": 0.8233,
+    "availability_evidence": "E2",
+    "availability_tier": "normal",
+    "acute_chronic": 1.0,
+    "evidence_tier": "E1"
+  },
+  "error": null,
+  "ranAt": "2026-08-27T18:03:27Z"
+}

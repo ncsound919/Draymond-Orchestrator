@@ -1,0 +1,647 @@
+{
+  "experiment_id": "7fcff755-7807-41be-b90e-862c16fc4c59",
+  "goal_id": "sports-01",
+  "hypothesis_id": "sports-01-h1",
+  "type": "simulation",
+  "domain": "sports",
+  "model_id": "sports-01-development",
+  "inputs": {
+    "ticks": 60
+  },
+  "status": "completed",
+  "elapsed_s": 3.12,
+  "detail": "simulation",
+  "result": {
+    "model_id": "sports-01-development",
+    "ticks": 60,
+    "series": [
+      {
+        "tick": 0,
+        "development_index": 0.3,
+        "stress_load": 0.2,
+        "adaptation": 0.4,
+        "phenotype_drift": 0.1
+      },
+      {
+        "tick": 1,
+        "development_index": 0.32,
+        "stress_load": 0.216,
+        "adaptation": 0.45,
+        "phenotype_drift": 0.104
+      },
+      {
+        "tick": 2,
+        "development_index": 0.3425,
+        "stress_load": 0.229,
+        "adaptation": 0.4992,
+        "phenotype_drift": 0.10832
+      },
+      {
+        "tick": 3,
+        "development_index": 0.36746,
+        "stress_load": 0.239048,
+        "adaptation": 0.54775,
+        "phenotype_drift": 0.1129
+      },
+      {
+        "tick": 4,
+        "development_index": 0.394848,
+        "stress_load": 0.246183,
+        "adaptation": 0.595798,
+        "phenotype_drift": 0.117681
+      },
+      {
+        "tick": 5,
+        "development_index": 0.424637,
+        "stress_load": 0.250435,
+        "adaptation": 0.643488,
+        "phenotype_drift": 0.122605
+      },
+      {
+        "tick": 6,
+        "development_index": 0.456812,
+        "stress_load": 0.251826,
+        "adaptation": 0.690967,
+        "phenotype_drift": 0.127613
+      },
+      {
+        "tick": 7,
+        "development_index": 0.49136,
+        "stress_load": 0.250368,
+        "adaptation": 0.738375,
+        "phenotype_drift": 0.13265
+      },
+      {
+        "tick": 8,
+        "development_index": 0.528279,
+        "stress_load": 0.246065,
+        "adaptation": 0.785857,
+        "phenotype_drift": 0.137657
+      },
+      {
+        "tick": 9,
+        "development_index": 0.567572,
+        "stress_load": 0.238914,
+        "adaptation": 0.833554,
+        "phenotype_drift": 0.142579
+      },
+      {
+        "tick": 10,
+        "development_index": 0.609249,
+        "stress_load": 0.228901,
+        "adaptation": 0.881608,
+        "phenotype_drift": 0.147357
+      },
+      {
+        "tick": 11,
+        "development_index": 0.65333,
+        "stress_load": 0.216004,
+        "adaptation": 0.930163,
+        "phenotype_drift": 0.151935
+      },
+      {
+        "tick": 12,
+        "development_index": 0.699838,
+        "stress_load": 0.200194,
+        "adaptation": 0.979363,
+        "phenotype_drift": 0.156255
+      },
+      {
+        "tick": 13,
+        "development_index": 0.748806,
+        "stress_load": 0.181433,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.160259
+      },
+      {
+        "tick": 14,
+        "development_index": 0.798806,
+        "stress_load": 0.161433,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.163887
+      },
+      {
+        "tick": 15,
+        "development_index": 0.848806,
+        "stress_load": 0.141433,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.167116
+      },
+      {
+        "tick": 16,
+        "development_index": 0.898806,
+        "stress_load": 0.121433,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.169945
+      },
+      {
+        "tick": 17,
+        "development_index": 0.948806,
+        "stress_load": 0.101433,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.172373
+      },
+      {
+        "tick": 18,
+        "development_index": 0.998806,
+        "stress_load": 0.081433,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.174402
+      },
+      {
+        "tick": 19,
+        "development_index": 1.0,
+        "stress_load": 0.061433,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.176031
+      },
+      {
+        "tick": 20,
+        "development_index": 1.0,
+        "stress_load": 0.041433,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.177259
+      },
+      {
+        "tick": 21,
+        "development_index": 1.0,
+        "stress_load": 0.021433,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.178088
+      },
+      {
+        "tick": 22,
+        "development_index": 1.0,
+        "stress_load": 0.001433,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.178517
+      },
+      {
+        "tick": 23,
+        "development_index": 1.0,
+        "stress_load": -0.018567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.178545
+      },
+      {
+        "tick": 24,
+        "development_index": 1.0,
+        "stress_load": -0.038567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.178174
+      },
+      {
+        "tick": 25,
+        "development_index": 1.0,
+        "stress_load": -0.058567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.177403
+      },
+      {
+        "tick": 26,
+        "development_index": 1.0,
+        "stress_load": -0.078567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.176231
+      },
+      {
+        "tick": 27,
+        "development_index": 1.0,
+        "stress_load": -0.098567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.17466
+      },
+      {
+        "tick": 28,
+        "development_index": 1.0,
+        "stress_load": -0.118567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.172689
+      },
+      {
+        "tick": 29,
+        "development_index": 1.0,
+        "stress_load": -0.138567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.170317
+      },
+      {
+        "tick": 30,
+        "development_index": 1.0,
+        "stress_load": -0.158567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.167546
+      },
+      {
+        "tick": 31,
+        "development_index": 1.0,
+        "stress_load": -0.178567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.164375
+      },
+      {
+        "tick": 32,
+        "development_index": 1.0,
+        "stress_load": -0.198567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.160803
+      },
+      {
+        "tick": 33,
+        "development_index": 1.0,
+        "stress_load": -0.218567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.156832
+      },
+      {
+        "tick": 34,
+        "development_index": 1.0,
+        "stress_load": -0.238567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.15246
+      },
+      {
+        "tick": 35,
+        "development_index": 1.0,
+        "stress_load": -0.258567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.147689
+      },
+      {
+        "tick": 36,
+        "development_index": 1.0,
+        "stress_load": -0.278567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.142518
+      },
+      {
+        "tick": 37,
+        "development_index": 1.0,
+        "stress_load": -0.298567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.136946
+      },
+      {
+        "tick": 38,
+        "development_index": 1.0,
+        "stress_load": -0.318567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.130975
+      },
+      {
+        "tick": 39,
+        "development_index": 1.0,
+        "stress_load": -0.338567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.124604
+      },
+      {
+        "tick": 40,
+        "development_index": 1.0,
+        "stress_load": -0.358567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.117832
+      },
+      {
+        "tick": 41,
+        "development_index": 1.0,
+        "stress_load": -0.378567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.110661
+      },
+      {
+        "tick": 42,
+        "development_index": 1.0,
+        "stress_load": -0.398567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.10309
+      },
+      {
+        "tick": 43,
+        "development_index": 1.0,
+        "stress_load": -0.418567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.095118
+      },
+      {
+        "tick": 44,
+        "development_index": 1.0,
+        "stress_load": -0.438567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.086747
+      },
+      {
+        "tick": 45,
+        "development_index": 1.0,
+        "stress_load": -0.458567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.077976
+      },
+      {
+        "tick": 46,
+        "development_index": 1.0,
+        "stress_load": -0.478567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.068804
+      },
+      {
+        "tick": 47,
+        "development_index": 1.0,
+        "stress_load": -0.498567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.059233
+      },
+      {
+        "tick": 48,
+        "development_index": 1.0,
+        "stress_load": -0.518567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.049262
+      },
+      {
+        "tick": 49,
+        "development_index": 1.0,
+        "stress_load": -0.538567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.03889
+      },
+      {
+        "tick": 50,
+        "development_index": 1.0,
+        "stress_load": -0.558567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.028119
+      },
+      {
+        "tick": 51,
+        "development_index": 1.0,
+        "stress_load": -0.578567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.016948
+      },
+      {
+        "tick": 52,
+        "development_index": 1.0,
+        "stress_load": -0.598567,
+        "adaptation": 1.0,
+        "phenotype_drift": 0.005376
+      },
+      {
+        "tick": 53,
+        "development_index": 1.0,
+        "stress_load": -0.618567,
+        "adaptation": 1.0,
+        "phenotype_drift": -0.006595
+      },
+      {
+        "tick": 54,
+        "development_index": 1.0,
+        "stress_load": -0.638567,
+        "adaptation": 1.0,
+        "phenotype_drift": -0.018966
+      },
+      {
+        "tick": 55,
+        "development_index": 1.0,
+        "stress_load": -0.658567,
+        "adaptation": 1.0,
+        "phenotype_drift": -0.031738
+      },
+      {
+        "tick": 56,
+        "development_index": 1.0,
+        "stress_load": -0.678567,
+        "adaptation": 1.0,
+        "phenotype_drift": -0.044909
+      },
+      {
+        "tick": 57,
+        "development_index": 1.0,
+        "stress_load": -0.698567,
+        "adaptation": 1.0,
+        "phenotype_drift": -0.058481
+      },
+      {
+        "tick": 58,
+        "development_index": 1.0,
+        "stress_load": -0.718567,
+        "adaptation": 1.0,
+        "phenotype_drift": -0.072452
+      },
+      {
+        "tick": 59,
+        "development_index": 1.0,
+        "stress_load": -0.738567,
+        "adaptation": 1.0,
+        "phenotype_drift": -0.086823
+      },
+      {
+        "tick": 60,
+        "development_index": 1.0,
+        "stress_load": -0.758567,
+        "adaptation": 1.0,
+        "phenotype_drift": -0.101595
+      }
+    ],
+    "events_triggered": [
+      {
+        "tick": 15,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 16,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 17,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 18,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 19,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 20,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 21,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 22,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 23,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 24,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 25,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 26,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 27,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 28,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 29,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 30,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 31,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 32,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 33,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 34,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 35,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 36,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 37,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 38,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 39,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 40,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 41,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 42,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 43,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 44,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 45,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 46,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 47,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 48,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 49,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 50,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 51,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 52,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 53,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 54,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 55,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 56,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 57,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 58,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 59,
+        "action": "flag:elite_trajectory"
+      },
+      {
+        "tick": 60,
+        "action": "flag:elite_trajectory"
+      }
+    ],
+    "final_state": {
+      "development_index": 1.0,
+      "stress_load": -0.758567,
+      "adaptation": 1.0,
+      "phenotype_drift": -0.101595
+    },
+    "outputs": {
+      "development_index": 1.0,
+      "stress_load": -0.758567
+    },
+    "evidence_tier": "E1",
+    "error": null
+  },
+  "error": null,
+  "ranAt": "2026-08-27T18:03:22Z"
+}

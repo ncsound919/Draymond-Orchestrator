@@ -1,0 +1,447 @@
+{
+  "experiment_id": "88c98552-2b39-405a-b87c-4586534c8e33",
+  "goal_id": "biotech-01",
+  "hypothesis_id": "biotech-01-h1",
+  "type": "simulation",
+  "domain": "biotech",
+  "model_id": "biotech-01-early-detection",
+  "inputs": {
+    "ticks": 48
+  },
+  "status": "completed",
+  "elapsed_s": 3.75,
+  "detail": "simulation",
+  "result": {
+    "model_id": "biotech-01-early-detection",
+    "ticks": 48,
+    "series": [
+      {
+        "tick": 0,
+        "burden": 1.0,
+        "detection_lag": 1.0,
+        "interception": 0.0,
+        "risk_score": 0.2
+      },
+      {
+        "tick": 1,
+        "burden": 1.01,
+        "detection_lag": 0.9,
+        "interception": 0.02,
+        "risk_score": 0.864665
+      },
+      {
+        "tick": 2,
+        "burden": 1.018484,
+        "detection_lag": 0.8,
+        "interception": 0.04,
+        "risk_score": 0.853246
+      },
+      {
+        "tick": 3,
+        "burden": 1.02541,
+        "detection_lag": 0.7,
+        "interception": 0.06,
+        "risk_score": 0.84011
+      },
+      {
+        "tick": 4,
+        "burden": 1.030742,
+        "detection_lag": 0.6,
+        "interception": 0.08,
+        "risk_score": 0.82504
+      },
+      {
+        "tick": 5,
+        "burden": 1.034452,
+        "detection_lag": 0.5,
+        "interception": 0.1,
+        "risk_score": 0.807794
+      },
+      {
+        "tick": 6,
+        "burden": 1.036521,
+        "detection_lag": 0.4,
+        "interception": 0.12,
+        "risk_score": 0.788108
+      },
+      {
+        "tick": 7,
+        "burden": 1.036936,
+        "detection_lag": 0.3,
+        "interception": 0.14,
+        "risk_score": 0.765695
+      },
+      {
+        "tick": 8,
+        "burden": 1.035692,
+        "detection_lag": 0.2,
+        "interception": 0.16,
+        "risk_score": 0.740245
+      },
+      {
+        "tick": 9,
+        "burden": 1.032792,
+        "detection_lag": 0.1,
+        "interception": 0.18,
+        "risk_score": 0.711434
+      },
+      {
+        "tick": 10,
+        "burden": 1.028247,
+        "detection_lag": 0.1,
+        "interception": 0.2,
+        "risk_score": 0.678922
+      },
+      {
+        "tick": 11,
+        "burden": 1.022078,
+        "detection_lag": 0.1,
+        "interception": 0.22,
+        "risk_score": 0.677313
+      },
+      {
+        "tick": 12,
+        "burden": 1.01431,
+        "detection_lag": 0.1,
+        "interception": 0.24,
+        "risk_score": 0.675116
+      },
+      {
+        "tick": 13,
+        "burden": 1.004979,
+        "detection_lag": 0.1,
+        "interception": 0.26,
+        "risk_score": 0.672328
+      },
+      {
+        "tick": 14,
+        "burden": 0.994125,
+        "detection_lag": 0.1,
+        "interception": 0.28,
+        "risk_score": 0.668947
+      },
+      {
+        "tick": 15,
+        "burden": 0.981798,
+        "detection_lag": 0.1,
+        "interception": 0.3,
+        "risk_score": 0.664971
+      },
+      {
+        "tick": 16,
+        "burden": 0.968052,
+        "detection_lag": 0.1,
+        "interception": 0.32,
+        "risk_score": 0.660397
+      },
+      {
+        "tick": 17,
+        "burden": 0.952951,
+        "detection_lag": 0.1,
+        "interception": 0.34,
+        "risk_score": 0.655223
+      },
+      {
+        "tick": 18,
+        "burden": 0.93656,
+        "detection_lag": 0.1,
+        "interception": 0.36,
+        "risk_score": 0.649448
+      },
+      {
+        "tick": 19,
+        "burden": 0.918953,
+        "detection_lag": 0.1,
+        "interception": 0.38,
+        "risk_score": 0.64307
+      },
+      {
+        "tick": 20,
+        "burden": 0.900206,
+        "detection_lag": 0.1,
+        "interception": 0.4,
+        "risk_score": 0.63609
+      },
+      {
+        "tick": 21,
+        "burden": 0.880402,
+        "detection_lag": 0.1,
+        "interception": 0.42,
+        "risk_score": 0.628508
+      },
+      {
+        "tick": 22,
+        "burden": 0.859624,
+        "detection_lag": 0.1,
+        "interception": 0.44,
+        "risk_score": 0.620326
+      },
+      {
+        "tick": 23,
+        "burden": 0.837962,
+        "detection_lag": 0.1,
+        "interception": 0.46,
+        "risk_score": 0.611548
+      },
+      {
+        "tick": 24,
+        "burden": 0.815504,
+        "detection_lag": 0.1,
+        "interception": 0.48,
+        "risk_score": 0.602181
+      },
+      {
+        "tick": 25,
+        "burden": 0.792344,
+        "detection_lag": 0.1,
+        "interception": 0.5,
+        "risk_score": 0.592231
+      },
+      {
+        "tick": 26,
+        "burden": 0.768574,
+        "detection_lag": 0.1,
+        "interception": 0.52,
+        "risk_score": 0.581709
+      },
+      {
+        "tick": 27,
+        "burden": 0.744287,
+        "detection_lag": 0.1,
+        "interception": 0.54,
+        "risk_score": 0.570628
+      },
+      {
+        "tick": 28,
+        "burden": 0.719576,
+        "detection_lag": 0.1,
+        "interception": 0.56,
+        "risk_score": 0.559002
+      },
+      {
+        "tick": 29,
+        "burden": 0.694535,
+        "detection_lag": 0.1,
+        "interception": 0.58,
+        "risk_score": 0.546851
+      },
+      {
+        "tick": 30,
+        "burden": 0.669254,
+        "detection_lag": 0.1,
+        "interception": 0.6,
+        "risk_score": 0.534195
+      },
+      {
+        "tick": 31,
+        "burden": 0.643822,
+        "detection_lag": 0.1,
+        "interception": 0.62,
+        "risk_score": 0.52106
+      },
+      {
+        "tick": 32,
+        "burden": 0.618327,
+        "detection_lag": 0.1,
+        "interception": 0.64,
+        "risk_score": 0.507472
+      },
+      {
+        "tick": 33,
+        "burden": 0.592852,
+        "detection_lag": 0.1,
+        "interception": 0.66,
+        "risk_score": 0.493464
+      },
+      {
+        "tick": 34,
+        "burden": 0.567478,
+        "detection_lag": 0.1,
+        "interception": 0.68,
+        "risk_score": 0.479069
+      },
+      {
+        "tick": 35,
+        "burden": 0.542282,
+        "detection_lag": 0.1,
+        "interception": 0.7,
+        "risk_score": 0.464324
+      },
+      {
+        "tick": 36,
+        "burden": 0.517337,
+        "detection_lag": 0.1,
+        "interception": 0.72,
+        "risk_score": 0.44927
+      },
+      {
+        "tick": 37,
+        "burden": 0.492712,
+        "detection_lag": 0.1,
+        "interception": 0.74,
+        "risk_score": 0.433949
+      },
+      {
+        "tick": 38,
+        "burden": 0.46847,
+        "detection_lag": 0.1,
+        "interception": 0.76,
+        "risk_score": 0.418406
+      },
+      {
+        "tick": 39,
+        "burden": 0.444672,
+        "detection_lag": 0.1,
+        "interception": 0.78,
+        "risk_score": 0.402689
+      },
+      {
+        "tick": 40,
+        "burden": 0.421371,
+        "detection_lag": 0.1,
+        "interception": 0.8,
+        "risk_score": 0.386846
+      },
+      {
+        "tick": 41,
+        "burden": 0.398617,
+        "detection_lag": 0.1,
+        "interception": 0.82,
+        "risk_score": 0.370927
+      },
+      {
+        "tick": 42,
+        "burden": 0.376454,
+        "detection_lag": 0.1,
+        "interception": 0.84,
+        "risk_score": 0.354983
+      },
+      {
+        "tick": 43,
+        "burden": 0.354921,
+        "detection_lag": 0.1,
+        "interception": 0.86,
+        "risk_score": 0.339065
+      },
+      {
+        "tick": 44,
+        "burden": 0.334051,
+        "detection_lag": 0.1,
+        "interception": 0.88,
+        "risk_score": 0.323223
+      },
+      {
+        "tick": 45,
+        "burden": 0.313875,
+        "detection_lag": 0.1,
+        "interception": 0.9,
+        "risk_score": 0.307507
+      },
+      {
+        "tick": 46,
+        "burden": 0.294415,
+        "detection_lag": 0.1,
+        "interception": 0.92,
+        "risk_score": 0.291965
+      },
+      {
+        "tick": 47,
+        "burden": 0.27569,
+        "detection_lag": 0.1,
+        "interception": 0.94,
+        "risk_score": 0.276646
+      },
+      {
+        "tick": 48,
+        "burden": 0.257715,
+        "detection_lag": 0.1,
+        "interception": 0.96,
+        "risk_score": 0.261592
+      }
+    ],
+    "events_triggered": [
+      {
+        "tick": 1,
+        "action": "flag:life_threatening_window"
+      },
+      {
+        "tick": 2,
+        "action": "flag:life_threatening_window"
+      },
+      {
+        "tick": 3,
+        "action": "flag:life_threatening_window"
+      },
+      {
+        "tick": 4,
+        "action": "flag:life_threatening_window"
+      },
+      {
+        "tick": 5,
+        "action": "flag:life_threatening_window"
+      },
+      {
+        "tick": 37,
+        "action": "flag:intercepted_early"
+      },
+      {
+        "tick": 38,
+        "action": "flag:intercepted_early"
+      },
+      {
+        "tick": 39,
+        "action": "flag:intercepted_early"
+      },
+      {
+        "tick": 40,
+        "action": "flag:intercepted_early"
+      },
+      {
+        "tick": 41,
+        "action": "flag:intercepted_early"
+      },
+      {
+        "tick": 42,
+        "action": "flag:intercepted_early"
+      },
+      {
+        "tick": 43,
+        "action": "flag:intercepted_early"
+      },
+      {
+        "tick": 44,
+        "action": "flag:intercepted_early"
+      },
+      {
+        "tick": 45,
+        "action": "flag:intercepted_early"
+      },
+      {
+        "tick": 46,
+        "action": "flag:intercepted_early"
+      },
+      {
+        "tick": 47,
+        "action": "flag:intercepted_early"
+      },
+      {
+        "tick": 48,
+        "action": "flag:intercepted_early"
+      }
+    ],
+    "final_state": {
+      "burden": 0.257715,
+      "detection_lag": 0.1,
+      "interception": 0.96,
+      "risk_score": 0.261592
+    },
+    "outputs": {
+      "burden": 0.257715,
+      "risk_score": 0.261592
+    },
+    "evidence_tier": "E1",
+    "error": null
+  },
+  "error": null,
+  "ranAt": "2026-08-27T18:03:26Z"
+}

@@ -1,0 +1,46 @@
+{
+  "experiment_id": "ca1ea44e-acb8-451c-a87a-d99705cef2a8",
+  "goal_id": "biotech-03",
+  "hypothesis_id": "biotech-03-h1",
+  "type": "analysis",
+  "domain": "biotech",
+  "model_id": "biotech-03-precision-treatment",
+  "inputs": {
+    "dataset": "C:\\Users\\User\\Downloads\\Uplift\\Draymond-Orchestrator\\datasets\\biotech\\metabric\\profiles\\0.json"
+  },
+  "status": "completed",
+  "elapsed_s": 2.02,
+  "detail": "analysis",
+  "result": {
+    "ter": 0.5575,
+    "four_factors": {
+      "proliferation": 100.0,
+      "clearance": 33.33333333333333,
+      "angiogenesis": 50.0,
+      "metastasis": 10.0
+    },
+    "tumor_gravity": 0.8,
+    "tumor_flow": 0.4192307687979112,
+    "baseline_risk": 0.9685179157320623,
+    "post_treatment_risk": 0.8120650216522676,
+    "risk_tier": "high",
+    "recurrence_risk": 0.8120650216522676,
+    "composite_score": 43.39,
+    "archetype": "cancer_dominant",
+    "archetype_scores": {
+      "virus_like_spread": 0.0942,
+      "unstable_genome": 0.0,
+      "cancer_dominant": 0.471,
+      "master_transcription_factor": 0.2174,
+      "metastatic_aggression": 0.0725,
+      "therapy_evader": 0.1449
+    },
+    "drug_classes": [
+      "chemotherapy",
+      "cell-cycle inhibitors"
+    ],
+    "cancer_type": "Breast Cancer"
+  },
+  "error": null,
+  "ranAt": "2026-08-27T18:03:16Z"
+}

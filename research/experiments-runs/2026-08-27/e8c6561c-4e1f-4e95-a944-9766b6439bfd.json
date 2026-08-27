@@ -1,0 +1,378 @@
+{
+  "experiment_id": "e8c6561c-4e1f-4e95-a944-9766b6439bfd",
+  "goal_id": "biotech-05",
+  "hypothesis_id": "biotech-05-h1",
+  "type": "simulation",
+  "domain": "biotech",
+  "model_id": "biotech-05-metastasis",
+  "inputs": {
+    "ticks": 48
+  },
+  "status": "completed",
+  "elapsed_s": 3.12,
+  "detail": "simulation",
+  "result": {
+    "model_id": "biotech-05-metastasis",
+    "ticks": 48,
+    "series": [
+      {
+        "tick": 0,
+        "primary_tumor": 1.0,
+        "circulating_cells": 0.1,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.2
+      },
+      {
+        "tick": 1,
+        "primary_tumor": 1.05,
+        "circulating_cells": 0.107,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.21
+      },
+      {
+        "tick": 2,
+        "primary_tumor": 1.1025,
+        "circulating_cells": 0.11421,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.22
+      },
+      {
+        "tick": 3,
+        "primary_tumor": 1.157625,
+        "circulating_cells": 0.121665,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.23
+      },
+      {
+        "tick": 4,
+        "primary_tumor": 1.215506,
+        "circulating_cells": 0.129401,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.24
+      },
+      {
+        "tick": 5,
+        "primary_tumor": 1.276282,
+        "circulating_cells": 0.137453,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.25
+      },
+      {
+        "tick": 6,
+        "primary_tumor": 1.340096,
+        "circulating_cells": 0.145857,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.26
+      },
+      {
+        "tick": 7,
+        "primary_tumor": 1.4071,
+        "circulating_cells": 0.154649,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.27
+      },
+      {
+        "tick": 8,
+        "primary_tumor": 1.477455,
+        "circulating_cells": 0.163866,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.28
+      },
+      {
+        "tick": 9,
+        "primary_tumor": 1.551328,
+        "circulating_cells": 0.173544,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.29
+      },
+      {
+        "tick": 10,
+        "primary_tumor": 1.628895,
+        "circulating_cells": 0.183723,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.3
+      },
+      {
+        "tick": 11,
+        "primary_tumor": 1.710339,
+        "circulating_cells": 0.19444,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.31
+      },
+      {
+        "tick": 12,
+        "primary_tumor": 1.795856,
+        "circulating_cells": 0.205736,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.32
+      },
+      {
+        "tick": 13,
+        "primary_tumor": 1.885649,
+        "circulating_cells": 0.217652,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.33
+      },
+      {
+        "tick": 14,
+        "primary_tumor": 1.979932,
+        "circulating_cells": 0.230229,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.34
+      },
+      {
+        "tick": 15,
+        "primary_tumor": 2.078928,
+        "circulating_cells": 0.243512,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.35
+      },
+      {
+        "tick": 16,
+        "primary_tumor": 2.182875,
+        "circulating_cells": 0.257544,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.36
+      },
+      {
+        "tick": 17,
+        "primary_tumor": 2.292018,
+        "circulating_cells": 0.272374,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.37
+      },
+      {
+        "tick": 18,
+        "primary_tumor": 2.406619,
+        "circulating_cells": 0.288048,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.38
+      },
+      {
+        "tick": 19,
+        "primary_tumor": 2.52695,
+        "circulating_cells": 0.304617,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.39
+      },
+      {
+        "tick": 20,
+        "primary_tumor": 2.653298,
+        "circulating_cells": 0.322133,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.4
+      },
+      {
+        "tick": 21,
+        "primary_tumor": 2.785963,
+        "circulating_cells": 0.340649,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.41
+      },
+      {
+        "tick": 22,
+        "primary_tumor": 2.925261,
+        "circulating_cells": 0.360223,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.42
+      },
+      {
+        "tick": 23,
+        "primary_tumor": 3.071524,
+        "circulating_cells": 0.380913,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.43
+      },
+      {
+        "tick": 24,
+        "primary_tumor": 3.2251,
+        "circulating_cells": 0.402779,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.44
+      },
+      {
+        "tick": 25,
+        "primary_tumor": 3.386355,
+        "circulating_cells": 0.425887,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.45
+      },
+      {
+        "tick": 26,
+        "primary_tumor": 3.555673,
+        "circulating_cells": 0.450302,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.46
+      },
+      {
+        "tick": 27,
+        "primary_tumor": 3.733456,
+        "circulating_cells": 0.476094,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.47
+      },
+      {
+        "tick": 28,
+        "primary_tumor": 3.920129,
+        "circulating_cells": 0.503337,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.48
+      },
+      {
+        "tick": 29,
+        "primary_tumor": 4.116136,
+        "circulating_cells": 0.532106,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.49
+      },
+      {
+        "tick": 30,
+        "primary_tumor": 4.321942,
+        "circulating_cells": 0.562481,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.5
+      },
+      {
+        "tick": 31,
+        "primary_tumor": 4.538039,
+        "circulating_cells": 0.594546,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.51
+      },
+      {
+        "tick": 32,
+        "primary_tumor": 4.764941,
+        "circulating_cells": 0.628389,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.52
+      },
+      {
+        "tick": 33,
+        "primary_tumor": 5.003189,
+        "circulating_cells": 0.6641,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.53
+      },
+      {
+        "tick": 34,
+        "primary_tumor": 5.253348,
+        "circulating_cells": 0.701777,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.54
+      },
+      {
+        "tick": 35,
+        "primary_tumor": 5.516015,
+        "circulating_cells": 0.74152,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.55
+      },
+      {
+        "tick": 36,
+        "primary_tumor": 5.791816,
+        "circulating_cells": 0.783434,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.56
+      },
+      {
+        "tick": 37,
+        "primary_tumor": 6.081407,
+        "circulating_cells": 0.82763,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.57
+      },
+      {
+        "tick": 38,
+        "primary_tumor": 6.385477,
+        "circulating_cells": 0.874224,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.58
+      },
+      {
+        "tick": 39,
+        "primary_tumor": 6.704751,
+        "circulating_cells": 0.923338,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.59
+      },
+      {
+        "tick": 40,
+        "primary_tumor": 7.039989,
+        "circulating_cells": 0.975099,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.6
+      },
+      {
+        "tick": 41,
+        "primary_tumor": 7.391988,
+        "circulating_cells": 1.029642,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.61
+      },
+      {
+        "tick": 42,
+        "primary_tumor": 7.761588,
+        "circulating_cells": 1.087107,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.62
+      },
+      {
+        "tick": 43,
+        "primary_tumor": 8.149667,
+        "circulating_cells": 1.147641,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.63
+      },
+      {
+        "tick": 44,
+        "primary_tumor": 8.55715,
+        "circulating_cells": 1.211399,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.64
+      },
+      {
+        "tick": 45,
+        "primary_tumor": 8.985008,
+        "circulating_cells": 1.278544,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.65
+      },
+      {
+        "tick": 46,
+        "primary_tumor": 9.434258,
+        "circulating_cells": 1.349246,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.66
+      },
+      {
+        "tick": 47,
+        "primary_tumor": 9.905971,
+        "circulating_cells": 1.423684,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.67
+      },
+      {
+        "tick": 48,
+        "primary_tumor": 10.40127,
+        "circulating_cells": 1.502046,
+        "metastatic_sites": 0.0,
+        "seeding_rate": 0.68
+      }
+    ],
+    "events_triggered": [],
+    "final_state": {
+      "primary_tumor": 10.40127,
+      "circulating_cells": 1.502046,
+      "metastatic_sites": 0.0,
+      "seeding_rate": 0.68
+    },
+    "outputs": {
+      "metastatic_sites": 0.0,
+      "circulating_cells": 1.502046
+    },
+    "evidence_tier": "E1",
+    "error": null
+  },
+  "error": null,
+  "ranAt": "2026-08-27T18:03:19Z"
+}

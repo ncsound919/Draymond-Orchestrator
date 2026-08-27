@@ -1,0 +1,51 @@
+{
+  "experiment_id": "5cc08a4a-b888-476d-805c-acfa6a4ec8b4",
+  "goal_id": "sports-08",
+  "hypothesis_id": "sports-08-h1",
+  "type": "translation",
+  "domain": "sports",
+  "model_id": null,
+  "inputs": {
+    "profile": {
+      "profile_id": "2010-11_101106",
+      "sport": "basketball",
+      "name": "Andrew Bogut",
+      "season": "2010-11",
+      "team": "Bucks",
+      "games": 65,
+      "performance": {
+        "fg": 49.46091644204852,
+        "tp": 0,
+        "ast": 2.0153846153846153,
+        "oreb": 3.0615384615384613,
+        "tov": -1.9230769230769231,
+        "pf": -3.3384615384615386,
+        "defensive_attention": 0.6615384615384615,
+        "court_spacing": 0
+      },
+      "biometrics": {
+        "hrv": 65,
+        "load": 0.7363408119658118,
+        "acute_chronic": 1,
+        "sleep_hrs": 7.5
+      },
+      "source": "nba-box-scores-2010-2024"
+    }
+  },
+  "status": "completed",
+  "elapsed_s": 0.23,
+  "detail": "translation",
+  "result": {
+    "from_domain": "sports",
+    "to_domain": "biotech",
+    "source_read": "no profile metrics detected",
+    "target_read": "As a biotech/tumor profile, this athlete maps to a system with moderate proliferation and balanced immune clearance. Injury load translates to controlled recurrence signal \u2014 routine surveillance is adequate.",
+    "translated_metrics": [],
+    "archetype": null,
+    "archetype_translation": null,
+    "confidence": 0.6,
+    "evidence_tier": "E4"
+  },
+  "error": null,
+  "ranAt": "2026-08-27T18:03:31Z"
+}

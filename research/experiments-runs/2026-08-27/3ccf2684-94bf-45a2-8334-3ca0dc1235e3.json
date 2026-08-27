@@ -1,0 +1,41 @@
+{
+  "experiment_id": "3ccf2684-94bf-45a2-8334-3ca0dc1235e3",
+  "goal_id": "sports-08",
+  "hypothesis_id": "sports-08-h1",
+  "type": "analysis",
+  "domain": "sports",
+  "model_id": "sports-08-unified-ai",
+  "inputs": {
+    "dataset": "C:\\Users\\User\\Downloads\\Uplift\\Draymond-Orchestrator\\datasets\\sports\\athlete-injury\\profiles\\A002.json"
+  },
+  "status": "completed",
+  "elapsed_s": 0.19,
+  "detail": "analysis",
+  "result": {
+    "sport": "basketball",
+    "ter": 8.412916666666666,
+    "ter_evidence": "E2",
+    "four_factors": {
+      "proliferation": 50.0,
+      "clearance": 33.33333333333333,
+      "resource": 50.0,
+      "metastasis": 50.0
+    },
+    "gravity": 0.46,
+    "flow": 0.25,
+    "fatigue": 0.33538461538461534,
+    "fatigue_evidence": "E2",
+    "injury_risk": 26.67,
+    "injury_risk_evidence": "E2",
+    "recovery_priority": "normal",
+    "baseline_form": 0.7525,
+    "baseline_form_evidence": "E2",
+    "availability": 0.7262,
+    "availability_evidence": "E2",
+    "availability_tier": "normal",
+    "acute_chronic": 1.33,
+    "evidence_tier": "E1"
+  },
+  "error": null,
+  "ranAt": "2026-08-27T18:03:31Z"
+}

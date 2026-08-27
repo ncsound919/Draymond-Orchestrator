@@ -1,0 +1,281 @@
+{
+  "summary": {
+    "total": 30,
+    "completed": 15,
+    "failed": 0,
+    "skipped": 0,
+    "unrunnable": 15
+  },
+  "results": [
+    {
+      "id": "ca1ea44e-acb8-451c-a87a-d99705cef2a8",
+      "goal": "biotech-03",
+      "hyp": "biotech-03-h1",
+      "type": "analysis",
+      "status": "completed",
+      "elapsed_s": 2.02,
+      "result_file": "C:\\Users\\User\\Downloads\\Uplift\\Draymond-Orchestrator\\research\\experiments-runs\\2026-08-27\\ca1ea44e-acb8-451c-a87a-d99705cef2a8.json",
+      "error": null
+    },
+    {
+      "id": "e8c6561c-4e1f-4e95-a944-9766b6439bfd",
+      "goal": "biotech-05",
+      "hyp": "biotech-05-h1",
+      "type": "simulation",
+      "status": "completed",
+      "elapsed_s": 3.12,
+      "result_file": "C:\\Users\\User\\Downloads\\Uplift\\Draymond-Orchestrator\\research\\experiments-runs\\2026-08-27\\e8c6561c-4e1f-4e95-a944-9766b6439bfd.json",
+      "error": null
+    },
+    {
+      "id": "7fcff755-7807-41be-b90e-862c16fc4c59",
+      "goal": "sports-01",
+      "hyp": "sports-01-h1",
+      "type": "simulation",
+      "status": "completed",
+      "elapsed_s": 3.12,
+      "result_file": "C:\\Users\\User\\Downloads\\Uplift\\Draymond-Orchestrator\\research\\experiments-runs\\2026-08-27\\7fcff755-7807-41be-b90e-862c16fc4c59.json",
+      "error": null
+    },
+    {
+      "id": "88c98552-2b39-405a-b87c-4586534c8e33",
+      "goal": "biotech-01",
+      "hyp": "biotech-01-h1",
+      "type": "simulation",
+      "status": "completed",
+      "elapsed_s": 3.75,
+      "result_file": "C:\\Users\\User\\Downloads\\Uplift\\Draymond-Orchestrator\\research\\experiments-runs\\2026-08-27\\88c98552-2b39-405a-b87c-4586534c8e33.json",
+      "error": null
+    },
+    {
+      "id": "a720b546-0e30-46ba-bd06-8bbbdd32f403",
+      "goal": "sports-03",
+      "hyp": "sports-03-h2",
+      "type": "analysis",
+      "status": "completed",
+      "elapsed_s": 0.17,
+      "result_file": "C:\\Users\\User\\Downloads\\Uplift\\Draymond-Orchestrator\\research\\experiments-runs\\2026-08-27\\a720b546-0e30-46ba-bd06-8bbbdd32f403.json",
+      "error": null
+    },
+    {
+      "id": "33dc2ac0-2bf4-4941-b131-1cd07688d5ca",
+      "goal": "sports-03",
+      "hyp": "sports-03-h2",
+      "type": "translation",
+      "status": "completed",
+      "elapsed_s": 0.23,
+      "result_file": "C:\\Users\\User\\Downloads\\Uplift\\Draymond-Orchestrator\\research\\experiments-runs\\2026-08-27\\33dc2ac0-2bf4-4941-b131-1cd07688d5ca.json",
+      "error": null
+    },
+    {
+      "id": "98d9795f-929a-42b0-852a-bcde48f3ed34",
+      "goal": "sports-03",
+      "hyp": "sports-03-h2",
+      "type": "analysis",
+      "status": "completed",
+      "elapsed_s": 0.2,
+      "result_file": "C:\\Users\\User\\Downloads\\Uplift\\Draymond-Orchestrator\\research\\experiments-runs\\2026-08-27\\98d9795f-929a-42b0-852a-bcde48f3ed34.json",
+      "error": null
+    },
+    {
+      "id": "3ebc1e98-57d9-40aa-adb0-86d45b63cfc3",
+      "goal": "sports-03",
+      "hyp": "sports-03-h2",
+      "type": "analysis",
+      "status": "completed",
+      "elapsed_s": 0.19,
+      "result_file": "C:\\Users\\User\\Downloads\\Uplift\\Draymond-Orchestrator\\research\\experiments-runs\\2026-08-27\\3ebc1e98-57d9-40aa-adb0-86d45b63cfc3.json",
+      "error": null
+    },
+    {
+      "id": "794c27ea-e323-4dba-b517-578ab7b8dbe5",
+      "goal": "sports-03",
+      "hyp": "sports-03-h2",
+      "type": "translation",
+      "status": "completed",
+      "elapsed_s": 0.24,
+      "result_file": "C:\\Users\\User\\Downloads\\Uplift\\Draymond-Orchestrator\\research\\experiments-runs\\2026-08-27\\794c27ea-e323-4dba-b517-578ab7b8dbe5.json",
+      "error": null
+    },
+    {
+      "id": "d470ea7d-8453-4606-ab2e-ccf43319dd8b",
+      "goal": "sports-08",
+      "hyp": "sports-08-h1",
+      "type": "simulation",
+      "status": "completed",
+      "elapsed_s": 2.51,
+      "result_file": "C:\\Users\\User\\Downloads\\Uplift\\Draymond-Orchestrator\\research\\experiments-runs\\2026-08-27\\d470ea7d-8453-4606-ab2e-ccf43319dd8b.json",
+      "error": null
+    },
+    {
+      "id": "e683646b-5f50-4908-a326-61f9a62117f4",
+      "goal": "sports-08",
+      "hyp": "sports-08-h1",
+      "type": "analysis",
+      "status": "completed",
+      "elapsed_s": 0.17,
+      "result_file": "C:\\Users\\User\\Downloads\\Uplift\\Draymond-Orchestrator\\research\\experiments-runs\\2026-08-27\\e683646b-5f50-4908-a326-61f9a62117f4.json",
+      "error": null
+    },
+    {
+      "id": "d9679b1c-a26b-4ed3-9ae4-6c86f4412488",
+      "goal": "sports-08",
+      "hyp": "sports-08-h1",
+      "type": "analysis",
+      "status": "completed",
+      "elapsed_s": 0.22,
+      "result_file": "C:\\Users\\User\\Downloads\\Uplift\\Draymond-Orchestrator\\research\\experiments-runs\\2026-08-27\\d9679b1c-a26b-4ed3-9ae4-6c86f4412488.json",
+      "error": null
+    },
+    {
+      "id": "972003c8-ac72-4170-954b-7ccee4639d97",
+      "goal": "sports-08",
+      "hyp": "sports-08-h1",
+      "type": "analysis",
+      "status": "completed",
+      "elapsed_s": 0.16,
+      "result_file": "C:\\Users\\User\\Downloads\\Uplift\\Draymond-Orchestrator\\research\\experiments-runs\\2026-08-27\\972003c8-ac72-4170-954b-7ccee4639d97.json",
+      "error": null
+    },
+    {
+      "id": "3ccf2684-94bf-45a2-8334-3ca0dc1235e3",
+      "goal": "sports-08",
+      "hyp": "sports-08-h1",
+      "type": "analysis",
+      "status": "completed",
+      "elapsed_s": 0.19,
+      "result_file": "C:\\Users\\User\\Downloads\\Uplift\\Draymond-Orchestrator\\research\\experiments-runs\\2026-08-27\\3ccf2684-94bf-45a2-8334-3ca0dc1235e3.json",
+      "error": null
+    },
+    {
+      "id": "5cc08a4a-b888-476d-805c-acfa6a4ec8b4",
+      "goal": "sports-08",
+      "hyp": "sports-08-h1",
+      "type": "translation",
+      "status": "completed",
+      "elapsed_s": 0.23,
+      "result_file": "C:\\Users\\User\\Downloads\\Uplift\\Draymond-Orchestrator\\research\\experiments-runs\\2026-08-27\\5cc08a4a-b888-476d-805c-acfa6a4ec8b4.json",
+      "error": null
+    },
+    {
+      "id": "26c27fd8-ce3e-4128-a317-03f634406b58",
+      "goal": "biotech-01",
+      "hyp": "biotech-01-h2",
+      "type": "analysis",
+      "status": "unrunnable",
+      "reason": "claim-only stub: no model_id, dataset, or profile"
+    },
+    {
+      "id": "cdb4eaa4-7e2b-4c3c-ae4a-2a4e14531d6b",
+      "goal": "biotech-02",
+      "hyp": "biotech-02-h1",
+      "type": "analysis",
+      "status": "unrunnable",
+      "reason": "claim-only stub: no model_id, dataset, or profile"
+    },
+    {
+      "id": "e3286ef9-c8a1-43b3-8ba5-1cdd78173cfb",
+      "goal": "biotech-04",
+      "hyp": "biotech-04-h1",
+      "type": "analysis",
+      "status": "unrunnable",
+      "reason": "claim-only stub: no model_id, dataset, or profile"
+    },
+    {
+      "id": "7e9472e7-0fc6-44fa-92e0-47b72a8bbbd2",
+      "goal": "biotech-06",
+      "hyp": "biotech-06-h1",
+      "type": "analysis",
+      "status": "unrunnable",
+      "reason": "claim-only stub: no model_id, dataset, or profile"
+    },
+    {
+      "id": "99d69c24-fbb1-4dc6-b736-7f22b07dd23d",
+      "goal": "biotech-07",
+      "hyp": "biotech-07-h1",
+      "type": "analysis",
+      "status": "unrunnable",
+      "reason": "claim-only stub: no model_id, dataset, or profile"
+    },
+    {
+      "id": "7fb379d1-01a0-4b3d-95c0-7364580b04eb",
+      "goal": "biotech-08",
+      "hyp": "biotech-08-h1",
+      "type": "analysis",
+      "status": "unrunnable",
+      "reason": "claim-only stub: no model_id, dataset, or profile"
+    },
+    {
+      "id": "56d15fa8-afd7-4f6b-91b6-99c7c8b30d5d",
+      "goal": "biotech-09",
+      "hyp": "biotech-09-h1",
+      "type": "analysis",
+      "status": "unrunnable",
+      "reason": "claim-only stub: no model_id, dataset, or profile"
+    },
+    {
+      "id": "2c078651-aceb-4a68-8d6b-e0367781f44f",
+      "goal": "biotech-10",
+      "hyp": "biotech-10-h1",
+      "type": "analysis",
+      "status": "unrunnable",
+      "reason": "claim-only stub: no model_id, dataset, or profile"
+    },
+    {
+      "id": "aaa5101c-33d9-43bd-90ad-bb100a5691de",
+      "goal": "sports-02",
+      "hyp": "sports-02-h1",
+      "type": "analysis",
+      "status": "unrunnable",
+      "reason": "claim-only stub: no model_id, dataset, or profile"
+    },
+    {
+      "id": "63442ad1-7cd9-4f02-95e9-1b1e4165da79",
+      "goal": "sports-04",
+      "hyp": "sports-04-h1",
+      "type": "analysis",
+      "status": "unrunnable",
+      "reason": "claim-only stub: no model_id, dataset, or profile"
+    },
+    {
+      "id": "c4b3bb85-d5d8-4af0-a717-46aae55c44bb",
+      "goal": "sports-05",
+      "hyp": "sports-05-h1",
+      "type": "analysis",
+      "status": "unrunnable",
+      "reason": "claim-only stub: no model_id, dataset, or profile"
+    },
+    {
+      "id": "a98dd5f6-9e95-4792-a6e6-3b9cca4fead6",
+      "goal": "sports-06",
+      "hyp": "sports-06-h1",
+      "type": "analysis",
+      "status": "unrunnable",
+      "reason": "claim-only stub: no model_id, dataset, or profile"
+    },
+    {
+      "id": "bdfad17c-2af7-421d-996e-4f7d36106e28",
+      "goal": "sports-07",
+      "hyp": "sports-07-h1",
+      "type": "analysis",
+      "status": "unrunnable",
+      "reason": "claim-only stub: no model_id, dataset, or profile"
+    },
+    {
+      "id": "896f04a0-0042-4705-a6ab-f6baef868638",
+      "goal": "sports-09",
+      "hyp": "sports-09-h1",
+      "type": "analysis",
+      "status": "unrunnable",
+      "reason": "claim-only stub: no model_id, dataset, or profile"
+    },
+    {
+      "id": "a0a27d48-77eb-4205-af24-d0208765fc2a",
+      "goal": "sports-10",
+      "hyp": "sports-10-h1",
+      "type": "analysis",
+      "status": "unrunnable",
+      "reason": "claim-only stub: no model_id, dataset, or profile"
+    }
+  ]
+}
