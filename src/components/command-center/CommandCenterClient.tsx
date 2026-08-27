@@ -16,6 +16,7 @@ import BrainPanel from './brain/BrainPanel';
 import SciencePanel from './science/SciencePanel';
 import CrmPanel from './crm/CrmPanel';
 import SeoPanel from './seo/SeoPanel';
+import VisualizerTab from '@/components/visualizer/VisualizerApp';
 
 const TABS = [
   { value: 'home', label: 'Home', component: HomePanel },
@@ -26,6 +27,7 @@ const TABS = [
   { value: 'science', label: 'Science', component: SciencePanel },
   { value: 'crm', label: 'CRM', component: CrmPanel },
   { value: 'seo', label: 'SEO', component: SeoPanel },
+  { value: 'visualizer', label: 'Visualizer', component: VisualizerTab },
 ] as const;
 
 export default function CommandCenterClient() {
