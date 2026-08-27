@@ -9,9 +9,24 @@
 //     triggers and conditional chain spawning.
 // ============================================================================
 
+type OrchestratorEvent = {
+  type: string;
+  data: Record<string, unknown>;
+  ts: string;
+};
+
+export type StreamSubscriber = (event: OrchestratorEvent) => void;
+const streamSubscribers = new Set<StreamSubscriber>();
+
+/** Subscribe to a live copy of every event published to the SSE bridge. Returns unsubscribe. */
+export function subscribeToStream(cb: StreamSubscriber): () => void {
+  streamSubscribers.add(cb);
+  return () => streamSubscribers.delete(cb);
+}
+
 // NOTE: The publishEvent function lives in the events route module.
 // We lazy-import it to avoid circular dependency issues with Next.js route modules.
-let _publishEvent: ((event: { type: string; data: Record<string, unknown>; ts: string }) => void) | null = null;
+let _publishEvent: ((event: OrchestratorEvent) => void) | null = null;
 
 function getPublisher() {
   if (!_publishEvent) {
@@ -62,7 +77,7 @@ function getSystemicHandler() {
   return _onSystemicEvent!;
 }
 
-function emit(type: string, data: Record<string, unknown>): void {
+export function emit(type: string, data: Record<string, unknown>): void {
   try {
     // Push to SSE clients (Open Chat)
     getPublisher()({ type, data, ts: new Date().toISOString() });
@@ -72,6 +87,11 @@ function emit(type: string, data: Record<string, unknown>): void {
 
     // Feed into systemic stores: memory + self-learning + knowledge graph
     getSystemicHandler()(type, data).catch(() => {});
+
+    // Feed into in-process subscribers (e.g. Ecosystem Visualizer)
+    for (const sub of streamSubscribers) {
+      try { sub({ type, data, ts: new Date().toISOString() }); } catch { /* never break the event path */ }
+    }
   } catch {
     // Non-fatal: SSE push is best-effort
   }
