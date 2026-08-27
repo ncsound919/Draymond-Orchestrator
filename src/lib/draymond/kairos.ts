@@ -74,10 +74,16 @@ function repeatNotifyHours(): number {
 function cap(): number {
   return Math.max(10, Number(process.env.KAIROS_CAP ?? 200));
 }
+/** Un-acked moments not seen by any detector for this long are auto-resolved. */
+function staleResolveHours(): number {
+  return Math.max(1, Number(process.env.KAIROS_STALE_RESOLVE_HOURS ?? 48));
+}
 
 const HEARTBEAT_STALE_MS = 30 * 60_000;
 const LEAD_STALE_DAYS = 14;
 const WEAK_AGENT_SCORE_FLOOR = 0.6;
+/** Don't alert on jobs whose last failure is older than this (they're stale, not live). */
+const JOB_FAILED_STALE_MS = 7 * 86_400_000;
 
 function DEFAULT_STATE(): KairosState {
   return { moments: [], settings: {}, updatedAt: nowIso() };
@@ -105,14 +111,22 @@ export async function detectMonitorDown(): Promise<DetectorHit[]> {
 
 export async function detectJobFailed(): Promise<DetectorHit[]> {
   const { listJobs } = await import('./scheduler');
-  const jobs = await listJobs({ last_run_status: 'failed', limit: 20 });
-  return jobs.map((j) => ({
-    kind: 'job_failed' as const,
-    severity: 'warn' as const,
-    title: `Job failed: ${j.name}`,
-    detail: j.last_error ?? `failed after ${j.fail_count ?? 0} failures`,
-    source: 'scheduler',
-  }));
+  const jobs = await listJobs({ last_run_status: 'failed', limit: 50 });
+  const now = Date.now();
+  return jobs
+    // Disabled jobs can't run again — their failure is historical, not live.
+    .filter((j) => j.is_enabled !== false)
+    // Jobs whose last (failed) run is older than the staleness window are
+    // historical too; re-alerting on them every tick caused alert rot.
+    .filter((j) => !j.last_run_at || now - new Date(j.last_run_at).getTime() < JOB_FAILED_STALE_MS)
+    .slice(0, 20)
+    .map((j) => ({
+      kind: 'job_failed' as const,
+      severity: 'warn' as const,
+      title: `Job failed: ${j.name}`,
+      detail: j.last_error ?? `failed after ${j.fail_count ?? 0} failures`,
+      source: 'scheduler',
+    }));
 }
 
 export async function detectStaleLead(): Promise<DetectorHit[]> {
@@ -204,16 +218,49 @@ export async function detectRepairLoop(): Promise<DetectorHit[]> {
 export async function detectStaleHeartbeat(): Promise<DetectorHit[]> {
   const { getHeartbeats } = await import('./heartbeat');
   const hbs = await getHeartbeats();
+
+  // ── Monitor self-check ──────────────────────────────────────────────────
+  // If the sweep stamp is missing or older than 3× the tick interval, the
+  // heartbeat MONITOR itself has died — per-agent records are meaningless at
+  // that point (the blind week: this file froze for days, zero alerts fired
+  // because the loop iterated zero/frozen records). Raise a critical hit.
+  try {
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    const dir = process.env.DRAYMOND_REGISTRY_DIR ?? path.join(process.cwd(), '.draymond');
+    const stampPath = path.join(dir, 'heartbeat-sweep-stamp');
+    let stampMs: number | null = null;
+    try {
+      const raw = await fs.readFile(stampPath, 'utf-8');
+      const parsed = new Date(raw.trim()).getTime();
+      if (!Number.isNaN(parsed)) stampMs = parsed;
+    } catch { /* no stamp file — treat as never-swept */ }
+    const monitorCutoff = Date.now() - HEARTBEAT_STALE_MS * 3;
+    if (stampMs === null || stampMs < monitorCutoff) {
+      const ageMin = stampMs === null ? 'never' : `${Math.max(1, Math.round((Date.now() - stampMs) / 60_000))}m`;
+      return [{
+        kind: 'stale_heartbeat' as const,
+        severity: 'critical' as const,
+        title: 'Heartbeat MONITOR dead — sweep output stale',
+        detail: `Last heartbeat sweep: ${ageMin} ago. The liveness monitor itself has stopped; all agent status data is unreliable. Check the agent_heartbeat_sweep scheduler job.`,
+        source: 'heartbeats',
+      }];
+    }
+  } catch { /* self-check best-effort — fall through to per-agent checks */ }
+
   const cutoff = Date.now() - HEARTBEAT_STALE_MS;
   const hits: DetectorHit[] = [];
   for (const rec of Object.values(hbs)) {
     const seen = new Date(rec.last_seen).getTime();
-    if (!rec.up || seen < cutoff) {
+    // NaN last_seen on an up:true record must count as stale (NaN comparisons
+    // are always false, which silently exempted corrupted records).
+    const seenIsStale = Number.isNaN(seen) || seen < cutoff;
+    if (!rec.up || seenIsStale) {
       hits.push({
         kind: 'stale_heartbeat' as const,
         severity: 'warn' as const,
         title: `Agent heartbeat stale: ${rec.name}`,
-        detail: `${rec.up ? 'stale' : 'down'} — last seen ${Math.max(1, Math.round((Date.now() - seen) / 60_000))}m ago${rec.detail ? ` (${rec.detail})` : ''}`,
+        detail: `${rec.up ? 'stale' : 'down'} — last seen ${Number.isNaN(seen) ? 'unknown' : `${Math.max(1, Math.round((Date.now() - seen) / 60_000))}m`}${rec.detail ? ` (${rec.detail})` : ''}`,
         source: 'heartbeats',
       });
     }
@@ -421,9 +468,30 @@ export interface KairosScanResult {
   created: number;
   repeated: number;
   notified: number;
+  resolved?: number;
   errors: string[];
   budgetExceeded: boolean;
   durationMs: number;
+}
+
+/**
+ * Auto-resolve moments no detector has reported within the staleness window.
+ * Without this, a condition that silently clears (job disabled, monitor
+ * removed, endpoint deleted) keeps its moment un-acked forever and rots the
+ * feed/digest. Returns how many moments were resolved.
+ */
+export async function resolveStaleMoments(): Promise<number> {
+  const state = await readJsonState<KairosState>('kairos', DEFAULT_STATE());
+  const cutoff = Date.now() - staleResolveHours() * 3_600_000;
+  let resolved = 0;
+  for (const m of state.moments) {
+    if (!m.acked && new Date(m.lastSeen).getTime() < cutoff) {
+      m.acked = true;
+      resolved += 1;
+    }
+  }
+  if (resolved > 0) await writeJsonState('kairos', state);
+  return resolved;
 }
 
 /** One detection pass — runs detectors in order within the tick budget. */
@@ -457,6 +525,17 @@ export async function kairosScan(): Promise<KairosScanResult> {
     if (r.notified) notified += 1;
   }
 
+  const resolved = await resolveStaleMoments().catch(() => 0);
+  if (resolved > 0) {
+    await logEvent({
+      agent_id: 'draymond',
+      category: 'health',
+      severity: 'info',
+      event_type: 'kairos_moments_resolved',
+      message: `[Kairos] Auto-resolved ${resolved} stale moment(s) unseen for ${staleResolveHours()}h`,
+    }).catch(() => {});
+  }
+
   if (budgetExceeded) {
     await logEvent({
       agent_id: 'draymond',
@@ -475,6 +554,7 @@ export async function kairosScan(): Promise<KairosScanResult> {
     created,
     repeated,
     notified,
+    resolved,
     errors,
     budgetExceeded,
     durationMs: Date.now() - started,

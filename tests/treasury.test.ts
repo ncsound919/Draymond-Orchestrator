@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeAll, afterAll, beforeEach } from 'vitest';
+﻿import { describe, expect, it, beforeAll, afterAll, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -64,7 +64,7 @@ describe('treasury pulse', () => {
   });
 
   it('records an error status when the Stripe call fails', async () => {
-    process.env.STRIPE_SECRET_KEY = 'sk_test_invalid';
+    process.env.STRIPE_SECRET_KEY = 'sk_live_test_invalid';
     // Point fetch at a deliberately failing path by stubbing global fetch.
     const original = global.fetch;
     global.fetch = (async () => {
@@ -80,7 +80,7 @@ describe('treasury pulse', () => {
   });
 
   it('merges settled charges from a successful Stripe pull', async () => {
-    process.env.STRIPE_SECRET_KEY = 'sk_test_ok';
+    process.env.STRIPE_SECRET_KEY = 'sk_live_test_ok';
     const original = global.fetch;
     global.fetch = (async (url: unknown) => {
       const parsed = new URL(String(url));
@@ -110,7 +110,7 @@ describe('treasury pulse', () => {
   });
 
   it('drops refunded charges from revenue on the next pulse', async () => {
-    process.env.STRIPE_SECRET_KEY = 'sk_test_refund';
+    process.env.STRIPE_SECRET_KEY = 'sk_live_test_refund';
     const original = global.fetch;
     global.fetch = (async () => ({
       ok: true,
@@ -125,7 +125,7 @@ describe('treasury pulse', () => {
     try {
       const result = await runTreasuryPulse(30);
       expect(result.status).toBe('ok');
-      expect(result.revenueUsd).toBe(0); // refunded → excluded
+      expect(result.revenueUsd).toBe(0); // refunded â†’ excluded
     } finally {
       global.fetch = original;
     }
@@ -139,7 +139,7 @@ describe('fetchStripeCharges', () => {
   });
 
   it('throws for an inverted window', async () => {
-    process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+    process.env.STRIPE_SECRET_KEY = 'sk_live_test_x';
     await expect(fetchStripeCharges(10, 5)).rejects.toThrow('invalid window');
   });
 });

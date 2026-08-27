@@ -40,7 +40,6 @@ describe('tool port registry', () => {
     expect(toolBySlug('litellm')?.port).toBe(4100);
     expect(toolBySlug('vibeserve')?.port).toBe(3600);
     expect(toolBySlug('claw-protect')?.port).toBe(3300);
-    expect(toolBySlug('bet-buddy')?.port).toBe(3001); // untouched
     expect(toolBySlug('graphify')?.port).toBe(3203);
     expect(toolBySlug('deterministic-brain')?.port).toBe(3210);
   });

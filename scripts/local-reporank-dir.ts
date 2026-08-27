@@ -95,7 +95,9 @@ async function main() {
   const sourceFiles = collectFiles(root);
   const fileTree = sourceFiles.map((f) => f.path);
 
-  const svc = new GradingService(process.env.GEMINI_API_KEY || '', process.env.GEMINI_MODEL || 'gemini-2.5-flash');
+  // GradingService routes through the fleet LLM chain — it takes no
+  // constructor args and resolves credentials from the environment itself.
+  const svc = new GradingService();
   const report = await svc.gradeRepo({
     repoUrl: root,
     repoName,

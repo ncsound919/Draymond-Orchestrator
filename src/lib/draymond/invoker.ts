@@ -1,5 +1,5 @@
-// ============================================================================
-// DRAYMOND ORCHESTRATION SYSTEM — Entity Invocation Bridge
+﻿// ============================================================================
+// DRAYMOND ORCHESTRATION SYSTEM â€” Entity Invocation Bridge
 // ============================================================================
 // Takes an entity's invocation_method and invocation_config and actually
 // calls the agent/tool/service. This replaces the `invocation_ready` stubs
@@ -118,7 +118,7 @@ export async function invokeEntity(
 // ============================================================================
 
 /**
- * Pipeline invocation — the parent agent dispatches to one of its folded
+ * Pipeline invocation â€” the parent agent dispatches to one of its folded
  * tools' real runnable entrypoints via the fleet-pipelines registry.
  *
  * `invocation_config` shape:
@@ -127,7 +127,7 @@ export async function invokeEntity(
  * ```
  * When `tool` is omitted the pipeline's first stage runs. The resolved stage
  * is re-dispatched as a synthetic entity (http / cli / subprocess), so a
- * parent agent is a single dispatcher over its folded tools — never a
+ * parent agent is a single dispatcher over its folded tools â€” never a
  * disjointed one-off call.
  */
 async function invokePipeline(
@@ -221,6 +221,74 @@ function failResult(error: string, duration_ms: number, status_code?: number): I
 }
 
 /**
+ * Truth gate for HTTP invocations: a 200 whose body reports an error is NOT a
+ * success. Entities that answer `{"error": "..."}` or `{"success": false}`
+ * with HTTP 200 were recorded as completed steps, and their fabricated output
+ * flowed downstream as real data. Also detects explicit `ok:false`.
+ */
+function assessHttpBody(
+  response: Response,
+  output: Record<string, unknown>,
+  bodyText: string,
+  duration_ms: number,
+  errorPrefix = '',
+): InvocationResult {
+  if (!response.ok) {
+    return {
+      success: false,
+      output,
+      error: `HTTP ${response.status}: ${bodyText.slice(0, 500)}`,
+      duration_ms,
+      status_code: response.status,
+    };
+  }
+  const bodyError =
+    typeof output.error === 'string' && output.error.trim()
+      ? String(output.error)
+      : typeof output.message === 'string' && (output.success === false || output.ok === false)
+        ? String(output.message)
+        : undefined;
+  const explicitFalse = output.success === false || output.ok === false;
+  if (explicitFalse) {
+    return {
+      success: false,
+      output,
+      error: `${errorPrefix}HTTP ${response.status} but body reported failure${bodyError ? `: ${bodyError.slice(0, 300)}` : ''}`,
+      duration_ms,
+      status_code: response.status,
+    };
+  }
+  return {
+    success: true,
+    output,
+    error: undefined,
+    duration_ms,
+    status_code: response.status,
+  };
+}
+
+/**
+ * Write to a child's stdin without risking an unhandled EPIPE crash: if the
+ * child exits before consuming its stdin, the pipe emits an 'error' event and
+ * an uncaught 'error' on any stream takes down the whole orchestrator process
+ * mid-chain (orphaning running locks). Errors are swallowed here deliberately â€”
+ * the child's exit/non-zero code surfaces the real failure.
+ */
+function safeWriteStdin(child: import('node:child_process').ChildProcess, data: string): void {
+  if (!child.stdin) return;
+  // Attach the EPIPE guard only when the stream supports event listeners
+  // (test doubles may provide bare write/end stubs).
+  const stream = child.stdin as unknown as { on?: (ev: string, cb: () => void) => void };
+  if (typeof stream.on === 'function') {
+    stream.on('error', () => { /* EPIPE — surfaced via child exit code */ });
+  }
+  try {
+    child.stdin.write(data);
+    child.stdin.end();
+  } catch { /* same: the exit code carries the failure */ }
+}
+
+/**
  * True when a binary is resolvable on PATH (via `where` / `which`).
  * Used to gate `cli_command` / `subprocess` skills on their declared
  * `invocation_config.requires` bins so the fleet never dispatches to a
@@ -245,6 +313,24 @@ function missingRequiredBin(entity: EntityForInvocation): string | null {
     if (typeof bin === 'string' && !binaryOnPath(bin)) return bin;
   }
   return null;
+}
+
+/**
+ * Resolve `${ENV_VAR}` references in configured header values at CALL time.
+ * Credentials persisted in the registry at seed time (e.g.
+ * `Authorization: Bearer ${CRON_SECRET}`) otherwise go stale whenever the
+ * underlying env var rotates â€” a silent source of 401/expired_token chain
+ * failures. Unresolvable vars expand to empty string (same as before).
+ */
+function interpolateEnvHeaders(headers: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    out[key] =
+      typeof value === 'string'
+        ? value.replace(/\$\{([A-Z0-9_]+)\}/g, (_m, name: string) => process.env[name] ?? '')
+        : value;
+  }
+  return out;
 }
 
 /**
@@ -373,7 +459,7 @@ async function invokeHttpApi(
   const start = Date.now();
   const config = entity.invocation_config;
 
-  // Multi-endpoint support: `endpoints` maps an action → `{ path, method? }`
+  // Multi-endpoint support: `endpoints` maps an action â†’ `{ path, method? }`
   // (or a bare path string). `:param` tokens in the path are substituted from
   // `input` (and removed from the request body). Falls back to the base `url`
   // when no endpoint matches.
@@ -428,7 +514,7 @@ async function invokeHttpApi(
     return failResult(`SSRF blocked: ${urlCheck.error}`, Date.now() - start);
   }
 
-  const configHeaders = (config.headers ?? {}) as Record<string, string>;
+  const configHeaders = interpolateEnvHeaders((config.headers ?? {}) as Record<string, string>);
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...configHeaders,
@@ -456,23 +542,18 @@ async function invokeHttpApi(
     }
 
     const response = await fetch(url, fetchOptions);
-    clearTimeout(timer);
-
+    // Keep the abort timer alive through the body read: a server that drips
+    // (or never finishes) the body previously hung the step forever.
     const duration_ms = Date.now() - start;
     const bodyText = await response.text();
+    clearTimeout(timer);
     const output = safeParseJson(bodyText);
 
     if (options?.include_raw) {
       output._raw = bodyText;
     }
 
-    return {
-      success: response.ok,
-      output,
-      error: response.ok ? undefined : `HTTP ${response.status}: ${bodyText.slice(0, 500)}`,
-      duration_ms,
-      status_code: response.status,
-    };
+    return assessHttpBody(response, output, bodyText, duration_ms);
   } catch (err) {
     const duration_ms = Date.now() - start;
     const message = err instanceof Error ? err.message : String(err);
@@ -514,7 +595,7 @@ async function invokeApiCall(
     return failResult(`SSRF blocked: ${urlCheck.error}`, Date.now() - start);
   }
 
-  const configHeaders = (config.headers ?? {}) as Record<string, string>;
+  const configHeaders = interpolateEnvHeaders((config.headers ?? {}) as Record<string, string>);
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...configHeaders,
@@ -534,23 +615,16 @@ async function invokeApiCall(
       signal: controller.signal,
       redirect: 'manual',
     });
-    clearTimeout(timer);
-
     const duration_ms = Date.now() - start;
     const bodyText = await response.text();
+    clearTimeout(timer);
     const output = safeParseJson(bodyText);
 
     if (options?.include_raw) {
       output._raw = bodyText;
     }
 
-    return {
-      success: response.ok,
-      output,
-      error: response.ok ? undefined : `HTTP ${response.status}: ${bodyText.slice(0, 500)}`,
-      duration_ms,
-      status_code: response.status,
-    };
+    return assessHttpBody(response, output, bodyText, duration_ms);
   } catch (err) {
     const duration_ms = Date.now() - start;
     const message = err instanceof Error ? err.message : String(err);
@@ -626,7 +700,7 @@ async function invokeSubprocess(
         if (error) {
           const errorMsg = error.killed
             ? `Process timed out after ${timeoutMs}ms`
-            : `Process exited with error: ${error.message}${stderr ? ` — stderr: ${stderr.slice(0, 500)}` : ''}`;
+            : `Process exited with error: ${error.message}${stderr ? ` â€” stderr: ${stderr.slice(0, 500)}` : ''}`;
           resolve(failResult(errorMsg, duration_ms));
           return;
         }
@@ -640,10 +714,9 @@ async function invokeSubprocess(
       },
     );
 
-    // Write input to stdin
+    // Write input to stdin (EPIPE-safe — see safeWriteStdin)
     if (child.stdin) {
-      child.stdin.write(JSON.stringify(input));
-      child.stdin.end();
+      safeWriteStdin(child, JSON.stringify(input));
     }
   });
 }
@@ -671,7 +744,7 @@ async function invokeCliCommand(
     return failResult('invocation_config.command is required for cli_command', Date.now() - start);
   }
 
-  // Gate on declared required binaries (`invocation_config.requires`) — never
+  // Gate on declared required binaries (`invocation_config.requires`) â€” never
   // dispatch to a missing runtime (Step 9).
   const missingBin = missingRequiredBin(entity);
   if (missingBin) {
@@ -725,7 +798,7 @@ async function invokeCliCommand(
         if (error) {
           const errorMsg = error.killed
             ? `Command timed out after ${timeoutMs}ms`
-            : `Command failed: ${error.message}${stderr ? ` — stderr: ${stderr.slice(0, 500)}` : ''}`;
+            : `Command failed: ${error.message}${stderr ? ` â€” stderr: ${stderr.slice(0, 500)}` : ''}`;
           resolve(failResult(errorMsg, duration_ms));
           return;
         }
@@ -769,14 +842,14 @@ async function invokeWebhook(
     return failResult(`SSRF blocked: ${urlCheck.error}`, Date.now() - start);
   }
 
-  const configHeaders = (config.headers ?? {}) as Record<string, string>;
+  const configHeaders = interpolateEnvHeaders((config.headers ?? {}) as Record<string, string>);
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...configHeaders,
     ...options?.extra_headers,
   };
 
-  // Webhooks use a short timeout — we only care about delivery acknowledgement
+  // Webhooks use a short timeout â€” we only care about delivery acknowledgement
   const timeoutMs = Math.min(resolveTimeoutMs(entity, options), 10_000);
 
   try {
@@ -866,7 +939,7 @@ async function invokeInternal(
     success: true,
     output: {
       status: 'internal',
-      message: 'Internal entity — no remote invocation needed',
+      message: 'Internal entity â€” no remote invocation needed',
       entity_id: entity.id,
       entity_slug: entity.slug,
     },
@@ -880,7 +953,7 @@ async function invokeInternal(
 
 /**
  * Manual entities require human execution. The invoker cannot run them
- * automatically — it returns a marker so the chain engine can surface
+ * automatically â€” it returns a marker so the chain engine can surface
  * the step for manual completion.
  */
 function invokeManual(entity: EntityForInvocation): Promise<InvocationResult> {
@@ -964,7 +1037,7 @@ async function invokePythonModule(
         if (error) {
           const errorMsg = error.killed
             ? `Python process timed out after ${timeoutMs}ms`
-            : `Python execution failed: ${error.message}${stderr ? ` — stderr: ${stderr.slice(0, 500)}` : ''}`;
+            : `Python execution failed: ${error.message}${stderr ? ` â€” stderr: ${stderr.slice(0, 500)}` : ''}`;
           resolve(failResult(errorMsg, duration_ms));
           return;
         }
@@ -982,8 +1055,7 @@ async function invokePythonModule(
     );
 
     if (child.stdin) {
-      child.stdin.write(JSON.stringify(input));
-      child.stdin.end();
+      safeWriteStdin(child, JSON.stringify(input));
     }
   });
 }
@@ -1000,10 +1072,10 @@ async function invokePythonModule(
  * NOTE: This uses a REST-style endpoint pattern (`/mcp/tools/{tool_name}`)
  * rather than the standard MCP JSON-RPC 2.0 single-endpoint protocol.
  * This is intentionally non-standard to support lightweight HTTP-only
- * MCP server implementations (item 12 — documented as intentional).
+ * MCP server implementations (item 12 â€” documented as intentional).
  *
  * The `action` parameter from the step is included in the request body
- * (item 15 — previously silently ignored).
+ * (item 15 â€” previously silently ignored).
  *
  * Expects `invocation_config` to have:
  * ```
@@ -1036,7 +1108,7 @@ async function invokeMcpTool(
     return failResult(`SSRF blocked: ${urlCheck.error}`, Date.now() - start);
   }
 
-  const configHeaders = (config.headers ?? {}) as Record<string, string>;
+  const configHeaders = interpolateEnvHeaders((config.headers ?? {}) as Record<string, string>);
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...configHeaders,
@@ -1056,23 +1128,16 @@ async function invokeMcpTool(
       signal: controller.signal,
       redirect: 'manual',
     });
-    clearTimeout(timer);
-
     const duration_ms = Date.now() - start;
     const bodyText = await response.text();
+    clearTimeout(timer);
     const output = safeParseJson(bodyText);
 
     if (options?.include_raw) {
       output._raw = bodyText;
     }
 
-    return {
-      success: response.ok,
-      output,
-      error: response.ok ? undefined : `MCP tool HTTP ${response.status}: ${bodyText.slice(0, 500)}`,
-      duration_ms,
-      status_code: response.status,
-    };
+    return assessHttpBody(response, output, bodyText, duration_ms, 'MCP tool ');
   } catch (err) {
     const duration_ms = Date.now() - start;
     const message = err instanceof Error ? err.message : String(err);
@@ -1187,7 +1252,7 @@ async function invokeMcpStdio(
         if (error) {
           const errorMsg = error.killed
             ? `MCP stdio process timed out after ${timeoutMs}ms`
-            : `MCP stdio process failed: ${error.message}${stderr ? ` — stderr: ${stderr.slice(0, 500)}` : ''}`;
+            : `MCP stdio process failed: ${error.message}${stderr ? ` â€” stderr: ${stderr.slice(0, 500)}` : ''}`;
           resolve(failResult(errorMsg, duration_ms));
           return;
         }
@@ -1198,9 +1263,9 @@ async function invokeMcpStdio(
         // Parse the JSON-RPC response from stdout
         const trimmedOut = stdoutText.trim();
 
-        // Empty stdout means the process produced no output — protocol failure (item 13)
+        // Empty stdout means the process produced no output â€” protocol failure (item 13)
         if (!trimmedOut) {
-          resolve(failResult('MCP stdio process returned empty stdout — no JSON-RPC response', duration_ms));
+          resolve(failResult('MCP stdio process returned empty stdout â€” no JSON-RPC response', duration_ms));
           return;
         }
 
@@ -1250,8 +1315,7 @@ async function invokeMcpStdio(
 
     // Write JSON-RPC request to stdin (item 11: fail explicitly if stdin unavailable)
     if (child.stdin) {
-      child.stdin.write(jsonRpcRequest);
-      child.stdin.end();
+      safeWriteStdin(child, jsonRpcRequest);
     } else {
       // stdin is null — cannot send the request, fail immediately
       resolve(failResult('MCP stdio process stdin is not available — cannot send JSON-RPC request', Date.now() - start));

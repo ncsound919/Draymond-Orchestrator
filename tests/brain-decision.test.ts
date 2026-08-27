@@ -76,4 +76,40 @@ describe('brain decision engine', () => {
     expect(signals).toContain('job:error');
     expect(signals).toContain('monitor:down');
   });
+
+  it('consults Dev-Brain FIRST and uses its recommendation when reachable', async () => {
+    const matrix = {
+      id: 'matrix_x',
+      decisionTopic: 'Business operations decision.',
+      context: 'ctx',
+      totalOptionsCount: 2,
+      recommendedOptionId: 'goal:Dev-brain goal',
+      synthesisRationale: 'Recommended: Dev-brain goal (60%).',
+      tradeOffSummary: 'x',
+      generatedBy: 'deterministic_engine',
+      timestamp: '2026-08-26T00:00:00.000Z',
+      normalizedPercentageSum: 100,
+      options: [
+        { id: 'goal:Dev-brain goal', title: 'Advance: Dev-brain goal', weightPercentage: 60, confidenceScore: 90, recommended: true, scores: {}, pros: [], cons: [], riskLevel: 'LOW', expectedROI: '1x', timeToValue: '1w', verdictTag: 'STRONGLY_RECOMMENDED', mitigationStrategy: '', supportingLeaders: [] },
+        { id: 'job:Failing job', title: 'Repair job: Failing job', weightPercentage: 40, confidenceScore: 80, recommended: false, scores: {}, pros: [], cons: [], riskLevel: 'LOW', expectedROI: '1x', timeToValue: '1w', verdictTag: 'VIABLE', mitigationStrategy: '', supportingLeaders: [] },
+      ],
+    };
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL) => {
+      if (String(url).includes('/api/health')) return new Response(JSON.stringify({ status: 'healthy' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      if (String(url).includes('/api/decide')) return new Response(JSON.stringify(matrix), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      throw new Error(`unexpected url ${url}`);
+    }));
+
+    const d = await runBrainDecision({
+      agenda: [{ title: 'Low-progress goal', progress: 10 }, { title: 'Dev-brain goal', progress: 50 }],
+      failingJobs: [{ name: 'Failing job', error: 'x' }],
+      downMonitors: [],
+      brainReachable: false,
+    });
+
+    expect(d.brainConsulted).toBe(true);
+    expect(d.focusGoal).toBe('Dev-brain goal'); // Dev-Brain recommendation wins over lowest-progress
+    expect(d.brainReasoning?.decision).toContain('Dev-Brain');
+    vi.unstubAllGlobals();
+  });
 });

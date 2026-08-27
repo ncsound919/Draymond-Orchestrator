@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -47,6 +47,10 @@ let index: { logEvent: Mock };
 
 beforeEach(async () => {
   vi.resetModules();
+  // Fresh sweep stamp: the heartbeat monitor self-check treats a missing/stale
+  // stamp as "monitor dead" (critical). Tests here exercise per-agent
+  // detection, so simulate a live monitor unless a test overrides it.
+  fs.writeFileSync(path.join(tmp, 'heartbeat-sweep-stamp'), new Date().toISOString());
   kairos = await import('../src/lib/draymond/kairos');
   monitors = (await import('../src/lib/draymond/monitors')) as unknown as { checkAllSites: Mock };
   scheduler = (await import('../src/lib/draymond/scheduler')) as unknown as { listJobs: Mock };
@@ -72,9 +76,9 @@ beforeEach(async () => {
   delete process.env.KAIROS_TICK_BUDGET_MS;
   delete process.env.KAIROS_TICK_MS;
   vi.useRealTimers();
-  // Isolated state per test — the scan feed must not leak across cases.
+  // Isolated state per test â€” the scan feed must not leak across cases.
   fs.rmSync(path.join(tmp, 'kairos.json'), { force: true });
-  // resetModules does NOT reset the mock registry — clear accumulated call
+  // resetModules does NOT reset the mock registry â€” clear accumulated call
   // history, then install safe empty defaults so unmocked detectors in a given
   // test produce zero hits instead of throwing (or worse, emitting).
   vi.clearAllMocks();
@@ -83,7 +87,7 @@ beforeEach(async () => {
   pipeline.listOpportunities.mockResolvedValue([]);
   treasury.settledRevenueUsd.mockResolvedValue(0);
   strategy.readStrategy.mockResolvedValue({});
-  strategy.totalMonthlyTarget.mockReturnValue(0); // no target → no moment
+  strategy.totalMonthlyTarget.mockReturnValue(0); // no target â†’ no moment
   budget.canCallProvider.mockReturnValue({ ok: true });
   budget.providerBudget.mockReturnValue(0);
   llm.buildProviderOrder.mockReturnValue([]);
@@ -151,11 +155,11 @@ describe('kairos detectors', () => {
     const feed = await kairos.kairosFeed();
     expect(feed).toHaveLength(1);
     expect(feed[0]!.occurrences).toBe(2);
-    // critical stays critical (no escalation) and lastSeen < 24h → no re-notify
+    // critical stays critical (no escalation) and lastSeen < 24h â†’ no re-notify
     expect(ntfy.publishIssueNotification).toHaveBeenCalledTimes(1);
   });
 
-  it('escalates severity on repeats (warn → critical) and re-notifies on escalation', async () => {
+  it('escalates severity on repeats (warn â†’ critical) and re-notifies on escalation', async () => {
     scheduler.listJobs.mockResolvedValue([
       { id: 'j1', name: 'night-recap', last_run_status: 'failed', last_error: 'boom', fail_count: 2 },
     ]);
@@ -164,7 +168,7 @@ describe('kairos detectors', () => {
     const feed = await kairos.kairosFeed();
     expect(feed.find((m) => m.kind === 'job_failed')?.severity).toBe('critical');
     expect(feed.find((m) => m.kind === 'job_failed')?.occurrences).toBe(2);
-    // initial warn moments do not notify — only the critical escalation does
+    // initial warn moments do not notify â€” only the critical escalation does
     expect(ntfy.publishIssueNotification).toHaveBeenCalledTimes(1);
   });
 
@@ -208,7 +212,7 @@ describe('kairos detectors', () => {
     expect(r.notified).toBeGreaterThanOrEqual(0);
     expect(notifications.sendAlertEmail).toHaveBeenCalled();
     expect(notifications.sendAlertEmail.mock.calls[0][0]).toBe('ops@uplift.ai');
-    // second scan within 24h → no second digest
+    // second scan within 24h â†’ no second digest
     notifications.sendAlertEmail.mockClear();
     await kairos.kairosScan();
     expect(notifications.sendAlertEmail).not.toHaveBeenCalled();
@@ -235,20 +239,20 @@ describe('kairos daemon', () => {
 
 describe('kairos dedupe hash normalization', () => {
   it('collapses failure counters, relative ages, and amounts into one hash', () => {
-    // A monitor that stays down increments its failure counter every scan —
+    // A monitor that stays down increments its failure counter every scan â€”
     // the old hash changed with it, spawning a new moment each tick.
-    const a = kairos.momentHash('monitor_down', 'http://localhost:8010/health — no response (40x)');
-    const b = kairos.momentHash('monitor_down', 'http://localhost:8010/health — no response (167x)');
+    const a = kairos.momentHash('monitor_down', 'http://localhost:8010/health â€” no response (40x)');
+    const b = kairos.momentHash('monitor_down', 'http://localhost:8010/health â€” no response (167x)');
     expect(a).toBe(b);
 
     // Stale-heartbeat "last seen Xm ago" ages must not break dedupe either.
-    const ha = kairos.momentHash('stale_heartbeat', 'down — last seen 4m ago (fetch failed)');
-    const hb = kairos.momentHash('stale_heartbeat', 'down — last seen 539m ago (fetch failed)');
+    const ha = kairos.momentHash('stale_heartbeat', 'down â€” last seen 4m ago (fetch failed)');
+    const hb = kairos.momentHash('stale_heartbeat', 'down â€” last seen 539m ago (fetch failed)');
     expect(ha).toBe(hb);
 
     // Distinct URLs still dedupe separately.
-    expect(kairos.momentHash('monitor_down', 'http://a — no response (40x)'))
-      .not.toBe(kairos.momentHash('monitor_down', 'http://b — no response (40x)'));
+    expect(kairos.momentHash('monitor_down', 'http://a â€” no response (40x)'))
+      .not.toBe(kairos.momentHash('monitor_down', 'http://b â€” no response (40x)'));
   });
 
   it('pruneDuplicateMoments merges pre-normalization duplicates', async () => {
@@ -256,8 +260,8 @@ describe('kairos dedupe hash normalization', () => {
     const now = new Date().toISOString();
     const state = {
       moments: [
-        { id: 'km-a', kind: 'monitor_down', severity: 'critical', title: 'Site down: X', detail: 'http://x — no response (10x)', source: 'monitors', firstSeen: now, lastSeen: now, occurrences: 1, hash: 'old-a', acked: false },
-        { id: 'km-b', kind: 'monitor_down', severity: 'critical', title: 'Site down: X', detail: 'http://x — no response (11x)', source: 'monitors', firstSeen: now, lastSeen: now, occurrences: 1, hash: 'old-b', acked: false },
+        { id: 'km-a', kind: 'monitor_down', severity: 'critical', title: 'Site down: X', detail: 'http://x â€” no response (10x)', source: 'monitors', firstSeen: now, lastSeen: now, occurrences: 1, hash: 'old-a', acked: false },
+        { id: 'km-b', kind: 'monitor_down', severity: 'critical', title: 'Site down: X', detail: 'http://x â€” no response (11x)', source: 'monitors', firstSeen: now, lastSeen: now, occurrences: 1, hash: 'old-b', acked: false },
         { id: 'km-c', kind: 'job_failed', severity: 'warn', title: 'Job failed: Y', detail: 'boom', source: 'scheduler', firstSeen: now, lastSeen: now, occurrences: 1, hash: 'old-c', acked: false },
       ],
       settings: {},
@@ -292,7 +296,7 @@ describe('kairos branch coverage', () => {
     await kairos.kairosScan();
     let feed = await kairos.kairosFeed();
     expect(feed.filter((m) => m.kind === 'revenue_shortfall')).toHaveLength(1);
-    // above target → no new moment
+    // above target â†’ no new moment
     treasury.settledRevenueUsd.mockResolvedValue(12_000);
     await kairos.kairosScan();
     feed = await kairos.kairosFeed();
@@ -362,6 +366,31 @@ describe('kairos branch coverage', () => {
     expect(feed.filter((m) => m.kind === 'stale_heartbeat')).toHaveLength(2);
   });
 
+  it('raises CRITICAL monitor-dead when the sweep stamp is missing', async () => {
+    // No sweep has ever run â€” the monitor itself is dead, per-agent records
+    // are meaningless and must not mask the critical signal.
+    fs.rmSync(path.join(tmp, 'heartbeat-sweep-stamp'), { force: true });
+    heartbeat.getHeartbeats.mockResolvedValue({
+      a1: { slug: 'a1', name: 'A', last_seen: new Date().toISOString(), up: true, detail: '' },
+    });
+    await kairos.kairosScan();
+    const feed = await kairos.kairosFeed();
+    const dead = feed.find((m) => m.kind === 'stale_heartbeat');
+    expect(dead).toBeDefined();
+    expect(dead?.severity).toBe('critical');
+    expect(dead?.title).toContain('MONITOR dead');
+  });
+
+  it('raises CRITICAL monitor-dead when the sweep stamp is stale', async () => {
+    fs.writeFileSync(path.join(tmp, 'heartbeat-sweep-stamp'), new Date(Date.now() - 4 * 3_600_000).toISOString());
+    heartbeat.getHeartbeats.mockResolvedValue({});
+    await kairos.kairosScan();
+    const feed = await kairos.kairosFeed();
+    const dead = feed.find((m) => m.kind === 'stale_heartbeat');
+    expect(dead).toBeDefined();
+    expect(dead?.severity).toBe('critical');
+  });
+
   it('trims the feed to KAIROS_CAP', async () => {
     process.env.KAIROS_CAP = '10'; // cap() clamps anything below 10 up to 10
     for (const id of ['j1', 'j2', 'j3', 'j4', 'j5', 'j6', 'j7', 'j8', 'j9', 'j10', 'j11', 'j12']) {
@@ -391,7 +420,7 @@ describe('kairos branch coverage', () => {
     for (const m of state.moments) m.lastSeen = new Date(Date.now() - 2 * 3_600_000).toISOString();
     fs.writeFileSync(file, JSON.stringify(state));
     await kairos.kairosScan();
-    // job_failed escalates warn→critical (notify), monitor_down re-notifies via the repeat window (notify).
+    // job_failed escalates warnâ†’critical (notify), monitor_down re-notifies via the repeat window (notify).
     expect(ntfy.publishIssueNotification).toHaveBeenCalledTimes(3);
   });
 
@@ -400,12 +429,12 @@ describe('kairos branch coverage', () => {
     monitors.checkAllSites.mockResolvedValue({ ...DOWN_RESULT, results: [] });
     vi.useFakeTimers();
     kairos.startKairos();
-    kairos.startKairos(); // already running → no second timer
+    kairos.startKairos(); // already running â†’ no second timer
     expect(kairos.isKairosRunning()).toBe(true);
     await vi.advanceTimersByTimeAsync(0);
     expect(monitors.checkAllSites).toHaveBeenCalledTimes(1); // single catch-up
     monitors.checkAllSites.mockRejectedValue(new Error('boom'));
-    await vi.advanceTimersByTimeAsync(5000); // tick with failing scan → error swallowed
+    await vi.advanceTimersByTimeAsync(5000); // tick with failing scan â†’ error swallowed
     kairos.stopKairos();
     expect(kairos.isKairosRunning()).toBe(false);
   });

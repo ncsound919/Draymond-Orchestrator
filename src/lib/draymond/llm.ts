@@ -104,9 +104,13 @@ const PROVIDER_URLS: Record<LLMProvider, string> = {
   anthropic: 'https://api.anthropic.com/v1/messages',
   qwen: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions',
   litellm: 'http://localhost:4100/v1/chat/completions',
-  // DSH harness gateway — OpenAI-compatible endpoint proxied through the harness llm seam
-  // (attributionHeaders, retryPolicy, credential seam). Env OPENCODE_VIA_DSH=1 prefers this.
-  dsh: 'http://localhost:3080/v1/chat/completions',
+  // Fleet gateway seam — same LiteLLM proxy as `litellm`, addressed by the
+  // STABLE `fleet-free` model_group alias so callers survive daily free-model
+  // rotation. NOTE: the DSH web server (:3080) exposes NO completions API — it
+  // is a UI-only SPA; never point HTTP callers there. Env OPENCODE_VIA_DSH=1
+  // historically preferred this; the harness value-add (persona/skills/hooks)
+  // lives in the CLI session layer, not on an HTTP port.
+  dsh: 'http://localhost:4100/v1/chat/completions',
   ollama: 'http://localhost:11434/v1/chat/completions',
 };
 
@@ -146,7 +150,7 @@ const DEFAULT_MODELS: Record<LLMProvider, string> = {
   anthropic: 'claude-sonnet-4-5',
   qwen: 'qwen-plus',
   litellm: 'gpt-4o-mini',
-  dsh: DEFAULT_FREE_MODEL,
+  dsh: 'fleet-free',
   // Local Ollama tier — qwen3:0.6b is the installed fast model (tool-calling
   // capable, ~34 tok/s on this CPU vs ~7 for the 4.6B workhorse).
   ollama: process.env.OLLAMA_MODEL ?? 'qwen3:0.6b',
@@ -208,7 +212,10 @@ function loadKeyPoolIntoEnv(): void {
   const root = process.env.DRAYMOND_REGISTRY_DIR
     ? resolve(process.env.DRAYMOND_REGISTRY_DIR, '..')
     : process.cwd();
-  for (const rel of ['data/litellm.env', '.env.local']) {
+  // PRECEDENCE: .env.local first (operator-managed, matches fleet-manifest
+  // injection); the Keywire-vault-projected litellm.env only contributes keys
+  // absent there. Vault copies can lag operator key rotations.
+  for (const rel of ['.env.local', 'data/litellm.env']) {
     let raw: string;
     try {
       raw = readFileSync(join(root, rel), 'utf8');
@@ -249,9 +256,13 @@ let _catalogMtime = 0;
 function readFreeCatalog(): Record<string, any> {
   try {
     const p = join(registryDir(), 'model-routing.json');
+    const raw = readFileSync(p, 'utf8');
     const mtime = statSync(p).mtimeMs;
     if (_catalog === undefined || mtime !== _catalogMtime) {
-      _catalog = JSON.parse(readFileSync(p, 'utf8')) as Record<string, any>;
+      // Strip a UTF-8 BOM — PowerShell writers emit one and JSON.parse chokes,
+      // which silently reverts the whole hot path to stale DEFAULT_FREE_MODEL.
+      const clean = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw;
+      _catalog = JSON.parse(clean) as Record<string, any>;
       _catalogMtime = mtime;
     }
   } catch {

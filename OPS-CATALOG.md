@@ -1,21 +1,21 @@
 # Uplift Lab — Operational Catalog
 
-Generated: 2026-08-25T06:15:52.967Z
+Generated: 2026-08-26T22:10:38.714Z
 
 ## Totals
 
 | Kind | Count |
 | --- | --- |
 | skill | 227 |
-| tool | 49 |
+| tool | 63 |
 | agent | 42 |
-| service | 38 |
+| service | 40 |
 | job | 28 |
 | chain | 22 |
 | extension | 22 |
 | mcp_server | 10 |
 | workflow | 6 |
-| **Total** | **444** |
+| **Total** | **460** |
 
 ## By Category
 
@@ -219,7 +219,7 @@ Generated: 2026-08-25T06:15:52.967Z
 | UFC-MCP | agent | `ufc-mcp` | ✅ | mcp |
 | Uplift Agent | agent | `uplift-agent` | ✅ | http |
 
-### research (30)
+### research (31)
 
 | Name | Kind | Slug | Active | Invocation |
 | --- | --- | --- | --- | --- |
@@ -244,6 +244,7 @@ Generated: 2026-08-25T06:15:52.967Z
 | OmniResearch Pro | agent | `omni-research` | ✅ | http_api |
 | Open Notebook | skill | `open-notebook` | ✅ | path:../integrations/open-notebook |
 | Open Notebook (stage) | tool | `open-notebook` | ✅ | pipeline |
+| Overlay Oncology | service | `overlay-oncology` | ✅ | http_api |
 | Overlay Science | service | `overlay-science` | ✅ | internal |
 | playgene | service | `playgene` | ✅ | http_api |
 | Qingyan Research | skill | `qingyan-research` | ✅ | path:agents/skills/qingyan-research |
@@ -279,7 +280,7 @@ Generated: 2026-08-25T06:15:52.967Z
 | Memory Decay Sweep | job | `Memory Decay Sweep` | ✅ | 0 * * * * |
 | Morning Briefing | job | `Morning Briefing` | ✅ | 0 9 * * * |
 | Music Business Automation | job | `Music Business Automation` | ✅ | 0 11 * * * |
-| News Outlet Ingest | job | `News Outlet Ingest` | ✅ | 45 2 * * * |
+| News Outlet Ingest | job | `News Outlet Ingest` | ✅ | 45 2 * * 1,5 |
 | Research Data Feed | job | `Research Data Feed` | ✅ | 0 6 * * 3 |
 | Research Rotation | job | `Research Rotation` | ✅ | 0 6 * * * |
 | Science Campaign Seed | job | `Science Campaign Seed` | ✅ | 0 16 * * * |
@@ -342,7 +343,7 @@ Generated: 2026-08-25T06:15:52.967Z
 | TPC Beats | tool | `tpc-beats` | ✅ | internal |
 | Video Frames Skill | skill | `skill-video-frames` | ✅ | python_module |
 
-### security (15)
+### security (17)
 
 | Name | Kind | Slug | Active | Invocation |
 | --- | --- | --- | --- | --- |
@@ -351,6 +352,8 @@ Generated: 2026-08-25T06:15:52.967Z
 | CAI (Cybersecurity AI) | agent | `cai` | ✅ | cli_command |
 | ClawSafe | tool | `clawsafe` | ✅ | internal |
 | Domain Intel | skill | `domain-intel` | ✅ | path:agents/optional-skills/research/domain-intel |
+| Halofy | tool | `halofy` | ✅ | http_api |
+| kern | tool | `kern` | ✅ | cli_command |
 | LLM Safety Benchmark | tool | `llm-safety-benchmark` | ✅ | internal |
 | Nuclei | skill | `nuclei-scanner` | ✅ | path:../integrations/nuclei |
 | OSS Forensics | skill | `oss-forensics` | ✅ | path:agents/optional-skills/security/oss-forensics |
@@ -379,6 +382,24 @@ Generated: 2026-08-25T06:15:52.967Z
 | Paperclip Extension | extension | `ext-paperclip` | ✅ | python_module |
 | Tap919 Middleman (metered gateway) | tool | `tap919-middleman` | ✅ | http_api |
 | Vercel | service | `service-vercel` | ✅ | api_call |
+
+### engineering (13)
+
+| Name | Kind | Slug | Active | Invocation |
+| --- | --- | --- | --- | --- |
+| Codegang | tool | `codegang` | ✅ | http_api |
+| Deterministic Brain | tool | `deterministic-brain` | ✅ | http_api |
+| Grader | tool | `grader` | ✅ | http_api |
+| Gradient | tool | `gradient` | ✅ | cli_command |
+| Graphify | tool | `graphify` | ✅ | mcp_stdio |
+| kimodo.cpp | tool | `kimodo-cpp` | ✅ | cli_command |
+| Mutly | tool | `mutly` | ✅ | http_api |
+| OCR It | tool | `ocr-it` | ✅ | cli_command |
+| open-sheet | tool | `open-sheet` | ✅ | cli_command |
+| RepoRank | tool | `reporank` | ✅ | http_api |
+| Rome | tool | `rome` | ✅ | cli_command |
+| spec-ptc | tool | `spec-ptc` | ✅ | cli_command |
+| VibeServe | tool | `vibeserve` | ✅ | mcp_stdio |
 
 ### media (10)
 
@@ -423,6 +444,19 @@ Generated: 2026-08-25T06:15:52.967Z
 | UI/UX Pro Max | skill | `ui-ux-pro-max` | ✅ | path:agents/skills/ui-ux-pro-max |
 | Writing Plans | skill | `writing-plans` | ✅ | path:agents/skills/writing-plans |
 
+### knowledge (8)
+
+| Name | Kind | Slug | Active | Invocation |
+| --- | --- | --- | --- | --- |
+| Book Synthesis Engine | skill | `book-synthesis` | ✅ | path:agents/Book-Synthesis-Engine-main |
+| BookBridge | skill | `bookbridge` | ✅ | path:agents/BookBridge--main |
+| BookBridge | service | `bookbridge` | ✅ | http_api |
+| BookBridge Library Bridge | skill | `book-bridge` | ✅ | http_api |
+| Eidos | tool | `eidos` | ✅ | cli_command |
+| Kaggle | tool | `kaggle` | ✅ | http_api |
+| LatticeDB | tool | `latticedb` | ✅ | cli_command |
+| OwnMem | tool | `ownmem` | ✅ | cli_command |
+
 ### memory (8)
 
 | Name | Kind | Slug | Active | Invocation |
@@ -435,18 +469,6 @@ Generated: 2026-08-25T06:15:52.967Z
 | MemAgent | skill | `memagent` | ✅ | path:../integrations/MemAgent |
 | Memory Core Extension | extension | `ext-memory-core` | ✅ | python_module |
 | Memory Framework | skill | `memory` | ✅ | path:../integrations/MemAgent |
-
-### engineering (7)
-
-| Name | Kind | Slug | Active | Invocation |
-| --- | --- | --- | --- | --- |
-| Codegang | tool | `codegang` | ✅ | http_api |
-| Deterministic Brain | tool | `deterministic-brain` | ✅ | http_api |
-| Grader | tool | `grader` | ✅ | http_api |
-| Graphify | tool | `graphify` | ✅ | mcp_stdio |
-| Mutly | tool | `mutly` | ✅ | http_api |
-| RepoRank | tool | `reporank` | ✅ | http_api |
-| VibeServe | tool | `vibeserve` | ✅ | mcp_stdio |
 
 ### automation (6)
 
@@ -468,16 +490,6 @@ Generated: 2026-08-25T06:15:52.967Z
 | PPT | skill | `ppt` | ✅ | path:agents/skills/ppt |
 | Stirling PDF | skill | `stirling-pdf` | ✅ | path:../integrations/Stirling-PDF |
 | XLSX Workbench | skill | `xlsx` | ✅ | path:agents/skills/xlsx |
-
-### knowledge (5)
-
-| Name | Kind | Slug | Active | Invocation |
-| --- | --- | --- | --- | --- |
-| Book Synthesis Engine | skill | `book-synthesis` | ✅ | path:agents/Book-Synthesis-Engine-main |
-| BookBridge | skill | `bookbridge` | ✅ | path:agents/BookBridge--main |
-| BookBridge | service | `bookbridge` | ✅ | http_api |
-| BookBridge Library Bridge | skill | `book-bridge` | ✅ | http_api |
-| Kaggle | tool | `kaggle` | ✅ | http_api |
 
 ### ai-provider (5)
 
@@ -548,6 +560,14 @@ Generated: 2026-08-25T06:15:52.967Z
 | GitHub Pull | skill | `github-pull` | ✅ | cli_command |
 | inference-sh CLI | skill | `inference-sh-cli` | ✅ | path:agents/optional-skills/devops/cli |
 
+### service (3)
+
+| Name | Kind | Slug | Active | Invocation |
+| --- | --- | --- | --- | --- |
+| Buzz | service | `buzz` | ✅ | http_api |
+| hayamimi | tool | `hayamimi` | ✅ | cli_command |
+| Sentio | tool | `sentio` | ✅ | http_api |
+
 ### books (3)
 
 | Name | Kind | Slug | Active | Invocation |
@@ -597,6 +617,13 @@ Generated: 2026-08-25T06:15:52.967Z
 | --- | --- | --- | --- | --- |
 | Base (L2) | skill | `base-chain` | ✅ | path:agents/optional-skills/blockchain/base |
 | Solana | skill | `solana` | ✅ | path:agents/optional-skills/blockchain/solana |
+
+### community (2)
+
+| Name | Kind | Slug | Active | Invocation |
+| --- | --- | --- | --- | --- |
+| Block Hustlers Skill | skill | `skill-block-hustlers` | ✅ | python_module |
+| Workout Guide | tool | `workout-guide` | ✅ | cli_command |
 
 ### workflows (1)
 
@@ -723,12 +750,6 @@ Generated: 2026-08-25T06:15:52.967Z
 | Name | Kind | Slug | Active | Invocation |
 | --- | --- | --- | --- | --- |
 | Paperclip | service | `paperclip` | ✅ | http_api |
-
-### community (1)
-
-| Name | Kind | Slug | Active | Invocation |
-| --- | --- | --- | --- | --- |
-| Block Hustlers Skill | skill | `skill-block-hustlers` | ✅ | python_module |
 
 ### core (1)
 
@@ -927,18 +948,27 @@ Generated: 2026-08-25T06:15:52.967Z
 | Web Validation | bookbridge |
 | adaptive_scraping | scrapling |
 | adaptive_therapy | bbtech-web-app |
+| agent-editable-data | eidos |
+| agent-mailbox | sentio |
+| agent-rl | gradient |
+| agent-runtime | rome |
+| agent-spreadsheets | open-sheet |
+| agent-workspace | buzz |
 | agent_orchestration | cai, paperclip |
 | ai-safety | aegis-safety, overlay-safety, clawsafe |
 | alphafold | colabfold |
 | analysis | fs-agent, hemp-os, omni-research, ext-autoresearch, ext-finance, ext-the-lab … |
 | analytics | social-media-dashboard, ghostfolio |
 | anomaly_detection | overlay-chain |
+| app-manifest | rome |
 | apt_analysis | cai |
 | archetypes | sports-science |
 | artist-sites | overlay-music |
 | artist_site_build | indy-music-platform |
+| async-exec | spec-ptc |
 | audio | ufc-mcp, overlay-music |
 | audit | draymond |
+| audit-trail | halofy |
 | audit_trail | hempforge |
 | automation | hemp-os, lil-homie, otm-agent, ext-browser, ext-marketing, ext-social-agent … |
 | autonomous_fixes | codenexus |
@@ -946,6 +976,7 @@ Generated: 2026-08-25T06:15:52.967Z
 | bayesian | math-x |
 | beat-production | tpc-beats |
 | beat_management | indy-music-platform |
+| benchmark_harness | overlay-oncology |
 | betting | bet-buddy, skill-sports-betting |
 | biomechanics | playgene, sports-science, injury-risk |
 | biostats | math-x |
@@ -953,6 +984,7 @@ Generated: 2026-08-25T06:15:52.967Z
 | blockchain | ext-overlay-chain, overlay-finance, recursive-ip, the-block, skill-overlay-chain |
 | blockchain_traceability | overlay-chain |
 | blue_teaming | cai |
+| bm25f-index | ownmem |
 | book-pipeline | book-to-skill-chain |
 | book-production | book-writing-assistant, book-publishing-platform, overlay-writing |
 | book-retrieval | bookbridge |
@@ -971,6 +1003,7 @@ Generated: 2026-08-25T06:15:52.967Z
 | build-telemetry | cheetah |
 | business-solutions | overlay-business-solutions, overlay-finance |
 | caching | ext-claw-router |
+| calibration_registry | overlay-oncology |
 | calling | skill-voice-call |
 | carbon_credits | ecos-environmental-initiatives |
 | challenge_management | ecos-environmental-initiatives |
@@ -999,6 +1032,7 @@ Generated: 2026-08-25T06:15:52.967Z
 | composition | movie-scoring |
 | confidence-gating | draymond |
 | confidence_scoring | codenexus |
+| container-runtime | kern |
 | content-ip | overlay-writing |
 | content-production | overlay-content |
 | content_generation | hemp-os |
@@ -1014,6 +1048,7 @@ Generated: 2026-08-25T06:15:52.967Z
 | cpu_rtl_generation | sub-team |
 | creation_studio | marketing-tool |
 | cross_disciplinary_analysis | sub-team |
+| cross_domain_tracker | overlay-oncology |
 | cross_file_impact | codenexus |
 | cross_referencing | hemp-os |
 | curriculum-guidance | ext-the-lab |
@@ -1035,6 +1070,7 @@ Generated: 2026-08-25T06:15:52.967Z
 | discovery_reporting | overlay-global-lens |
 | distribution | service-gumroad, indy-music-platform, overlay-music, sovereign-music-studio, wholesale-marketing-channel |
 | diy_kits | ecos-environmental-initiatives |
+| dkim | sentio |
 | docker-generation | cheetah |
 | document-access | mcp-filesystem |
 | document-parsing | book-to-skill |
@@ -1050,8 +1086,10 @@ Generated: 2026-08-25T06:15:52.967Z
 | enqueue_worker_task | open-chat-worker |
 | environmental_monitoring | ecos-environmental-initiatives |
 | episode_rendering | content-creation-engine |
+| equity_audit | overlay-oncology |
 | evaluation | llm-safety-benchmark |
 | execution | skill-open-sandbox |
+| exercise-assets | workout-guide |
 | experiment-tracking | ext-autoresearch |
 | experimentation | skill-digital-lab |
 | explain | graphify |
@@ -1066,18 +1104,25 @@ Generated: 2026-08-25T06:15:52.967Z
 | financial-strategy | fs-agent, overlay-finance |
 | flashcards | bookbridge |
 | forensics | ext-cyber-security |
+| formula-tree | open-sheet |
 | four_factors | bbtech-web-app |
 | framework-extraction | book-to-skill |
+| full-text-search | latticedb |
 | gamification | ecos-environmental-initiatives, skill-block-hustlers, block-2 |
 | generation | hemp-os, otm-agent, omni-research, ext-autoresearch, ext-deepseek, ext-huggingface … |
+| ggml-inference | kimodo-cpp |
 | git | mcp-git |
+| git-native-memory | ownmem |
 | github | mcp-github |
 | github-search | github-pull |
 | goal_alignment | paperclip |
 | governance | paperclip |
 | gpu-training | ext-autoresearch |
 | graph-observer | deterministic-brain |
+| graph-rag | latticedb |
+| graph-traversal | latticedb |
 | grounding | book-bridge |
+| grpo-training | gradient |
 | guardrails | overlay-safety |
 | health-checking | ext-draymond-supervisor |
 | highlight_extraction | youtube-shorts |
@@ -1089,6 +1134,7 @@ Generated: 2026-08-25T06:15:52.967Z
 | image | ufc-mcp |
 | injury-risk | sports-science, injury-risk |
 | insight-reports | comic-metaphor-engine |
+| inspectable-evals | gradient |
 | intelligence-reports | omni-research |
 | inventory_optimization | overlay-chain |
 | invoicing | service-stripe |
@@ -1105,6 +1151,8 @@ Generated: 2026-08-25T06:15:52.967Z
 | knowledge-graph | mcp-memory, bookbridge, graphify |
 | lab-director | biotech-ide |
 | label-management | nc-sound |
+| language-routing | hayamimi |
+| latency-optimization | spec-ptc |
 | learning-paths | ext-the-lab |
 | ledger_integration | bbtech-web-app |
 | lesson-generation | comic-metaphor-engine |
@@ -1113,6 +1161,7 @@ Generated: 2026-08-25T06:15:52.967Z
 | literature_intelligence | hempforge |
 | llm-safety-benchmark | overlay-safety, llm-safety-benchmark |
 | load-balancing | ext-claw-router |
+| local-first | eidos |
 | local-scoring | codegang |
 | long_context_memory | memagent |
 | market-analysis | ext-the-bank |
@@ -1123,8 +1172,10 @@ Generated: 2026-08-25T06:15:52.967Z
 | marketplace | ecos-environmental-initiatives |
 | math | math-x |
 | mcp | vibeserve |
+| mcp-governance | halofy |
 | membership_tiers | ecos-environmental-initiatives |
 | memory | draymond, ext-engram, ext-memory-lancedb, ext-mem0, ext-memory-core, mcp-memory … |
+| memory-recall | ownmem |
 | metacognition | deterministic-brain |
 | metaphor-mapping | comic-metaphor-engine |
 | metaphor_storylines | overlay-global-lens |
@@ -1142,6 +1193,7 @@ Generated: 2026-08-25T06:15:52.967Z
 | monte_carlo_simulation | cureforge |
 | multi-agent | ext-claw-team, ext-draymond-supervisor, ext-paperclip, skill-trading-agents |
 | multi-agent-pipeline | codegang |
+| multi-tenant-email | sentio |
 | multi-tool-agent | opencode |
 | multi_book_synthesis | book-synthesis |
 | music | skill-spotify-player |
@@ -1156,10 +1208,13 @@ Generated: 2026-08-25T06:15:52.967Z
 | notebook_synthesis | open-notebook |
 | novelty-checking | ai-scientist |
 | odds-modeling | boxing-sim |
+| offline-tesseract | ocr-it |
+| on-device-asr | hayamimi |
 | onco-metrics | disease-research |
 | opportunity-scanning | otm-agent |
 | orchestration | draymond, hemp-os, ext-draymond-supervisor, ext-paperclip, book-to-skill-chain, agent-browser … |
 | outreach | otm-agent |
+| pagination | ocr-it |
 | paper-generation | ai-scientist |
 | paper_generation | hemp-os |
 | parallel-execution | ext-claw-team |
@@ -1167,6 +1222,8 @@ Generated: 2026-08-25T06:15:52.967Z
 | payments | service-stripe |
 | pdf_operations | stirling-pdf |
 | pen-testing | ext-cyber-security |
+| per-agent-identity | buzz |
+| persistent-apps | rome |
 | personalized-notes | book-synthesis-personal |
 | planning | mcp-sequential-thinking, overlay-business-solutions, skill-budget-integration |
 | play-genome | playgene |
@@ -1174,6 +1231,7 @@ Generated: 2026-08-25T06:15:52.967Z
 | portfolio-tracking | ext-the-bank, ghostfolio |
 | portfolio_analytics | recursive-ip |
 | postgres | mcp-postgres |
+| potency_calibration | overlay-oncology |
 | pr_review | codenexus |
 | prediction | skill-sports-betting |
 | preset-generation | cheetah |
@@ -1188,7 +1246,7 @@ Generated: 2026-08-25T06:15:52.967Z
 | proposals | deterministic-brain |
 | protein-structure | overlay-science, colabfold |
 | prototyping | skill-digital-lab |
-| provenance | bookbridge, book-bridge |
+| provenance | bookbridge, book-bridge, halofy |
 | prs | mcp-github |
 | publishing | book-publishing-platform, global-lens, overlay-writing |
 | purple_teaming | cai |
@@ -1197,15 +1255,18 @@ Generated: 2026-08-25T06:15:52.967Z
 | queue_review | open-chat-worker |
 | rag-research | omni-research |
 | reading-plan | bookbridge, book-bridge |
+| realtime-stt | hayamimi |
 | reasoning | mcp-sequential-thinking, skill-enhanced |
 | rebalancing | ext-the-bank |
 | recommendations | skill-spotify-player |
 | red-teaming | ext-cyber-security |
 | red_teaming | cai |
 | refactoring | megacode |
+| region-ocr | ocr-it |
 | registry-registration | github-pull |
 | regulatory-scaffolding | synop |
 | regulatory_risk | hempforge |
+| relational-spreadsheet | eidos |
 | remediation | reporank |
 | repo-grading | grader |
 | repo-ops | mcp-git |
@@ -1218,10 +1279,12 @@ Generated: 2026-08-25T06:15:52.967Z
 | research | hemp-os, mcp-fetch |
 | research-feed | kaggle |
 | research-orchestration | biotech-ide, overlay-science |
+| research_contracts | overlay-oncology |
 | research_portal | bbtech-web-app |
 | research_publishing | overlay-global-lens |
 | research_workspace | open-notebook |
 | resource-monitoring | cheetah |
+| resource-profiles | kern |
 | resource-pull | github-pull |
 | result-synthesis | ext-claw-team |
 | retrieval | ext-engram, book-bridge, skill-engram |
@@ -1234,14 +1297,17 @@ Generated: 2026-08-25T06:15:52.967Z
 | sample-management | det-engine-soundbank |
 | sandbox-testing | mutly |
 | sandboxed_execution | cureforge |
-| sandboxing | skill-open-sandbox |
+| sandboxing | skill-open-sandbox, kern |
 | sbom | supply-chain-health |
+| scaffolding | rome |
 | scenario_simulation | overlay-chain |
 | scheduling | social-media-dashboard |
 | scientific-engine | biotech-ide |
+| scope-resolution | halofy |
 | scoring | grader |
 | scraping | ext-browser, skill-xurl, browser-use |
 | search | omni-research, ext-mem0, skill-mem0, skill-weather |
+| seccomp | kern |
 | security-scanning | ext-cyber-security, overlay-safety, sentinel-monitor, cheetah, clawsafe, codegang |
 | security_scanning | codenexus |
 | segmentation | marketing-tool |
@@ -1250,12 +1316,14 @@ Generated: 2026-08-25T06:15:52.967Z
 | semantic_analysis | codenexus |
 | semantic_index | zvec |
 | signals | skill-trading |
+| signed-events | buzz |
 | simulation | fs-agent, hemp-os, overlay-science |
 | skill-generation | book-to-skill |
 | skill-installation | github-pull |
 | skill-registration | book-to-skill-chain |
 | smart_links | indy-music-platform |
 | smiles | moleculargraph |
+| smpl-x | kimodo-cpp |
 | snapshotting | kaggle |
 | social-media | ext-social-agent |
 | social_scheduling | indy-music-platform |
@@ -1263,6 +1331,7 @@ Generated: 2026-08-25T06:15:52.967Z
 | spatial_metrics | bbtech-web-app |
 | speaker_detection | youtube-shorts |
 | specification | sub-team |
+| speculative-tool-calling | spec-ptc |
 | speech | service-openai-api |
 | speech-recognition | ext-voice |
 | sports-analytics | sports-science, codex-metrics |
@@ -1275,6 +1344,8 @@ Generated: 2026-08-25T06:15:52.967Z
 | subscriptions | service-stripe |
 | summarization | bookbridge, book-bridge, skill-summarize |
 | supply_chain_query | overlay-chain |
+| survival_modeling | overlay-oncology |
+| svg-library | workout-guide |
 | swarm-orchestration | ext-claw-team |
 | sweep | deterministic-brain |
 | symbol-extraction | mutly |
@@ -1286,6 +1357,7 @@ Generated: 2026-08-25T06:15:52.967Z
 | team_management | paperclip |
 | template-generation | cheetah |
 | ter_calculation | bbtech-web-app |
+| text-to-motion | kimodo-cpp |
 | text-to-speech | ext-voice |
 | threat-detection | aegis-safety, overlay-safety, sentinel-monitor |
 | time | mcp-time |
@@ -1296,12 +1368,13 @@ Generated: 2026-08-25T06:15:52.967Z
 | trend_detection | hempforge |
 | trend_intelligence | overlay-global-lens |
 | tutoring | ext-the-lab |
+| typed-lookup | workout-guide |
 | ui-component-generation | cheetah |
 | ui_generation | vibeserve |
 | usage_events | tap919-middleman |
 | utility | ufc-mcp |
 | validation | mcp-cis-assistant, phaselock |
-| vector-search | ext-memory-lancedb |
+| vector-search | ext-memory-lancedb, latticedb |
 | vector_search | zvec |
 | verification | sub-team |
 | version_history | recursive-ip |
@@ -1321,7 +1394,10 @@ Generated: 2026-08-25T06:15:52.967Z
 | web-search | omni-research |
 | web_pentesting | cai |
 | web_validation | book-synthesis |
+| webhooks | sentio |
 | wholesale-marketing | overlay-finance, wholesale-marketing-channel |
 | windows-control | system-agent |
 | workflow_management | hempforge |
+| workflows | buzz |
 | writing | book-writing-assistant |
+| xlsx-export | open-sheet |

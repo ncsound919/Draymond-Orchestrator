@@ -7,17 +7,19 @@
 //
 //   1. Gather the agenda (active goals) + live system intel (failing jobs,
 //      down monitors, health, repairs, learning lessons).
-//   2. Ask the deterministic brain `/reason` for a bounded decision on where
-//      to focus (which agenda goals, which hiccups to fix first).
+//   2. Ask the PRIMARY decision layer — Dev-Brain (POST /api/decide, weighted
+//      deterministic matrix, no LLM) — for a bounded decision on where to
+//      focus (which agenda goals, which hiccups to fix first). Falls back to
+//      the local harness / deterministic brain /reason when Dev-Brain is down.
 //   3. Route hiccups/issues to the repair + coding teams (repairFailedJob /
 //      attemptRepair / startDownServices), bounded by evidence + cooldown so
 //      repeated identical failures do NOT burn tokens or spam emails.
 //   4. Record every decision + outcome to self-learning (recordOutcome) so the
 //      SAME mistake is never repeated blindly — lessons drive the next decision.
 //
-// The brain is the advisor; Draymond is the executor. When BRAIN_URL is unset
-// or the brain is offline, a deterministic fallback (agenda + intel → priority
-// order) still runs, so business decisions never stall on the brain being down.
+// Dev-Brain is the advisor; Draymond is the executor. When Dev-Brain, the
+// local harness, and the brain are all down, a deterministic fallback (agenda
+// + intel → priority order) still runs, so business decisions never stall.
 // ============================================================================
 
 import { runBrainSweep } from './brain-client';
@@ -107,7 +109,7 @@ export async function runBrainDecision(input: BrainDecisionInput = {}): Promise<
   const downMonitors = input.downMonitors ?? intel?.monitors.down ?? [];
   const lessonList = lessons.map((l) => `${l.agentId}: ${l.lesson} (x${l.evidenceCount})`).slice(0, 10);
 
-  // ── 2. Consult reasoning (local-first) over the agenda + system state ─────
+  // ── 2. Build the decision context ──────────────────────────────────────────
   const brainQuery = [
     'Business operations decision. Agenda:',
     agenda.map((g) => `- ${g.title} (${g.progress}%)`).join('\n') || '- none',
@@ -122,12 +124,45 @@ export async function runBrainDecision(input: BrainDecisionInput = {}): Promise<
     'Recommend the single highest-value focus + the top 3 hiccups to repair first, considering the agenda.',
   ].join('\n');
 
-  // Local-first: the brain's local model (fast tier) reasons over the state at
-  // zero token cost. Falls back to the deterministic /reason when the local
-  // harness is unreachable, then null when the brain is down.
-  const { reasonLocal } = await import('./local-reason');
-  const localReason = await reasonLocal(brainQuery);
-  const brainConsulted = input.brainReachable ?? (localReason.source !== null);
+  // ── 2a. PRIMARY: Dev-Brain (deterministic decision layer) ─────────────────
+  // Dev-Brain is the fleet's primary decision advisor. When reachable, its
+  // weighted decision matrix drives focus + repair ordering. Falls through to
+  // the local harness when Dev-Brain is down — decisions never stall.
+  let devBrain: { matrix: import('./dev-brain').DevBrainMatrix } | null = null;
+  let localReason: { text: string | null; source: string | null } | null = null;
+  let brainConsulted = input.brainReachable ?? false;
+  let focusOverride: string | null = null;
+  let devBrainRepairOrder: string[] | null = null;
+
+  const decisionCandidates: import('./dev-brain').DevBrainCandidate[] = [
+    ...agenda.map((g) => ({ id: `goal:${g.title}`, title: `Advance: ${g.title}`, description: `Agenda goal at ${g.progress}% progress.`, tags: ['agenda'] })),
+    ...failingJobs.map((j) => ({ id: `job:${j.name}`, title: `Repair job: ${j.name}`, description: String(j.error ?? 'job failed').slice(0, 200), tags: ['repair'] })),
+    ...downMonitors.map((m) => ({ id: `mon:${m}`, title: `Restore monitor: ${m}`, description: 'Monitor is down.', tags: ['repair'] })),
+  ];
+
+  try {
+    const { devBrainReachable, devBrainDecide } = await import('./dev-brain');
+    if (await devBrainReachable()) {
+      const matrix = await devBrainDecide({ problem: brainQuery, candidates: decisionCandidates });
+      if (matrix) {
+        brainConsulted = true;
+        devBrain = { matrix };
+        const rec = matrix.options.find((o) => o.id === matrix.recommendedOptionId);
+        if (rec) focusOverride = rec.title.replace(/^Advance: /, '');
+        devBrainRepairOrder = matrix.options
+          .filter((o) => o.id.startsWith('job:') || o.id.startsWith('mon:'))
+          .sort((a, b) => b.weightPercentage - a.weightPercentage)
+          .map((o) => o.id);
+      }
+    }
+  } catch { /* fall through to local harness */ }
+
+  // ── 2b. Fallback: local harness / deterministic brain ─────────────────────
+  if (!brainConsulted) {
+    const { reasonLocal: local } = await import('./local-reason');
+    localReason = await local(brainQuery);
+    brainConsulted = input.brainReachable ?? (localReason.source !== null);
+  }
 
   // Also trigger a bounded brain sweep when the brain is up (metacognitive
   // observation over the knowledge graph feeds future sweeps).
@@ -137,8 +172,8 @@ export async function runBrainDecision(input: BrainDecisionInput = {}): Promise<
     sweepRan = Boolean(report);
   }
 
-  // ── 3. Focus goal: the least-progress agenda goal (mission pull). ───────
-  const focusGoal = agenda.length ? [...agenda].sort((a, b) => a.progress - b.progress)[0]!.title : null;
+  // ── 3. Focus goal: Dev-Brain recommendation, else least-progress agenda. ─
+  const focusGoal = focusOverride ?? (agenda.length ? [...agenda].sort((a, b) => a.progress - b.progress)[0]!.title : null);
   if (focusGoal) {
     priorities.push({ id: 'goal', label: `Advance agenda: ${focusGoal}`, why: 'lowest progress goal pulls the mission forward', agent: 'overlay-strategist' });
   }
@@ -156,8 +191,27 @@ export async function runBrainDecision(input: BrainDecisionInput = {}): Promise<
   for (const m of downMonitors) {
     repairQueue.push({ signal: 'monitor:down', detail: `monitor ${m} down`, kind: 'monitor', priority: 2 });
   }
-  // Sort: monitors first (cheap health), then jobs.
-  repairQueue.sort((a, b) => a.priority - b.priority);
+  // Sort: monitors first (cheap health), then jobs — unless Dev-Brain ranked
+  // the repair options (its weighted matrix is the primary ordering).
+  if (devBrainRepairOrder) {
+    const pos = new Map(devBrainRepairOrder.map((id, i) => [id, i]));
+    const idFor = (r: BrainDecision['repairQueue'][number]): string | undefined => {
+      if (r.kind === 'job') return `job:${r.detail.match(/^job (.+?):/)?.[1] ?? r.detail}`;
+      if (r.kind === 'monitor') return `mon:${r.detail.replace('monitor ', '').replace(' down', '')}`;
+      return undefined;
+    };
+    repairQueue.sort((a, b) => {
+      const pa = idFor(a); const pb = idFor(b);
+      const wa = pa === undefined ? undefined : pos.get(pa);
+      const wb = pb === undefined ? undefined : pos.get(pb);
+      if (wa === undefined && wb === undefined) return a.priority - b.priority;
+      if (wa === undefined) return 1;
+      if (wb === undefined) return -1;
+      return wa - wb;
+    });
+  } else {
+    repairQueue.sort((a, b) => a.priority - b.priority);
+  }
 
   // ── 4b. Free-API key acquisition list (the "fill the API list" drive). ───
   // Missing mission-critical keys (E1-E4) become a priority so the fleet can
@@ -240,7 +294,11 @@ export async function runBrainDecision(input: BrainDecisionInput = {}): Promise<
   return {
     generatedAt,
     brainConsulted,
-    brainReasoning: localReason.text ? { query: brainQuery.slice(0, 400), decision: localReason.text } : null,
+    brainReasoning: devBrain
+      ? { query: brainQuery.slice(0, 400), decision: `Dev-Brain: ${devBrain.matrix.recommendedOptionId} — ${devBrain.matrix.synthesisRationale.slice(0, 300)}` }
+      : localReason?.text
+        ? { query: brainQuery.slice(0, 400), decision: localReason.text }
+        : null,
     focusGoal,
     priorities,
     repairQueue,

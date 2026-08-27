@@ -77,9 +77,11 @@ export function classifyRetryable(error: string, statusCode?: number): RetryClas
 /**
  * Exponential backoff with full jitter, matching Temporal's default shape
  * (InitialInterval × BackoffCoefficient^attempt). Returns milliseconds.
+ * Capped at 30s: with max_retries up to 10 the uncapped curve reached ~512s,
+ * letting one step blow far past the chain wall-clock budget.
  */
 export function retryDelayMs(attempt: number, baseMs = 1000): number {
-  const exp = baseMs * Math.pow(2, attempt);
+  const exp = Math.min(baseMs * Math.pow(2, attempt), 30_000);
   return Math.round(exp * (0.5 + Math.random() * 0.5));
 }
 

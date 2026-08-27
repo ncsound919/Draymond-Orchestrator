@@ -398,7 +398,11 @@ for (const [key, resolver] of CHAIN_TASK_FALLBACKS) {
   registerFallback(key, {
     label: `${key} — deterministic brain escalation`,
     kind: 'brain',
-    resolve: () => 'Escalating to deterministic brain...',
+    // Last resort when degraded AND the brain is unreachable. Must never look
+    // like real output: callers and downstream graders treat this string as
+    // the failure it is instead of shipping placeholder prose as a result.
+    resolve: () =>
+      `[chain-fallback:FAILED] "${key}" could not run: LLM chain down and deterministic brain unreachable. Task NOT completed.`,
     brain: resolver,
   });
 }
@@ -428,12 +432,21 @@ registerFallback(
 // double-count coverage for paths that never pass the key directly.
 
 // ---------------------------------------------------------------------------
-// workers (none call LLM — declared for completeness, zero coverage impact)
+// llm.ts — vision subtask
 // ---------------------------------------------------------------------------
-// (intentionally no entries — see src/workers which only calls internal routes)
+
+declareLlmFunction('vision.callVisionSubtask');
+registerFallback(
+  'vision.callVisionSubtask',
+  template(
+    'vision — honest degraded reply when both local lane and cloud are down',
+    'Vision analysis is temporarily unavailable (local Ollama lane and cloud vision providers unreachable). Continuing without image interpretation — please describe the image in text if possible.'
+  )
+);
 
 /** Register everything at import time. Safe to call multiple times. */
 export function installFallbackRegistry(): void {
   // All registrations happen at module load; this hook exists so the import
   // side-effect is explicit in bootstrap/index.
 }
+

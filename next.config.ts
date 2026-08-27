@@ -78,10 +78,12 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  // Pin the workspace root �?" a stray pnpm-lock.yaml in a parent directory
+  // Pin the workspace root — a stray pnpm-lock.yaml in a parent directory
   // makes Next infer the wrong root and double the path (e.g. ./src\src\...).
+  // TURBOPACK_ROOT override: when node_modules is a junction into a parent
+  // pnpm store (files outside cwd), resolution needs the wider root.
   turbopack: {
-    root: process.cwd(),
+    root: process.env.TURBOPACK_ROOT || process.cwd(),
   },
 
   images: {

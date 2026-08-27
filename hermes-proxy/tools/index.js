@@ -51,6 +51,24 @@ export const tools = [
   }),
 ];
 
+const OMNI_URL = process.env.OMNI_RESEARCH_URL || 'http://127.0.0.1:3010';
+const AETHERDESK_URL = process.env.AETHERDESK_BASE_URL || 'http://127.0.0.1:8002';
+// Internal key — same value AetherDesk expects as x-api-key.
+const AETHERDESK_KEY =
+  process.env.AETHERDESK_API_KEY || process.env.INTERNAL_API_KEY || '';
+
+async function fetchJson(url, opts = {}, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...opts, signal: controller.signal });
+    const body = await res.json().catch(() => ({}));
+    return { status: res.status, ok: res.ok, body };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const TOOL_IMPL = {
   async get_time(args) {
     const tz = args?.timezone || 'UTC';
@@ -63,9 +81,29 @@ const TOOL_IMPL = {
   async get_health() {
     return { ok: true, status: 'healthy', uptimeMs: process.uptime() * 1000 };
   },
-  async web_search() {
-    // Placeholder — wire a real search provider to enable.
-    return { ok: false, error: 'web_search provider not configured' };
+  // REAL: routed through the OmniResearch service (:3010) which fans out to
+  // PubMed/arXiv/DuckDuckGo/BookBridge — all keyless fleet systems.
+  async web_search(args) {
+    const query = String(args?.query || '').trim();
+    if (!query) return { ok: false, error: 'query is required' };
+    try {
+      const { status, ok, body } = await fetchJson(`${OMNI_URL}/api/web-search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+      });
+      if (!ok) return { ok: false, error: `omni-research HTTP ${status}` };
+      const results = Array.isArray(body?.results)
+        ? body.results.slice(0, 8).map((r) => ({
+            title: String(r.title ?? r.name ?? ''),
+            url: String(r.url ?? r.link ?? ''),
+            snippet: String(r.summary ?? r.abstract ?? r.snippet ?? '').slice(0, 400),
+          }))
+        : [];
+      return { ok: true, results };
+    } catch (err) {
+      return { ok: false, error: `web_search failed: ${err instanceof Error ? err.message : err}` };
+    }
   },
   async calendar_create_event() {
     return { ok: false, error: 'calendar integration not configured' };
@@ -82,14 +120,54 @@ const TOOL_IMPL = {
   async drive_search() {
     return { ok: false, error: 'drive integration not configured' };
   },
+  // REAL: wired to the AetherDesk API (:8002) with the internal key.
   async aetherdesk_list_agents() {
-    return { ok: false, error: 'aetherdesk not configured' };
+    if (!AETHERDESK_KEY) return { ok: false, error: 'aetherdesk not configured (no internal key)' };
+    try {
+      const { status, ok, body } = await fetchJson(
+        `${AETHERDESK_URL}/api/v1/tenants/TENANT-001/agents`,
+        { headers: { 'x-api-key': AETHERDESK_KEY } },
+      );
+      if (!ok) return { ok: false, error: `aetherdesk HTTP ${status}` };
+      return { ok: true, agents: Array.isArray(body) ? body : body?.agents ?? [] };
+    } catch (err) {
+      return { ok: false, error: `aetherdesk_list_agents failed: ${err instanceof Error ? err.message : err}` };
+    }
   },
   async aetherdesk_list_leads() {
-    return { ok: false, error: 'aetherdesk not configured' };
+    if (!AETHERDESK_KEY) return { ok: false, error: 'aetherdesk not configured (no internal key)' };
+    try {
+      const { status, ok, body } = await fetchJson(
+        `${AETHERDESK_URL}/api/v1/campaign/leads?status=new`,
+        { headers: { 'x-api-key': AETHERDESK_KEY } },
+      );
+      if (!ok) return { ok: false, error: `aetherdesk HTTP ${status}` };
+      return { ok: true, leads: Array.isArray(body) ? body : [] };
+    } catch (err) {
+      return { ok: false, error: `aetherdesk_list_leads failed: ${err instanceof Error ? err.message : err}` };
+    }
   },
-  async aetherdesk_launch_campaign() {
-    return { ok: false, error: 'aetherdesk not configured' };
+  async aetherdesk_launch_campaign(args) {
+    if (!AETHERDESK_KEY) return { ok: false, error: 'aetherdesk not configured (no internal key)' };
+    try {
+      const { status, ok, body } = await fetchJson(
+        `${AETHERDESK_URL}/api/v1/campaign/launch`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': AETHERDESK_KEY },
+          body: JSON.stringify({
+            profile_id: String(args?.profile_id || 'default'),
+            max_concurrent: Number(args?.max_concurrent || 1),
+            lead_limit: Number(args?.lead_limit || 10),
+          }),
+        },
+        30000,
+      );
+      if (!ok) return { ok: false, error: `aetherdesk HTTP ${status}: ${JSON.stringify(body).slice(0, 200)}` };
+      return { ok: true, campaign: body };
+    } catch (err) {
+      return { ok: false, error: `aetherdesk_launch_campaign failed: ${err instanceof Error ? err.message : err}` };
+    }
   },
   async create_promo_video() {
     return { ok: false, error: 'video generation not configured' };

@@ -33,6 +33,18 @@ function buildGauges(register: Registry) {
     brainRouted: new Gauge({ name: 'draymond_llm_brain_routed_total', help: 'Tasks routed via the deterministic brain pre-route (paid LLM skipped)', registers: [register] }),
     brainTokensSaved: new Gauge({ name: 'draymond_llm_tokens_saved_total', help: 'Estimated LLM tokens saved by deterministic brain routing', registers: [register] }),
     brainSavingsCents: new Gauge({ name: 'draymond_llm_savings_cents_total', help: 'Estimated LLM cost saved (cents) by deterministic brain routing', registers: [register] }),
+    // S3 — free catalog sync observability
+    freeCatalogAgeHours: new Gauge({ name: 'draymond_free_catalog_age_hours', help: 'Hours since last successful free catalog sync (Infinity when never synced)', registers: [register] }),
+    freeCatalogCandidatesProbed: new Gauge({ name: 'draymond_free_catalog_candidates_probed', help: 'Number of free model candidates probed in last sync run', registers: [register] }),
+    freeCatalogLastSync: new Gauge({ name: 'draymond_free_catalog_last_sync', help: 'Unix epoch seconds of last successful free catalog sync (0 = never)', registers: [register] }),
+    // S4 — budget / model assignment counters (in-memory since process start)
+    budgetFreeAssignments: new Gauge({ name: 'draymond_budget_free_assignments_total', help: 'Model assignments to free tier since process start', registers: [register] }),
+    budgetGoAssignments: new Gauge({ name: 'draymond_budget_go_assignments_total', help: 'Model assignments to Go (paid) tier since process start', registers: [register] }),
+    budgetOllamaAssignments: new Gauge({ name: 'draymond_budget_ollama_assignments_total', help: 'Model assignments to local Ollama tier since process start', registers: [register] }),
+    budgetTreasuryCents: new Gauge({ name: 'draymond_budget_treasury_cents', help: 'Current treasury revenue balance in cents (read-only from treasury.json)', registers: [register] }),
+    // S7 — routing observability
+    visionRoutedTotal: new Gauge({ name: 'draymond_vision_routed_total', help: 'Vision subtasks routed to local Ollama lane since process start', registers: [register] }),
+    modelFallbackTotal: new Gauge({ name: 'draymond_model_fallback_total', help: 'LLM provider fallback count since process start', labelNames: ['provider'] as const, registers: [register] }),
   };
 }
 
@@ -150,7 +162,38 @@ async function refresh(): Promise<void> {
   } catch {
     /* module unavailable — skip */
   }
+
+  // S3 — Free catalog sync observability (reads model-routing.json, fail-soft).
+  try {
+    const { readFileSync: rfs, existsSync: exs } = await import('node:fs');
+    const { join: pjoin } = await import('node:path');
+    const registryDir = process.env.DRAYMOND_REGISTRY_DIR ?? pjoin(process.cwd(), '.draymond');
+    const routingPath = pjoin(registryDir, 'model-routing.json');
+    if (exs(routingPath)) {
+      const routing = JSON.parse(rfs(routingPath, 'utf8')) as { lastFreeSyncAt?: string };
+      if (routing.lastFreeSyncAt) {
+        const syncMs = new Date(routing.lastFreeSyncAt).getTime();
+        const ageH = (Date.now() - syncMs) / 3_600_000;
+        g.freeCatalogAgeHours.set(Math.round(ageH * 10) / 10);
+        g.freeCatalogLastSync.set(Math.floor(syncMs / 1000));
+      } else {
+        g.freeCatalogAgeHours.set(Infinity);
+        g.freeCatalogLastSync.set(0);
+      }
+    }
+  } catch { /* skip */ }
+
+  // S4 — Budget assignment counters + treasury balance.
+  try {
+    const { getAssignmentCounts, readTreasuryBalance } = await import('./workflow-budget');
+    const counts = getAssignmentCounts();
+    g.budgetFreeAssignments.set(counts.free);
+    g.budgetGoAssignments.set(counts.go);
+    g.budgetOllamaAssignments.set(counts.ollama);
+    g.budgetTreasuryCents.set(readTreasuryBalance());
+  } catch { /* skip */ }
 }
+
 
 /** Render the full Prometheus exposition text (call from the /metrics route). */
 export async function renderMetrics(): Promise<string> {

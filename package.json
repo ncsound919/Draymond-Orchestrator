@@ -18,6 +18,7 @@
     "scripts": {
         "dev": "next dev",
         "build": "next build",
+        "postbuild": "node scripts/copy-standalone-static.mjs",
         "prebuild": "node scripts/prune-next.mjs",
         "clean": "node scripts/prune-next.mjs",
         "verify:build": "node scripts/verify-build.mjs --verify",

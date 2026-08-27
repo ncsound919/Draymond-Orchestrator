@@ -38,9 +38,13 @@ export interface PoolProbeResult {
 
 export interface PoolState {
   checkedAt: string;
-  museFreeActiveKeys: string[];          // env var names entitled to the primary free model
+  assignedFreeModel: string;             // daily catalog winner (.draymond/model-routing.json)
+  museFreeActiveKeys: string[];          // env var names entitled to the ASSIGNED free model
   freeActiveKeys: string[];              // env var names valid on ≥1 zen free model
   freeModelAvailability: Record<string, string[]>; // model id -> env var names that serve it
+  /** Overflow lane ids promoted from env (absent = group omitted from yaml). */
+  openrouterFreeModel?: string;
+  ollamaCloudModel?: string;
   openrouter: PoolProbeResult | null;
   deepseek: PoolProbeResult | null;
   ollamaCloud: { credential: string; ok: boolean }[];
@@ -59,12 +63,29 @@ const FREE_MODELS = [
 ];
 const PROBE_TIMEOUT_MS = 25_000;
 
+/** Strip a UTF-8 BOM — PowerShell writers emit one and JSON.parse chokes. */
+function stripBom(s: string): string {
+  return s.charCodeAt(0) === 0xfeff ? s.slice(1) : s;
+}
+
+/** Read the daily-assigned free model (fail-soft → bootstrap list head). */
+function readAssignedFreeModel(): string {
+  try {
+    const drayDir = process.env.DRAYMOND_REGISTRY_DIR ?? path.join(repoRoot(), '.draymond');
+    const raw = JSON.parse(stripBom(fs.readFileSync(path.join(drayDir, 'model-routing.json'), 'utf8')));
+    if (typeof raw.assignedFreeModel === 'string' && raw.assignedFreeModel) return raw.assignedFreeModel;
+  } catch { /* absent — fall through */ }
+  return FREE_MODELS[0];
+}
+
 // ── env loading (data/litellm.env first = freshest vault sync, then .env.local)
 
 function loadEnvMap(): Record<string, string> {
   const out: Record<string, string> = {};
   const root = repoRoot();
-  for (const rel of ['data/litellm.env', '.env.local']) {
+  // PRECEDENCE: .env.local first (operator-managed truth, matches runtime
+  // injection); litellm.env (vault projection) fills in keys absent there.
+  for (const rel of ['.env.local', 'data/litellm.env']) {
     const p = path.join(root, rel);
     if (!fs.existsSync(p)) continue;
     for (const line of fs.readFileSync(p, 'utf8').split('\n')) {
@@ -132,7 +153,11 @@ export async function runPoolHealth(opts: { restartLitellm?: boolean } = {}): Pr
   const museFreeActiveKeys: string[] = [];
   const freeActiveKeys: string[] = [];
   const freeModelAvailability: Record<string, string[]> = {};
-  for (const m of FREE_MODELS) freeModelAvailability[m] = [];
+  // Probe the daily-assigned model FIRST (it leads the generated pools); the
+  // hardcoded list trails so stale ids rot out of litellm.yaml automatically.
+  const assigned = readAssignedFreeModel();
+  const probeModels = [assigned, ...FREE_MODELS.filter((m) => m !== assigned)];
+  for (const m of probeModels) freeModelAvailability[m] = [];
 
   // 1) opencode accounts: which free models may each account serve today?
   for (const name of OPENCODE_KEYS) {
@@ -140,7 +165,7 @@ export async function runPoolHealth(opts: { restartLitellm?: boolean } = {}): Pr
     if (!key) continue;
     const serving: string[] = [];
     let anyOk = false;
-    for (const m of FREE_MODELS) {
+    for (const m of probeModels) {
       const r = await postChat('https://opencode.ai/zen/v1/chat/completions', key, m);
       // 200 or 429 both prove entitlement (429 = valid key, quota window busy)
       if (r.ok || r.http === 429) {
@@ -155,7 +180,7 @@ export async function runPoolHealth(opts: { restartLitellm?: boolean } = {}): Pr
     } else {
       probes.push({ provider: 'opencode', credential: name, status: 'error', detail: 'no free model entitled' });
     }
-    if (serving.includes(FREE_MODELS[0])) museFreeActiveKeys.push(name);
+    if (serving.includes(assigned)) museFreeActiveKeys.push(name);
   }
 
   // 2) OpenRouter: balance/key status without burning a request
@@ -174,13 +199,15 @@ export async function runPoolHealth(opts: { restartLitellm?: boolean } = {}): Pr
     probes.push(openrouter);
   }
 
-  // 3) Ollama Cloud: model-list auth check (no tokens burned)
+  // 3) Ollama Cloud: real chat ping — /models is a public catalog and 200s
+  // even for revoked keys, which masked dead accounts for weeks.
+  const ollamaModel = (process.env.OLLAMA_CLOUD_LITELLM_MODEL || 'openai/gpt-oss:20b').replace(/^openai\//, '');
   const ollamaCloud: { credential: string; ok: boolean }[] = [];
   for (const name of OLLAMA_KEYS) {
     const key = env[name];
     if (!key) continue;
-    const r = await getJson('https://ollama.com/v1/models', key);
-    const ok = r.http === 200;
+    const r = await postChat('https://ollama.com/v1/chat/completions', key, ollamaModel);
+    const ok = r.ok;
     ollamaCloud.push({ credential: name, ok });
     probes.push({ provider: 'ollama-cloud', credential: name, status: ok ? 'ok' : r.http === 401 ? 'unauthorized' : 'error', detail: `http=${r.http}` });
   }
@@ -200,9 +227,12 @@ export async function runPoolHealth(opts: { restartLitellm?: boolean } = {}): Pr
 
   const state: PoolState = {
     checkedAt: new Date().toISOString(),
+    assignedFreeModel: assigned,
     museFreeActiveKeys,
     freeActiveKeys,
     freeModelAvailability,
+    openrouterFreeModel: process.env.OPENROUTER_FREE_LITELLM_MODEL,
+    ollamaCloudModel: process.env.OLLAMA_CLOUD_LITELLM_MODEL,
     openrouter,
     deepseek,
     ollamaCloud,
@@ -266,28 +296,58 @@ export async function runPoolHealth(opts: { restartLitellm?: boolean } = {}): Pr
 
 // ── deterministic config builder (pure — unit tested) ───────────────────────
 
-export function buildLitellmConfig(state: Pick<PoolState, 'museFreeActiveKeys' | 'freeActiveKeys'>): string {
+export function buildLitellmConfig(
+  state: Pick<
+    PoolState,
+    | 'assignedFreeModel'
+    | 'museFreeActiveKeys'
+    | 'freeActiveKeys'
+    | 'freeModelAvailability'
+    | 'openrouterFreeModel'
+    | 'ollamaCloudModel'
+  >
+): string {
   // NOTE: model ids verified against https://opencode.ai/docs/zen/
   // (Muse Spark 1.2 Contributor Free, Hy3 Free, MiMo-V2.5 Free, Big Pickle,
   //  Nemotron 3 Ultra Free, Nemotron 3.5 Lightning Free). Free ids rotate —
   // keep in sync with the Zen catalog probe list above.
+  const assigned = state.assignedFreeModel || FREE_MODELS[0];
   const lines: string[] = [];
   lines.push('# LiteLLM proxy config — GENERATED by src/lib/draymond/pool-health.ts');
   lines.push(`# Generated: ${new Date().toISOString()} from the latest KeyWire-vault pool health run.`);
   lines.push('# Edit scripts/template instead of this file — it is overwritten each morning.');
   lines.push('model_list:');
 
-  // Primary free pool: muse (current assignee) on accounts entitled to it.
-  for (const k of state.museFreeActiveKeys) {
-    lines.push(`  - model_name: opencode-free`);
+  // STABLE EDGE GROUP: `fleet-free` is the one name downstream consumers (DSH
+  // harness adapter, hooks) point at. It always maps to the current daily-
+  // assigned free model across every entitled account — rotation happens HERE,
+  // never in DSH/patch files again.
+  for (const k of state.museFreeActiveKeys.length > 0 ? state.museFreeActiveKeys : state.freeActiveKeys) {
+    lines.push(`  - model_name: fleet-free`);
     lines.push(`    litellm_params:`);
-    lines.push(`      model: openai/${FREE_MODELS[0]}`);
+    lines.push(`      model: openai/${assigned}`);
     lines.push(`      api_key: os.environ/${k}`);
     lines.push(`      api_base: https://opencode.ai/zen/v1`);
   }
-  // Zen free pool: every valid account × every current free model.
+  // Legacy alias kept for backwards compatibility (llm.ts chain / old calls).
+  for (const k of state.museFreeActiveKeys) {
+    lines.push(`  - model_name: opencode-free`);
+    lines.push(`    litellm_params:`);
+    lines.push(`      model: openai/${assigned}`);
+    lines.push(`      api_key: os.environ/${k}`);
+    lines.push(`      api_base: https://opencode.ai/zen/v1`);
+  }
+  // Zen free pool: every valid account × every model with ≥1 live entitlement
+  // (assigned always leads). Availability-gated so rotated-away ids (e.g. a
+  // dead muse-spark) never enter the pool and burn router retries.
+  const poolModels = [
+    assigned,
+    ...Object.keys(state.freeModelAvailability ?? {}).filter(
+      (m) => m !== assigned && (state.freeModelAvailability[m]?.length ?? 0) > 0
+    ),
+  ];
   for (const k of state.freeActiveKeys) {
-    for (const m of FREE_MODELS) {
+    for (const m of poolModels) {
       lines.push(`  - model_name: zen-free`);
       lines.push(`    litellm_params:`);
       lines.push(`      model: openai/${m}`);
@@ -296,23 +356,24 @@ export function buildLitellmConfig(state: Pick<PoolState, 'museFreeActiveKeys' |
     }
   }
   // Overflow pools: OpenRouter free variants + Ollama Cloud. Model ids come
-  // from env so they can be updated without code changes:
-  //   OPENROUTER_FREE_LITELLM_MODEL=openrouter/<model>:free
-  //   OLLAMA_CLOUD_LITELLM_MODEL=openai/<cloud-model>
-  if (process.env.OPENROUTER_FREE_LITELLM_MODEL) {
+  // from state (promoted from env during the run) with an env fallback so a
+  // bare buildLitellmConfig call still emits the groups.
+  const orModel = state.openrouterFreeModel ?? process.env.OPENROUTER_FREE_LITELLM_MODEL;
+  const ocModel = state.ollamaCloudModel ?? process.env.OLLAMA_CLOUD_LITELLM_MODEL;
+  if (orModel) {
     lines.push(`  - model_name: openrouter-free`);
     lines.push(`    litellm_params:`);
-    lines.push(`      model: ${JSON.stringify(process.env.OPENROUTER_FREE_LITELLM_MODEL)}`);
+    lines.push(`      model: ${JSON.stringify(orModel)}`);
     lines.push(`      api_key: os.environ/OPENROUTER_API_KEY`);
   }
-  if (process.env.OLLAMA_CLOUD_LITELLM_MODEL) {
+  if (ocModel) {
     for (const k of [
       'OLLAMA_KEY_PRIMARY', 'OLLAMA_KEY_TAP919BEATS', 'OLLAMA_KEY_TAP4500',
       'OLLAMA_KEY_NCSOUND919', 'OLLAMA_KEY_JOHNREDD888', 'OLLAMA_KEY_NCSOUND_ALT',
     ]) {
       lines.push(`  - model_name: ollama-cloud`);
       lines.push(`    litellm_params:`);
-      lines.push(`      model: ${JSON.stringify(process.env.OLLAMA_CLOUD_LITELLM_MODEL)}`);
+      lines.push(`      model: ${JSON.stringify(ocModel)}`);
       lines.push(`      api_key: os.environ/${k}`);
       lines.push(`      api_base: https://ollama.com/v1`);
     }
@@ -333,12 +394,15 @@ export function buildLitellmConfig(state: Pick<PoolState, 'museFreeActiveKeys' |
   lines.push('  allowed_fails: 2');
   lines.push('  num_retries: 2');
   lines.push('  fallbacks:');
-  lines.push('    - opencode-free: ["zen-free", "deepseek"]');
-  lines.push('    - zen-free: ["deepseek"]');
+  lines.push('    - fleet-free: ["zen-free", "ollama-cloud", "openrouter-free", "deepseek"]');
+  lines.push('    - opencode-free: ["fleet-free", "zen-free", "ollama-cloud", "deepseek"]');
+  lines.push('    - zen-free: ["fleet-free", "ollama-cloud", "deepseek"]');
   lines.push('');
   lines.push('general_settings:');
   lines.push('  master_key: os.environ/LITELLM_MASTER_KEY');
-  lines.push('  database_url: null');
+  // NOTE: no `database_url` key at all — setting it to null still makes newer
+  // LiteLLM builds initialise the budget/spend client and 400 with
+  // "No connected db" on proxied calls. Omit ⇒ in-memory only.
   lines.push('  drop_params: true');
   lines.push('');
   lines.push('litellm_settings:');

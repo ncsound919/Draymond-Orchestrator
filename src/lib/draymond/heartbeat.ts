@@ -19,6 +19,10 @@ import { getAllAgents, updateAgentStatus } from '@/lib/registry/agent-store';
 
 const DIR = process.env.DRAYMOND_REGISTRY_DIR ?? path.join(process.cwd(), '.draymond');
 const HEARTBEAT_FILE = path.join(DIR, 'heartbeats.json');
+/** Freshness stamp written on EVERY successful sweep. Kairos reads this to
+ *  detect that the MONITOR ITSELF has died (the Aug-2025 blind week: sweeps
+ *  silently stopped, per-agent records just froze, nothing alerted). */
+const SWEEP_STAMP_FILE = path.join(DIR, 'heartbeat-sweep-stamp');
 
 export interface HeartbeatRecord {
   slug: string;
@@ -110,6 +114,12 @@ export async function runHeartbeatSweep(): Promise<{
   // Persist heartbeat file.
   try {
     await writeBrainFile(HEARTBEAT_FILE, JSON.stringify(heartbeats, null, 2), 'write', 'heartbeat');
+  } catch { /* best-effort */ }
+
+  // Freshness stamp — written unconditionally so its absence/age proves the
+  // sweep stopped, independent of whether any agents are registered.
+  try {
+    await fs.writeFile(SWEEP_STAMP_FILE, new Date().toISOString(), 'utf-8');
   } catch { /* best-effort */ }
 
   const up = services.filter((s) => s.up).length;

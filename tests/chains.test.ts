@@ -14,6 +14,7 @@ const { mockAdmin, mockGetEntity, mockInvokeEntity, mockLogEvent } = vi.hoisted(
         return chain;
       }),
       eq: vi.fn(() => chain),
+      neq: vi.fn(() => chain),
       order: vi.fn(() => chain),
       limit: vi.fn(() => chain),
       in: vi.fn(() => chain),

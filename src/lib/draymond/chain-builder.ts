@@ -327,6 +327,20 @@ async function validateBlueprint(
     errors.push('Chain has no steps');
   }
 
+  // Duplicate step names make depends_on ambiguous and collide ctx.steps keys.
+  const seenNames = new Set<string>();
+  for (const step of blueprint.steps) {
+    if (seenNames.has(step.name)) {
+      errors.push(`Duplicate step name "${step.name}" — names must be unique`);
+    }
+    seenNames.add(step.name);
+  }
+
+  // Index steps by name to detect FORWARD dependencies: a step that depends
+  // on a LATER step compiles cleanly but deterministically fails at runtime
+  // ("Dependencies not met").
+  const orderByName = new Map(blueprint.steps.map((s, i) => [s.name, i]));
+
   for (const step of blueprint.steps) {
     // Check entity exists
     if (!catalogSlugs.has(step.entity_slug)) {
@@ -342,9 +356,18 @@ async function validateBlueprint(
         errors.push(
           `Step "${step.name}" depends on unknown step "${dep}"`
         );
+        continue;
       }
       if (dep === step.name) {
         errors.push(`Step "${step.name}" depends on itself`);
+        continue;
+      }
+      const depIdx = orderByName.get(dep);
+      const ownIdx = orderByName.get(step.name);
+      if (depIdx !== undefined && ownIdx !== undefined && depIdx >= ownIdx) {
+        errors.push(
+          `Step "${step.name}" (order ${ownIdx}) depends on "${dep}" (order ${depIdx}) — dependencies must appear EARLIER in the chain`
+        );
       }
     }
   }

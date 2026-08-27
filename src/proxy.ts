@@ -21,18 +21,27 @@ const CORS_ALLOW_HEADERS =
   'Authorization, Content-Type, X-Review-Token, X-Api-Key';
 const CORS_EXPOSE_HEADERS = 'Content-Type';
 
-function corsHeaders(): Record<string, string> {
-  const origin =
-    process.env.CORS_ORIGIN && process.env.CORS_ORIGIN.trim()
-      ? process.env.CORS_ORIGIN.trim()
-      : '*';
-  return {
-    'Access-Control-Allow-Origin': origin,
+function corsHeaders(requestOrigin?: string | null): Record<string, string> {
+  const configured = process.env.CORS_ORIGIN && process.env.CORS_ORIGIN.trim()
+    ? process.env.CORS_ORIGIN.trim()
+    : '';
+  // Reflect the caller's origin only when explicitly allowlisted; otherwise no
+  // ACAO header at all (browsers block cross-origin reads; non-browser LAN
+  // clients are unaffected). Never default to '*': this dashboard is tunneled
+  // publicly and unauthenticated GET responses (health/registry/catalog) are
+  // otherwise readable by any website the operator visits.
+  const origin = configured === '*' ? '*' : configured;
+  const headers: Record<string, string> = {
     'Access-Control-Allow-Methods': 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': CORS_ALLOW_HEADERS,
     'Access-Control-Expose-Headers': CORS_EXPOSE_HEADERS,
     'Access-Control-Max-Age': '86400',
   };
+  if (origin && requestOrigin && (origin === '*' || origin === requestOrigin)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+    headers['Vary'] = 'Origin';
+  }
+  return headers;
 }
 
 export async function proxy(request: NextRequest) {
@@ -43,13 +52,13 @@ export async function proxy(request: NextRequest) {
     if (request.method === 'OPTIONS') {
       return new NextResponse(null, {
         status: 204,
-        headers: corsHeaders(),
+        headers: corsHeaders(request.headers.get('origin')),
       });
     }
     const response = NextResponse.next({
       request: { headers: request.headers },
     });
-    for (const [key, value] of Object.entries(corsHeaders())) {
+    for (const [key, value] of Object.entries(corsHeaders(request.headers.get('origin')))) {
       response.headers.set(key, value);
     }
     return response;

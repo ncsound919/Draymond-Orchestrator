@@ -57,6 +57,7 @@ export function verifyStripeSignature(rawBody: Buffer, sigHeader: string, secret
 interface StripeEvent {
   id: string;
   type: string;
+  livemode?: boolean;
   data?: {
     object?: {
       id?: string;
@@ -64,6 +65,7 @@ interface StripeEvent {
       currency?: string;
       status?: string;
       refunded?: boolean;
+      amount_refunded?: number;
       created?: number;
       metadata?: Record<string, string>;
     };
@@ -77,10 +79,23 @@ interface StripeEvent {
 export async function recordChargeFromWebhook(event: StripeEvent): Promise<{ recorded: boolean; revenueUsd: number }> {
   const { readState, writeState, recomputeRevenueFromLedger } = await import('@/lib/draymond/treasury-state');
   const state = await readState();
+
+  // Truth gate: test-mode events NEVER enter the revenue ledger. A sk_test_
+  // key or a livemode:false webhook settling into the same ledger as live cash
+  // would fabricate revenue. Reject loudly instead of silently recording.
+  if (event.livemode === false) {
+    console.warn(
+      `[stripe-webhook] REJECTED test-mode event ${event.id} (${event.type}) — test charges are not revenue.`,
+    );
+    return { recorded: false, revenueUsd: Math.round(state.revenueCents / 100) };
+  }
+
   const charge = event.data?.object;
   if (!charge?.id || !charge.amount) return { recorded: false, revenueUsd: Math.round(state.revenueCents / 100) };
 
-  const isRefunded = charge.refunded === true;
+  // Net out partial refunds — Stripe only flips `refunded:true` on FULL refunds.
+  const refundedCents = typeof charge.amount_refunded === 'number' ? charge.amount_refunded : 0;
+  const isRefunded = charge.refunded === true || refundedCents >= charge.amount;
   const settledStatus = isRefunded ? 'refunded' : (charge.status ?? 'unknown');
   const metadata = charge.metadata;
   const value = (metadata?.platform ?? metadata?.product ?? '').toLowerCase();
@@ -91,7 +106,8 @@ export async function recordChargeFromWebhook(event: StripeEvent): Promise<{ rec
 
   state.charges[charge.id] = {
     id: charge.id,
-    amountCents: charge.amount,
+    // Net of partial refunds — `refunded:true` only means FULL refund.
+    amountCents: Math.max(0, charge.amount - refundedCents),
     currency: charge.currency ?? 'usd',
     platform,
     status: settledStatus,

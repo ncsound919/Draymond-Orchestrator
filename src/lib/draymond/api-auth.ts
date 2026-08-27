@@ -45,7 +45,13 @@ function safeCompare(a: string, b: string): boolean {
 export function authorizeRequest(request: NextRequest | Request): NextResponse | null {
   // Explicit opt-in bypass for local manual development only.
   // Tests must NOT set this variable — they exercise the real auth path.
-  if (process.env.ALLOW_INSECURE_DEV_AUTH === 'true') {
+  // Hard-gated to non-production: this app is tunneled publicly, and this
+  // bypass disables ALL API auth. It must never fire on a deployed instance.
+  if (
+    process.env.ALLOW_INSECURE_DEV_AUTH === 'true' &&
+    process.env.NODE_ENV !== 'production'
+  ) {
+    console.warn('[API Auth] ALLOW_INSECURE_DEV_AUTH bypass active (non-production only)');
     return null;
   }
 

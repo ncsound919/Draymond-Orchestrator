@@ -37,9 +37,11 @@ const CWD_OVERRIDES: Record<string, string> = {
   'sports-steve': 'agents/Sports-Steve-main',
   'social-media-dashboard': 'agents/Social-Media-Dashboard--main',
   'mutly': 'agents/Mutly-Daemon-Agent',
-  'bet-buddy': 'agents/Sports-Steve-main/Bet-Buddy--main/backend',
   'uplift-agent': 'agents/Uplift-Agent',
-  'omni-research': 'agents/OmniResearch-Replacement',
+  // OmniResearch: PM2 owns the REAL app (OmniResearch-Pro-main/server.ts).
+  // This override previously pointed at agents/OmniResearch-Replacement — an
+  // 8KB stub that repaired-into a port conflict with the live service.
+  // Health probes resolve via TOOL_PORTS slug; no local start override needed.
   'phoenix': '../04_Integrations/integrations/phoenix',
   'generative-video-ai': '../04_Integrations/integrations/Generative-Video-AI',
   'open-notebook': '../04_Integrations/integrations/open-notebook',
@@ -133,11 +135,6 @@ const START_MAP: Record<string, { command: [string, string[]]; port: number; hea
     command: ['npm', ['run', 'dev', '--', '-p', '3700']],
     port: 3700,
     health: '/api/health',
-  },
-  'bet-buddy': {
-    command: ['node', ['dist/server.js']],
-    port: 3001,
-    health: '/health',
   },
   'claw-protect': {
     command: ['npm', ['run', 'dev']],

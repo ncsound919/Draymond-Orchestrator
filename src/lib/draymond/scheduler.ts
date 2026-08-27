@@ -1061,6 +1061,23 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         };
       }
 
+      if (handler === 'github_awesome_scan') {
+        // Weekly GitHub-Awesome tool-intake scan: channel feed → transcript →
+        // candidates → Dev-Brain /api/intake → .draymond/tool-intake.json +
+        // kairos/hypotheses handoff. Deterministic, no LLM.
+        const { runGithubAwesomeScan } = await import('./github-awesome-scan');
+        const scan = await runGithubAwesomeScan({ quiet: true });
+        return {
+          handler,
+          episode: scan.episode?.title ?? null,
+          candidates: scan.candidates.length,
+          pulled: scan.pulled,
+          topPicks: scan.topPicks.slice(0, 5).map((t) => `${t.title}(${t.compositeTriageScore})`),
+          pruned: scan.pruned.length,
+          handoff: scan.handoff,
+        };
+      }
+
       if (handler === 'ingest_news') {
         const { ingestNews, renderNewsDigest } = await import('./news');
         const { items, errors } = await ingestNews();
@@ -2204,6 +2221,14 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     cron_expression: '0 7 * * *',
     job_type: 'custom',
     job_config: { handler: 'run_overlay_qa' },
+    is_enabled: true,
+  },
+  {
+    name: 'GitHub Awesome Weekly Scan',
+    description: 'Weekly Sunday 6am tool-intake scan of the Github Awesome channel (latest GitHub Trending Weekly video → transcript → Dev-Brain /api/intake → .draymond/tool-intake.json + kairos/hypotheses).',
+    cron_expression: '0 6 * * 0',
+    job_type: 'custom',
+    job_config: { handler: 'github_awesome_scan' },
     is_enabled: true,
   },
   {

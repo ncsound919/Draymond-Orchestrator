@@ -833,6 +833,10 @@ async function executeStep(
   let lastStatusCode: number | undefined; // last HTTP status for retry classification
 
   while (true) {
+    // Reset per-attempt: a stale status code from attempt N must not classify
+    // attempt N+1's (different) error — e.g. a real 429 followed by a fatal
+    // validation error would burn the retry budget on the fatal failure.
+    lastStatusCode = undefined;
     try {
       // Mark step as running
       await updateStepStatus(step.id, 'running', {
@@ -1176,12 +1180,29 @@ export async function executeChain(
     steps: {},
   };
 
-  // Mark chain as running
-  await updateChainStatus(chainId, 'running', {
-    started_at: new Date().toISOString(),
-    lease_expires_at: chainLeaseExpiryIso(new Date()),
-    total_duration_ms: undefined,
-  }, supabase);
+  // Mark chain as running — ATOMICALLY. The read-check above is advisory only:
+  // two concurrent triggers (cron + manual, or overlapping cron ticks) both
+  // passed it historically and double-executed the chain. This claim update
+  // only succeeds when the row is not already 'running'; zero rows updated =
+  // someone else won the race.
+  const claim = await supabase
+    .from('draymond_chains')
+    .update({
+      status: 'running',
+      started_at: new Date().toISOString(),
+      lease_expires_at: chainLeaseExpiryIso(new Date()),
+      total_duration_ms: null,
+    })
+    .eq('id', chainId)
+    .neq('status', 'running')
+    .select('id');
+  if (claim.error) {
+    console.error(`[Draymond Chains] Failed to claim chain ${chainId}: ${claim.error.message}`);
+    throw new Error(`Chain ${chainId} could not be claimed for execution: ${claim.error.message}`);
+  }
+  if (!claim.data || claim.data.length === 0) {
+    throw new Error(`Chain ${chainId} is already running (concurrent execution blocked by atomic claim)`);
+  }
 
   const stopChainHeartbeat = startChainHeartbeat(chainId, supabase);
 

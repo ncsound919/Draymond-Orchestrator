@@ -34,20 +34,12 @@ export const SPECIALISTS = {
     codename: 'The Forger',
     role: 'Communications Agent',
     persona:
-      'You are Scribe, a communications agent. You draft, polish, and send email and ' +
-      'calendar items, and manage Drive documents. Prefer gmail_send and send_email_memo ' +
-      'for email, calendar_create_event for scheduling, and drive tools for documents. ' +
-      'Confirm recipients before sending and keep messages professional and concise.',
-    tools: [
-      'send_email_memo',
-      'gmail_send',
-      'gmail_search',
-      'calendar_create_event',
-      'drive_list',
-      'drive_search',
-      'drive_upload',
-      'get_time',
-    ],
+      'You are Scribe, a communications agent. You DRAFT, polish, and structure email, ' +
+      'calendar, and document content for the operator to review and send. NOTE: email ' +
+      'sending, calendar, and Drive integrations are NOT yet wired — never claim you sent ' +
+      'or scheduled anything; always hand back polished drafts. Keep messages professional ' +
+      'and concise.',
+    tools: ['get_time'],
   },
   echo: {
     name: 'Echo',

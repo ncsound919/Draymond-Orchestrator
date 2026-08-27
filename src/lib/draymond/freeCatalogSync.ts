@@ -30,6 +30,12 @@ export interface FreeCatalogResult {
   candidates: CatalogCandidate[];
   syncedAt: string;
   dryRun?: boolean;
+  /** Previous assignment before this sync rotated it (absent on first run). */
+  prevAssignedModel?: string;
+  /** True when Deepseek Harness/ecosystem.patch.yml was rewritten to the new id. */
+  dshPatched?: boolean;
+  /** True when litellm.yaml was regenerated post-assignment (fleet-free edge). */
+  litellmRegenerated?: boolean;
 }
 
 const PROBE_TIMEOUT_MS = 10_000;
@@ -42,11 +48,13 @@ function registryDir(): string {
   );
 }
 
-/** Read .draymond/model-routing.json (fail-soft: empty object when absent). */
+/** Read .draymond/model-routing.json (fail-soft: empty object when absent).
+ *  Strips a UTF-8 BOM — PowerShell writers emit one and JSON.parse chokes. */
 function readRouting(): Record<string, unknown> {
   try {
     const p = join(registryDir(), 'model-routing.json');
-    return JSON.parse(readFileSync(p, 'utf8')) as Record<string, unknown>;
+    const raw = readFileSync(p, 'utf8');
+    return JSON.parse(raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw) as Record<string, unknown>;
   } catch {
     return {};
   }
@@ -65,6 +73,7 @@ function persistAssignment(
   const updated = {
     ...current,
     assignedFreeModel: model,
+    lastRotatedFrom: typeof current.assignedFreeModel === 'string' ? current.assignedFreeModel : null,
     freeModelList: freeModels,
     lastFreeSyncAt: syncedAt,
     // Keywire vault pool — kept in the catalog so runtimes read accounts + models
@@ -81,6 +90,27 @@ function persistAssignment(
           ],
   };
   writeFileSync(p, JSON.stringify(updated, null, 2), 'utf8');
+}
+
+/**
+ * Rewrites stale free-model ids inside the DeepSeek Harness ecosystem patch so
+ * freshly-booted agents never anchor on an upstream id that has rotated away.
+ * Literal token swap — free ids are unique slugs (e.g. `hy3-free`), safe to
+ * replace everywhere they appear including descriptive comments. OpenRouter
+ * ids contain `/` and never enter this file. Fail-soft by design: a missed
+ * patch only costs one stale boot; pool-health regenerates LiteLLM anyway.
+ */
+function patchDshEcosystemPatch(oldId: string | undefined, newId: string): boolean {
+  if (!oldId || oldId === newId || oldId.includes('/')) return false;
+  try {
+    const p = join(registryDir(), '..', 'Deepseek Harness', 'ecosystem.patch.yml');
+    const text = readFileSync(p, 'utf8');
+    if (!text.includes(oldId)) return false;
+    writeFileSync(p, text.split(oldId).join(newId), 'utf8');
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Probe a single candidate with a cheap completion call. Returns latencyMs and eligibility. */
@@ -190,7 +220,7 @@ export async function runFreeCatalogSync(
 
   // Feature flag
   if (process.env.FREE_CATALOG_SYNC === '0') {
-    const cached = (readRouting().assignedFreeModel as string | undefined) ?? 'muse-spark-1.2-contributor-free';
+    const cached = (readRouting().assignedFreeModel as string | undefined) ?? 'hy3-free';
     return {
       assignedModel: cached,
       latencyMs: 0,
@@ -250,14 +280,32 @@ export async function runFreeCatalogSync(
   ];
 
   // Pick winner: lowest latency eligible candidate, else last known assignment
-  const fallbackDefault = 'muse-spark-1.2-contributor-free';
-  const winner = eligible[0]?.id ?? (readRouting().assignedFreeModel as string | undefined) ?? fallbackDefault;
+  const fallbackDefault = 'hy3-free';
+  const prevAssigned = readRouting().assignedFreeModel as string | undefined;
+  const winner = eligible[0]?.id ?? prevAssigned ?? fallbackDefault;
+
+  let dshPatched = false;
+  let litellmRegenerated = false;
 
   if (!dryRun) {
     persistAssignment(winner, orderedList, syncedAt, false);
+    dshPatched = patchDshEcosystemPatch(prevAssigned, winner);
+    // Regenerate litellm.yaml so the stable `fleet-free` edge group serves the
+    // new winner across every entitled pool account (pool-health owns the
+    // file; this is a batch-time push so rotation lag ≈ zero). Fail-soft: the
+    // scheduled pool_health cron is the eventual-consistency backstop.
+    if (process.env.FREE_CATALOG_LITELLM_REGEN !== '0') {
+      try {
+        const { runPoolHealth } = await import('./pool-health');
+        await runPoolHealth({ restartLitellm: true });
+        litellmRegenerated = true;
+      } catch {
+        /* cron backstop will converge */
+      }
+    }
   }
 
-  console.info(`[freeCatalogSync] assigned=${winner} eligible=${eligible.length}/${probed.length} list=[${orderedList.join(', ')}] dryRun=${dryRun}`);
+  console.info(`[freeCatalogSync] assigned=${winner} eligible=${eligible.length}/${probed.length} list=[${orderedList.join(', ')}] dshPatched=${dshPatched} litellmRegenerated=${litellmRegenerated} dryRun=${dryRun}`);
 
   return {
     assignedModel: winner,
@@ -267,5 +315,8 @@ export async function runFreeCatalogSync(
     candidates: probed,
     syncedAt,
     dryRun,
+    ...(prevAssigned ? { prevAssignedModel: prevAssigned } : {}),
+    ...(dshPatched ? { dshPatched } : {}),
+    ...(litellmRegenerated ? { litellmRegenerated } : {}),
   };
 }

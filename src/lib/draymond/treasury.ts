@@ -22,6 +22,8 @@ interface StripeCharge {
   currency: string;
   status: string;
   refunded?: boolean;
+  amount_refunded?: number;
+  livemode?: boolean;
   created: number;
   metadata?: Record<string, string>;
 }
@@ -41,6 +43,10 @@ function platformFromMetadata(metadata: Record<string, string> | undefined): Tre
 export async function fetchStripeCharges(since: number, until: number): Promise<StripeCharge[]> {
   const secret = process.env.STRIPE_SECRET_KEY;
   if (!secret) throw new Error("STRIPE_SECRET_KEY not configured");
+  // Test-mode keys must never fund the revenue ledger — that fabricates revenue.
+  if (secret.startsWith("sk_test_")) {
+    throw new Error("STRIPE_SECRET_KEY is a TEST key (sk_test_…) — refusing to count test charges as revenue");
+  }
   if (until < since) throw new Error(`invalid window: since ${since} > until ${until}`);
 
   const charges: StripeCharge[] = [];
@@ -109,11 +115,19 @@ export async function runTreasuryPulse(lookbackDays = 30): Promise<TreasuryPulse
   try {
     const charges = await fetchStripeCharges(sinceUnix, untilUnix);
     let newSettled = 0;
+    let skippedTestMode = 0;
     for (const c of charges) {
-      const isRefunded = c.refunded === true;
+      // Truth gate: livemode:false (test) charges never enter the ledger.
+      if (c.livemode === false) {
+        skippedTestMode += 1;
+        continue;
+      }
+      // Net out partial refunds — refunded:true only means FULL refund.
+      const refundedCents = typeof c.amount_refunded === "number" ? c.amount_refunded : 0;
+      const isRefunded = c.refunded === true || refundedCents >= c.amount;
       const settledStatus = isRefunded ? "refunded" : c.status;
       const existing = state.charges[c.id];
-      const amount = c.amount > 0 ? c.amount : 0;
+      const amount = Math.max(0, (c.amount > 0 ? c.amount : 0) - refundedCents);
       state.charges[c.id] = {
         id: c.id,
         amountCents: amount,
@@ -123,6 +137,9 @@ export async function runTreasuryPulse(lookbackDays = 30): Promise<TreasuryPulse
         createdAt: new Date(c.created * 1000).toISOString(),
       };
       if (!existing && settledStatus === "succeeded") newSettled += 1;
+    }
+    if (skippedTestMode > 0) {
+      console.warn(`[treasury] skipped ${skippedTestMode} test-mode charge(s) — not revenue`);
     }
 
     state.revenueCents = recomputeRevenueFromLedger(state);

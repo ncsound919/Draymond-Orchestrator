@@ -1,5 +1,5 @@
 // ============================================================================
-// FLEET MANIFEST — single source of truth for every PM2-managed service
+// FLEET MANIFEST â€” single source of truth for every PM2-managed service
 // ============================================================================
 // The fleet analogue of the kernel's linkmap.txt: one file declares the
 // composition of the whole fleet (script, cwd, port, env, restart policy),
@@ -12,8 +12,8 @@
 //     two roots: UPLIFT_ROOT and the orchestrator dir under it.
 //
 // Env knobs:
-//   UPLIFT_ROOT            — override the ecosystem root (default: C:\Users\User\Downloads\Uplift)
-//   PYTHON_PATH / NODE_PATH— override the interpreter paths (else auto-detected defaults)
+//   UPLIFT_ROOT            â€” override the ecosystem root (default: C:\Users\User\Downloads\Uplift)
+//   PYTHON_PATH / NODE_PATHâ€” override the interpreter paths (else auto-detected defaults)
 // ============================================================================
 
 const fs = require("node:fs");
@@ -22,7 +22,7 @@ const path = require("node:path");
 const UPLIFT_ROOT = process.env.UPLIFT_ROOT || "C:\\Users\\User\\Downloads\\Uplift";
 const ORCH_DIR = path.join(UPLIFT_ROOT, "Draymond-Orchestrator");
 
-// Rooted path helpers — the ONLY place ecosystem paths are derived.
+// Rooted path helpers â€” the ONLY place ecosystem paths are derived.
 const P = (rel) => path.join(UPLIFT_ROOT, rel); // uplift-rooted
 const O = (rel) => path.join(ORCH_DIR, rel);     // orchestrator-rooted
 
@@ -35,7 +35,7 @@ function loadEnvLocal(file = path.join(ORCH_DIR, ".env.local")) {
       if (m && !(m[1] in env)) env[m[1]] = m[2].replace(/^"|"$/g, "");
     }
   } catch {
-    // No .env.local — the process will fail-fast on missing keys.
+    // No .env.local â€” the process will fail-fast on missing keys.
   }
   return env;
 }
@@ -54,7 +54,7 @@ const CLOUDFLARED_BIN =
 
 /**
  * Build a PM2 app object from manifest data. Every service gets the same
- * self-healing restart policy and structured logs under data/logs — declared
+ * self-healing restart policy and structured logs under data/logs â€” declared
  * once here instead of pasted into 24 app blocks.
  */
 function pm2App({
@@ -95,16 +95,29 @@ function pm2App({
   return app;
 }
 
-// ── Draymond control plane (ecosystem.config.js) ────────────────────────────
+// â”€â”€ Draymond control plane (ecosystem.config.js) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// When TURBOPACK_ROOT is a parent directory (pnpm-store junction layout), the
+// standalone server nests at .next/standalone/<app-dir>/server.js.
+const STANDALONE_NESTED_SERVER = path.join(
+  ORCH_DIR,
+  ".next",
+  "standalone",
+  path.basename(ORCH_DIR),
+  "server.js"
+);
+const STANDALONE_DIR = fs.existsSync(STANDALONE_NESTED_SERVER)
+  ? path.dirname(STANDALONE_NESTED_SERVER)
+  : O(".next/standalone");
 const CORE_APP = pm2App({
   name: "draymond",
-  script: O(".next/standalone/server.js"),
+  script: path.join(STANDALONE_DIR, "server.js"),
   cwd: ORCH_DIR,
   memory: process.env.DRAYMOND_MAX_MEMORY_RESTART || "1G",
   env: {
     ...D,
     NODE_ENV: "production",
     PORT: process.env.PORT || "3444",
+    TURBOPACK_ROOT: UPLIFT_ROOT,
     DRAYMOND_DB_PATH: path.join(ORCH_DIR, "data", "draymond.db"),
     DRAYMOND_REGISTRY_DIR: path.join(ORCH_DIR, ".draymond"),
     GMAIL_USE_OAUTH: "1",
@@ -116,7 +129,7 @@ const CORE_APP = pm2App({
   },
 });
 
-// ── Fleet services (ecosystem.fleet.config.js) ──────────────────────────────
+// â”€â”€ Fleet services (ecosystem.fleet.config.js) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const FLEET_SERVICES = [
   pm2App({
     name: "cloudflared",
@@ -164,7 +177,7 @@ const FLEET_SERVICES = [
     memory: "1G",
     env: { ...D, NODE_ENV: "production" },
   }),
-  // OmniResearch Pro — deep-research analyst (Gemini / Ollama / SearXNG).
+  // OmniResearch Pro â€” deep-research analyst (Gemini / Ollama / SearXNG).
   // Research-squad lead. Runs on :3010 (OMNI_RESEARCH_URL) so KeyWire keeps :3000.
   pm2App({
     name: "omniresearch",
@@ -215,11 +228,11 @@ const FLEET_SERVICES = [
   }),
   pm2App({
     name: "litellm",
-    script:
-      process.env.LITELLM_BIN ||
-      "C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python310\\Scripts\\litellm.exe",
-    args: "--config litellm.yaml --port 4100",
+    // Wrapper loads .env.local + data/litellm.env (KeyWire-vault pool keys)
+    // before spawning litellm; spawning litellm directly skips the pool.
+    script: "scripts/litellm-pool.js",
     cwd: ORCH_DIR,
+    interpreter: NODE,
     memory: "1G",
     env: {
       ...D,
@@ -237,14 +250,6 @@ const FLEET_SERVICES = [
     node_args: "--import tsx",
     memory: "1G",
     env: { PORT: "3100", NODE_ENV: "production", ...D },
-  }),
-  pm2App({
-    name: "bet-buddy",
-    script: "dist/server.js",
-    cwd: O("agents/Sports-Steve-main/Bet-Buddy--main/backend"),
-    interpreter: NODE,
-    memory: "512M",
-    env: { PORT: "3001", NODE_ENV: "production", ...D },
   }),
   pm2App({
     name: "bbtech-web-app",
@@ -265,7 +270,7 @@ const FLEET_SERVICES = [
     env: {
       PORT: "3070",
       NODE_ENV: "development",
-      NEXT_PUBLIC_BRAIN_URL: D.NEXT_PUBLIC_BRAIN_URL || "http://localhost:3210",
+      NEXT_PUBLIC_BRAIN_URL: D.NEXT_PUBLIC_BRAIN_URL || "http://localhost:8000",
       NEXT_PUBLIC_DRAYMOND_URL: D.NEXT_PUBLIC_DRAYMOND_URL || "http://localhost:3444",
       GEMINI_API_KEY: D.GEMINI_API_KEY || "",
       ...D,
@@ -294,14 +299,14 @@ const FLEET_SERVICES = [
     memory: "512M",
     env: { NODE_ENV: "development", PORT: "5175" },
   }),
-  // Overlay Global Lens — public research/news outlet. Reads ecosystem research
+  // Overlay Global Lens â€” public research/news outlet. Reads ecosystem research
   // from .draymond/*.json (via DRAPMOND_DIR) and the Overlay Science research
   // outputs (via OVERLAY_RESEARCH_DIR), plus Draymond's HTTP endpoints.
   // Runs its own SQLite (app.sqlite) for fast public serving. Port 3090 is the
   // fleet dev port (Draymond owns 3000/3444).
   pm2App({
     name: "global-lens",
-    script: P("Overlay-Global-Lens/dist/server.cjs"),
+    script: P("Overlay-Global-Lens/dist/server.mjs"),
     cwd: P("Overlay-Global-Lens"),
     interpreter: NODE,
     memory: "1G",
@@ -322,7 +327,7 @@ const FLEET_SERVICES = [
     },
   }),
 
-  // Comic Metaphor Engine — serves /api/map, /api/search, /api/lesson to the
+  // Comic Metaphor Engine â€” serves /api/map, /api/search, /api/lesson to the
   // Global Lens outlet (and the rest of the fleet). Port 8100. Its KB (240
   // protocols) includes the 20 business-Marvel seed arcs shared with the outlet.
   pm2App({
@@ -333,9 +338,51 @@ const FLEET_SERVICES = [
     memory: "1G",
     env: { ...D, NODE_ENV: "production", PYTHONIOENCODING: "utf-8" },
   }),
+  pm2App({
+    name: "dev-brain",
+    script: P("Dev-Brain/dist/server.cjs"),
+    args: "",
+    cwd: P("Dev-Brain"),
+    interpreter: NODE,
+    memory: "256M",
+    env: { PORT: "3450", HOST: "127.0.0.1", NODE_ENV: "production" },
+  }),
+  pm2App({
+    name: "halofy",
+    script: P("04_Integrations/github-awesome/halofy/kernel/node_modules/tsx/dist/cli.mjs"),
+    args: "src/http/main.ts",
+    cwd: P("04_Integrations/github-awesome/halofy/kernel"),
+    interpreter: NODE,
+    memory: "512M",
+    env: { HALOMEM_PORT: "8787", NODE_ENV: "production" },
+  }),
+  pm2App({
+    name: "eidos",
+    script: "C:\\Users\\User\\.local\\bin\\eidos.exe",
+    args: "serve C:\\Users\\User\\Downloads\\Uplift\\Draymond-Orchestrator\\data\\eidos\\fleet.eidos --port 8420",
+    cwd: ORCH_DIR,
+    memory: "256M",
+    env: { PORT: "8420" },
+  }),
+  pm2App({
+    name: "buzz-relay",
+    script: P("04_Integrations/github-awesome/buzz/pm2-buzz-relay.cjs"),
+    args: "",
+    cwd: P("04_Integrations/github-awesome/buzz"),
+    interpreter: NODE,
+    memory: "512M",
+  }),
+  pm2App({
+    name: "rome",
+    script: P("04_Integrations/github-awesome/rome/pm2-rome.cjs"),
+    args: "",
+    cwd: P("04_Integrations/github-awesome/rome"),
+    interpreter: NODE,
+    memory: "512M",
+  }),
 ];
 
-// ── Marketing / coding stack (ecosystem.marketing.config.js) ────────────────
+// â”€â”€ Marketing / coding stack (ecosystem.marketing.config.js) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const REDIS_BIN =
   process.env.REDIS_BIN ||
@@ -371,7 +418,7 @@ const SMD_ENV = {
 };
 
 const MARKETING_SERVICES = [
-  // Redis — message broker and result backend for Celery.
+  // Redis â€” message broker and result backend for Celery.
   // The Windows service exists but is stopped by default; PM2 manages it here
   // so the whole SMD stack starts and stops together.
   pm2App({
@@ -392,7 +439,7 @@ const MARKETING_SERVICES = [
     env: SMD_ENV,
   }),
 
-  // Celery worker — executes video generation, campaign sends, and AI copy tasks.
+  // Celery worker â€” executes video generation, campaign sends, and AI copy tasks.
   // Runs in the ai_tasks + default queues. Requires smd-redis to be healthy first.
   pm2App({
     name: "smd-celery",
@@ -405,7 +452,7 @@ const MARKETING_SERVICES = [
     env: SMD_ENV,
   }),
 
-  // Celery beat — triggers recurring tasks: campaign scheduler (every 5 min)
+  // Celery beat â€” triggers recurring tasks: campaign scheduler (every 5 min)
   // and analytics sync (every 60 min), as defined in celeryconfig.py.
   pm2App({
     name: "smd-beat",
@@ -418,7 +465,7 @@ const MARKETING_SERVICES = [
     env: SMD_ENV,
   }),
 
-  // Browser automation micro-service — Playwright-powered posting for Instagram,
+  // Browser automation micro-service â€” Playwright-powered posting for Instagram,
   // TikTok, YouTube, LinkedIn, and X. Port 8040. Sessions persisted to disk.
   // Requires: `playwright install chromium` run once in the SMD virtualenv.
   pm2App({
@@ -437,19 +484,6 @@ const MARKETING_SERVICES = [
     },
   }),
 
-  pm2App({
-    name: "opencode",
-    script: OPENCODE_BIN,
-    args: "serve --port 4096",
-    cwd: ORCH_DIR,
-    memory: "1G",
-    env: {
-      NODE_ENV: "production",
-      OPENCODE_SERVER_PASSWORD: D.OPENCODE_SERVER_PASSWORD || "ocpass",
-      OPENCODE_API_KEY: D.OPENCODE_API_KEY || "",
-      OPENCODE_MODEL: D.OPENCODE_MODEL || "opencode/deepseek-v4-flash",
-    },
-  }),
   pm2App({
     name: "grader",
     script: O("agents/Grader-main/node_modules/tsx/dist/cli.mjs"),
@@ -517,18 +551,18 @@ const MARKETING_SERVICES = [
   }),
 ];
 
-// ── DeepSeek Harness — ecosystem-aware LLM router (dsh web, port 3080) ───────
-// Routes OpenCode (Ox Alpha free primary → DeepSeek fallback) through the harness llm seam.
-// Ecosystem overlay: C:/Users/User/Downloads/Deepseek Harness/ecosystem.patch.yml
+// â”€â”€ DeepSeek Harness â€” ecosystem-aware LLM router (dsh web, port 3080) â”€â”€â”€â”€â”€â”€â”€
+// Routes OpenCode (Ox Alpha free primary â†’ DeepSeek fallback) through the harness llm seam.
+// Ecosystem overlay: C:/Users/User/Downloads/Uplift/Deepseek Harness/ecosystem.patch.yml
 // Harness home: %DSH_HOME% (default ~/.dsh) or UPLIFT_ROOT-adjacent .dsh-home
-const DSH_DIR = process.env.DSH_DIR || "C:\\Users\\User\\Downloads\\Deepseek Harness\\deepseek-harness-master";
+const DSH_DIR = process.env.DSH_DIR || path.join(UPLIFT_ROOT, "Deepseek Harness", "deepseek-harness-master");
 const DSH_SERVICES = [
   pm2App({
     name: "dsh-harness",
     script: NODE,
     // NOTE: --patch must come directly after `web`; once the parser sees an
     // unknown option (--port) everything after is passed to the web app.
-    args: "--import tsx apps/cli/src/bin.ts web --patch \"C:/Users/User/Downloads/Deepseek Harness/ecosystem.patch.yml\" --port 3080",
+    args: "--import tsx apps/cli/src/bin.ts web --patch \"C:/Users/User/Downloads/Uplift/Deepseek Harness/ecosystem.patch.yml\" --port 3080",
     cwd: DSH_DIR,
     memory: "1G",
     env: {
@@ -538,7 +572,7 @@ const DSH_SERVICES = [
       DSH_HOME: process.env.DSH_HOME || path.join(UPLIFT_ROOT, ".dsh-home"),
       UPLIFT_ROOT,
       DRAYMOND_REGISTRY_DIR: path.join(ORCH_DIR, ".draymond"),
-      // LLM routing — Ox Alpha free primary, DeepSeek direct fallback
+      // LLM routing â€” Ox Alpha free primary, DeepSeek direct fallback
       OPENCODE_API_KEY: D.OPENCODE_API_KEY || "",
       DEEPSEEK_API_KEY: D.DEEPSEEK_API_KEY || "",
       DEEPSEEK_BASE_URL: D.DEEPSEEK_BASE_URL || "https://api.deepseek.com",
@@ -547,7 +581,7 @@ const DSH_SERVICES = [
   }),
 ];
 
-// ── Deterministic brain (ecosystem.brain.config.js) ─────────────────────────
+// â”€â”€ Deterministic brain (ecosystem.brain.config.js) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const BRAIN_DIR = O("agents/deterministic-brain");
 const BRAIN_SERVICES = [
   pm2App({
@@ -558,7 +592,7 @@ const BRAIN_SERVICES = [
     memory: "1G",
     env: {
       ...D,
-      API_PORT: "3210",
+      API_PORT: D.API_PORT || "8000",
       UVICORN_WORKERS: "1",
       SOUL_PATH: path.join(BRAIN_DIR, ".soul.yaml"),
       NODE_ENV: "production",
@@ -578,3 +612,4 @@ module.exports = {
   DSH_SERVICES,
   BRAIN_SERVICES,
 };
+

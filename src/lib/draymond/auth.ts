@@ -14,7 +14,11 @@ export async function requireDraymondAuth(): Promise<
   try {
     // Explicit opt-in bypass for local manual development only.
     // Unit tests must NOT set this variable so they exercise real auth paths.
-    if (process.env.ALLOW_INSECURE_DEV_AUTH === 'true') {
+    // Non-production only — never on the publicly tunneled instance.
+    if (
+      process.env.ALLOW_INSECURE_DEV_AUTH === 'true' &&
+      process.env.NODE_ENV !== 'production'
+    ) {
       return { user: { id: 'local-dev-admin', email: 'admin@localhost' } };
     }
 

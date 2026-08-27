@@ -170,6 +170,22 @@ export async function appliedRepairs(signal: string, sinceMs: number): Promise<R
 }
 
 /**
+ * Repair EXECUTIONS (applied or attempted-and-failed) for a signal within
+ * `sinceMs`. The loop guard uses this: failed executions must count, or a
+ * broken repair command re-runs forever.
+ */
+async function executedRepairs(signal: string, sinceMs: number): Promise<RepairAttempt[]> {
+  const log = await readLog();
+  const since = Date.now() - sinceMs;
+  return log.filter(
+    (a) =>
+      a.signal === signal &&
+      (a.status === "applied" || (a.status === "escalated" && a.action.safe && a.action.command.length > 0)) &&
+      new Date(a.detectedAt).getTime() >= since,
+  );
+}
+
+/**
  * Detect repair loops: the same signal auto-repaired repeatedly within the
  * loop window. A loop means the blind repair is NOT working — escalate.
  */
@@ -199,6 +215,32 @@ export async function detectRepairLoops(limit = 20): Promise<RepairLoopReport[]>
   return reports.slice(-limit);
 }
 
+/**
+ * Resolve an affected service slug from a failure-signal detail string.
+ * Monitor/job details carry human names ("Uplift Agent down", "monitor
+ * omniresearch-pro down") — match them against TOOL_PORTS names/slugs so
+ * monitor:down repairs target a concrete service instead of escalating as
+ * "service: unknown" forever.
+ */
+export async function resolveServiceFromDetail(detail: string): Promise<string | null> {
+  try {
+    const { TOOL_PORTS } = await import("./ports");
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const d = norm(detail);
+    if (!d) return null;
+    // Longest name first so "Hermes Proxy" wins over partial overlaps.
+    const candidates = TOOL_PORTS.filter((t) => typeof t.port === "number").sort(
+      (a, b) => b.name.length - a.name.length,
+    );
+    for (const t of candidates) {
+      if (d.includes(norm(t.name)) || d.includes(norm(t.slug))) return t.slug;
+    }
+  } catch {
+    /* ports table unavailable — fall through to escalation */
+  }
+  return null;
+}
+
 /** Run a repair action. Only `safe` actions are executed; loops are escalated. */
 export async function attemptRepair(signal: string, detail: string): Promise<RepairAttempt> {
   // Benign whitelist: record the attempt as skipped, never dispatch, escalate,
@@ -217,7 +259,68 @@ export async function attemptRepair(signal: string, detail: string): Promise<Rep
   }
 
   const map = loadRepairMap();
-  const action = map[signal];
+  let action = map[signal];
+
+  // monitor:down — resolve the concrete service and attempt a real start.
+  // Uses the service-manager's proven start recipes (same path the bootstrap
+  // uses), never restartService (its win32 branch taskkills ALL node.exe,
+  // which would kill draymond itself). Unresolvable/unstartable services
+  // still escalate, but with a precise detail instead of "unknown".
+  if (signal === "monitor:down" && (!action || !action.safe)) {
+    const slug = await resolveServiceFromDetail(detail);
+    if (slug) {
+      const sm = await import("./service-manager");
+      if (!sm.canStartService(slug)) {
+        const attempt: RepairAttempt = {
+          id: `rp_${Date.now()}`,
+          detectedAt: new Date().toISOString(),
+          signal,
+          action: { name: `start:${slug}`, service: slug, command: [], safe: false },
+          status: "escalated",
+          detail: `Service "${slug}" resolved but has no local start recipe/deps — escalate. ${detail}`,
+        };
+        await appendLog(attempt);
+        return attempt;
+      }
+      // Per-service loop guard (cooldown keyed on slug, not the generic signal).
+      const log = await readLog();
+      const since = Date.now() - cooldownMs();
+      const recent = log.filter(
+        (a) => a.signal === signal && a.status === "applied" && a.action.service === slug &&
+          new Date(a.detectedAt).getTime() >= since,
+      );
+      if (recent.length >= maxInCooldown()) {
+        const attempt: RepairAttempt = {
+          id: `rp_${Date.now()}`,
+          detectedAt: new Date().toISOString(),
+          signal,
+          action: { name: `start:${slug}`, service: slug, command: [], safe: false },
+          status: "escalated",
+          detail: `Repair loop for "${slug}" — ${recent.length} starts within cooldown. Cooling down; on-call. ${detail}`,
+        };
+        await appendLog(attempt);
+        await recordRepairOutcome(attempt);
+        return attempt;
+      }
+      const health = await sm.startService(slug);
+      const attempt: RepairAttempt = {
+        id: `rp_${Date.now()}`,
+        detectedAt: new Date().toISOString(),
+        signal,
+        action: { name: `start:${slug}`, service: slug, command: ["internal:start-service", slug], safe: true },
+        status: health.up ? "applied" : "escalated",
+        detail: health.up
+          ? `Started "${slug}" — healthy at ${health.url}. ${detail}`
+          : `Start attempt for "${slug}" failed health check: ${health.detail}`,
+      };
+      await appendLog(attempt);
+      await recordRepairOutcome(attempt);
+      return attempt;
+    }
+    // No service resolved — fall through to static-map escalation below, but
+    // do not re-attempt every cycle: the escalation itself is the record.
+  }
+
   const attempt: RepairAttempt = {
     id: `rp_${Date.now()}`,
     detectedAt: new Date().toISOString(),
@@ -242,10 +345,13 @@ export async function attemptRepair(signal: string, detail: string): Promise<Rep
   }
 
   // Failure-loop guard: don't blindly re-apply the same repair on a loop.
-  const recent = await appliedRepairs(signal, cooldownMs());
+  // Counts APPLIED and FAILED-EXECUTION attempts: a repair whose command fails
+  // every time used to record only "escalated" (which the guard ignores), so
+  // it re-executed unbounded on every detection cycle.
+  const recent = await executedRepairs(signal, cooldownMs());
   if (recent.length >= maxInCooldown()) {
     attempt.status = "escalated";
-    attempt.detail = `Repair loop detected for "${signal}" — ${recent.length} auto-repairs within the cooldown window. Cooling down; on-call. ${detail}`;
+    attempt.detail = `Repair loop detected for "${signal}" — ${recent.length} repair attempts within the cooldown window. Cooling down; on-call. ${detail}`;
     await appendLog(attempt);
     await recordRepairOutcome(attempt);
     return attempt;
