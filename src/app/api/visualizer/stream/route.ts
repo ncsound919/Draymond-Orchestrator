@@ -1,5 +1,6 @@
 import { subscribeToStream } from '@/lib/draymond/event-bridge';
 import type { StreamSubscriber } from '@/lib/draymond/event-bridge';
+import { requireDraymondAuth } from '@/lib/draymond/auth';
 
 export interface SseEnvelope {
   type: string;
@@ -24,6 +25,8 @@ export async function GET(request: Request) {
   if (origin && !origin.includes(host)) {
     return new Response('forbidden', { status: 403 });
   }
+  const auth = await requireDraymondAuth();
+  if (auth.error) return auth.error;
   const encoder = new TextEncoder();
   let unsub: (() => void) | null = null;
   let heartbeat: ReturnType<typeof setInterval> | null = null;
