@@ -28,9 +28,13 @@ export default function VisualizerApp() {
     if (!host) return;
     let app: Application | null = null;
     let scene: SceneHandle | null = null;
+    let disposed = false;
     (async () => {
-      app = new Application();
-      await app.init({
+      const a = new Application();
+      // init() must resolve before destroy() is safe (Pixi's ResizePlugin only
+      // installs _cancelResize during init). Keep `app` null until ready so the
+      // cleanup below never destroys a half-initialized instance.
+      await a.init({
         width: host.clientWidth,
         height: host.clientHeight,
         background: 0x0b0b1a,
@@ -38,16 +42,18 @@ export default function VisualizerApp() {
         resolution: window.devicePixelRatio || 1,
         autoDensity: true,
       });
-      if (!host.isConnected) { app.destroy(true, { children: true, texture: true }); return; }
-      host.appendChild(app.canvas);
-      scene = createScene(app);
+      if (disposed || !host.isConnected) { a.destroy(true, { children: true, texture: true }); return; }
+      app = a;
+      host.appendChild(a.canvas);
+      scene = createScene(a);
       scene.onBuildingClick((slug) => setSelected(stateRef.current.buildings[slug] ?? null));
-      appRef.current = app;
+      appRef.current = a;
       sceneRef.current = scene;
     })();
     return () => {
+      disposed = true;
       scene?.destroy();
-      app?.destroy(true, { children: true, texture: true });
+      if (app) app.destroy(true, { children: true, texture: true });
       appRef.current = null;
       sceneRef.current = null;
     };
