@@ -1898,6 +1898,7 @@ interface JobSeedDef {
   job_type: 'chain' | 'health_check' | 'notification' | 'decay_sweep' | 'custom';
   job_config: Record<string, unknown>;
   notify_on_failure?: boolean;
+  notify_on_success?: boolean;
   is_enabled?: boolean;
 }
 
@@ -2181,6 +2182,20 @@ const JOB_DEFS: JobSeedDef[] = [
     notify_on_failure: true,
   },
 
+  // ── Staffing Commission Payout (Friday 09:00) ────────────────────────
+  // Fires the commission engine's payout endpoint weekly. Eligibility rules
+  // (settled + 7d dispute window + active agent + $5 min) live in the engine;
+  // this job is just the trigger. 09:00 Friday gives operators time to review
+  // accrued commissions before funds move to agents.
+  {
+    name: 'Staffing Commission Payout',
+    cron_expression: '0 9 * * 5',
+    job_type: 'custom',
+    job_config: { handler: 'commission_payout' },
+    notify_on_failure: true,
+    notify_on_success: true,
+  },
+
   // ── Editorial Morning Push (7AM daily) ──────────────────────────────
   {
     name: 'Editorial Morning Push',
@@ -2451,7 +2466,7 @@ export async function seedBusinessAutomation(): Promise<BusinessSeedResult> {
             job_config: def.job_config,
             is_enabled: def.is_enabled ?? true,
             notify_on_failure: def.notify_on_failure ?? false,
-            notify_on_success: false,
+            notify_on_success: def.notify_on_success ?? false,
             max_retries: 1,
             timeout_seconds: 300,
             next_run_at: getNextRunTime(def.cron_expression).toISOString(),

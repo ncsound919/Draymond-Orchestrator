@@ -683,6 +683,11 @@ export const CUSTOM_HANDLERS: CustomHandlerDef[] = [
   { handler: 'finance_strategy_brief', label: 'Finance Strategy Brief', description: 'Pull the finance-connect daily strategy brief for the treasurer/strategist.' },
   { handler: 'finance_goals_sync', label: 'Finance Goals Sync', description: 'Sync capability-grounded finance goals into draymond_goals.' },
   { handler: 'wf_mission_sync', label: 'Mission Workflow Sync', description: 'Daily mission pipeline + revenue-vs-target sync (the 09:30 agenda step).' },
+  {
+    handler: 'commission_payout',
+    label: 'Staffing Commission Payout',
+    description: 'Run weekly commission payout: find all eligible accrued commissions (settled, 7+ days, active agents), create Stripe Connect transfers, update payout records. Fires every Friday at 09:00.',
+  },
 ];
 
 /**
@@ -1695,6 +1700,55 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
           total: dash.opportunities.total,
           byStage: dash.opportunities.byStage,
           staleLeads: stale.map((o) => o.id),
+        };
+      }
+
+      if (handler === 'commission_payout') {
+        // Weekly staffing commission payout (every Friday). The commission
+        // engine owns the payout logic (eligibility, Stripe Connect transfers,
+        // commission status updates); we just trigger it via HTTP. Reads the
+        // engine URL + API key from env. Fails loudly so a misconfigured key
+        // is obvious — silent skip would let payouts stack up unnoticed.
+        const base = (process.env.COMMISSION_ENGINE_URL ?? 'http://127.0.0.1:8003').replace(/\/+$/, '');
+        const apiKey = process.env.COMMISSION_ENGINE_API_KEY ?? '';
+        if (!apiKey) {
+          throw new Error(
+            'commission_payout: COMMISSION_ENGINE_API_KEY is not set; refusing to run silently.'
+          );
+        }
+        const res = await fetch(`${base}/api/v1/payouts/run`, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${apiKey}`,
+          },
+          body: '{}',
+          signal: AbortSignal.timeout(120_000),
+        });
+        if (!res.ok) {
+          const body = await res.text();
+          throw new Error(`commission_engine HTTP ${res.status}: ${body.slice(0, 500)}`);
+        }
+        const result = (await res.json()) as {
+          payouts?: Array<{
+            id: string;
+            agent_id: string;
+            amount: string;
+            status: string;
+            stripe_transfer_id: string | null;
+          }>;
+          errors?: string[];
+        };
+        return {
+          handler,
+          triggered_at: new Date().toISOString(),
+          payouts_total: result.payouts?.length ?? 0,
+          payouts_completed: (result.payouts ?? []).filter((p) => p.status === 'completed').length,
+          payouts_failed: (result.payouts ?? []).filter((p) => p.status === 'failed').length,
+          total_amount: (result.payouts ?? [])
+            .filter((p) => p.status === 'completed')
+            .reduce((sum, p) => sum + Number(p.amount), 0),
+          errors: result.errors ?? [],
         };
       }
 
