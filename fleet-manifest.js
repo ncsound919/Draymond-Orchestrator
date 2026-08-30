@@ -170,6 +170,23 @@ const FLEET_SERVICES = [
     env: { ...D, NODE_ENV: "production" },
   }),
   pm2App({
+    name: "commission-engine",
+    script: PYTHON,
+    args: "-m uvicorn commission_engine.main:app --host 127.0.0.1 --port 8003",
+    cwd: P("05_Apps/Staffing-Commission-Engine"),
+    memory: "1G",
+    env: {
+      ...D,
+      NODE_ENV: "production",
+      DATABASE_URL: D.STAFFING_COMMISSION_DATABASE_URL || D.DATABASE_URL || "",
+      STRIPE_SECRET_KEY: D.STRIPE_SECRET_KEY || "",
+      STRIPE_WEBHOOK_SECRET: D.STRIPE_WEBHOOK_SECRET || "",
+      OPERATOR_API_KEY: D.OPERATOR_API_KEY || "",
+      COMMISSION_ENGINE_URL: D.COMMISSION_ENGINE_URL || "https://commission.overlay365.com",
+      PORT: "8003",
+    },
+  }),
+  pm2App({
     name: "bookbridge",
     script: PYTHON,
     args: "main.py --http-only",
