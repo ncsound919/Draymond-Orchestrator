@@ -522,6 +522,14 @@ const MARKETING_SERVICES = [
       NODE_ENV: "development",
       AGENT_API_KEY: D.AGENTBROWSER_API_KEY || "local-dev-agent-key",
       DATABASE_URL: "file:./dev.db",
+      // Keywire vault integration for autonomous credential resolution.
+      // KEYWIRE_SERVICE_TOKEN must be set in Draymond's .env.local (a JWT minted
+      // in the Keywire console). Without it, /api/v1/credentials + sql-executor
+      // report keywire_unconfigured (honest degrade — never fabricated secrets).
+      KEYWIRE_URL: D.KEYWIRE_URL || "http://localhost:3000",
+      KEYWIRE_SERVICE_TOKEN: D.KEYWIRE_SERVICE_TOKEN || "",
+      KEYWIRE_PROJECT_ID: D.KEYWIRE_PROJECT_ID || "default",
+      KEYWIRE_ENV_SLUG: D.KEYWIRE_ENV_SLUG || "production",
     },
   }),
   pm2App({
