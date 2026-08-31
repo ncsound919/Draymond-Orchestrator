@@ -2196,6 +2196,18 @@ const JOB_DEFS: JobSeedDef[] = [
     notify_on_success: true,
   },
 
+  // ── Staffing Commission Monthly Reset (1st 00:05) ────────────────────
+  // Resets all agents' monthly_sales_volume + tier to bronze on the 1st.
+  // Lazy reset in attribution covers idle engines, but this is the canonical
+  // monthly boundary. Idempotent: safe to re-run.
+  {
+    name: 'Staffing Commission Monthly Reset',
+    cron_expression: '5 0 1 * *',
+    job_type: 'custom',
+    job_config: { handler: 'commission_monthly_reset' },
+    notify_on_failure: true,
+  },
+
   // ── Editorial Morning Push (7AM daily) ──────────────────────────────
   {
     name: 'Editorial Morning Push',

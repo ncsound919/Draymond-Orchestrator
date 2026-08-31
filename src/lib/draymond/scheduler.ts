@@ -688,6 +688,11 @@ export const CUSTOM_HANDLERS: CustomHandlerDef[] = [
     label: 'Staffing Commission Payout',
     description: 'Run weekly commission payout: find all eligible accrued commissions (settled, 7+ days, active agents), create Stripe Connect transfers, update payout records. Fires every Friday at 09:00.',
   },
+  {
+    handler: 'commission_monthly_reset',
+    label: 'Staffing Commission Monthly Reset',
+    description: 'Reset all agents monthly_sales_volume to 0 and tier to bronze on the 1st of each month (00:05). Fires 1st at 00:05.',
+  },
 ];
 
 /**
@@ -1729,27 +1734,64 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
           const body = await res.text();
           throw new Error(`commission_engine HTTP ${res.status}: ${body.slice(0, 500)}`);
         }
-        const result = (await res.json()) as {
-          payouts?: Array<{
-            id: string;
-            agent_id: string;
-            amount: string;
-            status: string;
-            stripe_transfer_id: string | null;
-          }>;
-          errors?: string[];
-        };
+        const raw = (await res.json()) as
+          | Array<{
+              id: string;
+              agent_id: string;
+              amount: string;
+              status: string;
+              stripe_transfer_id: string | null;
+            }>
+          | {
+              payouts?: Array<{
+                id: string;
+                agent_id: string;
+                amount: string;
+                status: string;
+                stripe_transfer_id: string | null;
+              }>;
+              errors?: string[];
+            };
+        const payouts = Array.isArray(raw) ? raw : (raw.payouts ?? []);
+        const errors = Array.isArray(raw) ? [] : (raw.errors ?? []);
         return {
           handler,
           triggered_at: new Date().toISOString(),
-          payouts_total: result.payouts?.length ?? 0,
-          payouts_completed: (result.payouts ?? []).filter((p) => p.status === 'completed').length,
-          payouts_failed: (result.payouts ?? []).filter((p) => p.status === 'failed').length,
-          total_amount: (result.payouts ?? [])
+          payouts_total: payouts.length,
+          payouts_completed: payouts.filter((p) => p.status === 'completed').length,
+          payouts_failed: payouts.filter((p) => p.status === 'failed').length,
+          total_amount: payouts
             .filter((p) => p.status === 'completed')
             .reduce((sum, p) => sum + Number(p.amount), 0),
-          errors: result.errors ?? [],
+          errors,
         };
+      }
+
+      if (handler === 'commission_monthly_reset') {
+        // Monthly tier reset — 00:05 on the 1st. Resets all agents' monthly
+        // volume + tier to bronze. Idempotent: safe to re-run same day.
+        const base = (process.env.COMMISSION_ENGINE_URL ?? 'http://127.0.0.1:8003').replace(/\/+$/, '');
+        const apiKey = process.env.COMMISSION_ENGINE_API_KEY ?? '';
+        if (!apiKey) {
+          throw new Error(
+            'commission_monthly_reset: COMMISSION_ENGINE_API_KEY is not set; refusing to run silently.'
+          );
+        }
+        const res = await fetch(`${base}/api/v1/maintenance/reset-monthly-volumes`, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${apiKey}`,
+          },
+          body: '{}',
+          signal: AbortSignal.timeout(30_000),
+        });
+        if (!res.ok) {
+          const body = await res.text();
+          throw new Error(`commission_engine HTTP ${res.status}: ${body.slice(0, 500)}`);
+        }
+        const data = (await res.json()) as { reset: number };
+        return { handler, triggered_at: new Date().toISOString(), reset: data.reset };
       }
 
       console.log(
