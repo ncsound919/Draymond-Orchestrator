@@ -26,22 +26,15 @@ def test_gravity_and_flow_bounds():
     assert flow_index(tempo=0.6, possession_quality=0.9) >= 0.0
 
 
-def test_ter_score_fallback_matches_bbtech_formula(monkeypatch):
-    monkeypatch.setattr(cm, "_BBTECH_AVAILABLE", False)
-    assert cm.ter_score(85.0, 92.0, 55.0, 65.0, -68.0, -78.0, 24.0) == 23.76125
+def test_ter_score_uses_authoritative_formula():
+    """The in-module TER formula is the authoritative reference (bbtech import is dead code)."""
+    assert ter_score(85.0, 92.0, 55.0, 65.0, -68.0, -78.0, 24.0) == 23.76125
+    assert ter_score(85.0, 92.0, 55.0, 65.0, -68.0, -78.0, 0.0) == 0.0
 
 
-def test_ter_score_zero_cell_cycle_returns_zero(monkeypatch):
-    monkeypatch.setattr(cm, "_BBTECH_AVAILABLE", False)
-    assert cm.ter_score(85.0, 92.0, 55.0, 65.0, -68.0, -78.0, 0.0) == 0.0
-
-
-def test_four_factors_clearance_parity(monkeypatch):
-    live = cm.four_factors(88, 60, 50, 30)
-    monkeypatch.setattr(cm, "_BBTECH_AVAILABLE", False)
-    fallback = cm.four_factors(88, 60, 50, 30)
-    assert fallback["clearance"] == 37.5
-    assert fallback["clearance"] == live["clearance"]
+def test_four_factors_clearance_formula_direct():
+    res = four_factors(88, 60, 50, 30)
+    assert res["clearance"] == 37.5
 
 
 def test_four_factors_from_performance_real_values():
