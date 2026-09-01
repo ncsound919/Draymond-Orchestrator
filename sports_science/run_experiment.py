@@ -20,7 +20,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from sports_science.betting_pipeline import run_experiment, run_forward_test  # noqa: E402
-from sports_science.validation_engine import utc_now_iso  # noqa: E402
+from sports_science.validation_engine import require_honest, utc_now_iso  # noqa: E402
 from sports_science.evidence import worst_tier  # noqa: E402
 
 
@@ -49,6 +49,25 @@ def _metrics(results) -> list[dict]:
     return out
 
 
+@require_honest
+def _run_experiment_inner(from_date: str, to_date: str, max_games: int) -> dict:
+    results, report = run_experiment(
+        from_date=from_date, to_date=to_date, max_games=max_games
+    )
+    metrics = _metrics(results)
+    for m in metrics:
+        m["name"] = m["name"].replace("betting_experiment.", "betting_experiment.")
+    return {
+        "ok": True,
+        "kind": "betting_experiment",
+        "domain": "sports",
+        "metrics": metrics,
+        "evidence_tier": worst_tier({m.get("name", str(i)): m for i, m in enumerate(metrics)}),
+        "report": report,
+        "generated_at": utc_now_iso(),
+    }
+
+
 def _main() -> int:
     parser = argparse.ArgumentParser(description="Overlay Science betting experiment pipeline")
     parser.add_argument("--from", dest="from_date", default="2010-01-01")
@@ -62,22 +81,24 @@ def _main() -> int:
             results, report = run_forward_test(
                 from_date=args.from_date, to_date=args.to_date, max_games=args.max_games
             )
-        else:
-            results, report = run_experiment(
-                from_date=args.from_date, to_date=args.to_date, max_games=args.max_games
-            )
             metrics = _metrics(results)
             for m in metrics:
-                m["name"] = m["name"].replace("betting_experiment.", "betting_experiment.forward." if args.forward else "betting_experiment.")
+                m["name"] = m["name"].replace(
+                    "betting_experiment.", "betting_experiment.forward."
+                )
             output = {
                 "ok": True,
-                "kind": "betting_experiment" + (".forward" if args.forward else ""),
+                "kind": "betting_experiment.forward",
                 "domain": "sports",
                 "metrics": metrics,
                 "evidence_tier": worst_tier({m.get("name", str(i)): m for i, m in enumerate(metrics)}),
                 "report": report,
                 "generated_at": utc_now_iso(),
             }
+            print(json.dumps(output, default=str))
+            return 0
+        else:
+            output = _run_experiment_inner(args.from_date, args.to_date, args.max_games)
             print(json.dumps(output, default=str))
             return 0
     except Exception as exc:  # noqa: BLE001

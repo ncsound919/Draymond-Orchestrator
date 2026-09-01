@@ -25,11 +25,13 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from sports_science.sports_model import TeamFormModel  # noqa: E402
-from sports_science.validation_engine import utc_now_iso  # noqa: E402
+from sports_science.validation_engine import require_honest, utc_now_iso  # noqa: E402
 from sports_science.evidence import worst_tier  # noqa: E402
 
 
-def _win_prob_metrics(model: TeamFormModel, home: str, away: str, date: str) -> list[dict[str, Any]]:
+@require_honest
+def _win_prob_metrics(home: str, away: str, date: str) -> list[dict[str, Any]]:
+    model = TeamFormModel()
     result = model.win_probability(home, away, date)
     if result.get("status") != "ok":
         return [
@@ -60,7 +62,9 @@ def _win_prob_metrics(model: TeamFormModel, home: str, away: str, date: str) -> 
     ]
 
 
-def _totals_metrics(model: TeamFormModel, team: str, line: float, date: str) -> list[dict[str, Any]]:
+@require_honest
+def _totals_metrics(team: str, line: float, date: str) -> list[dict[str, Any]]:
+    model = TeamFormModel()
     result = model.total_over_probability(team, line, date)
     if result.get("status") != "ok":
         return [
@@ -88,7 +92,9 @@ def _totals_metrics(model: TeamFormModel, team: str, line: float, date: str) -> 
     ]
 
 
-def _player_metrics(model: TeamFormModel, player: str, line: float, date: str) -> list[dict[str, Any]]:
+@require_honest
+def _player_metrics(player: str, line: float, date: str) -> list[dict[str, Any]]:
+    model = TeamFormModel()
     result = model.player_points_over_probability(player, line, date)
     if result.get("status") != "ok":
         return [
@@ -116,7 +122,9 @@ def _player_metrics(model: TeamFormModel, player: str, line: float, date: str) -
     ]
 
 
-def _market_metrics(model: TeamFormModel, from_date: str, to_date: str, max_games: int) -> list[dict[str, Any]]:
+@require_honest
+def _market_metrics(from_date: str, to_date: str, max_games: int) -> list[dict[str, Any]]:
+    model = TeamFormModel()
     result = model.market_benchmark(from_date=from_date, to_date=to_date, max_games=max_games)
     if result.get("status") != "ok":
         return [
@@ -147,7 +155,9 @@ def _market_metrics(model: TeamFormModel, from_date: str, to_date: str, max_game
     ]
 
 
-def _backtest_metrics(model: TeamFormModel, from_date: str, to_date: str, max_games: int) -> list[dict[str, Any]]:
+@require_honest
+def _backtest_metrics(from_date: str, to_date: str, max_games: int) -> list[dict[str, Any]]:
+    model = TeamFormModel()
     result = model.backtest(from_date=from_date, to_date=to_date, max_games=max_games)
     if result.get("status") != "ok":
         return [
@@ -220,17 +230,16 @@ def _main() -> int:
 
     args = parser.parse_args()
     try:
-        model = TeamFormModel()
         if args.command == "query":
-            metrics = _win_prob_metrics(model, args.home, args.away, args.date)
+            metrics = _win_prob_metrics(args.home, args.away, args.date)
         elif args.command == "totals":
-            metrics = _totals_metrics(model, args.team, args.line, args.date)
+            metrics = _totals_metrics(args.team, args.line, args.date)
         elif args.command == "player":
-            metrics = _player_metrics(model, args.player, args.line, args.date)
+            metrics = _player_metrics(args.player, args.line, args.date)
         elif args.command == "market":
-            metrics = _market_metrics(model, args.from_date, args.to_date, args.max_games)
+            metrics = _market_metrics(args.from_date, args.to_date, args.max_games)
         elif args.command == "backtest":
-            metrics = _backtest_metrics(model, args.from_date, args.to_date, args.max_games)
+            metrics = _backtest_metrics(args.from_date, args.to_date, args.max_games)
         else:  # pragma: no cover
             metrics = []
         print(json.dumps(build_output(args.command, metrics, "sports"), default=str))
