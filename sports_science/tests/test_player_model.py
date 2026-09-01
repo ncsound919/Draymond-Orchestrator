@@ -30,3 +30,25 @@ def test_player_impact_estimate_returns_float():
     val = player_impact_estimate(plus_minus=10.0, possessions=500)
     assert isinstance(val, float)
     assert val != 10.0  # shrunk toward prior
+
+
+def test_holdout_validation_tier_is_e2_or_e3():
+    from sports_science.player_model import validate_player_model
+    seasons = {
+        s: [{"score": 0.5 + 0.3 * i + s * 0.01, "outcome": 1 if (0.5 + 0.3 * i + s * 0.01) > 0.5 else 0}
+            for i in range(40)]
+        for s in range(2010, 2016)
+    }
+    res = validate_player_model(seasons, holdout_season=2015)
+    assert res["status"] in ("ok", "unavailable")
+    if res["status"] == "ok":
+        assert res["evidence_tier"] in ("E2", "E3")
+        assert "concordance" in res
+
+
+def test_holdout_validation_unavailable_when_small():
+    from sports_science.player_model import validate_player_model
+    seasons = {2015: [{"score": 0.5, "outcome": 1}]}
+    res = validate_player_model(seasons, holdout_season=2015)
+    assert res["status"] == "unavailable"
+    assert res["evidence_tier"] == "E4"

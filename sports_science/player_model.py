@@ -49,3 +49,28 @@ def player_impact_estimate(
         return float(prior_mean)
     raw_rate = float(plus_minus) / float(possessions)
     return shrinkage(raw_rate, int(possessions), prior_mean=prior_mean, prior_strength=prior_strength)
+
+
+def validate_player_model(seasons: dict, holdout_season: int,
+                          k: int = 5, seed: int = 7, min_n: int = 40,
+                          bootstraps: int = 50) -> dict:
+    records = seasons.get(holdout_season, [])
+    if len(records) < max(2 * k, 2):
+        return {"status": "unavailable",
+                "reason": f"holdout season {holdout_season} has {len(records)} records",
+                "evidence_tier": "E4"}
+    val = validate_predictor(records, k=k, seed=seed, min_n=min_n, bootstraps=bootstraps)
+    if val.get("status") == "unavailable":
+        return val
+    return {
+        "status": "ok",
+        "concordance": val["concordance"],
+        "ci_low": val["ci_low"],
+        "ci_high": val["ci_high"],
+        "calibration_error": val["calibration_error"],
+        "n": val["n"],
+        "evidence_tier": val["evidence_tier"],
+        "provenance": provenance_record(
+            "player_model.validate", {"holdout_season": holdout_season},
+            {"k": k, "seed": seed}, CODE_VERSION),
+    }
