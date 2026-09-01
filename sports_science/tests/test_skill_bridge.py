@@ -9,11 +9,11 @@ def test_executor_returns_agentresult_like_shape():
     ctx = type("Ctx", (), {"experiment_id": "exp_test"})()
     out = asyncio.run(executor(inputs, ctx))
     assert out["success"] is False
-    assert out["evidence_tier"] == "E1"
+    assert out["evidence_tier"] == "E4"
     assert out["error"]  # missing dataset surfaces as an error, not a false success
     # LabDirector reads AgentResult attributes, not just dict keys
     assert out.success is False
-    assert out.evidence_tier == "E1"
+    assert out.evidence_tier == "E4"
     assert out.logs == []
 
 

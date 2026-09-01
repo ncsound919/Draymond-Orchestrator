@@ -14,26 +14,41 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from sports_science.codex_metrics import ter_score, four_factors, gravity_index, flow_index  # noqa: E402
+from sports_science.codex_metrics import ter_score, four_factors, four_factors_from_performance, gravity_index, flow_index  # noqa: E402
 from sports_science.evidence import grade_metric  # noqa: E402
 from sports_science.injury_risk import fatigue_score, injury_risk_percent, recovery_priority  # noqa: E402
 from sports_science.clinical import baseline_form, projected_availability, availability_tier  # noqa: E402
 
 
-def compute_metrics_from_json(input_path: Path) -> dict[str, Any]:
-    raw = json.loads(Path(input_path).read_text(encoding="utf-8"))
+def worst_tier(metrics: dict) -> str:
+    order = ["E1", "E2", "E3", "E4"]
+    worst = None
+    for v in metrics.values():
+        if isinstance(v, dict) and isinstance(v.get("evidence_tier"), str):
+            t = v["evidence_tier"]
+            if t in order and (worst is None or order.index(t) > order.index(worst)):
+                worst = t
+    return worst or "E3"
+
+
+def compute_metrics_from_raw(raw: dict) -> dict[str, Any]:
     p = raw.get("performance", {})
     b = raw.get("biometrics", {})
     ter = ter_score(
         fg=p.get("fg", 0.0), tp=p.get("tp", 0.0), ast=p.get("ast", 0.0),
         oreb=p.get("oreb", 0.0), tov=p.get("tov", 0.0), pf=p.get("pf", 0.0),
     )
-    factors = four_factors(
-        proliferation=p.get("proliferation", 50.0),
-        clearance=p.get("clearance", 50.0),
-        resource=p.get("resource", 50.0),
-        metastasis=p.get("metastasis", 50.0),
-    )
+    # four factors: use explicit values when present, otherwise derive the
+    # analogy factors from the real performance line (never flat defaults).
+    if any(k in p for k in ("proliferation", "clearance", "resource", "metastasis")):
+        factors = four_factors(
+            proliferation=p.get("proliferation", 50.0),
+            clearance=p.get("clearance", 50.0),
+            resource=p.get("resource", 50.0),
+            metastasis=p.get("metastasis", 50.0),
+        )
+    else:
+        factors = four_factors_from_performance(p)
     gravity = gravity_index(
         defensive_attention=p.get("defensive_attention", 0.5),
         court_spacing=p.get("court_spacing", 0.5),
@@ -49,6 +64,13 @@ def compute_metrics_from_json(input_path: Path) -> dict[str, Any]:
     availability = projected_availability(fatigue, risk_frac, b.get("acute_chronic", 1.0))
     form = baseline_form(ter, gravity, flow)
     acute_chronic = b.get("acute_chronic", 1.0)
+    graded = {
+        "ter_evidence": {"evidence_tier": grade_metric("ter", ter, source="derived")},
+        "fatigue_evidence": {"evidence_tier": grade_metric("fatigue", fatigue, source="derived")},
+        "injury_risk_evidence": {"evidence_tier": grade_metric("injury_risk", risk, source="derived")},
+        "baseline_form_evidence": {"evidence_tier": grade_metric("baseline_form", form, source="derived")},
+        "availability_evidence": {"evidence_tier": grade_metric("availability", availability, source="derived")},
+    }
     return {
         "sport": raw.get("sport", "unknown"),
         "ter": ter,
@@ -68,8 +90,13 @@ def compute_metrics_from_json(input_path: Path) -> dict[str, Any]:
         "availability_evidence": grade_metric("availability", availability, source="derived"),
         "availability_tier": availability_tier(risk_frac),
         "acute_chronic": acute_chronic,
-        "evidence_tier": "E1",
+        "evidence_tier": worst_tier(graded),
     }
+
+
+def compute_metrics_from_json(input_path: Path) -> dict[str, Any]:
+    raw = json.loads(Path(input_path).read_text(encoding="utf-8"))
+    return compute_metrics_from_raw(raw)
 
 
 def _main() -> int:

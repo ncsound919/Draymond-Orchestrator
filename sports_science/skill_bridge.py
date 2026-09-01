@@ -20,11 +20,11 @@ def _metric_result(inputs: dict, ctx: Any) -> dict:
     dataset = inputs.get("dataset", "")
     path = Path(dataset)
     if not path.exists():
-        return {"success": False, "data": {}, "error": f"dataset not found: {dataset}", "evidence_tier": "E1"}
+        return {"success": False, "data": {}, "error": f"dataset not found: {dataset}", "evidence_tier": "E4"}
     try:
-        return {"success": True, "data": compute_metrics_from_json(path), "error": None, "evidence_tier": "E1"}
+        return {"success": True, "data": compute_metrics_from_json(path), "error": None, "evidence_tier": "E2"}
     except (OSError, ValueError) as e:
-        return {"success": False, "data": {}, "error": f"metrics computation failed: {e}", "evidence_tier": "E1"}
+        return {"success": False, "data": {}, "error": f"metrics computation failed: {e}", "evidence_tier": "E4"}
 
 
 def _coach_result(inputs: dict, ctx: Any) -> dict:
@@ -40,7 +40,7 @@ def _coach_result(inputs: dict, ctx: Any) -> dict:
         upstream = inputs.get("upstream_results") or {}
         metrics = next((v for v in upstream.values() if isinstance(v, dict) and "ter" in v), None)
     plan = build_gameplan(sport=inputs.get("sport", "basketball"), metrics_file=metrics)
-    return {"success": plan["status"] == "ok", "data": plan, "error": plan.get("message"), "evidence_tier": "E1"}
+    return {"success": plan["status"] == "ok", "data": plan, "error": plan.get("message"), "evidence_tier": "E3"}
 
 
 _EXECUTORS: dict[str, Callable[[dict, Any], dict]] = {

@@ -19,7 +19,7 @@ def test_full_statcrew_to_coach_dag(tmp_path):
 
     # Step 1: stat_crew produces metrics (mimics LabDirector task t1 completion)
     metrics_result = asyncio.run(stat_crew({"dataset": str(sample)}, ctx))
-    assert metrics_result["evidence_tier"] == "E1"
+    assert metrics_result["evidence_tier"] == "E2"
     assert metrics_result["data"]["injury_risk"] > 0.0  # poor HRV + high load raises risk above zero
     assert "recovery_priority" in metrics_result["data"]
 

@@ -116,5 +116,5 @@ def gameplan_response(metrics: dict) -> dict:
         "availability_tier": tier,
         "minutes": minutes,
         "recommendation": recommendation,
-        "evidence_tier": "E1",
+        "evidence_tier": "E3",
     }
