@@ -85,3 +85,22 @@ def test_reproducibility_debt_is_true_when_determinism_fails(monkeypatch):
         assert result["reproducibility_debt"] is True
     finally:
         os.unlink(path)
+
+
+def test_insights_from_player_metrics_profile():
+    """A player-metric profile (usage, per-100 output) synthesizes into insights
+    with non-empty translated metrics — proving the translation bridge consumes
+    player-level signals."""
+    from sports_science.run_insights import _derived_profile
+    from science_bridge.insights import synthesize
+    profile = {
+        "performance": {"fg": 55.0, "tp": 30.0, "ast": 5.0, "oreb": 4.0,
+                        "tov": -2.5, "pf": -3.0, "defensive_attention": 0.7,
+                        "court_spacing": 0.4},
+        "biometrics": {"hrv": 60.0, "load": 0.75, "acute_chronic": 1.1, "sleep_hrs": 7.0},
+        "player_metrics": {"usage": 0.28, "points_per_100": 32.0},
+    }
+    derived = _derived_profile(profile, "sports")
+    report = synthesize(derived, from_domain="sports")
+    assert len(report.translated_metrics) >= 4
+    assert report.source_read != "no profile metrics detected"

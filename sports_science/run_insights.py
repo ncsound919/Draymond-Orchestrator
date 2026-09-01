@@ -59,6 +59,14 @@ def _derived_profile(profile: dict, domain: str) -> dict:
     if "performance" not in profile and "biometrics" not in profile:
         return dict(profile)
     derived = dict(compute_metrics_from_raw(profile))
+    # Fold PBP player metrics into the four-factor analogy (labeled E3-analogy).
+    pm = profile.get("player_metrics", {})
+    if isinstance(pm, dict):
+        usage = pm.get("usage")
+        if isinstance(usage, (int, float)):
+            ff = derived.get("four_factors") or {}
+            ff["proliferation"] = max(0.0, min(100.0, float(ff.get("proliferation", 50)) * (0.5 + float(usage))))
+            derived["four_factors"] = ff
     if domain == "sports":
         # synthesize()'s sports branch reads injury_risk as a 0-1 fraction, but
         # compute_metrics_from_raw returns a 0-100 percent — normalize here.
