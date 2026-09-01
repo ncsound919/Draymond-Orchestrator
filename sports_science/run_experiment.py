@@ -51,18 +51,21 @@ def _metrics(results) -> list[dict]:
 
 @require_honest
 def _run_experiment_inner(from_date: str, to_date: str, max_games: int) -> dict:
+    """Decorated with @require_honest — returns E4 UnavailableResult on any exception
+    (e.g. missing sports_model.db) instead of crashing. This changes the CLI exit code from
+    1 to 0 for previously-fatal FileNotFoundError; downstream consumers should check
+    the metrics' evidence_tier, not just the exit code."""
     results, report = run_experiment(
         from_date=from_date, to_date=to_date, max_games=max_games
     )
     metrics = _metrics(results)
-    for m in metrics:
-        m["name"] = m["name"].replace("betting_experiment.", "betting_experiment.")
+    tier = worst_tier({m.get("name", str(i)): m for i, m in enumerate(metrics)}) or "E4"
     return {
         "ok": True,
         "kind": "betting_experiment",
         "domain": "sports",
         "metrics": metrics,
-        "evidence_tier": worst_tier({m.get("name", str(i)): m for i, m in enumerate(metrics)}),
+        "evidence_tier": tier,
         "report": report,
         "generated_at": utc_now_iso(),
     }
