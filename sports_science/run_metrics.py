@@ -15,20 +15,9 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from sports_science.codex_metrics import ter_score, four_factors, four_factors_from_performance, gravity_index, flow_index  # noqa: E402
-from sports_science.evidence import grade_metric  # noqa: E402
+from sports_science.evidence import grade_metric, worst_tier  # noqa: E402
 from sports_science.injury_risk import fatigue_score, injury_risk_percent, recovery_priority  # noqa: E402
 from sports_science.clinical import baseline_form, projected_availability, availability_tier  # noqa: E402
-
-
-def worst_tier(metrics: dict) -> str:
-    order = ["E1", "E2", "E3", "E4"]
-    worst = None
-    for v in metrics.values():
-        if isinstance(v, dict) and isinstance(v.get("evidence_tier"), str):
-            t = v["evidence_tier"]
-            if t in order and (worst is None or order.index(t) > order.index(worst)):
-                worst = t
-    return worst or "E3"
 
 
 def compute_metrics_from_raw(raw: dict) -> dict[str, Any]:
@@ -40,7 +29,7 @@ def compute_metrics_from_raw(raw: dict) -> dict[str, Any]:
     )
     # four factors: use explicit values when present, otherwise derive the
     # analogy factors from the real performance line (never flat defaults).
-    if any(k in p for k in ("proliferation", "clearance", "resource", "metastasis")):
+    if all(k in p for k in ("proliferation", "clearance", "resource", "metastasis")):
         factors = four_factors(
             proliferation=p.get("proliferation", 50.0),
             clearance=p.get("clearance", 50.0),

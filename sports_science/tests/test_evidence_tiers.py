@@ -36,3 +36,14 @@ def test_run_experiment_tier_not_gated_on_profit():
                        "bets": 900, "n": 1200, "verdict": ""})()
     ])
     assert metrics[0]["evidence_tier"] == "E2"
+
+
+def test_run_experiment_low_bets_is_e3():
+    from sports_science.run_experiment import _metrics
+    metrics = _metrics([
+        type("R", (), {"name": "m", "roi": 0.10, "concordance": 0.55, "ci_low": 0.50,
+                       "ci_high": 0.60, "brier": 0.24, "calibration_error": 0.02,
+                       "gap": 0.02, "gap_p_positive": 0.6, "roi_p_positive": 0.5,
+                       "bets": 100, "n": 200, "verdict": ""})()
+    ])
+    assert metrics[0]["evidence_tier"] == "E3"

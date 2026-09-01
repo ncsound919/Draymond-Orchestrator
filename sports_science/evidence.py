@@ -27,13 +27,41 @@ def grade_metric(metric: str, value: float | None = None, source: str = "derived
     return "E2"
 
 
+def best_tier(metrics: dict) -> str:
+    """Return the best (lowest-index) evidence tier among nested dict values.
+
+    Best-wins aggregation — use this for PROMOTING tier summaries.
+    Use worst_tier for runner envelope aggregation where any failure should downgrade.
+    """
+    tiers = [v["evidence_tier"] for v in metrics.values()
+             if isinstance(v, dict) and v.get("evidence_tier") in EVIDENCE_TIERS]
+    if not tiers:
+        return "E4"
+    for t in EVIDENCE_TIERS:
+        if t in tiers:
+            return t
+    return "E4"
+
+
+def worst_tier(graded: dict) -> str:
+    """Return the worst (highest-index) evidence tier among nested dict values.
+
+    Any-failure-downgrade aggregation — use this for runner envelope aggregation.
+    Use best_tier for PROMOTING tier summaries where the best sub-tier should bubble up.
+    """
+    worst = None
+    for v in graded.values():
+        if isinstance(v, dict) and isinstance(v.get("evidence_tier"), str):
+            t = v["evidence_tier"]
+            if t in EVIDENCE_TIERS and (worst is None or EVIDENCE_TIERS.index(t) > EVIDENCE_TIERS.index(worst)):
+                worst = t
+    return worst or "E3"
+
+
 def grade_profile(metrics: dict) -> dict:
-    """Attach an evidence_tier summary to a metrics dict (best available tier)."""
-    if isinstance(metrics, dict) and "evidence_tier" in metrics:
-        return metrics
-    tiers = []
-    for v in metrics.values():
-        if isinstance(v, dict) and "evidence_tier" in v:
-            tiers.append(v["evidence_tier"])
-    best = "E1" if "E1" in tiers else "E2" if "E2" in tiers else "E3" if "E3" in tiers else "E4"
-    return {"evidence_tier": best}
+    """Attach an evidence_tier summary to a metrics dict (best available tier).
+
+    Deprecated: use best_tier() for the string return value, or worst_tier()
+    for the downgrade-aggregation semantics.
+    """
+    return {"evidence_tier": best_tier(metrics)}
