@@ -33,6 +33,8 @@ export const DAY_FLOW: OrchestrationStep[] = [
   { id: 'news', phase: 'morning', time: '06:00', job: 'ingest_news', purpose: 'Current events into the fleet', feedsTo: ['overlay-strategist', 'omniresearch-pro'] },
   { id: 'research-rotation', phase: 'morning', time: '06:00', job: 'research_rotation', purpose: 'Drain the highest-priority ready science/sports experiment', feedsTo: ['deterministic-brain', 'overlay-strategist'] },
   { id: 'market', phase: 'morning', time: '07:00', job: 'fetch_market_data', purpose: 'Crypto + papers snapshot', feedsTo: ['overlay-treasurer', 'trading-agents', 'ghostfolio-engine', 'sports-steve'] },
+  { id: 'oss-marketing-up', phase: 'morning', time: '08:00', job: 'oss_marketing_stack', purpose: 'Start OSS marketing team (Shlink, Postiz, Listmonk, Twenty, Formbricks)', feedsTo: ['social-media-dashboard', 'mission-pipeline'] },
+  { id: 'strategy', phase: 'morning', time: '06:30', job: 'strategy_team', purpose: 'Overlay Strategist scan: intel brief + venture scout + roadmap clusters', feedsTo: ['overlay-strategist', 'mission-pipeline'] },
   { id: 'qa', phase: 'morning', time: '07:00', job: 'run_overlay_qa', purpose: 'Site integrity pass', feedsTo: ['overlay-auditor'] },
   { id: 'treasury', phase: 'morning', time: '08:00', job: 'treasury_pulse', purpose: 'Cash pulse with market context', feedsTo: ['mission-pipeline'] },
   { id: 'finance-strategy', phase: 'morning', time: '08:15', job: 'finance_strategy_brief', purpose: 'Book-grounded daily finance strategy brief', feedsTo: ['overlay-treasurer', 'overlay-strategist', 'fs-agent'] },
@@ -49,6 +51,7 @@ export const DAY_FLOW: OrchestrationStep[] = [
   { id: 'knowledge', phase: 'night', time: '02:20', job: 'bookbridge', purpose: 'Knowledge pipeline (library → synthesis → vector → memory)' },
   // ── Evening — prepare next day ──────────────────────────────────────────
   { id: 'eve-marketing', phase: 'evening', time: '20:00', job: 'marketing-pulse', purpose: 'Build next-day marketing tools' },
+  { id: 'oss-marketing-status', phase: 'evening', time: '22:30', job: 'oss_marketing_stack', purpose: 'OSS marketing team status before night stop', feedsTo: ['mission-pipeline'] },
   { id: 'repair-shift', phase: 'evening', time: '18:00', job: 'repair_shift', purpose: 'Daily repair team shift — code-review audit, fix + upgrade the ecosystem, benchmark improvements, self-learn' },
   { id: 'research-grade', phase: 'evening', time: '18:30', job: 'research_grade_loop', purpose: 'Breakthrough-potential grading of CureMind/BB-Tech research output' },
   // ── Night — learn + build while idle ────────────────────────────────────

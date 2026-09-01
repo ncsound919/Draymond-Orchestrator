@@ -2,7 +2,7 @@ export type EvidenceTier = 'E1' | 'E2' | 'E3' | 'E4';
 
 // Known engines; unknowns fall through to the widened string so they stay valid
 // (dag.ts maps unrecognized engines to the E3 evidence tier).
-export type EngineName = 'stat_crew' | 'coach' | 'math_core' | 'sim-kernel' | 'translation' | 'insights' | 'formula' | 'layers' | 'derive' | (string & {});
+export type EngineName = 'stat_crew' | 'coach' | 'math_core' | 'sim-kernel' | 'translation' | 'insights' | 'formula' | 'layers' | 'derive' | 'model' | (string & {});
 
 // Note: TaskStatus.'done' contributes to an experiment-level status of
 // 'completed' (see ExperimentStatus). dag.ts `statusOf` performs the mapping.

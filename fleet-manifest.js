@@ -141,16 +141,34 @@ const FLEET_SERVICES = [
   }),
   pm2App({
     name: "hermes-brain",
-    script: "server.js",
-    cwd: O("hermes-proxy"),
-    interpreter: NODE,
+    // The REAL NousResearch Hermes agent (api_server on 8642) — boots via the
+    // gateway launcher (regenerates ~/.hermes/config.yaml from .env.local,
+    // sets OPENCODE_ZEN/GO keys, then `hermes gateway`). The chat role moved
+    // off hermes-proxy to this api_server in Phase 1; Open-Chat's HermesClient
+    // talks to it on 8642.
+    script: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    args: "-NoProfile -ExecutionPolicy Bypass -File scripts/start-hermes-gateway.ps1",
+    cwd: ORCH_DIR,
     memory: "1G",
     env: {
-      HERMES_PROXY_PORT: "8642",
       NODE_ENV: "production",
       API_SERVER_HOST: D.API_SERVER_HOST || "127.0.0.1",
       API_SERVER_PORT: D.API_SERVER_PORT || "8642",
       API_SERVER_KEY: D.API_SERVER_KEY || "",
+    },
+  }),
+  // Hermes Proxy — media + voice only (no chat). Chat moved to hermes-brain
+  // (8642); this runs the Node proxy on HERMES_PROXY_PORT=8648 so the two no
+  // longer collide on 8642. Open-Chat's phone UI voice goes here.
+  pm2App({
+    name: "hermes-proxy",
+    script: "server.js",
+    cwd: O("hermes-proxy"),
+    interpreter: NODE,
+    memory: "512M",
+    env: {
+      HERMES_PROXY_PORT: "8648",
+      NODE_ENV: "production",
     },
   }),
   pm2App({
@@ -225,7 +243,9 @@ const FLEET_SERVICES = [
     args: "main.py --serve --port 8050 --host 0.0.0.0",
     cwd: O("agents/Sub-Team-main"),
     memory: "1G",
-    env: { ...D, NODE_ENV: "production" },
+    // PYTHONUTF8=1 required: the CPU RTL pipeline prints Unicode diagnostics and
+    // crashes with UnicodeEncodeError on a cp1252 console without it.
+    env: { ...D, NODE_ENV: "production", PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" },
   }),
   pm2App({
     name: "overlay-chain",
@@ -305,6 +325,35 @@ const FLEET_SERVICES = [
       NODE_ENV: "development",
       SYSTEM_AGENT_KEY: D.SYSTEM_AGENT_KEY || "",
       SYSTEM_AGENT_APPROVAL_SECRET: D.SYSTEM_AGENT_APPROVAL_SECRET || "",
+    },
+  }),
+  // Big Homie — task supervision / evidence checks / QA harness backend.
+  // FastAPI web server binds 8888 (config.py server_port). AgentBrowser's
+  // Big-Homie client already targets ws://localhost:8888 + /tools/status +
+  // /execute — this entry makes it an always-on, pm2-supervised service.
+  pm2App({
+    name: "big-homie",
+    script: PYTHON,
+    args: "big_homie_web.py",
+    cwd: O("agents/AgentBrowser-main/Big-Homie-main"),
+    memory: "1G",
+    env: { NODE_ENV: "production" },
+  }),
+  // Vibe-Reality — Gemini "reality-check" repo auditor (deep-score loop's
+  // third scorer). VIBE_REALITY_LOCAL=1 skips Firebase auth for fleet-internal
+  // scoring; production tiering still requires an idToken.
+  pm2App({
+    name: "vibe-reality",
+    script: "server.ts",
+    cwd: O("agents/Vibe-Reality-main"),
+    interpreter: NODE,
+    node_args: "--import tsx",
+    memory: "512M",
+    env: {
+      PORT: "3202",
+      NODE_ENV: "production",
+      VIBE_REALITY_LOCAL: "1",
+      GEMINI_API_KEY: D.GEMINI_API_KEY || "",
     },
   }),
   pm2App({
@@ -435,6 +484,23 @@ const SMD_ENV = {
 };
 
 const MARKETING_SERVICES = [
+  // opencode - headless codegen serve (codegen fallback for the repair team).
+  // Pinned to the paid opencode Go tier (deepseek-v4-flash). Reads the Go key
+  // from ~/.local/share/opencode/account.json; OPENCODE_MODEL must stay pinned
+  // or the serve wedges.
+  pm2App({
+    name: "opencode",
+    script: OPENCODE_BIN,
+    args: "serve --port 4096",
+    cwd: ORCH_DIR,
+    interpreter: NODE,
+    memory: "512M",
+    env: {
+      OPENCODE_MODEL: "opencode/deepseek-v4-flash",
+      NODE_ENV: "production",
+      PORT: "4096",
+    },
+  }),
   // Redis â€” message broker and result backend for Celery.
   // The Windows service exists but is stopped by default; PM2 manages it here
   // so the whole SMD stack starts and stops together.

@@ -3,6 +3,7 @@ import sports_science.codex_metrics as cm
 from sports_science.codex_metrics import (
     ter_score,
     four_factors,
+    four_factors_from_performance,
     gravity_index,
     flow_index,
     FOUR_FACTOR_NAMES,
@@ -41,3 +42,19 @@ def test_four_factors_clearance_parity(monkeypatch):
     fallback = cm.four_factors(88, 60, 50, 30)
     assert fallback["clearance"] == 37.5
     assert fallback["clearance"] == live["clearance"]
+
+
+def test_four_factors_from_performance_real_values():
+    p = {"fg": 85.0, "tp": 92.0, "ast": 55.0, "oreb": 65.0, "tov": -68.0, "pf": -78.0,
+         "defensive_attention": 0.8, "court_spacing": 0.6}
+    res = four_factors_from_performance(p)
+    assert set(res.keys()) == set(FOUR_FACTOR_NAMES)
+    assert all(0.0 <= v <= 100.0 for v in res.values())
+    # High shooting drives high proliferation; high errors drive metastasis.
+    assert res["proliferation"] > res["metastasis"]
+
+
+def test_four_factors_from_performance_monotonic_in_shooting():
+    high = four_factors_from_performance({"fg": 90.0, "tp": 60.0, "tov": -1.0, "pf": -1.0})
+    low = four_factors_from_performance({"fg": 20.0, "tp": 0.0, "tov": -5.0, "pf": -5.0})
+    assert low["proliferation"] < high["proliferation"]

@@ -207,12 +207,15 @@ export async function scoreWithVibeReality(slug: string, repoUrl?: string): Prom
     return soft({ scorer: 'vibe-reality', error: 'no GitHub repo URL to analyze', summary: 'vibe skipped (no repo)' });
   }
 
+  // Local mode (VIBE_REALITY_LOCAL=1) skips Firebase auth for loopback fleet
+  // scoring — no short-lived ID token needed.
+  const localMode = process.env.VIBE_REALITY_LOCAL === '1';
   const idToken = process.env.VIBE_REALITY_ID_TOKEN;
-  if (!idToken) return soft({ scorer: 'vibe-reality', error: 'VIBE_REALITY_ID_TOKEN not set (Firebase ID token required by Vibe-Reality)' });
+  if (!localMode && !idToken) return soft({ scorer: 'vibe-reality', error: 'VIBE_REALITY_ID_TOKEN not set (Firebase ID token required by Vibe-Reality); set VIBE_REALITY_LOCAL=1 for fleet-internal scoring' });
 
   const submit = await postJson(
     `${base.replace(/\/+$/, '')}/api/analyze`,
-    { repoUrl: repo, ephemeral: true, idToken },
+    localMode ? { repoUrl: repo, ephemeral: true } : { repoUrl: repo, ephemeral: true, idToken },
     {},
     15_000
   );

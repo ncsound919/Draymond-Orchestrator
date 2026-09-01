@@ -12,6 +12,8 @@ import { checkAllAgentHealth } from './index';
 import { sendNotification, sendAlertEmail } from './notifications';
 import { emitJobStarted, emitJobCompleted, emitJobFailed } from '@/lib/draymond/event-bridge';
 import { delegationTimeoutSeconds, delegationFor, isWithinWindow, delegationWindow } from './delegation';
+import { sectorFor } from './corporate';
+import { sectorSweep, touchSector } from './sector-lifecycle';
 import { classifyRetryable, retryDelayMs } from './retry';
 import type { BbtechInsightSyncResult } from '@/lib/science/trendsFeed';
 import type { DrainResult as GapDrainResult } from '@/lib/science/researchEscalation';
@@ -493,6 +495,15 @@ export async function runJobNow(id: string): Promise<JobRunResult> {
   const stopHeartbeat = startJobHeartbeat(job.id);
   emitJobStarted(job.id, job.name, job.job_type);
 
+  // Sector lifecycle: record this job's sector as active so the idle sweep
+  // keeps that sector's on-demand services warm while its tasks are running.
+  try {
+    const handler = job.job_config?.handler;
+    if (typeof handler === 'string') touchSector(sectorFor(handler));
+  } catch {
+    // best-effort — lifecycle must never block a job
+  }
+
   try {
     const output = await executeJobByType(job);
     const durationMs = Date.now() - startTime;
@@ -637,6 +648,7 @@ export const CUSTOM_HANDLERS: CustomHandlerDef[] = [
   { handler: 'brain_decision_cycle', label: 'Brain Decision Cycle', description: 'Consult the deterministic brain reasoning engine and route hiccups to the repair/coding teams.' },
   { handler: 'agent_heartbeat_sweep', label: 'Agent Heartbeat Sweep', description: 'Ping every roster service health endpoint and record real liveness.' },
   { handler: 'service_health_repair', label: 'Service Health Repair', description: 'Probe ecosystem services and auto-start any that are down.' },
+  { handler: 'sector_lifecycle_sweep', label: 'Sector Lifecycle Sweep', description: 'Stop idle on-demand services by sector TTL to free CPU/RAM (opt-in via DRAYMOND_SECTOR_LIFECYCLE=1).' },
   { handler: 'self_repair_check', label: 'Self-Repair Check', description: 'Failure scan + safe auto-repairs; escalate unknowns to on-call.' },
   { handler: 'repair_failed_jobs', label: 'Repair Team (failed jobs)', description: 'Scan failed jobs and deploy coding/skill agents to repair them.' },
   { handler: 'kairos_scan', label: 'Kairos Scan', description: 'Proactive fleet scan: down monitors, failed jobs, stale leads, revenue shortfall.' },
@@ -1794,6 +1806,20 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         return { handler, triggered_at: new Date().toISOString(), reset: data.reset };
       }
 
+      if (handler === 'sector_lifecycle_sweep') {
+        // CPU-friendly fleet operation: stop every managed on-demand service
+        // that has been idle past its sector TTL, so sectors "close" when the
+        // tasks at hand are done and free CPU/RAM for the next sector. Warm
+        // services (draymond/keywire/brain/litellm) are never touched. No-op
+        // unless DRAYMOND_SECTOR_LIFECYCLE=1 (operator opt-in).
+        const { sectorState, lifecycleEnabled } = await import('./sector-lifecycle');
+        if (!lifecycleEnabled()) {
+          return { handler, status: 'disabled', message: 'DRAYMOND_SECTOR_LIFECYCLE not enabled' };
+        }
+        const { stopped, kept, failed } = await sectorSweep();
+        return { handler, stopped, kept, failed, state: sectorState() };
+      }
+
       console.log(
         `[Draymond Scheduler] Custom job "${job.name}" triggered (handler: ${handler ?? 'none'}). ` +
         `No built-in handler registered — skipping execution.`
@@ -2703,6 +2729,14 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     cron_expression: '0 4 * * *',
     job_type: 'custom',
     job_config: { handler: 'free_model_daily_assignment' },
+    is_enabled: true,
+  },
+  {
+    name: 'Sector Lifecycle Sweep',
+    description: 'Every 10 minutes - stop managed on-demand services idle past their sector TTL so the fleet stays CPU-friendly (sectors run and close with the tasks at hand). No-op unless DRAYMOND_SECTOR_LIFECYCLE=1.',
+    cron_expression: '*/10 * * * *',
+    job_type: 'custom',
+    job_config: { handler: 'sector_lifecycle_sweep' },
     is_enabled: true,
   },
 ];

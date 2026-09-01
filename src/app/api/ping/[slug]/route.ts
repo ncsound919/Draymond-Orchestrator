@@ -4,6 +4,7 @@ import {
   recordServiceFailure,
   getGateSnapshot,
 } from '@/lib/draymond/repair-gate';
+import { authorizeRequest } from '@/lib/draymond/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +18,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
+  const authError = authorizeRequest(req);
+  if (authError) return authError;
+
   const { slug } = await params;
   const fail = req.nextUrl.searchParams.get('fail') === '1';
   const entry = fail ? recordServiceFailure(slug) : recordServicePing(slug);

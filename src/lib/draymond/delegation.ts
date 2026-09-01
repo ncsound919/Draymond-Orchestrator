@@ -21,6 +21,13 @@ import { writeBrainFile } from './journal';
 // ============================================================================
 
 import { syncFleetBudget } from "@/lib/command-center/controls";
+import {
+  sectorFor,
+  sectorDailyCap,
+  sectorMemberSlugs,
+  REVENUE_SECTOR_IDS,
+  type SectorId,
+} from './corporate';
 
 export type DelegationTier = 'free' | 'local' | 'flash' | 'pro' | 'reasoning';
 
@@ -42,6 +49,8 @@ export interface DelegationSpec {
   slug: string;
   /** Human label for dashboards. */
   label: string;
+  /** Which corporate sector / division this component belongs to. */
+  sector?: SectorId;
   /** Which day phase the work belongs to. */
   phase: DelegationPhase;
   /** Time-of-day window; defaults to the phase's window when omitted. */
@@ -124,6 +133,8 @@ export const DELEGATION_PLAN: DelegationSpec[] = [
   { slug: 'phase_recap', label: 'Phase recap (workplace)', phase: 'evening', window: { start: '00:00', end: '23:59' }, timeBudgetMs: 120_000, tokenBudgetPerRun: 24_000, tokenBudgetPerDay: 72_000, tier: 'flash', priority: 1, duty: 'always-on' },
   { slug: 'evening_call_recap', label: 'Evening call recap', phase: 'evening', timeBudgetMs: 90_000, tokenBudgetPerRun: 16_000, tokenBudgetPerDay: 16_000, tier: 'flash', priority: 2, duty: 'shift' },
   { slug: 'marketing-pulse', label: 'Marketing pulse', phase: 'morning', timeBudgetMs: 600_000, tokenBudgetPerRun: 64_000, tokenBudgetPerDay: 96_000, tier: 'flash', priority: 2, duty: 'shift' },
+  { slug: 'oss_marketing_stack', label: 'OSS marketing stack (Shlink/Postiz/Listmonk/Twenty/Formbricks)', phase: 'morning', timeBudgetMs: 180_000, tokenBudgetPerRun: 4_000, tokenBudgetPerDay: 12_000, tier: 'free', priority: 2, duty: 'shift' },
+  { slug: 'strategy_team', label: 'Strategy team (Overlay Strategist scan/report)', phase: 'morning', timeBudgetMs: 120_000, tokenBudgetPerRun: 24_000, tokenBudgetPerDay: 96_000, tier: 'flash', priority: 1, duty: 'shift' },
   { slug: 'social-media-dashboard', label: 'Social media dashboard', phase: 'midday', window: { start: '09:00', end: '18:00', days: [1, 2, 3, 4, 5] }, timeBudgetMs: 900_000, tokenBudgetPerRun: 64_000, tokenBudgetPerDay: 160_000, tier: 'flash', priority: 2, duty: 'shift' },
   { slug: 'aetherdesk', label: 'Aetherdesk call center', phase: 'midday', window: { start: '09:00', end: '17:00' }, timeBudgetMs: 600_000, tokenBudgetPerRun: 48_000, tokenBudgetPerDay: 120_000, tier: 'flash', priority: 2, duty: 'shift' },
 
@@ -182,6 +193,11 @@ const PLAN_BY_SLUG = new Map(DELEGATION_PLAN.map((s) => [s.slug, s]));
 /** Look up a delegation spec by slug; undefined when not in the plan. */
 export function delegationFor(slug: string): DelegationSpec | undefined {
   return PLAN_BY_SLUG.get(slug);
+}
+
+/** Sector for a spec (explicit field wins, else the corporate slug map). */
+export function specSector(spec: DelegationSpec | undefined): SectorId {
+  return spec?.sector ?? sectorFor(spec?.slug ?? '');
 }
 
 /** Effective time-of-day window for a spec (explicit window or phase default). */
@@ -302,7 +318,7 @@ export function delegationRemaining(slug: string): number {
   return Math.max(0, spec.tokenBudgetPerDay - delegationConsumed(slug));
 }
 
-/** True when the component can run right now (window + daily budget). */
+/** True when the component can run right now (window + per-spec budget + sector cap). */
 export function canDelegate(slug: string, now = new Date()): { ok: boolean; reason?: string } {
   const spec = delegationFor(slug);
   if (!spec) return { ok: true, reason: 'unplanned — no delegation spec' };
@@ -313,7 +329,52 @@ export function canDelegate(slug: string, now = new Date()): { ok: boolean; reas
   if (remaining <= 0) {
     return { ok: false, reason: `${spec.label} daily token budget exhausted (${spec.tokenBudgetPerDay})` };
   }
+  const sectorGate = canDelegateSector(specSector(spec), now);
+  if (!sectorGate.ok) {
+    return { ok: false, reason: sectorGate.reason };
+  }
   return { ok: true };
+}
+
+// ============================================================================
+// SECTOR AGGREGATE BUDGET (corporate layer enforcement)
+// ============================================================================
+// The per-sector daily cap from the revenue-target-weighted pool model is the
+// hard ceiling. A component is blocked when its whole sector has consumed its
+// cap — even if the component's own per-spec budget is untouched. This is what
+// makes the corporate allocation real instead of advisory.
+
+/** Tokens consumed today by every component in a sector. */
+export function sectorConsumed(sector: SectorId): number {
+  let total = 0;
+  for (const member of sectorMemberSlugs(sector)) {
+    total += delegationConsumed(member);
+  }
+  return total;
+}
+
+/** Remaining sector budget = sector cap - aggregate sector consumption today. */
+export function sectorRemaining(sector: SectorId): number {
+  const cap = sectorDailyCap(sector, fleetDailyBudget());
+  return Math.max(0, cap - sectorConsumed(sector));
+}
+
+/** True when the sector still has aggregate budget to run components. */
+export function canDelegateSector(sector: SectorId, now = new Date()): { ok: boolean; reason?: string } {
+  const cap = sectorDailyCap(sector, fleetDailyBudget());
+  const consumed = sectorConsumed(sector);
+  if (consumed >= cap) {
+    return {
+      ok: false,
+      reason: `sector "${sector}" daily token budget exhausted (${consumed}/${cap}) — corporate cap reached`,
+    };
+  }
+  return { ok: true };
+}
+
+/** True when a sector is a revenue sector (E1-E4). */
+export function isRevenueSector(sector: SectorId): boolean {
+  return (REVENUE_SECTOR_IDS as string[]).includes(sector);
 }
 
 /** Per-run ceiling, falling back to a sensible default for unplanned work. */
@@ -350,6 +411,7 @@ export function resetDelegation(): void {
 export interface DelegationSnapshotEntry {
   slug: string;
   label: string;
+  sector: SectorId;
   phase: DelegationPhase;
   window: DelegationWindow;
   timeBudgetMs: number;
@@ -364,12 +426,21 @@ export interface DelegationSnapshotEntry {
   reason?: string;
 }
 
+export interface SectorSnapshotEntry {
+  sector: SectorId;
+  cap: number;
+  consumed: number;
+  remaining: number;
+  active: boolean;
+}
+
 /** Full snapshot of the delegation plan + live state (dashboards / ops). */
 export function delegationSnapshot(now = new Date()): {
   fleetDailyBudget: number;
   totalPlannedPerDay: number;
   phases: Record<DelegationPhase, number>;
   entries: DelegationSnapshotEntry[];
+  sectors: SectorSnapshotEntry[];
 } {
   const totalPlannedPerDay = DELEGATION_PLAN.reduce((a, s) => a + s.tokenBudgetPerDay, 0);
   const phases = { morning: 0, midday: 0, evening: 0, night: 0 } as Record<DelegationPhase, number>;
@@ -379,6 +450,7 @@ export function delegationSnapshot(now = new Date()): {
     return {
       slug: s.slug,
       label: s.label,
+      sector: specSector(s),
       phase: s.phase,
       window: s.window ?? PHASE_WINDOW[s.phase],
       timeBudgetMs: s.timeBudgetMs,
@@ -393,5 +465,17 @@ export function delegationSnapshot(now = new Date()): {
       reason: gate.ok ? undefined : gate.reason,
     };
   });
-  return { fleetDailyBudget: fleetDailyBudget(), totalPlannedPerDay, phases, entries };
+  const sectors: SectorSnapshotEntry[] = Array.from(new Set(entries.map((e) => e.sector))).map(
+    (sector) => {
+      const gate = canDelegateSector(sector, now);
+      return {
+        sector,
+        cap: sectorDailyCap(sector, fleetDailyBudget()),
+        consumed: sectorConsumed(sector),
+        remaining: sectorRemaining(sector),
+        active: gate.ok,
+      };
+    },
+  );
+  return { fleetDailyBudget: fleetDailyBudget(), totalPlannedPerDay, phases, entries, sectors };
 }

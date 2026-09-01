@@ -71,7 +71,7 @@ export const FLEET_PIPELINES: FleetPipeline[] = [
         purpose: 'Deterministic brand-tone check on every planned post.',
         kind: 'cli',
         command: 'npx',
-        args: ['tsx', path.join('..', 'overlay365', 'agent-team', 'agents', 'marketing', 'index.ts'), 'voice'],
+        args: ['tsx', path.join('..', '01_Platforms', 'Overlay365', 'agent-team', 'agents', 'marketing', 'index.ts'), 'voice'],
       },
       {
         tool: 'overlay-marketing-scheduler',
@@ -79,7 +79,7 @@ export const FLEET_PIPELINES: FleetPipeline[] = [
         purpose: 'Turns topic seeds into a weekly cross-platform posting plan.',
         kind: 'cli',
         command: 'npx',
-        args: [path.join('..', 'overlay365', 'agent-team', 'agents', 'marketing', 'index.ts'), 'schedule'],
+        args: [path.join('..', '01_Platforms', 'Overlay365', 'agent-team', 'agents', 'marketing', 'index.ts'), 'schedule'],
       },
       {
         tool: 'overlay-marketing-format',
@@ -87,7 +87,7 @@ export const FLEET_PIPELINES: FleetPipeline[] = [
         purpose: 'Character / hashtag / link checks per platform — pass/fail.',
         kind: 'cli',
         command: 'npx',
-        args: [path.join('..', 'overlay365', 'agent-team', 'agents', 'marketing', 'index.ts'), 'format'],
+        args: [path.join('..', '01_Platforms', 'Overlay365', 'agent-team', 'agents', 'marketing', 'index.ts'), 'format'],
       },
       {
         tool: 'overlay-marketing-tracker',
@@ -95,7 +95,7 @@ export const FLEET_PIPELINES: FleetPipeline[] = [
         purpose: 'Aggregate impressions/engagements, flag anomalies, keep nulls visible.',
         kind: 'cli',
         command: 'npx',
-        args: [path.join('..', 'overlay365', 'agent-team', 'agents', 'marketing', 'index.ts'), 'track'],
+        args: [path.join('..', '01_Platforms', 'Overlay365', 'agent-team', 'agents', 'marketing', 'index.ts'), 'track'],
       },
       {
         tool: 'marketing-tool',

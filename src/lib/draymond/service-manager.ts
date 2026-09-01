@@ -48,6 +48,9 @@ const CWD_OVERRIDES: Record<string, string> = {
   'stirling-pdf': '../04_Integrations/integrations/Stirling-PDF',
   'litellm': '../04_Integrations/integrations/litellm',
   'tap919-middleman': '../06_Resources/tap919-middleman-main',
+  'big-homie': 'agents/AgentBrowser-main/Big-Homie-main',
+  'vibe-reality': 'agents/Vibe-Reality-main',
+  'sub-team': 'agents/Sub-Team-main',
 };
 
 /**
@@ -97,7 +100,7 @@ const START_MAP: Record<string, { command: [string, string[]]; port: number; hea
     health: '/api/health',
   },
   'uplift-agent': {
-    command: ['node', ['agents/Uplift-Agent/server.js']],
+    command: ['node', ['server.js']],
     port: 8000,
     health: '/health',
   },
@@ -159,12 +162,42 @@ const START_MAP: Record<string, { command: [string, string[]]; port: number; hea
   'codenexus': {
     command: ['npm', ['run', 'dev']],
     port: 3205,
+    health: '/health',
+  },
+  'big-homie': {
+    // FastAPI web server (big_homie_web.py) — task supervision / QA harness.
+    // Binds 8888 (config.py server_port); /tools/status is the status endpoint.
+    command: ['python', ['big_homie_web.py']],
+    port: 8888,
+    health: '/tools/status',
+  },
+  'vibe-reality': {
+    // Gemini "reality-check" repo auditor. VIBE_REALITY_LOCAL=1 skips Firebase
+    // auth for fleet-internal scoring (production path still requires idToken).
+    command: ['node', ['--import', 'tsx', 'server.ts']],
+    port: 3202,
     health: '/api/health',
+    env: { PORT: '3202', VIBE_REALITY_LOCAL: '1' },
   },
   'cureforge': {
     command: ['npm', ['run', 'dev']],
     port: 3060,
     health: '/api/health',
+  },
+  'sub-team': {
+    command: ['python', ['main.py', '--serve', '--port', '8050', '--host', '0.0.0.0']],
+    port: 8050,
+    health: '/health',
+    env: { PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  },
+  'lil-homie': {
+    // Nanobot gateway. Honest gate: no provider/channel config → nanobot
+    // gateway exits immediately. canStartService only gates on the dir, so this
+    // recipe surfaces an explicit "started but unhealthy" instead of a silent
+    // dead process when config is missing.
+    command: ['nanobot', ['gateway']],
+    port: 18790,
+    health: '/',
   },
   'bbtech-web-app': {
     command: ['npm', ['run', 'dev']],

@@ -4,7 +4,7 @@ import { promisify } from 'node:util';
 import { mkdtemp, writeFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { parseJsonBody } from '@/lib/draymond/api-auth';
+import { authorizeRequest, parseJsonBody } from '@/lib/draymond/api-auth';
 
 export const runtime = 'nodejs';
 
@@ -21,6 +21,9 @@ function agentTeamDir(): string {
 const RUN_TIMEOUT_MS = 60_000;
 
 export async function POST(req: NextRequest) {
+  const authError = authorizeRequest(req);
+  if (authError) return authError;
+
   const dir = agentTeamDir();
   const { data: request, error: parseError } = await parseJsonBody<Record<string, unknown>>(req);
   if (parseError) return parseError;

@@ -132,6 +132,26 @@ export async function recordChargeFromWebhook(event: StripeEvent): Promise<{ rec
           serviceId: serviceValue as 'aetherdesk' | 'maas' | 'audit' | 'research',
           opportunityId: metadata?.opportunityId,
         });
+
+        // Auto-dispatch delivery for chain-deliverable services (audit,
+        // research, maas). Aetherdesk is webhook-driven (its own line). This
+        // closes the loop: pay → fleet delivers. Best-effort — never fails the
+        // webhook response.
+        if (serviceValue === 'audit' || serviceValue === 'research' || serviceValue === 'maas') {
+          try {
+            const { dispatchSettledDelivery } = await import('@/lib/draymond/mission-delivery');
+            await dispatchSettledDelivery({
+              stripeChargeId: charge.id,
+              serviceId: serviceValue as 'audit' | 'research' | 'maas',
+              tierId: metadata?.tier,
+              customerEmail: metadata?.customerEmail,
+            });
+          } catch (err) {
+            console.warn(
+              `[stripe-webhook] delivery dispatch failed for ${charge.id}: ${err instanceof Error ? err.message : String(err)}`
+            );
+          }
+        }
       }
     } catch {
       /* mission attribution best-effort — treasury already recorded */

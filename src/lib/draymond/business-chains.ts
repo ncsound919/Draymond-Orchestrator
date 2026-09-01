@@ -463,12 +463,13 @@ const ENTITY_DEFS: EntitySeedDef[] = [
       'Full-spectrum agentic workforce with 8 specialized CrewAI agents (research, coding, data science, business strategy, creative, security, architecture, hardware). Retains deterministic CPU RTL pipeline and cross-disciplinary/business analysis.',
     invocation_method: 'http_api',
     invocation_config: {
-      base_url:
-        process.env.SUB_TEAM_URL || 'http://localhost:8050',
-      health_endpoint: '/health',
+      url: process.env.SUB_TEAM_URL || 'http://localhost:8050',
+      health_url: `${(process.env.SUB_TEAM_URL || 'http://localhost:8050').replace(/\/+$/, '')}/health`,
       timeout_ms: 120_000,
       headers: {
-        Authorization: `Bearer ${process.env.SUB_TEAM_AUTH_TOKEN || process.env.CRON_SECRET || ''}`,
+        // Persist as a literal so interpolateEnvHeaders re-resolves CRON_SECRET
+        // at invocation time (avoids stale token after rotation).
+        Authorization: 'Bearer ${CRON_SECRET}',
         'Content-Type': 'application/json',
       },
       endpoints: {
@@ -484,7 +485,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
       fallback: {
         command: process.env.SUB_TEAM_PYTHON || 'python',
         args: ['main.py'],
-        working_dir: process.env.SUB_TEAM_DIR || './agents/Sub-Team',
+        working_dir: process.env.SUB_TEAM_DIR || './agents/Sub-Team-main',
         env: {
           DRAYMOND_TOTAL_BUDGET: '10000',
         },
@@ -1285,59 +1286,19 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
     name: 'CPU RTL Generation Pipeline',
     slug: 'cpu-rtl-generation',
     description:
-      'End-to-end CPU RTL generation via Uplift Agent Sub Team tools: specification, microarchitecture design, Verilog implementation, and formal verification.',
+      'Deterministic CPU RTL generation via the Sub-Team HTTP server: specification → microarchitecture → Verilog implementation → formal verification run inside one /pipeline/cpu call.',
     steps: [
       {
-        name: 'CPU Specification',
-        entitySlug: 'uplift-agent',
-        action: 'batch',
+        name: 'Generate CPU RTL',
+        entitySlug: 'sub-team',
+        action: 'cpu_pipeline',
         input_mapping: {
-          task: 'sub_team_spec',
           isa: '$.input.isa',
-          pipeline_template: '$.input.pipeline_template',
-          extensions: '$.input.extensions',
+          pipeline: '$.input.pipeline_template',
         },
-        output_key: 'formal_spec',
+        output_key: 'cpu_rtl',
         step_order: 1,
         depends_on_indices: [],
-      },
-      {
-        name: 'Microarchitecture Design',
-        entitySlug: 'uplift-agent',
-        action: 'batch',
-        input_mapping: {
-          task: 'sub_team_microarch',
-          spec: '$.steps.formal_spec.output',
-        },
-        output_key: 'microarch_plan',
-        step_order: 2,
-        depends_on_indices: [0],
-      },
-      {
-        name: 'Verilog Implementation',
-        entitySlug: 'uplift-agent',
-        action: 'batch',
-        input_mapping: {
-          task: 'sub_team_implement',
-          spec: '$.steps.formal_spec.output',
-          plan: '$.steps.microarch_plan.output',
-        },
-        output_key: 'rtl_output',
-        step_order: 3,
-        depends_on_indices: [1],
-      },
-      {
-        name: 'Formal Verification',
-        entitySlug: 'uplift-agent',
-        action: 'batch',
-        input_mapping: {
-          task: 'sub_team_verify',
-          spec: '$.steps.formal_spec.output',
-          rtl: '$.steps.rtl_output.output',
-        },
-        output_key: 'verification_report',
-        step_order: 4,
-        depends_on_indices: [2],
       },
     ],
   },
@@ -2252,6 +2213,17 @@ const JOB_DEFS: JobSeedDef[] = [
       input: {},
     },
     notify_on_failure: true,
+  },
+
+  // ── Sector Productivity Persist (11:40PM daily) ──────────────────────
+  // Snapshots the corporate sector productivity (real work units per sector)
+  // into .draymond/sector-productivity.json for the weekly trend. Ops overhead
+  // — cheap, deterministic, no LLM.
+  {
+    name: 'Sector Productivity Persist',
+    cron_expression: '40 23 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'sector_productivity_persist' },
   },
 
   // ── Cancer Research Deep-Dive (5AM daily) ───────────────────────────

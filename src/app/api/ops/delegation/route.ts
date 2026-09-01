@@ -7,6 +7,7 @@ import {
   phaseBudget,
 } from '@/lib/draymond/delegation';
 import { fleetBudgetRemaining } from '@/lib/draymond/workflow-budget';
+import { orgSnapshot } from '@/lib/draymond/corporate';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest) {
       evening: phaseBudget('evening'),
       night: phaseBudget('night'),
     },
+    org: orgSnapshot(fleetDailyBudget()),
   });
 }
 

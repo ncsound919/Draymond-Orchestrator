@@ -87,6 +87,9 @@ def run_insights(profile_path: str | Path, from_domain: str | None = None) -> di
     domain = from_domain or "sports"
     derived = _derived_profile(profile, domain)
 
+    # Tripwire: compute_metrics_from_raw is deterministic by construction, so this
+    # always returns False today. It will flip to True the moment a nondeterministic
+    # source (wall-clock IDs, random/uuid) is introduced into the pipeline.
     det_report = verify_determinism(
         lambda _: compute_metrics_from_raw(profile),
         seeds=[1, 2],

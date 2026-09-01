@@ -152,6 +152,18 @@ export const COLUMN_MAPS: Record<string, ColumnMap> = {
     json: ['metadata'],
     bool: ['is_done'],
   },
+  tid_signals: {
+    json: ['context'],
+    bool: [],
+  },
+  tid_insights: {
+    json: ['evidence', 'suggested_action'],
+    bool: [],
+  },
+  tid_discoveries: {
+    json: ['action_detail', 'outcome'],
+    bool: [],
+  },
 };
 
 /** Names of the draymond tables that carry an auto-managed `id` (uuid) column. */
@@ -886,5 +898,56 @@ CREATE TABLE IF NOT EXISTS command_seo_tasks (
 );
 CREATE INDEX IF NOT EXISTS idx_command_seo_tasks_status ON command_seo_tasks(status);
 CREATE INDEX IF NOT EXISTS idx_command_seo_tasks_priority ON command_seo_tasks(priority);
+
+-- ============================================================================
+-- Trends, Insights & Discoveries (TID) Engine
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS tid_signals (
+  id TEXT PRIMARY KEY,
+  source TEXT NOT NULL,
+  category TEXT NOT NULL,
+  component TEXT,
+  metric TEXT NOT NULL,
+  value REAL NOT NULL,
+  context TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_tid_signals_source ON tid_signals(source);
+CREATE INDEX IF NOT EXISTS idx_tid_signals_component ON tid_signals(component);
+CREATE INDEX IF NOT EXISTS idx_tid_signals_metric ON tid_signals(metric);
+CREATE INDEX IF NOT EXISTS idx_tid_signals_created ON tid_signals(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS tid_insights (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  detail TEXT NOT NULL,
+  confidence REAL NOT NULL,
+  evidence TEXT NOT NULL DEFAULT '{}',
+  suggested_action TEXT,
+  status TEXT NOT NULL DEFAULT 'detected',
+  created_at TEXT NOT NULL,
+  promoted_at TEXT,
+  measured_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_tid_insights_status ON tid_insights(status);
+CREATE INDEX IF NOT EXISTS idx_tid_insights_confidence ON tid_insights(confidence DESC);
+CREATE INDEX IF NOT EXISTS idx_tid_insights_created ON tid_insights(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS tid_discoveries (
+  id TEXT PRIMARY KEY,
+  insight_id TEXT NOT NULL,
+  action_type TEXT NOT NULL,
+  action_detail TEXT NOT NULL DEFAULT '{}',
+  dispatched_at TEXT NOT NULL,
+  outcome TEXT,
+  outcome_score REAL,
+  measured_at TEXT,
+  status TEXT NOT NULL DEFAULT 'dispatched'
+);
+CREATE INDEX IF NOT EXISTS idx_tid_discoveries_status ON tid_discoveries(status);
+CREATE INDEX IF NOT EXISTS idx_tid_discoveries_insight ON tid_discoveries(insight_id);
+CREATE INDEX IF NOT EXISTS idx_tid_discoveries_dispatched ON tid_discoveries(dispatched_at DESC);
 `;
 

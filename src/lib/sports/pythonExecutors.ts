@@ -455,3 +455,175 @@ export async function runPythonDerive(
     if (dir) fs.rmSync(dir, { recursive: true, force: true });
   }
 }
+
+// ---------------------------------------------------------------------------
+// bbtech sports model bridge (Sports Steve / Bet Buddy): persisted into the
+// SAME trends-store choke point as insights + metrics lab, tagged
+// source='bbtech_sports_model' + metricKind='derived' so trend queries can
+// separate raw vs lab-generated stats. Best-effort like persistDerivedMetrics.
+// ---------------------------------------------------------------------------
+
+async function persistSportsModelReport(
+  report: Record<string, unknown>,
+  sessionId: string,
+  gradedTier: string | null,
+  source = 'bbtech_sports_model',
+): Promise<PersistResult | undefined> {
+  try {
+    const { persistInsightReport } = await import('@/lib/science/trendsFeed');
+    return await persistInsightReport(report, {
+      source,
+      sessionId,
+      domain: 'sports',
+      ...(gradedTier ? { evidenceTier: gradedTier } : {}),
+      metricKind: 'derived',
+    });
+  } catch (err) {
+    try {
+      console.warn(
+        '[sports] sports model persistence degraded',
+        err instanceof Error ? err.message : err,
+      );
+    } catch {
+      // logging itself must never throw
+    }
+    return undefined;
+  }
+}
+
+export type SportsModelAction = 'backtest' | 'query' | 'totals' | 'player' | 'market' | 'experiment';
+
+export interface SportsModelQuery {
+  home?: string;
+  away?: string;
+  team?: string;
+  player?: string;
+  line?: number;
+  date?: string;
+  from?: string;
+  to?: string;
+  maxGames?: number;
+  sessionId?: string;
+  forward?: boolean;
+}
+
+/**
+ * Run the bbtech sports model (real NBA dataset + math-x statistics) and
+ * persist the derived model output into Draymond's trends store. The
+ * backtest action emits the model's out-of-fold validation (concordance,
+ * calibration, lift) — the honest proof that the Sports Steve win-probability
+ * model works. query/totals emit single modeled probabilities.
+ */
+export async function runPythonSportsModel(
+  action: SportsModelAction,
+  opts: SportsModelQuery = {},
+): Promise<PythonResult> {
+  if (!['backtest', 'query', 'totals', 'player', 'market', 'experiment'].includes(action)) {
+    return { success: false, data: failureData('unknown action'), error: 'unknown action', evidence_tier: 'E4' };
+  }
+  // The betting experiment pipeline has its own runner (run_experiment.py).
+  if (action === 'experiment') {
+    return runPythonBettingExperiment(opts);
+  }
+  const args: string[] = [action];
+  if (action === 'query') {
+    if (!opts.home || !opts.away || !opts.date) {
+      return { success: false, data: failureData('query requires home, away, date'), error: 'query requires home, away, date', evidence_tier: 'E4' };
+    }
+    args.push('--home', opts.home, '--away', opts.away, '--date', opts.date);
+  } else if (action === 'totals') {
+    if (!opts.team || !opts.line || !opts.date) {
+      return { success: false, data: failureData('totals requires team, line, date'), error: 'totals requires team, line, date', evidence_tier: 'E4' };
+    }
+    args.push('--team', opts.team, '--line', String(opts.line), '--date', opts.date);
+  } else if (action === 'player') {
+    if (!opts.player || !opts.line || !opts.date) {
+      return { success: false, data: failureData('player requires player, line, date'), error: 'player requires player, line, date', evidence_tier: 'E4' };
+    }
+    args.push('--player', opts.player, '--line', String(opts.line), '--date', opts.date);
+  } else if (action === 'market') {
+    if (opts.from) args.push('--from', opts.from);
+    if (opts.to) args.push('--to', opts.to);
+    if (opts.maxGames) args.push('--max', String(opts.maxGames));
+  } else {
+    if (opts.from) args.push('--from', opts.from);
+    if (opts.to) args.push('--to', opts.to);
+    if (opts.maxGames) args.push('--max', String(opts.maxGames));
+  }
+
+  const sessionId = opts.sessionId ?? `sports-model-${action}-${Date.now()}`;
+  try {
+    const { stdout } = await runCli('run_model.py', args);
+    const data = JSON.parse(stdout);
+    if (data.error) {
+      return { success: false, data: failureData(data.error), error: data.error, evidence_tier: 'E4' };
+    }
+    if (!Array.isArray(data.metrics) || data.metrics.length === 0) {
+      const message = 'runner produced no metrics';
+      return { success: false, data: failureData(message), error: message, evidence_tier: 'E4' };
+    }
+    const gradedTier = worstEvidenceTier(data.metrics);
+    const wrapped = wrap(stripInnerEvidenceTier(data));
+    const persisted = await persistSportsModelReport(
+      wrapped.data[0],
+      sessionId,
+      gradedTier,
+    );
+    return {
+      success: true,
+      data: wrapped,
+      error: null,
+      evidence_tier: gradedTier ?? 'E4',
+      ...(persisted ? { persisted } : {}),
+    };
+  } catch (err) {
+    const message = errorMessage(err);
+    return { success: false, data: failureData(message), error: message, evidence_tier: 'E4' };
+  }
+}
+
+/**
+ * Run the full betting experiment & simulation pipeline (Elo, CARMELO, our
+ * EWMA model, and the behavioral fade-famous strategy) benchmarked against the
+ * real NBA money-line market, and persist the derived metrics into the trends
+ * store under source='bbtech_betting_experiment'. This is the honest "does any
+ * formula beat the closing line?" check.
+ */
+async function runPythonBettingExperiment(opts: SportsModelQuery = {}): Promise<PythonResult> {
+  const args: string[] = [];
+  if (opts.from) args.push('--from', opts.from);
+  if (opts.to) args.push('--to', opts.to);
+  if (opts.maxGames) args.push('--max', String(opts.maxGames));
+  if (opts.forward) args.push('--forward');
+
+  const sessionId = opts.sessionId ?? `betting-experiment-${new Date().toISOString().slice(0, 10)}`;
+  try {
+    const { stdout } = await runCli('run_experiment.py', args);
+    const data = JSON.parse(stdout);
+    if (data.error) {
+      return { success: false, data: failureData(data.error), error: data.error, evidence_tier: 'E3' };
+    }
+    if (!Array.isArray(data.metrics) || data.metrics.length === 0) {
+      const message = 'experiment produced no metrics';
+      return { success: false, data: failureData(message), error: message, evidence_tier: 'E3' };
+    }
+    const gradedTier = worstEvidenceTier(data.metrics);
+    const wrapped = wrap(stripInnerEvidenceTier(data));
+    const persisted = await persistSportsModelReport(
+      wrapped.data[0],
+      sessionId,
+      gradedTier,
+      'bbtech_betting_experiment',
+    );
+    return {
+      success: true,
+      data: wrapped,
+      error: null,
+      evidence_tier: gradedTier ?? 'E3',
+      ...(persisted ? { persisted } : {}),
+    };
+  } catch (err) {
+    const message = errorMessage(err);
+    return { success: false, data: failureData(message), error: message, evidence_tier: 'E3' };
+  }
+}

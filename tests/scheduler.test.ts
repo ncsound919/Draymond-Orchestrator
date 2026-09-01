@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -89,8 +89,18 @@ function job(overrides: Record<string, unknown> = {}) {
   };
 }
 
+let registryDir: string;
+
+beforeEach(() => {
+  // Isolate delegation/consumption writes from the real .draymond brain state.
+  registryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'draymond-scheduler-registry-'));
+  process.env.DRAYMOND_REGISTRY_DIR = registryDir;
+});
+
 afterEach(() => {
   mockAdmin._tables.clear();
+  delete process.env.DRAYMOND_REGISTRY_DIR;
+  try { fs.rmSync(registryDir, { recursive: true, force: true }); } catch { /* best-effort */ }
 });
 
 describe('scheduler CRUD', () => {

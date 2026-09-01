@@ -4,7 +4,7 @@
  */
 
 import { instantiateChain, executeChain } from "./chains";
-import { listOpportunities } from "./business-pipeline";
+import { listOpportunities, addOpportunity } from "./business-pipeline";
 import { markDelivered } from "./mission-pipeline";
 import { getService, readStrategy, type ServiceId } from "./mission-strategy";
 
@@ -24,6 +24,52 @@ export interface DeliveryResult {
   error?: string;
   chainSlug?: string;
   stepStatuses?: Record<string, string>;
+}
+
+/**
+ * Dispatch delivery for a settled storefront charge. Creates a 'won'
+ * opportunity from the Stripe metadata (deduped by stripe charge id so a
+ * webhook retry never double-dispatches), then runs the service's delivery
+ * chain. Returns the delivery result, or an early result when the service is
+ * webhook-driven (Aetherdesk) or already dispatched.
+ */
+export async function dispatchSettledDelivery(input: {
+  stripeChargeId: string;
+  serviceId: 'audit' | 'research' | 'maas';
+  tierId?: string;
+  customerEmail?: string;
+}): Promise<DeliveryResult> {
+  const { serviceId, stripeChargeId, tierId, customerEmail } = input;
+
+  // Idempotency: find an existing opportunity carrying this charge id.
+  const ops = await listOpportunities();
+  const existing = ops.find((o) =>
+    (o as unknown as Record<string, string>).stripeChargeId === stripeChargeId
+  );
+  if (existing) {
+    return dispatchDelivery(existing.id);
+  }
+
+  const strategy = await readStrategy();
+  const svc = getService(strategy, serviceId);
+  if (!svc) {
+    return { opportunityId: "", ok: false, stage: "unknown", error: `service ${serviceId} not in strategy` };
+  }
+  const tier = svc.tiers.find((t) => t.id === tierId) ?? svc.tiers[0]!;
+
+  const opp = await addOpportunity({
+    name: `${svc.name} — ${tier.name}${customerEmail ? ` (${customerEmail})` : ""}`,
+    engine: "E2-b2b",
+    stage: "won",
+    monthlyValue: Math.round(tier.priceCents / 100),
+    owner: "mission-engine",
+    nextAction: "deliver",
+    serviceId,
+    tierId: tier.id,
+    stripeChargeId,
+  });
+
+  return dispatchDelivery(opp.id);
 }
 
 export async function dispatchDelivery(opportunityId: string): Promise<DeliveryResult> {

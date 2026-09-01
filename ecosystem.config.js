@@ -12,8 +12,12 @@
 // The app must be built first (npm run build → next start).
 // ============================================================================
 
-const { CORE_APP } = require("./fleet-manifest");
-
 module.exports = {
-  apps: [CORE_APP],
+  apps: [{
+    name: "draymond",
+    script: "node_modules/next/dist/bin/next",
+    args: "dev -p 3444",
+    cwd: ".",
+    env: { NODE_ENV: "development" }
+  }],
 };

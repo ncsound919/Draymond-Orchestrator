@@ -15,8 +15,14 @@ import {
   fleetDailyBudget,
   phaseBudget,
   PHASE_WEIGHT,
+  canDelegateSector,
+  sectorConsumed,
+  sectorRemaining,
+  specSector,
+  isRevenueSector,
 } from '../src/lib/draymond/delegation';
 import { dayTokenBudget, DAY_FLOW, estimateStepTokens } from '../src/lib/draymond/day-orchestrator';
+import { sectorDailyCap, sectorFor } from '../src/lib/draymond/corporate';
 
 describe('delegation plan', () => {
   beforeEach(() => resetDelegation());
@@ -109,5 +115,60 @@ describe('delegation plan', () => {
     const rd = snap.entries.find((e) => e.slug === 'rd_night');
     expect(rd?.consumed).toBe(10_000);
     expect(rd?.remaining).toBeGreaterThan(0);
+  });
+
+  it('exposes a sector on every delegation entry', () => {
+    const snap = delegationSnapshot(new Date(2026, 7, 6, 10, 0));
+    for (const e of snap.entries) {
+      expect(e.sector).toBeDefined();
+      expect(e.sector).toBe(sectorFor(e.slug));
+    }
+  });
+
+  it('sector consumption aggregates across member slugs', () => {
+    resetDelegation();
+    recordDelegationConsumption('rd_night', 10_000);
+    recordDelegationConsumption('dream_cycle', 5_000);
+    expect(sectorConsumed('rd')).toBeGreaterThanOrEqual(15_000);
+    // ops is untouched
+    expect(sectorConsumed('ops')).toBe(0);
+  });
+
+  it('canDelegateSector blocks when the sector cap is reached', () => {
+    resetDelegation();
+    const cap = sectorDailyCap('rd', fleetDailyBudget());
+    const noon = new Date(2026, 7, 6, 12, 0);
+    expect(canDelegateSector('rd', noon).ok).toBe(true);
+    recordDelegationConsumption('rd_night', cap);
+    const gate = canDelegateSector('rd', noon);
+    expect(gate.ok).toBe(false);
+    expect(gate.reason).toContain('sector "rd"');
+  });
+
+  it('canDelegate respects the sector cap (spec budget not enough to matter)', () => {
+    resetDelegation();
+    const noon = new Date(2026, 7, 6, 12, 0);
+    // synthesis_midday lives in the rd sector and its midday window is open at noon.
+    expect(canDelegate('synthesis_midday', noon).ok).toBe(true);
+    // Exhaust the whole rd sector via another member → blocked even though
+    // synthesis_midday's own per-spec budget is untouched.
+    const cap = sectorDailyCap('rd', fleetDailyBudget());
+    recordDelegationConsumption('dream_cycle', cap);
+    const gate = canDelegate('synthesis_midday', noon);
+    expect(gate.ok).toBe(false);
+    expect(gate.reason).toContain('corporate cap');
+  });
+
+  it('specSector falls back to the corporate slug map', () => {
+    const spec = delegationFor('depscan');
+    expect(specSector(spec)).toBe('e3-tooling');
+    expect(specSector(undefined)).toBe(sectorFor(''));
+  });
+
+  it('classifies revenue sectors', () => {
+    expect(isRevenueSector('e1-platform')).toBe(true);
+    expect(isRevenueSector('e2-b2b')).toBe(true);
+    expect(isRevenueSector('ops')).toBe(false);
+    expect(isRevenueSector('rd')).toBe(false);
   });
 });

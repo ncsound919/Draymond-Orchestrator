@@ -92,6 +92,33 @@ def four_factors(proliferation, clearance, resource, metastasis):
     return dict(zip(FOUR_FACTOR_NAMES, (prol, clear, res, meta)))
 
 
+def four_factors_from_performance(p):
+    """Derive the four-factor ANALOGY values from a raw NBA performance dict.
+
+    bbtech maps a basketball profile onto an oncology four-factor model as a
+    TRANSLATION (see bbtech 2 analytics/four_factors.py): shooting -> proliferation,
+    turnover/foul control -> clearance, spacing/rebounding -> resource
+    (angiogenesis), errors -> metastasis. The mapping is deterministic and
+    monotonic in the real inputs, but the scaling constants are hand-chosen to
+    land raw stat lines on a 0-100 axis. This is an ANALOGY, not a biological
+    measurement — downstream consumers label it E3-analogy, never E1 biology.
+    """
+    fg = _clamp100(float(p.get("fg", 50.0)))
+    tp = _clamp100(float(p.get("tp", 0.0)))
+    oreb = max(0.0, float(p.get("oreb", 0.0)))
+    tov = max(0.0, -float(p.get("tov", 0.0)))  # profile stores liabilities negative
+    pf = max(0.0, -float(p.get("pf", 0.0)))
+    da = _clamp01(float(p.get("defensive_attention", 0.5)))
+    spacing = _clamp01(float(p.get("court_spacing", 0.5)))
+
+    proliferation = _clamp100(0.7 * fg + 0.3 * tp)                       # shooting -> growth
+    turnover_eff = 1.0 - min(1.0, tov / 5.0)
+    clearance = _clamp100(0.6 * 100.0 * da + 0.4 * 100.0 * turnover_eff - pf * 3.0)  # clean defensive control -> immune clearance
+    resource = _clamp100(100.0 * (0.5 * spacing + 0.5 * min(1.0, oreb / 8.0)))      # spacing + rebounding -> supply access
+    metastasis = _clamp100(10.0 + 15.0 * min(1.0, tov / 4.0) + 8.0 * min(1.0, pf / 4.0))  # errors -> spread/leakage
+    return dict(zip(FOUR_FACTOR_NAMES, (proliferation, clearance, resource, metastasis)))
+
+
 def gravity_index(defensive_attention, court_spacing):
     return _clamp01(0.6 * defensive_attention + 0.4 * court_spacing)
 

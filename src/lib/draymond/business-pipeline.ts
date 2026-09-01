@@ -23,6 +23,8 @@ export interface Opportunity {
   serviceId?: string;
   /** Selected pricing tier id from the service catalog. */
   tierId?: string;
+  /** Stripe charge id that settled this order (storefront auto-opportunities). */
+  stripeChargeId?: string;
   owner: string; // the agent/product delivering it
   nextAction: string;
   createdAt: string;

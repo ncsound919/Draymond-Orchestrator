@@ -588,6 +588,12 @@ export async function startCognition(): Promise<void> {
   } catch (err) {
     console.warn('[cognition] discovery-loop daemon skipped:', err instanceof Error ? err.message : err);
   }
+  try {
+    const { startTidDaemon } = await import('./tid-daemon');
+    startTidDaemon();
+  } catch (err) {
+    console.warn('[cognition] TID daemon skipped:', err instanceof Error ? err.message : err);
+  }
 }
 
 /** Delegate to the AutoDream cycle (self-gating, never rejects). */

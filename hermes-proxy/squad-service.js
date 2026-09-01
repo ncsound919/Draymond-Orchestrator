@@ -151,10 +151,19 @@ async function readBody(req) {
   return Buffer.concat(chunks);
 }
 
-export const server = http.createServer(async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+const LOOPBACK_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
+function setCors(req, res) {
+  const origin = req.headers.origin;
+  if (typeof origin === 'string' && LOOPBACK_ORIGIN.test(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+}
+
+export const server = http.createServer(async (req, res) => {
+  setCors(req, res);
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);

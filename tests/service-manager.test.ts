@@ -228,7 +228,7 @@ describe('startService', () => {
     await vi.advanceTimersByTimeAsync(12 * 1500);
     const r = await pending;
     expect(r.url).toBe('http://localhost:8000/health'); // uplift-agent is in TOOL_PORTS
-    expect(r.detail).toContain('started "node agents/Uplift-Agent/server.js"');
+    expect(r.detail).toContain('started "node server.js"');
     const opts = mockSpawn.mock.calls[0]![2] as { cwd?: string };
     expect(opts.cwd).toBe(path.join(tmp, 'agents', 'Uplift-Agent'));
   });

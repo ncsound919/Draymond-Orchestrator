@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import type { EngineName, ExperimentStatus, Task, TaskDAG } from './types';
 import { runDag, topoOrder, type Executor } from './dag';
 import { saveExperiment, getExperimentsMap as readMap } from './store';
-import { runPythonMetrics, runPythonCoach, runPythonTranslate, runPythonInsights, runPythonFormula, runPythonLayers, runPythonDerive } from './pythonExecutors';
+import { runPythonMetrics, runPythonCoach, runPythonTranslate, runPythonInsights, runPythonFormula, runPythonLayers, runPythonDerive, runPythonSportsModel, type SportsModelAction, type SportsModelQuery } from './pythonExecutors';
 import { runRustSimPlay, runRustSimBatch } from './rustExecutors';
 import { validateOutput } from './validate';
 
@@ -94,6 +94,26 @@ const makeExecutor: Executor = (task, upstream) => {
       profile as string | Record<string, unknown> | undefined,
       domain,
     );
+  }
+  if (task.engine === 'model') {
+    // bbtech sports model bridge: validated win probabilities for Sports Steve
+    // / Bet Buddy from the real NBA dataset + math-x statistics, persisted into
+    // the trends store under source='bbtech_sports_model'.
+    const action = (task.inputs?.action ?? 'backtest') as SportsModelAction;
+    const opts: SportsModelQuery = {
+      home: task.inputs?.home ? String(task.inputs.home) : undefined,
+      away: task.inputs?.away ? String(task.inputs.away) : undefined,
+      team: task.inputs?.team ? String(task.inputs.team) : undefined,
+      player: task.inputs?.player ? String(task.inputs.player) : undefined,
+      line: task.inputs?.line !== undefined ? Number(task.inputs.line) : undefined,
+      date: task.inputs?.date ? String(task.inputs.date) : undefined,
+      from: task.inputs?.from ? String(task.inputs.from) : undefined,
+      to: task.inputs?.to ? String(task.inputs.to) : undefined,
+      maxGames: task.inputs?.max_games !== undefined ? Number(task.inputs.max_games) : undefined,
+      sessionId: task.inputs?.session_id ? String(task.inputs.session_id) : undefined,
+      forward: task.inputs?.forward === true || task.inputs?.forward === 'true',
+    };
+    return runPythonSportsModel(action, opts);
   }
   return Promise.resolve({
     success: false,
