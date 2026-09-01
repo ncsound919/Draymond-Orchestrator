@@ -1,5 +1,5 @@
 # sports_science/run_metrics.py
-"""CLI + importable runner: raw sports data JSON -> Codex + injury metrics (E1)."""
+"""CLI + importable runner: raw sports data JSON -> Codex + injury metrics (E2/E3)."""
 from __future__ import annotations
 
 import argparse

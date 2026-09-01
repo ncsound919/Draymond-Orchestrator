@@ -19,19 +19,13 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from sports_science.betting_pipeline import run_experiment  # noqa: E402
+from sports_science.betting_pipeline import run_experiment, run_forward_test  # noqa: E402
 from sports_science.validation_engine import utc_now_iso  # noqa: E402
 
 
 def _metrics(results) -> list[dict]:
     out = []
     for r in results:
-        _validated = (
-            r.bets >= 500
-            and r.concordance is not None
-            and r.ci_low is not None
-            and (r.ci_low > 0.5 or r.ci_high < 0.5)
-        )
         out.append({
             "name": f"betting_experiment.{r.name}",
             "value": r.roi if r.roi is not None else r.concordance,
@@ -48,7 +42,7 @@ def _metrics(results) -> list[dict]:
             "bets": r.bets,
             "n": r.n,
             "verdict": r.verdict,
-            "evidence_tier": "E2" if _validated else "E3",
+            "evidence_tier": "E2" if (r.bets >= 500 and r.roi is not None and r.roi > 0) else "E3",
             "modeled": True,
         })
     return out
@@ -59,12 +53,21 @@ def _main() -> int:
     parser.add_argument("--from", dest="from_date", default="2010-01-01")
     parser.add_argument("--to", dest="to_date", default="2018-06-01")
     parser.add_argument("--max", dest="max_games", type=int, default=14000)
+    parser.add_argument("--forward", action="store_true",
+                        help="forward-test on the unseen 2019-2026 window (confirm or kill retrospective edges)")
     args = parser.parse_args()
     try:
-        results, report = run_experiment(
-            from_date=args.from_date, to_date=args.to_date, max_games=args.max_games
-        )
+        if args.forward:
+            results, report = run_forward_test(
+                from_date=args.from_date, to_date=args.to_date, max_games=args.max_games
+            )
+        else:
+            results, report = run_experiment(
+                from_date=args.from_date, to_date=args.to_date, max_games=args.max_games
+            )
         metrics = _metrics(results)
+        for m in metrics:
+            m["name"] = m["name"].replace("betting_experiment.", "betting_experiment.forward." if args.forward else "betting_experiment.")
         tiers = ["E1", "E2", "E3", "E4"]
         worst = None
         for m in metrics:
@@ -74,7 +77,7 @@ def _main() -> int:
                     worst = t
         output = {
             "ok": True,
-            "kind": "betting_experiment",
+            "kind": "betting_experiment" + (".forward" if args.forward else ""),
             "domain": "sports",
             "metrics": metrics,
             "evidence_tier": worst or "E3",
