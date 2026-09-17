@@ -78,7 +78,7 @@ function readAssignedFreeModel(): string {
   return FREE_MODELS[0];
 }
 
-// ── env loading (data/litellm.env first = freshest vault sync, then .env.local)
+// -- env loading (data/litellm.env first = freshest vault sync, then .env.local)
 
 function loadEnvMap(): Record<string, string> {
   const out: Record<string, string> = {};
@@ -145,7 +145,7 @@ const OLLAMA_KEYS = [
   'OLLAMA_KEY_NCSOUND919', 'OLLAMA_KEY_JOHNREDD888', 'OLLAMA_KEY_NCSOUND_ALT',
 ];
 
-// ── probe matrix ─────────────────────────────────────────────────────────────
+// -- probe matrix -------------------------------------------------------------
 
 export async function runPoolHealth(opts: { restartLitellm?: boolean } = {}): Promise<PoolState> {
   const env = loadEnvMap();
@@ -294,7 +294,7 @@ export async function runPoolHealth(opts: { restartLitellm?: boolean } = {}): Pr
   return state;
 }
 
-// ── deterministic config builder (pure — unit tested) ───────────────────────
+// -- deterministic config builder (pure — unit tested) -----------------------
 
 export function buildLitellmConfig(
   state: Pick<
@@ -388,6 +388,13 @@ export function buildLitellmConfig(
   lines.push(`      model: openai/deepseek-v4-flash`);
   lines.push(`      api_key: os.environ/OPENCODE_API_KEY`);
   lines.push(`      api_base: https://opencode.ai/zen/go/v1`);
+  // Vision: DeepSeek V4 Flash Vision (experimental) — the image-scan path for
+  // apps like PureScore (LLM_VISION_MODEL). Routed via OpenRouter, so it needs
+  // OpenRouter credit; the free tier is not assumed multimodal.
+  lines.push(`  - model_name: deepseek-vision`);
+  lines.push(`    litellm_params:`);
+  lines.push(`      model: openrouter/deepseek/deepseek-v4-flash-vision-exp`);
+  lines.push(`      api_key: os.environ/OPENROUTER_API_KEY`);
   lines.push('');
   lines.push('router_settings:');
   lines.push('  cooldown_time: 600');
