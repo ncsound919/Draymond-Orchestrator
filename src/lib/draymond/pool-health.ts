@@ -388,13 +388,13 @@ export function buildLitellmConfig(
   lines.push(`      model: openai/deepseek-v4-flash`);
   lines.push(`      api_key: os.environ/OPENCODE_API_KEY`);
   lines.push(`      api_base: https://opencode.ai/zen/go/v1`);
-  // Vision: DeepSeek V4 Flash Vision (experimental) — the image-scan path for
-  // apps like PureScore (LLM_VISION_MODEL). Routed via OpenRouter, so it needs
-  // OpenRouter credit; the free tier is not assumed multimodal.
+  // Vision: DeepSeek's `deepseek-flash` (DeepSeek-V4.1-Flash) is the supported
+  // vision model — the legacy deepseek-v4-flash-vision-exp is retired and served
+  // by V4.1-Flash. DeepSeek direct (funded); OpenRouter is NOT required.
   lines.push(`  - model_name: deepseek-vision`);
   lines.push(`    litellm_params:`);
-  lines.push(`      model: openrouter/deepseek/deepseek-v4-flash-vision-exp`);
-  lines.push(`      api_key: os.environ/OPENROUTER_API_KEY`);
+  lines.push(`      model: deepseek/deepseek-flash`);
+  lines.push(`      api_key: os.environ/DEEPSEEK_API_KEY`);
   lines.push('');
   lines.push('router_settings:');
   lines.push('  cooldown_time: 600');

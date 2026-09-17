@@ -47,8 +47,8 @@ model_list:
       api_base: https://opencode.ai/zen/go/v1
   - model_name: deepseek-vision
     litellm_params:
-      model: openrouter/deepseek/deepseek-v4-flash-vision-exp
-      api_key: os.environ/OPENROUTER_API_KEY
+      model: deepseek/deepseek-flash
+      api_key: os.environ/DEEPSEEK_API_KEY
 
 router_settings:
   cooldown_time: 600
