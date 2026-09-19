@@ -16,7 +16,7 @@ export function phaseList(): DayPhase[] {
   return [...DAY_PHASES];
 }
 
-// ── Fleet shapes (defensive — field presence varies by API) ───────────────
+// -- Fleet shapes (defensive — field presence varies by API) ---------------
 
 export interface FleetAgent {
   id: string;
@@ -107,7 +107,7 @@ export interface BrainDecisionResult {
   actions?: Array<{ action: string; detail: string; ok: boolean }>;
 }
 
-// ── Status color maps ─────────────────────────────────────────────────────
+// -- Status color maps -----------------------------------------------------
 
 const STATUS_DOT_COLORS: Record<string, string> = {
   active: 'bg-green-500',
@@ -155,7 +155,7 @@ export function jobStatusBadge(status: string | null | undefined): string {
   return JOB_STATUS_BADGES[status ?? ''] ?? 'bg-gray-500/20 text-gray-400';
 }
 
-// ── Counts ────────────────────────────────────────────────────────────────
+// -- Counts ----------------------------------------------------------------
 
 /** Number of enabled jobs in a list (defensive: missing flag → not enabled). */
 export function jobEnabledCount(
@@ -171,7 +171,7 @@ export function agentHealthyCount(
   return (agents ?? []).filter((a) => a.status === 'active').length;
 }
 
-// ── Time formatting ───────────────────────────────────────────────────────
+// -- Time formatting -------------------------------------------------------
 
 /** Compact relative timestamp ('2m ago'); 'Never' for null/absent/unparseable. */
 export function relativeTime(iso: string | null | undefined): string {
@@ -204,7 +204,7 @@ export function formatDateTime(iso: string | null | undefined): string {
   });
 }
 
-// ── Brain health ──────────────────────────────────────────────────────────
+// -- Brain health ----------------------------------------------------------
 
 export type BrainHealth = 'online' | 'degraded' | 'offline';
 

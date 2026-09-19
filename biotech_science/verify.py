@@ -85,6 +85,7 @@ def fetch_target_evidence(target: str) -> dict:
     chembl_count = 0
     has_ct = False
     try:
+        # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected -- target is sanitized to [A-Za-z0-9\-_] and the host is a fixed https:// endpoint, so no file:// scheme can be injected.
         with urllib.request.urlopen(
             f"https://www.ebi.ac.uk/chembl/api/data/target/search?q={target}&format=json",
             timeout=10,
@@ -93,6 +94,7 @@ def fetch_target_evidence(target: str) -> dict:
     except Exception:  # noqa: BLE001
         pass
     try:
+        # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected -- same sanitized target, fixed https:// host.
         with urllib.request.urlopen(
             f"https://clinicaltrials.gov/api/v2/studies?query.intr={target}&pageSize=1",
             timeout=10,
@@ -148,6 +150,7 @@ def verify_claim(claim: str, expected: float, tolerance: float = 1e-6) -> dict:
                 raise ValueError(f"disallowed construct: {type(node).__name__}")
 
         names = {"pi": math.pi, "e": math.e, "tau": math.tau}
+        # nosemgrep: python.lang.security.audit.eval-detected.eval-detected -- the tree is AST-whitelisted to arithmetic ops/constants and evaluated with __builtins__={} (no code execution).
         value = eval(compile(tree, "<claim>", "eval"), {"__builtins__": {}}, names)  # noqa: S307 - AST-whitelisted above
         result["computed"] = round(float(value), 8)
         result["verified"] = abs(float(value) - float(expected)) <= float(tolerance)

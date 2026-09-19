@@ -36,7 +36,7 @@ const ALLOWED_PATCH_FIELDS = new Set([
   'metadata',
 ]);
 
-// ── GET /api/entities/[id] ──────────────────────────────────────────────────
+// -- GET /api/entities/[id] --------------------------------------------------
 
 export async function GET(
   request: NextRequest,
@@ -67,7 +67,7 @@ export async function GET(
   }
 }
 
-// ── PATCH /api/entities/[id] ────────────────────────────────────────────────
+// -- PATCH /api/entities/[id] ------------------------------------------------
 
 export async function PATCH(
   request: NextRequest,
@@ -122,7 +122,7 @@ export async function PATCH(
   }
 }
 
-// ── DELETE /api/entities/[id] ───────────────────────────────────────────────
+// -- DELETE /api/entities/[id] -----------------------------------------------
 
 export async function DELETE(
   request: NextRequest,

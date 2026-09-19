@@ -151,7 +151,7 @@ class PyodideWorkerManager {
           this.pending.delete(msg.id);
           break;
         case 'package-error':
-          console.warn(`[pyodide] Package install failed: ${msg.pkg}:`, msg.error);
+          console.warn('[pyodide] Package install failed: %s:', msg.pkg, msg.error);
           break;
         case 'cleared':
           this.pending.get(msg.id)?.resolve('cleared');

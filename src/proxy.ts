@@ -47,7 +47,7 @@ function corsHeaders(requestOrigin?: string | null): Record<string, string> {
 export async function proxy(request: NextRequest) {
   const isApiPath = request.nextUrl.pathname.startsWith('/api');
 
-  // ── API: CORS + preflight ────────────────────────────────────────────────
+  // -- API: CORS + preflight ------------------------------------------------
   if (isApiPath) {
     if (request.method === 'OPTIONS') {
       return new NextResponse(null, {
@@ -64,7 +64,7 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // ── Pages: session gate ───────────────────────────────────────────────────
+  // -- Pages: session gate ---------------------------------------------------
   const response = NextResponse.next({
     request: {
       headers: request.headers,

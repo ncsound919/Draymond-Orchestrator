@@ -146,7 +146,7 @@ export async function runBenchmarkCycle(
     try {
       await recordDeepScores(run_id, componentClass, deep);
     } catch (err) {
-      console.error(`[run-benchmark] failed to persist deep scores for ${componentClass}:`, err);
+      console.error('[run-benchmark] failed to persist deep scores for %s:', componentClass, err);
     }
   }
 

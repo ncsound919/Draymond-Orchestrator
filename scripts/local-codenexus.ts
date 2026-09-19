@@ -20,6 +20,7 @@ const EXCLUDE = new Set([
   'node_modules', 'dist', 'build', 'coverage', '.git', '.next', '.vite',
   'src-tauri', 'e2e', 'test-results', 'playwright-report', '.verification-sandbox',
   'test-docs', 'reports', 'docs', '.turbo', '.cache', '.github', 'public', 'assets',
+  'agents', '.draymond', '.audit', 'data', 'deep-audit-reports',
 ]);
 
 function collectSource(root: string, limit = 120): { file: string; content: string }[] {
@@ -69,9 +70,21 @@ async function main() {
 
   const findings: Record<string, unknown>[] = [];
   const bySeverity: Record<string, number> = {};
+  const seen = new Set<string>();
+
+  /** Extract a 1-based line number from a detector location string. */
+  const lineOf = (s?: string): number | undefined => {
+    if (!s) return undefined;
+    const m = s.match(/line\s+(\d+)/i);
+    return m ? Number(m[1]) : undefined;
+  };
 
   const add = (severity: string, category: string, title: string, description: string, file: string, line?: number, recommendation?: string) => {
     const sev = severity.toLowerCase();
+    // Dedupe identical findings (the lenses can emit the same signal per trace).
+    const key = `${file}|${category}|${title}|${line ?? ''}`;
+    if (seen.has(key)) return;
+    seen.add(key);
     bySeverity[sev] = (bySeverity[sev] ?? 0) + 1;
     findings.push({
       severity: sev === 'high' || sev === 'critical' ? sev : sev === 'medium' ? 'medium' : 'low',
@@ -92,11 +105,17 @@ async function main() {
     try {
       const sr = reviewSource(f.content);
       for (const tb of sr.trustBoundaries) {
-        if (tb.risk === 'CRITICAL' || tb.risk === 'HIGH') {
+        // A trust boundary is context, not a finding. Only report outbound
+        // network crossings that carry input with no detected validation.
+        if (
+          (tb.risk === 'CRITICAL' || tb.risk === 'HIGH')
+          && tb.direction === 'outbound'
+          && tb.verificationStatus === 'unverified'
+        ) {
           add(tb.risk === 'CRITICAL' ? 'critical' : 'high', 'trust-boundary',
-            `Trust boundary: ${tb.boundary}`,
-            `Trust boundary "${tb.boundary}" (${tb.direction}) crosses with ${tb.verificationStatus} verification.`,
-            f.file, 1, 'Verify all inputs crossing this boundary and enforce access control.');
+            `Unvalidated outbound call: ${tb.boundary}`,
+            `Outbound trust boundary "${tb.boundary}" carries input without detected validation/sanitisation.`,
+            f.file, undefined, 'Validate/sanitise data before crossing this boundary.');
         }
       }
       for (const sm of sr.stateMachines) {
@@ -119,7 +138,7 @@ async function main() {
       for (const finding of wf.findings) {
         add(finding.severity, finding.category,
           finding.title, finding.description,
-          f.file, 1, finding.recommendation);
+          f.file, lineOf(finding.location), finding.recommendation);
       }
     } catch {
       /* skip */
@@ -132,7 +151,7 @@ async function main() {
         if (trace.accessControl?.idorVulnerable) {
           add('high', 'source-to-sink', 'IDOR-vulnerable data flow',
             `Data from "${trace.source}" reaches sinks without access control: ${(trace.sinks ?? []).join(', ')}`,
-            f.file, 1, 'Enforce authorization checks on every access to this resource.');
+            f.file, lineOf(trace.source), 'Enforce authorization checks on every access to this resource.');
         }
       }
       const ac = analyzeAccessControl(f.content);

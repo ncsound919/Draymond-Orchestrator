@@ -72,7 +72,7 @@ function sseWorkflow(workflowId: string, update: Record<string, unknown>): strin
   return `data: ${payload}\n\n`;
 }
 
-// ── Extracted handler functions ──────────────────────────────────────────────
+// -- Extracted handler functions ----------------------------------------------
 
 async function handleEntityInvocation(
   slug: string,
@@ -344,15 +344,15 @@ export async function POST(request: NextRequest) {
       let resultText = '';
 
       if (entity_slug) {
-        // ── Entity invocation path (explicit slug) ─────────────────
+        // -- Entity invocation path (explicit slug) -----------------
         resultText = entity_slug === 'aetherdesk'
           ? await handleAetherDeskInvocation(entity_slug, metadata, write)
           : await handleEntityInvocation(entity_slug, metadata, write);
       } else if (chain_slug) {
-        // ── Chain execution path (explicit slug) ───────────────────
+        // -- Chain execution path (explicit slug) -------------------
         resultText = await handleChainExecution(chain_slug, metadata);
       } else if (build_chain) {
-        // ── Dynamic Chain Builder path ─────────────────────────────
+        // -- Dynamic Chain Builder path -----------------------------
         await write(sseChunk('[Draymond] Building chain from description...\n'));
         try {
           const buildResult = await buildAndExecuteChain({ description: task, context: metadata });
@@ -376,7 +376,7 @@ export async function POST(request: NextRequest) {
           resultText = `[Draymond] Chain builder error: ${buildErr instanceof Error ? buildErr.message : String(buildErr)}`;
         }
       } else if (auto_route) {
-        // ── Intelligent Task Router path ───────────────────────────
+        // -- Intelligent Task Router path ---------------------------
         try {
           const routeResult = await routeAndClassify(task, metadata);
           const route = routeResult.route;
@@ -416,7 +416,7 @@ export async function POST(request: NextRequest) {
           resultText = await handleUpliftDispatch(workflowId, task, metadata);
         }
       } else {
-        // ── Uplift dispatch path (default fallback) ────────────────
+        // -- Uplift dispatch path (default fallback) ----------------
         resultText = await handleUpliftDispatch(workflowId, task, metadata);
       }
 

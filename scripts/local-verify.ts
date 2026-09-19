@@ -88,12 +88,12 @@ async function main() {
   const findings: Record<string, unknown>[] = [];
   const steps: StepResult[] = [];
 
-  // ── TypeScript type-check ──
+  // -- TypeScript type-check --
   if (fs.existsSync(path.join(root, 'tsconfig.json'))) {
     steps.push(await run('npx', ['tsc', '--noEmit'], root, 180_000));
   }
 
-  // ── Scripts from package.json (build, test, lint — no servers/watch) ──
+  // -- Scripts from package.json (build, test, lint — no servers/watch) --
   const scripts = (pkg?.scripts as Record<string, string> | undefined) ?? {};
   const ordered = ['lint', 'typecheck', 'type-check', 'test', 'build'];
   const seen = new Set<string>();

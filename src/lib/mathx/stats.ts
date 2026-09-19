@@ -19,7 +19,7 @@
 //   sigmoid             — logistic map with overflow clamp
 // ============================================================================
 
-// ── Lgamma (Lanczos approximation, Numerical Recipes) ───────────────────────
+// -- Lgamma (Lanczos approximation, Numerical Recipes) -----------------------
 
 function lgamma(x: number): number {
   const cof = [
@@ -38,7 +38,7 @@ function lgamma(x: number): number {
   return -tmp + Math.log((2.5066282746310005 * ser) / x);
 }
 
-// ── Continued fraction for the incomplete beta (Numerical Recipes betacf) ──
+// -- Continued fraction for the incomplete beta (Numerical Recipes betacf) --
 
 function betacf(a: number, b: number, x: number): number {
   const MAXIT = 200;
@@ -104,7 +104,7 @@ export function inverseRegularizedIncompleteBeta(p: number, a: number, b: number
   return x;
 }
 
-// ── Public stats API ────────────────────────────────────────────────────────
+// -- Public stats API --------------------------------------------------------
 
 /**
  * Linear-interpolated sample percentile (R type 7, the default in most stats

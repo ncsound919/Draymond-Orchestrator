@@ -18,6 +18,62 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { TOOL_PORTS } from './ports';
 
+// -- Locally-spawned process registry ----------------------------------------
+// startService() spawns detached processes. With no record of what we started
+// there is no way to CLOSE them — so every repair/cron that "calls up a tool"
+// leaked an orphan (the runaway agent/dev-server tree this module now closes).
+// Disk-backed so a Draymond restart can still reclaim what it launched.
+const PID_REGISTRY = (): string => path.join(process.cwd(), 'data', 'server-pids.json');
+
+interface StartedService {
+  slug: string;
+  pid: number;
+  startedAt: string;
+  cwd: string;
+  command: string;
+}
+
+function readPidRegistry(): Record<string, StartedService> {
+  try {
+    return JSON.parse(fs.readFileSync(PID_REGISTRY(), 'utf-8')) as Record<string, StartedService>;
+  } catch {
+    return {};
+  }
+}
+
+function writePidRegistry(reg: Record<string, StartedService>): void {
+  try {
+    fs.mkdirSync(path.dirname(PID_REGISTRY()), { recursive: true });
+    fs.writeFileSync(PID_REGISTRY(), JSON.stringify(reg, null, 2));
+  } catch {
+    /* best-effort */
+  }
+}
+
+function recordStarted(slug: string, pid: number, cwd: string, command: string): void {
+  if (!pid) return;
+  const reg = readPidRegistry();
+  reg[slug] = { slug, pid, startedAt: new Date().toISOString(), cwd, command };
+  writePidRegistry(reg);
+}
+
+function clearStarted(slug: string): void {
+  const reg = readPidRegistry();
+  if (!(slug in reg)) return;
+  delete reg[slug];
+  writePidRegistry(reg);
+}
+
+/** Is a tracked PID still alive? (signal 0 = existence probe, no delivery.) */
+function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export interface ServiceHealth {
   slug: string;
   name: string;
@@ -31,7 +87,7 @@ export interface ServiceHealth {
 const CWD_OVERRIDES: Record<string, string> = {
   'bookbridge': 'agents/BookBridge--main',
   'hemp-os': '../potential/Hemp-OS-main',
-  'hempforge': '../potential/HempForge-main',
+  'hempforge': '../02_Pillars/Overlay Science/Biotech/HempForge-main',
   'deterministic-brain': 'agents/deterministic-brain',
   'opencode': '.',
   'sports-steve': 'agents/Sports-Steve-main',
@@ -51,6 +107,7 @@ const CWD_OVERRIDES: Record<string, string> = {
   'big-homie': 'agents/AgentBrowser-main/Big-Homie-main',
   'vibe-reality': 'agents/Vibe-Reality-main',
   'sub-team': 'agents/Sub-Team-main',
+  'recourse': 'agents/recourse',
 };
 
 /**
@@ -236,6 +293,15 @@ const START_MAP: Record<string, { command: [string, string[]]; port: number; hea
     health: '/health',
     env: { LITELLM_PORT: '4100' },
   },
+  'recourse': {
+    // Autonomous self-developing architecture OS (template-driven component
+    // building, sandboxed-verified tool registry, self-healing repair, dream
+    // engine, recursive-math loops). Production build via `npm run build`.
+    command: ['node', ['dist/server.cjs']],
+    port: 3050,
+    health: '/api/recourse/status',
+    env: { PORT: '3050', NODE_ENV: 'production' },
+  },
 };
 
 /** Canonical service registry — slug -> { port, health, env } from ports.ts. */
@@ -346,7 +412,7 @@ export async function startService(slug: string): Promise<ServiceHealth> {
   const pre = await probeService(slug, 1500);
   if (pre.up) return pre;
 
-  const cwd = path.resolve(process.cwd(), CWD_OVERRIDES[slug] ?? tool?.cwd ?? '.');
+  const cwd = /*turbopackIgnore: true*/ path.resolve(process.cwd(), CWD_OVERRIDES[slug] ?? tool?.cwd ?? '.');
   if (!fs.existsSync(cwd)) {
     return { slug, name: tool?.name ?? slug, url: serviceUrl(slug), up: false, detail: `working dir missing: ${cwd}` };
   }
@@ -362,15 +428,21 @@ export async function startService(slug: string): Promise<ServiceHealth> {
   if (process.platform === 'win32') {
     const resolvedExe = resolveWin32Executable(cmd);
     if (resolvedExe && /\.exe$/i.test(resolvedExe)) {
-      child = spawn(resolvedExe, args, { cwd, detached: true, stdio: 'ignore', env });
+      // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process -- resolvedExe/args come from the curated service recipe registry, not request input.
+      child = /*turbopackIgnore: true*/ spawn(resolvedExe, args, { cwd, detached: true, stdio: 'ignore', env });
     } else {
       // npm/npx/opencode are .cmd shims — fall back to cmd.exe /c for those.
+      // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process -- cmd/args come from the curated service recipe registry, not request input.
       child = spawn('cmd.exe', ['/d', '/s', '/c', `${cmd} ${args.map((a) => (a.includes(' ') ? `"${a}"` : a)).join(' ')}`], { cwd, detached: true, stdio: 'ignore', env });
     }
   } else {
+    // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process -- cmd/args come from the curated service recipe registry, not request input.
     child = spawn(cmd, args, { cwd, detached: true, stdio: 'ignore', env });
   }
   child.unref();
+  // Track what we launched so it can be CLOSED again (stopService). Without
+  // this the process is unreachable and runs forever after the job is done.
+  if (child.pid) recordStarted(slug, child.pid, cwd, `${cmd} ${args.join(' ')}`);
   // Redirect to server-logs via the shell wrapper where possible; detached
   // processes with stdio ignore don't write logs, so emit a marker.
   try {
@@ -392,16 +464,68 @@ export async function startService(slug: string): Promise<ServiceHealth> {
   };
 }
 
-/** Restart a service: best-effort kill then start. */
-export async function restartService(slug: string): Promise<ServiceHealth> {
-  const { execFileSync } = await import('node:child_process');
-  try {
-    if (process.platform === 'win32') {
-      execFileSync('taskkill', ['/F', '/IM', 'node.exe'], { stdio: 'ignore', timeout: 5000 }).toString();
-    } else {
-      execFileSync('pkill', ['-f', slug], { stdio: 'ignore', timeout: 5000 }).toString();
+/**
+ * Close a service that this module started (the "call up / close" pair).
+ *
+ * Kills ONLY the recorded process tree — `taskkill /PID <pid> /T /F` on
+ * Windows, a process-group signal elsewhere — then falls back to a sticky pm2
+ * stop when the slug is pm2-owned. It never kills by image name.
+ *
+ * (The previous restart path ran `taskkill /F /IM node.exe`, which killed the
+ * pm2 daemon, Draymond itself, and every other Node service on the machine.)
+ */
+export async function stopService(slug: string): Promise<ServiceHealth> {
+  const tool = TOOL_PORTS.find((t) => t.slug === slug);
+  const name = tool?.name ?? slug;
+  const entry = readPidRegistry()[slug];
+  let detail = '';
+
+  if (entry && isPidAlive(entry.pid)) {
+    try {
+      if (process.platform === 'win32') {
+        execFileSync('taskkill', ['/PID', String(entry.pid), '/T', '/F'], { stdio: 'ignore', timeout: 8000 });
+      } else {
+        try {
+          process.kill(-entry.pid, 'SIGTERM');
+        } catch {
+          process.kill(entry.pid, 'SIGTERM');
+        }
+      }
+      detail = `closed tracked "${entry.command}" (pid ${entry.pid})`;
+    } catch (err) {
+      detail = `failed to close pid ${entry.pid}: ${err instanceof Error ? err.message : String(err)}`;
     }
-  } catch { /* nothing running / kill failed — start anyway */ }
+  }
+  clearStarted(slug);
+
+  // pm2-owned service? stop it sticky (autorestart will not resurrect it).
+  try {
+    const { pm2IsOnline, pm2Stop } = await import('./pm2');
+    if (await pm2IsOnline(slug)) {
+      const ok = await pm2Stop(slug);
+      if (ok) {
+        detail = detail ? `${detail}; pm2 stop ${slug}` : `pm2 stop ${slug}`;
+      }
+    }
+  } catch {
+    /* pm2 optional */
+  }
+
+  if (!detail) detail = 'nothing tracked or running for this slug';
+  const post = await probeService(slug, 1500);
+  return { ...post, name, detail };
+}
+
+/** Close a batch of services (symmetry with startDownServices). */
+export async function stopServices(slugs: string[]): Promise<ServiceHealth[]> {
+  const out: ServiceHealth[] = [];
+  for (const slug of slugs) out.push(await stopService(slug));
+  return out;
+}
+
+/** Restart a service: close the one we started, then start fresh. */
+export async function restartService(slug: string): Promise<ServiceHealth> {
+  await stopService(slug);
   await new Promise((r) => setTimeout(r, 800));
   return startService(slug);
 }
@@ -414,7 +538,7 @@ export function canStartService(slug: string): boolean {
   const def = START_MAP[slug];
   if (!def) return false;
   const tool = TOOL_PORTS.find((t) => t.slug === slug);
-  const cwd = path.resolve(process.cwd(), CWD_OVERRIDES[slug] ?? tool?.cwd ?? '.');
+  const cwd = /*turbopackIgnore: true*/ path.resolve(process.cwd(), CWD_OVERRIDES[slug] ?? tool?.cwd ?? '.');
   if (!fs.existsSync(cwd)) return false;
   const [cmd] = def.command;
   // npm/pnpm/pnpx/npx/npm run need installed deps to boot.

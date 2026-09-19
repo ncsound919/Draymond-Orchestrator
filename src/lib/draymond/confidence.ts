@@ -25,7 +25,7 @@ import type {
   ExecutionLogInsert,
 } from './types';
 
-// ── Constants ────────────────────────────────────────────────────────────────
+// -- Constants ----------------------------------------------------------------
 
 /** Fallback score when we have zero history for an entity. */
 const BASELINE_CONFIDENCE = 0.75;
@@ -41,7 +41,7 @@ const SIGNAL_WEIGHTS = {
   chain_context: 0.15,
 } as const;
 
-// ── Execution logging ────────────────────────────────────────────────────────
+// -- Execution logging --------------------------------------------------------
 
 /**
  * Log an entity execution result. This feeds the adaptive confidence system.
@@ -71,7 +71,7 @@ export async function logExecution(input: ExecutionLogInsert): Promise<void> {
   }
 }
 
-// ── Performance record computation ───────────────────────────────────────────
+// -- Performance record computation -------------------------------------------
 
 /**
  * Compute performance metrics for an entity from its execution history.
@@ -144,7 +144,7 @@ export async function getEntityPerformance(
   };
 }
 
-// ── Adaptive confidence computation ──────────────────────────────────────────
+// -- Adaptive confidence computation ------------------------------------------
 
 /**
  * Compute an adaptive confidence score for an entity.
@@ -235,7 +235,7 @@ export async function computeConfidence(
   return result;
 }
 
-// ── Signal computations ──────────────────────────────────────────────────────
+// -- Signal computations ------------------------------------------------------
 
 async function computeHealthSignal(entityId: string): Promise<ConfidenceSignal> {
   const supabase = await createDraymondClient();
@@ -390,7 +390,7 @@ function computeChainContextSignal(ctx: {
   };
 }
 
-// ── Self-tuning threshold ────────────────────────────────────────────────────
+// -- Self-tuning threshold ----------------------------------------------------
 
 /**
  * Recommend a confidence threshold for an entity based on its track record.
@@ -419,11 +419,11 @@ function computeThresholdRecommendation(perf: EntityPerformanceRecord): number {
   return Number(Math.max(0.5, Math.min(0.95, threshold)).toFixed(3));
 }
 
-// ── Utility ──────────────────────────────────────────────────────────────────
+// -- Utility ------------------------------------------------------------------
 
 // percentile(sorted, p) is provided by @/lib/mathx/stats (linear-interpolated).
 
-// ── Batch performance report ─────────────────────────────────────────────────
+// -- Batch performance report -------------------------------------------------
 
 /**
  * Get performance records for all active entities.

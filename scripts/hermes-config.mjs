@@ -67,11 +67,34 @@ if (missing.length) {
 
 const vibeserveMain = join(ROOT, 'agents', 'VibeServe-main', 'vibeserve', '__main__.py');
 
+// Local-first inference: a llama.cpp/OpenAI-compatible server (MiniCPM5-2B).
+// Cloud providers below remain as the fallback chain when the local server is
+// down or the model fails. Override via .env.local without touching this file.
+const localBaseUrl = (env.LOCAL_LLM_BASE_URL || 'http://127.0.0.1:11434/v1').replace(/\/+$/, '');
+const localModel = env.LOCAL_LLM_MODEL || 'minicpm5-2b';
+
+// Local inference for Hermes. MiniCPM5-2B is served at 64K context
+// (start-minicpm.ps1), which clears Hermes' minimum 64K window
+// (agent_init.py). Enable with HERMES_LOCAL_PRIMARY=1 in .env.local; the cloud
+// providers below stay as the fallback chain. Expect slow turns — this CPU
+// throttles under sustained load.
+const localPrimary = env.HERMES_LOCAL_PRIMARY === '1';
+
 const config = {
-  model: {
-    provider: 'opencode-zen',
-    default: 'deepseek-v4-flash-free',
-  },
+  model: localPrimary
+    ? {
+        provider: 'custom',
+        base_url: localBaseUrl,
+        default: localModel,
+        // Local servers ignore the key; Hermes sends it as the bearer token.
+        api_key: env.LOCAL_LLM_API_KEY || 'no-key-required',
+        // Must be >= 64000 (Hermes floor) and match start-minicpm.ps1 -Context.
+        context_length: Number(env.LOCAL_LLM_CONTEXT) || 65536,
+      }
+    : {
+        provider: 'opencode-zen',
+        default: 'deepseek-v4-flash-free',
+      },
   fallback_providers: [
     { provider: 'opencode-go', model: 'deepseek-v4-flash' },
     { provider: 'deepseek', model: 'deepseek-v4-flash' },

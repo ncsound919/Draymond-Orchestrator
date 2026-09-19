@@ -77,7 +77,7 @@ export async function agentVoice(agentId: string): Promise<{ voice: Voice; confi
     configured = Boolean(piperRoot && (await fs.stat(path.join(piperRoot, `${voice.model}.onnx`)).then(() => true).catch(() => false)));
     detail = configured ? `piper model ${voice.model} found` : `piper model ${voice.model} missing (set PIPER_MODELS_DIR)`;
   } else if (voice.engine === "xtts") {
-    configured = Boolean(voice.samplePath && (await fs.stat(voice.samplePath!).then(() => true).catch(() => false)));
+    configured = Boolean(voice.samplePath && (await /*turbopackIgnore: true*/ fs.stat(voice.samplePath!).then(() => true).catch(() => false)));
     detail = configured ? "clone model + sample ready" : "voice-clone sample missing (set VOICE_SAMPLE_WAV)";
   } else {
     detail = "no voice engine configured";

@@ -94,7 +94,7 @@ async function writeRecords(records: RegistrationRecord[]): Promise<void> {
 /** Invoke the music-rights Playwright script with the JSON input on stdin. */
 function invokeScript(scriptPath: string, input: unknown): Promise<{ ok: boolean; output: string }> {
   return new Promise((resolve) => {
-    const child = execFile(
+    const child = /*turbopackIgnore: true*/ execFile(
       process.env.MUSIC_RIGHTS_RUNTIME || "npx",
       ["tsx", scriptPath],
       { cwd: baseDir(), timeout: 120_000, maxBuffer: 2 * 1024 * 1024 },
@@ -124,8 +124,8 @@ export async function registerMusic(input: RegisterMusicInput): Promise<Registra
     catalog: input.songs,
   };
 
-  const script = path.join(baseDir(), SCRIPTS[input.org]);
-  const hasScript = await fs.stat(script).then(() => true).catch(() => false);
+  const script = /*turbopackIgnore: true*/ path.join(baseDir(), SCRIPTS[input.org]);
+  const hasScript = await /*turbopackIgnore: true*/ fs.stat(script).then(() => true).catch(() => false);
   const hasCreds = Boolean(input.email && input.password);
 
   if (hasScript && hasCreds) {
@@ -188,7 +188,7 @@ export async function generateCrossPlatformFiles(
   const scriptDir = baseDir();
   const pending = OTHER_ORGS[completedOrg].map((org) => ({
     org,
-    script: path.join(scriptDir, SCRIPTS[org]),
+    script: /*turbopackIgnore: true*/ path.join(scriptDir, SCRIPTS[org]),
     status: "ready_to_submit" as const,
     payload: {
       org,

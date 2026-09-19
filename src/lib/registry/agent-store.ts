@@ -30,6 +30,7 @@ const avatarCache = new Map<string, { real: boolean; at: number }>();
  */
 export function hasRealAvatar(agent: Pick<RegisteredAgent, 'avatarUrl'>): boolean {
   if (!agent.avatarUrl) return false;
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal -- path.basename() strips directory components before the join.
   const file = path.join(AVATAR_DIR, path.basename(agent.avatarUrl));
   const cached = avatarCache.get(file);
   if (cached && Date.now() - cached.at < AVATAR_CACHE_TTL_MS) {
@@ -144,7 +145,7 @@ async function writeStore(store: RegistryStore): Promise<void> {
   await invalidateReadCache();
 }
 
-// ── Agents ───────────────────────────────────────────────────────────────────
+// -- Agents -------------------------------------------------------------------
 
 let _agentsListCache: { agents: RegisteredAgent[]; at: number } | null = null;
 const AGENTS_LIST_TTL_MS = Number(process.env.DRAYMOND_AGENTS_LIST_TTL_MS ?? 10000);
@@ -236,7 +237,7 @@ export async function updateAgentStatus(
   });
 }
 
-// ── Workflows ─────────────────────────────────────────────────────────────────
+// -- Workflows -----------------------------------------------------------------
 
 export async function getAllWorkflows(): Promise<RegisteredWorkflow[]> {
   return (await readStore()).workflows;
@@ -262,7 +263,7 @@ export async function deleteWorkflow(id: string): Promise<boolean> {
   });
 }
 
-// ── Systems ───────────────────────────────────────────────────────────────────
+// -- Systems -------------------------------------------------------------------
 
 export async function getAllSystems(): Promise<RegisteredSystem[]> {
   return (await readStore()).systems;

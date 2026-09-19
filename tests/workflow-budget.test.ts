@@ -1,8 +1,23 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+process.env.DRAYMOND_DB_PATH = ':memory:';
+
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
   canCallProvider, consumeTokens, acquireLane, releaseLane, laneStatus, laneSnapshot, resetBudget, isOnCooldown,
 } from '../src/lib/draymond/workflow-budget';
 import { supervise, bigHomieGate } from '../src/lib/draymond/supervisor';
+
+let _wbTmp: string;
+beforeAll(() => {
+  _wbTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'draymond-wb-'));
+  process.env.DRAYMOND_REGISTRY_DIR = _wbTmp;
+});
+afterAll(() => {
+  delete process.env.DRAYMOND_REGISTRY_DIR;
+  try { fs.rmSync(_wbTmp, { recursive: true, force: true }); } catch { /* ignore */ }
+});
 
 describe('workflow budget', () => {
   beforeEach(() => resetBudget());

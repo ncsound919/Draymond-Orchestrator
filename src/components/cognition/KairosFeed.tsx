@@ -37,11 +37,12 @@ export default function KairosFeed({ moments }: { moments: KairosMomentProps[] }
     setBusy(id);
     startTransition(async () => {
       try {
-        await fetch('/api/cognition/kairos/ack', {
+        const res = await fetch('/api/cognition/kairos/ack', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id }),
         });
+        if (!res.ok) console.warn(`[kairos] ack returned ${res.status}`);
       } catch {
         /* best-effort */
       } finally {

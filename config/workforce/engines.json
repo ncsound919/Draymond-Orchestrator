@@ -1,0 +1,67 @@
+{
+  "taxonomy": "overlay365-lane-engine",
+  "version": "1.1.0",
+  "created": "2026-09-17",
+  "note": "Single canonical mapping for the circular workforce. Codes normalize on the E<digit> prefix: Axiom writes E1-E4, Draymond business-pipeline writes E1-platform..E4-vertical; both map to the same engine.",
+  "axes": {
+    "lane": {
+      "description": "Axis A - audience lane (voice, tone, targeting). Personas in config/workforce/personas/.",
+      "values": ["music", "tech", "education", "brand"],
+      "source": "Axiom MissionState.lane (AXIOM_MISSION_LANE) once tagged; absent = unknown"
+    },
+    "engine": {
+      "description": "Axis B - revenue engine. Tracked by the Treasurer; settled money only.",
+      "canonical_values": {
+        "E1-platform": "Platform tiers (Overlay Health / Wealth / Justice)",
+        "E2-b2b": "B2B services (Aetherdesk, Marketing-as-a-Service, QA/monitoring)",
+        "E3-tooling": "Business tooling / API (audits, SCA, agent building)",
+        "E4-vertical": "Vertical products (music rights, sports intel, research, publishing)"
+      },
+      "short_codes": ["E1", "E2", "E3", "E4"],
+      "normalization": "match /^E([1-4])/i against the trimmed value; result is E1..E4",
+      "defined_in": "Draymond-Orchestrator/src/lib/draymond/business-pipeline.ts (RevenueEngine)"
+    }
+  },
+  "service_to_engine": {
+    "aetherdesk": "E2",
+    "maas": "E2",
+    "audit": "E3",
+    "research": "E4"
+  },
+  "lane_to_engines": {
+    "music": ["E4"],
+    "tech": ["E1", "E3"],
+    "education": ["E2", "E4"],
+    "brand": ["E2", "E4"]
+  },
+  "correlation_fields": {
+    "description": "Optional additive fields. Absent means unknown; never inferred.",
+    "mission": {
+      "engine": "MissionState.engine (Axiom applyMissionScoping via inferEngine; E1-E4)",
+      "pillar": "MissionState.pillar (Axiom)",
+      "lane": "MissionState.lane (Axiom; AXIOM_MISSION_LANE)",
+      "opportunityId": "MissionState.opportunityId (join to business-pipeline / invoices.json)"
+    },
+    "opportunity": {
+      "engine": "Opportunity.engine (business-pipeline.ts)",
+      "serviceId": "Opportunity.serviceId",
+      "stage": "Opportunity.stage"
+    },
+    "invoice": {
+      "serviceId": "Invoice.serviceId -> engine via service_to_engine",
+      "opportunityId": "Invoice.opportunityId"
+    }
+  },
+  "report": {
+    "module": "Draymond-Orchestrator/src/lib/draymond/circle-report.ts",
+    "cli": "npm run circle:report",
+    "outputs": ["data/circle-report.json", "data/circle-report.md"],
+    "output_note": "Reads .draymond but does not write there (brain-dir write boundary); override with DRAYMOND_CIRCLE_REPORT_DIR",
+    "invariant": "settled = invoices.status 'paid' + treasury settled charges; pipeline is never revenue"
+  },
+  "known_gaps": [
+    "Evidence-ledger records are not yet linked by refId to missions/opportunities; verified evidence is counted globally and flagged unlinked.",
+    "Missions from Axiom are stamped with engine only when a pillar is supplied (AXIOM_MISSION_PILLAR); otherwise engine is absent and surfaces as a broken link.",
+    "Lane tagging is new (2026-09-17); existing missions predate it and will report as missionsWithoutLane."
+  ]
+}

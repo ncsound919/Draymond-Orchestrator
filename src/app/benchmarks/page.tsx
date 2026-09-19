@@ -8,6 +8,16 @@ export const metadata: Metadata = {
   title: 'Benchmarks',
 };
 
+/** Run a query, logging + tagging failure instead of silently blanking the page. */
+async function settle<T>(promise: Promise<T>, fallback: T, label: string): Promise<{ ok: boolean; value: T }> {
+  try {
+    return { ok: true, value: await promise };
+  } catch (err) {
+    console.error(label, err);
+    return { ok: false, value: fallback };
+  }
+}
+
 function Sparkline({ values }: { values: number[] }) {
   if (values.length < 2) return <span className="text-sm text-white/50">no history</span>;
   const max = Math.max(...values, 1);
@@ -21,10 +31,12 @@ function Sparkline({ values }: { values: number[] }) {
 }
 
 export default async function BenchmarksPage() {
-  const [rows, queue] = await Promise.all([
-    latestBenchmarks(200).catch((err) => { console.error('[BenchmarksPage] Failed to load benchmarks:', err); return [] as Awaited<ReturnType<typeof latestBenchmarks>>; }),
-    upgradeQueue('queued').catch((err) => { console.error('[BenchmarksPage] Failed to load upgrade queue:', err); return [] as Awaited<ReturnType<typeof upgradeQueue>>; }),
+  const [benchRes, queueRes] = await Promise.all([
+    settle(latestBenchmarks(200), [] as Awaited<ReturnType<typeof latestBenchmarks>>, '[BenchmarksPage] Failed to load benchmarks:'),
+    settle(upgradeQueue('queued'), [] as Awaited<ReturnType<typeof upgradeQueue>>, '[BenchmarksPage] Failed to load upgrade queue:'),
   ]);
+  const rows = benchRes.value;
+  const queue = queueRes.value;
 
   const seen = new Set<string>();
   const ranked = [...rows]
@@ -38,8 +50,13 @@ export default async function BenchmarksPage() {
     .slice(0, 50);
 
   // One batched query per class covers all 50 rows' sparklines.
-  const trends = await trendsFor(ranked.map((r) => ({ component_class: r.component_class, component_slug: r.component_slug })))
-    .catch((err) => { console.error('[BenchmarksPage] Failed to load trends:', err); return {} as Record<string, number[]>; });
+  const trendsRes = await settle(
+    trendsFor(ranked.map((r) => ({ component_class: r.component_class, component_slug: r.component_slug }))),
+    {} as Record<string, number[]>,
+    '[BenchmarksPage] Failed to load trends:',
+  );
+  const trends = trendsRes.value;
+  const loadError = !benchRes.ok || !queueRes.ok || !trendsRes.ok;
 
   return (
     <div className="min-h-screen text-white p-8">
@@ -48,10 +65,17 @@ export default async function BenchmarksPage() {
         Weakness scores: 0 = healthy, 100 = worst. Tracked entities, sites, crons, chains.
       </p>
 
+      {loadError && (
+        <div role="alert" className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+          <span className="font-semibold">Some benchmark data failed to load.</span>{' '}
+          The tables below may be incomplete — an empty table here does not mean there is no data.
+        </div>
+      )}
+
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-white mb-4">Upgrade Queue</h2>
         {queue.length === 0 ? (
-          <p className="text-white/50">No queued upgrades.</p>
+          <p className="text-white/50">{loadError ? 'Upgrade queue unavailable.' : 'No queued upgrades.'}</p>
         ) : (
           <table className="w-full text-left border-collapse">
             <thead><tr className="border-b-2 border-white/10">
@@ -91,7 +115,7 @@ export default async function BenchmarksPage() {
                 <td className="p-2 text-xs text-white/50">{new Date(r.run_at).toISOString().slice(0, 10)}</td>
               </tr>
             ))}
-            {ranked.length === 0 && <tr><td className="p-2 text-white/50" colSpan={5}>No benchmark data yet. Run a benchmark job.</td></tr>}
+            {ranked.length === 0 && <tr><td className="p-2 text-white/50" colSpan={5}>{loadError ? 'Benchmark data unavailable.' : 'No benchmark data yet. Run a benchmark job.'}</td></tr>}
           </tbody>
         </table>
       </section>

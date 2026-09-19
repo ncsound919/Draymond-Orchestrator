@@ -22,6 +22,8 @@
 // ============================================================================
 
 import type { RepairCrew } from './repair-team';
+import { localJobConfigProposal, repairLocalEnabled } from './local-repair';
+import { recourseGroundingBlock } from './repair-crew';
 
 export interface CodingRepairOutcome {
   action: 'fixed' | 'handed-off' | 'escalated';
@@ -54,7 +56,12 @@ function clip(s: string, n = 1200): string {
 }
 
 /** Build the focused codegen prompt for a failing job. */
-function buildRepairPrompt(job: RepairJobLike, error: string, lessonHints: string[]): string {
+function buildRepairPrompt(
+  job: RepairJobLike,
+  error: string,
+  lessonHints: string[],
+  recourseBlock = '',
+): string {
   return [
     `You are the Draymond coding repair agent. A scheduled job is failing.`,
     ``,
@@ -62,6 +69,7 @@ function buildRepairPrompt(job: RepairJobLike, error: string, lessonHints: strin
     `JOB CONFIG: ${JSON.stringify(job.job_config).slice(0, 800)}`,
     `ERROR: ${error.slice(0, 800)}`,
     lessonHints.length ? `LESSONS (prior repeated failures):\n${lessonHints.join('\n').slice(0, 800)}` : '',
+    recourseBlock ? `\n${recourseBlock.slice(0, 2000)}` : '',
     ``,
     `Diagnose the root cause and propose a concrete, minimal fix.`,
     `If the job_config is wrong, output ONLY the corrected job_config JSON.`,
@@ -97,9 +105,37 @@ export async function dispatchCodingRepair(
   const started = Date.now();
   const engineTimeout =
     Number(opts.timeoutMs) || Number(process.env.DRAYMOND_REPAIR_CODEGEN_TIMEOUT_MS) || 120_000;
-  const prompt = buildRepairPrompt(job, error, lessonHints);
 
-  // ── 1. opencode (primary) ────────────────────────────────────────────────
+  // Recourse grounding: verified prior art (registry) + prior lessons, fetched
+  // through Axiom's bridge. Best-effort — empty when Axiom/Recourse are offline.
+  const grounding = await recourseGroundingBlock(`repair ${job.name}: ${error.slice(0, 200)}`).catch(() => '');
+  const prompt = buildRepairPrompt(job, error, lessonHints, grounding);
+
+  // -- 0. Local model (MiniCPM5-2B via llama.cpp) — free first pass ----------
+  // Cheap, on-device, zero token cost. Only trusted for a minimal job_config
+  // proposal; anything needing real code reasoning falls through to Axiom.
+  if (repairLocalEnabled()) {
+    const local = await localJobConfigProposal({
+      jobName: job.name,
+      jobType: job.job_type,
+      error,
+      jobConfig: job.job_config,
+      lessons: lessonHints,
+      recourseBlock: grounding,
+    });
+    if (local) {
+      const applied = await tryApplyJobConfigPatch(job, local.content);
+      if (applied.applied) {
+        return {
+          action: 'fixed',
+          detail: `local repair (${local.model}) proposed + applied a job_config patch: ${clip(applied.detail, 300)}`,
+          dispatch: { kind: 'codegen', engine: local.model, result: local.content, duration_ms: Date.now() - started },
+        };
+      }
+    }
+  }
+
+  // -- 1. opencode (primary) ------------------------------------------------
   try {
     const { runOpencodeCodegen } = await import('../ide/opencode-client');
     const result = await runOpencodeCodegen({ prompt, workspace: process.cwd(), timeoutMs: engineTimeout });
@@ -126,7 +162,7 @@ export async function dispatchCodingRepair(
     // Fall through to the Uplift Agent when opencode is unreachable.
   }
 
-  // ── 2. Uplift Agent (codegen fallback per the master coding stack) ───────
+  // -- 2. Uplift Agent (codegen fallback per the master coding stack) -------
   if (!opts.skipUplift) {
     const uplift = await dispatchUpliftRepair(job, prompt, engineTimeout);
     if (uplift.ok) {
@@ -139,7 +175,7 @@ export async function dispatchCodingRepair(
     }
   }
 
-  // ── 3. Deterministic terminal plan — never throw, never stall. ───────────
+  // -- 3. Deterministic terminal plan — never throw, never stall. -----------
   const plan = deterministicRepairPlan(job, error, crew);
   return {
     action: 'escalated',

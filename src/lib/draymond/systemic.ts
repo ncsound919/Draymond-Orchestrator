@@ -173,7 +173,7 @@ export async function ingestEvent(
 
   const agentId = opts.agentId ?? mem.agent;
 
-  // ── 1. Self-learning outcome ─────────────────────────────────────────
+  // -- 1. Self-learning outcome -----------------------------------------
   const outcome = outcomeOf(type, data);
   if (outcome) {
     await recordOutcome({
@@ -185,7 +185,7 @@ export async function ingestEvent(
     }).catch(() => {});
   }
 
-  // ── 2. Memory ────────────────────────────────────────────────────────
+  // -- 2. Memory --------------------------------------------------------
   const tier = /failed|down|blocked/.test(type) ? 'important' : 'contextual';
   await storeMemory({
     agent_id: agentId,
@@ -198,7 +198,7 @@ export async function ingestEvent(
     source_event: type,
   }).catch(() => {});
 
-  // ── 3. Knowledge graph — link the actor entity to what it touched ────
+  // -- 3. Knowledge graph — link the actor entity to what it touched ----
   const actor = await entityByLabel(agentId).catch(() => null);
   const subject = await subjectEntity(type, data).catch(() => null);
   if (actor && subject && actor.id !== subject.id) {
@@ -417,7 +417,7 @@ export async function seedKnowledgeGraph(): Promise<{ relations: number }> {
     if (!error) relations++;
   };
 
-  // ── Chain templates → data-flow edges between step entities ──────────
+  // -- Chain templates → data-flow edges between step entities ----------
   const chains = await listChains({ is_template: true }).catch(() => []);
   for (const chain of chains) {
     const steps = await getChainSteps(chain.id).catch(() => []);
@@ -450,7 +450,7 @@ export async function seedKnowledgeGraph(): Promise<{ relations: number }> {
     }
   }
 
-  // ── Entity dependency edges ──────────────────────────────────────────
+  // -- Entity dependency edges ------------------------------------------
   const entities = await searchEntities({ limit: 500 }).catch(() => []);
   for (const e of entities) {
     for (const depSlug of e.depends_on ?? []) {
@@ -498,7 +498,7 @@ export async function consolidateSystem(): Promise<{
     memories++;
   }
 
-  // ── Agenda alignment: update goal progress from real signals ─────────
+  // -- Agenda alignment: update goal progress from real signals ---------
   const supabase = createDraymondAdminClient();
   const { data: goals } = await supabase
     .from('draymond_goals')

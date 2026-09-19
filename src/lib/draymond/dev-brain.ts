@@ -8,9 +8,16 @@
 // local harness / deterministic fallbacks — decisions never stall.
 //
 // Endpoints used:
-//   GET  /api/health          liveness
-//   POST /api/intake          tool-intake ranking (github-awesome scan)
-//   POST /api/decide          weighted decision matrix over candidates
+//   GET  /api/health            liveness
+//   GET  /api/status            stats + backends
+//   GET  /api/sectors           sector catalog
+//   GET  /api/genomes?sector=   leader genomes
+//   POST /api/intake            tool-intake ranking (github-awesome scan)
+//   POST /api/decide            weighted decision matrix over candidates
+//   POST /api/strategy/decide   venture/proposal ranking (strategy team)
+//   POST /api/marketing/decide  channel/campaign weighting (marketing/SMD)
+//   POST /api/repair/triage     hiccup/failure ordering (repair team)
+//   POST /api/fusion/decide     Dev-Brain + deterministic brain (3210) fusion
 // ============================================================================
 
 export interface DevBrainCandidate {
@@ -127,4 +134,62 @@ export async function devBrainIntake(
       problem: 'Dev-Brain intake: candidate open-source tools for the Overlay365 fleet.',
     }),
   });
+}
+
+// -- Domain adapters: thin typed wrappers so callers don't hand-roll the path --
+
+async function decideVia(path: string, request: DevBrainDecideRequest): Promise<DevBrainMatrix | null> {
+  const body = {
+    problem: request.problem,
+    strategy: request.strategy,
+    candidates: (request.candidates ?? []).map((c) => ({
+      name: c.id,
+      description: c.description,
+      license: c.license,
+      stars: c.stars,
+      language: c.language,
+      platform: c.platform,
+      tags: c.tags ?? ['tool'],
+    })),
+  };
+  const matrix = await req<DevBrainMatrix>(path, { method: 'POST', body: JSON.stringify(body) });
+  return matrix && Array.isArray((matrix as unknown as { options?: unknown[] }).options) ? matrix : null;
+}
+
+/** Strategy ventures ranking (weeklyScan/scout) — never throws. */
+export async function devBrainStrategyDecide(request: DevBrainDecideRequest): Promise<DevBrainMatrix | null> {
+  return decideVia('/api/strategy/decide', request);
+}
+
+/** Marketing channel/campaign weighting — never throws. */
+export async function devBrainMarketingDecide(request: DevBrainDecideRequest): Promise<DevBrainMatrix | null> {
+  return decideVia('/api/marketing/decide', request);
+}
+
+/** Repair triage ordering (failures/monitors) — never throws. */
+export async function devBrainRepairTriage(request: DevBrainDecideRequest): Promise<DevBrainMatrix | null> {
+  return decideVia('/api/repair/triage', request);
+}
+
+/** Fusion: Dev-Brain matrix + deterministic brain (3210) task output in one call. Never throws. */
+export async function devBrainFusionDecide(request: DevBrainDecideRequest): Promise<{ devBrain: DevBrainMatrix; deterministicBrain: unknown } | null> {
+  const body = {
+    problem: request.problem,
+    strategy: request.strategy,
+    candidates: (request.candidates ?? []).map((c) => ({
+      name: c.id,
+      description: c.description,
+      license: c.license,
+      stars: c.stars,
+      language: c.language,
+      platform: c.platform,
+      tags: c.tags ?? ['tool'],
+    })),
+  };
+  return req('/api/fusion/decide', { method: 'POST', body: JSON.stringify(body) });
+}
+
+/** Sector catalog — never throws. */
+export async function devBrainSectors(): Promise<{ sectors: unknown[]; totalLeaders: number } | null> {
+  return req('/api/sectors');
 }

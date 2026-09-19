@@ -20,7 +20,7 @@ import type {
   RouterConfig,
 } from './types';
 
-// ── Default configuration ────────────────────────────────────────────────────
+// -- Default configuration ----------------------------------------------------
 
 const DEFAULT_CONFIG: RouterConfig = {
   model: 'deepseek-v4-flash-free',
@@ -48,7 +48,7 @@ export function getRouterConfig(): RouterConfig {
   return { ..._config };
 }
 
-// ── Registry snapshot (cached for routing) ───────────────────────────────────
+// -- Registry snapshot (cached for routing) -----------------------------------
 
 type RegistrySnapshot = {
   entities: Array<{
@@ -127,7 +127,7 @@ export function invalidateRouterCache(): void {
   _snapshotCache = null;
 }
 
-// ── LLM call ─────────────────────────────────────────────────────────────────
+// -- LLM call -----------------------------------------------------------------
 
 function buildSystemPrompt(snapshot: RegistrySnapshot): string {
   const entityList = snapshot.entities
@@ -216,7 +216,7 @@ function buildCompactPrompt(snapshot: RegistrySnapshot): string {
   ].join('\n');
 }
 
-// ── Response parsing ─────────────────────────────────────────────────────────
+// -- Response parsing ---------------------------------------------------------
 
 const VALID_INTENTS: Set<RouterIntent> = new Set([
   'invoke_entity',
@@ -308,7 +308,7 @@ function parseRouterResponse(raw: string, snapshot: RegistrySnapshot, latencyMs:
   };
 }
 
-// ── Public API ───────────────────────────────────────────────────────────────
+// -- Public API ---------------------------------------------------------------
 
 /**
  * Route a natural language task to the best entity or chain.
@@ -622,7 +622,7 @@ export async function routeAndClassify(
   };
 }
 
-// ── Direct matching (skip LLM for obvious patterns) ──────────────────────────
+// -- Direct matching (skip LLM for obvious patterns) --------------------------
 
 const ENTITY_PREFIX_RE = /^(?:run|invoke|execute|use|call)\s+(?:entity\s+)?['""]?([a-z0-9_-]+)['""]?/i;
 const CHAIN_PREFIX_RE = /^(?:run|execute|start)\s+(?:chain\s+)?['""]?([a-z0-9_-]+)['""]?\s*chain/i;

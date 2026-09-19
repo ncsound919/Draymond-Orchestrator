@@ -27,7 +27,7 @@ import type {
   MemoryTier,
 } from './types';
 
-// ── Semantic Memory Search ───────────────────────────────────────────────────
+// -- Semantic Memory Search ---------------------------------------------------
 
 /**
  * Search memories using multiple strategies:
@@ -186,7 +186,7 @@ function scoreMemory(
   return { score: Math.min(1, bestScore), matchType };
 }
 
-// ── Auto-Decay Sweeper ───────────────────────────────────────────────────────
+// -- Auto-Decay Sweeper -------------------------------------------------------
 
 /**
  * Run the memory decay sweep. Should be called periodically (e.g., every hour via scheduler).
@@ -310,7 +310,7 @@ export async function runDecaySweep(): Promise<MemoryDecayResult> {
   return result;
 }
 
-// ── Cross-Agent Memory Sharing ───────────────────────────────────────────────
+// -- Cross-Agent Memory Sharing -----------------------------------------------
 
 /**
  * Grant another agent permission to access a specific memory.
@@ -436,7 +436,7 @@ export async function revokeMemoryAccess(
   if (error) throw new Error(`Failed to revoke memory access: ${error.message}`);
 }
 
-// ── Memory Insights ──────────────────────────────────────────────────────────
+// -- Memory Insights ----------------------------------------------------------
 
 /**
  * Get memory analytics for a specific agent.
@@ -578,7 +578,7 @@ export async function rebuildProjectionsFromBrainState(
 
   let files: string[];
   try {
-    files = await fs.promises.readdir(dir);
+    files = await /*turbopackIgnore: true*/ fs.promises.readdir(dir);
   } catch {
     return { indexed: 0, skipped: 0 }; // no canonical store → nothing to index
   }
@@ -596,7 +596,7 @@ export async function rebuildProjectionsFromBrainState(
       parsed = await readLearningStore(dir);
     } else {
       try {
-        parsed = JSON.parse(await fs.promises.readFile(path.join(dir, file), 'utf-8'));
+        parsed = JSON.parse(await /*turbopackIgnore: true*/ fs.promises.readFile(/*turbopackIgnore: true*/ path.join(dir, file), 'utf-8'));
       } catch {
         skipped++;
         continue;
@@ -698,7 +698,7 @@ export async function checkBrainStateBudget(
 
   let names: string[];
   try {
-    names = await fs.promises.readdir(dir);
+    names = await /*turbopackIgnore: true*/ fs.promises.readdir(dir);
   } catch {
     return [];
   }
@@ -708,7 +708,7 @@ export async function checkBrainStateBudget(
     const capKb = caps[name];
     if (!capKb) continue;
     try {
-      const stat = await fs.promises.stat(path.join(dir, name));
+      const stat = await /*turbopackIgnore: true*/ fs.promises.stat(/*turbopackIgnore: true*/ path.join(dir, name));
       const capBytes = capKb * 1024;
       files.push({ file: name, sizeBytes: stat.size, capBytes, overBudget: stat.size > capBytes });
     } catch {

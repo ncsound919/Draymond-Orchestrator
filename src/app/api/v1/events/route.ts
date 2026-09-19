@@ -97,13 +97,18 @@ export async function GET(request: NextRequest) {
 
   clients.add(eventWriter);
 
-  // Send initial connected event
+  // Send initial connected event. Do NOT await: the write only resolves once
+  // a reader consumes the chunk, but the Response below has not been returned
+  // yet, so nothing is reading — awaiting here deadlocks the route (the
+  // Open-Chat SSE stream would hang instead of connecting).
   const connectedEvent: OrchestratorEvent = {
     type: 'connected',
     data: { message: 'Open-Chat event stream connected', client_count: clients.size },
     ts: new Date().toISOString(),
   };
-  await writer.write(sharedEncoder.encode(`data: ${JSON.stringify(connectedEvent)}\n\n`));
+  writer.write(sharedEncoder.encode(`data: ${JSON.stringify(connectedEvent)}\n\n`)).catch(() => {
+    clients.delete(eventWriter);
+  });
 
   // Heartbeat to keep proxies from closing the idle connection
   const heartbeat = setInterval(async () => {

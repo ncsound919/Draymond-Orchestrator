@@ -162,7 +162,7 @@ export async function syncRosterBenchmarks(): Promise<{
   return { updated: Object.keys(statsBySlug).length, statsBySlug };
 }
 
-// ── % gains ─────────────────────────────────────────────────────────────────
+// -- % gains -----------------------------------------------------------------
 
 function pctGain(baseline: number | null, current: number | null): number | null {
   if (baseline == null || current == null || baseline === 0) return null; // division by zero — no gain computable

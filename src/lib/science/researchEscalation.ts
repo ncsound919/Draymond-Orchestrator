@@ -215,9 +215,9 @@ function appendBrainEntry(
   entry: Record<string, unknown>,
 ): boolean {
   try {
-    const filePath = path.join(brainDir(dirOverride), file);
-    if (!fs.existsSync(filePath)) return false;
-    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as Record<string, unknown>;
+    const filePath = /*turbopackIgnore: true*/ path.join(brainDir(dirOverride), file);
+    if (!/*turbopackIgnore: true*/ fs.existsSync(filePath)) return false;
+    const parsed = JSON.parse(/*turbopackIgnore: true*/ fs.readFileSync(filePath, 'utf-8')) as Record<string, unknown>;
     const arr = Array.isArray(parsed[arrayKey]) ? (parsed[arrayKey] as unknown[]) : [];
     if (arr.some((e) => (e as Record<string, unknown>)?.id === entry.id)) return false;
     parsed[arrayKey] = [...arr, entry];

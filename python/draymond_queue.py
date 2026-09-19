@@ -32,10 +32,27 @@ and runnable today without a live Postgres. Both implement the same
 from __future__ import annotations
 
 import json
+import re
 import time
 import threading
 import uuid
 from typing import Callable, Dict, List, Optional, Tuple
+
+
+# ---------------------------------------------------------------------------
+# SQL identifier safety
+# ---------------------------------------------------------------------------
+# PostgreSQL cannot parameterise identifiers (LISTEN channels, queue names), so
+# every interpolated identifier is constrained to the identifier grammar first.
+_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _safe_ident(name: str) -> str:
+    """Return ``name`` if it is a safe SQL identifier, else raise ValueError."""
+    text = str(name)
+    if not _IDENT_RE.match(text):
+        raise ValueError(f"invalid SQL identifier: {name!r}")
+    return text
 
 
 # ---------------------------------------------------------------------------
@@ -317,7 +334,7 @@ class PgCustomQueue(MessageQueue):
 
     def listen(self, channel: str, callback: Callable[[str, str], None]) -> None:
         cur = self._conn.cursor()
-        cur.execute(f"LISTEN {channel};")
+        cur.execute(f"LISTEN {_safe_ident(channel)};")  # nosemgrep: python.lang.security.audit.formatted-sql-query.formatted-sql-query, python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query -- channel is validated by _safe_ident(); Postgres cannot bind identifiers.
         # Non-blocking notification pump; real usage wires this to a NOTIFY loop.
         self._conn.commit()
         for n in self._conn.notifies():
@@ -328,17 +345,17 @@ class PgCustomQueue(MessageQueue):
 # pgmq-backed queue (SQS-parity; v1.5.1 API as cited by the book)
 # ---------------------------------------------------------------------------
 def pgmq_send_sql(queue_name: str) -> str:
-    return f"SELECT pgmq.send('{queue_name}', %s::jsonb);"
+    return f"SELECT pgmq.send('{_safe_ident(queue_name)}', %s::jsonb);"
 
 
 def pgmq_read_sql(queue_name: str) -> str:
     # vt_offset = visibility timeout seconds; read makes messages invisible that long.
-    return f"SELECT msg_id, message, vt FROM pgmq.read('{queue_name}', %s, %s);"
+    return f"SELECT msg_id, message, vt FROM pgmq.read('{_safe_ident(queue_name)}', %s, %s);"
 
 
 def pgmq_archive_sql(queue_name: str) -> str:
-    return f"SELECT pgmq.archive('{queue_name}', %s);"
+    return f"SELECT pgmq.archive('{_safe_ident(queue_name)}', %s);"
 
 
 def pgmq_delete_sql(queue_name: str) -> str:
-    return f"SELECT pgmq.delete('{queue_name}', %s);"
+    return f"SELECT pgmq.delete('{_safe_ident(queue_name)}', %s);"

@@ -23,10 +23,49 @@ import { writeBrainFile } from './journal';
 
 import fs from "node:fs/promises";
 import path from "node:path";
+import { localFailureTriage, repairLocalEnabled } from "./local-repair";
+import { dispatchProjectRepair } from "./repair-crew";
 import { codingStackSummary, resolveCodingTools } from "./coding-stack";
 import { pipelineSummary } from "./fleet-pipelines";
 import { TOOL_PORTS } from "./ports";
 import { executeChainWithBrainFallback, TokenErrorType } from "./chain-execution-fallback";
+import type { DraymondChain } from "./types";
+
+// -- Dev-Brain repair triage (deterministic, advisory — never blocks dispatch) --
+
+/** Order a batch of hiccups via Dev-Brain's risk_containment weighting. Exported for brain-decision + API. */
+export async function devBrainTriageForRepair(
+  hiccups: Array<{ id: string; title: string; description: string }>,
+): Promise<string[] | null> {
+  if (hiccups.length < 2) return null;
+  try {
+    const { devBrainRepairTriage } = await import('./dev-brain');
+    const matrix = await devBrainRepairTriage({
+      problem: 'Repair triage: order failing jobs and down monitors by blast radius, reversibility, and time-to-restore. Cheapest safe win first; irreversible / customer-facing last without human gate.',
+      candidates: hiccups.map(h => ({ id: h.id, title: h.title, description: h.description, tags: ['repair', 'triage'] })),
+      strategy: 'risk_containment',
+    });
+    if (!matrix) return null;
+    return [...matrix.options].sort((a, b) => b.weightPercentage - a.weightPercentage).map(o => o.id);
+  } catch {
+    return null;
+  }
+}
+
+/** Get Dev-Brain's triage matrix for a set of signals (for API responses / logging). Never throws. */
+export async function devBrainRepairMatrix(
+  hiccups: Array<{ id: string; title: string; description: string }>,
+): Promise<import('./dev-brain').DevBrainMatrix | null> {
+  if (hiccups.length === 0) return null;
+  try {
+    const { devBrainRepairTriage } = await import('./dev-brain');
+    return await devBrainRepairTriage({
+      problem: 'Repair triage: order failing jobs and down monitors by blast radius, reversibility, and time-to-restore.',
+      candidates: hiccups.map(h => ({ id: h.id, title: h.title, description: h.description, tags: ['repair', 'triage'] })),
+      strategy: 'risk_containment',
+    });
+  } catch { return null; }
+}
 
 export type FailureKind = 'chain_config' | 'notification_config' | 'missing_env' | 'service_down' | 'code_error' | 'benchmark_weak' | 'unknown';
 
@@ -166,7 +205,21 @@ export async function repairFailedJob(
   lessonHints: string[] = [],
   options: RepairRepairOptions = {},
 ): Promise<RepairReport> {
-  const kind = classifyFailure(error);
+  const deterministicKind = classifyFailure(error);
+  let kind = deterministicKind;
+  // Local-first triage refinement: only override the fuzzy buckets (unknown /
+  // code_error) and only on a confident local verdict. The deterministic
+  // classifier stays the baseline; disabled/offline => no change.
+  if (repairLocalEnabled() && (deterministicKind === "unknown" || deterministicKind === "code_error")) {
+    try {
+      const triage = await localFailureTriage({ jobName: job.name, jobType: job.job_type, error, deterministicKind });
+      if (triage.source === "local-model" && triage.confidence >= 0.7 && triage.kind !== deterministicKind) {
+        kind = triage.kind;
+      }
+    } catch {
+      /* keep deterministic */
+    }
+  }
   const crew = assembleCrew(kind);
   const base = { jobId: job.id, jobName: job.name, failureKind: kind, error, crew, repairedAt: new Date().toISOString(), lessonHints };
 
@@ -200,7 +253,7 @@ export async function repairFailedJob(
         session_id: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      } as any,
+      } as DraymondChain,
       error: new Error(error),
       inputData: job.job_config as Record<string, unknown>,
     });
@@ -261,7 +314,14 @@ export async function repairFailedJob(
     return { ...base, action: "escalated", detail: `env gap — assign ${crew.lead} to provision the missing key` };
   }
 
-  if (kind === "service_down") {
+if (kind === "service_down") {
+    // Manual-cluster mode (DRAYMOND_AUTO_START_SERVICES=0): never auto-start —
+    // report the down service for the operator to load deliberately.
+    if (process.env.DRAYMOND_AUTO_START_SERVICES === '0') {
+      const detail = `service_down but auto-start disabled (manual cluster mode) — operator loads ${serviceForFailure(job.name, error).join(', ') || job.name} per task`;
+      await recordRepair({ ...base, action: "escalated", detail });
+      return { ...base, action: "escalated", detail, dispatch: { kind: "service_start", result: "disabled" } };
+    }
     // ACTUALLY try to start the service the job depends on.
     const targets = serviceForFailure(job.name, error);
     if (targets.length === 0) {
@@ -313,6 +373,15 @@ export async function repairFailedJob(
         const action: RepairReport["action"] = "handed-off";
         await recordRepair({ ...base, action, detail, dispatch: { kind: "deferred", result: detail } });
         return { ...base, action, detail, dispatch: { kind: "deferred", result: detail } };
+      }
+      // Real repair first: when the job maps to a workspace, hand Axiom a
+      // project loop (file edits + typecheck + repo tests + Recourse verify +
+      // rollback). Axiom owns PASS/FAIL and writes the outcome back.
+      const project = await dispatchProjectRepair({ job, error, lessons: lessonHints });
+      if (project) {
+        const report: RepairReport = { ...base, action: project.action, detail: project.detail, dispatch: project.dispatch };
+        await recordRepair(report);
+        return report;
       }
       const { dispatchCodingRepair } = await import("./coding-repair");
       const outcome = await dispatchCodingRepair(job, error, lessonHints, crew, { timeoutMs: options.dispatchTimeoutMs });
@@ -497,6 +566,19 @@ async function recordRepair(report: RepairReport): Promise<void> {
       detail: report.detail,
     });
   } catch { /* best-effort */ }
+
+  // Recourse memory write-back (through Axiom's guarded bridge) so future
+  // repairs can recall what was tried. Bounded to real outcomes, best-effort.
+  if (report.action === 'fixed' || report.action === 'escalated') {
+    try {
+      const { writeRepairOutcome } = await import('./repair-crew');
+      await writeRepairOutcome({
+        goal: `${report.jobName}: ${report.failureKind}`,
+        status: report.action,
+        findings: [report.detail.slice(0, 300)],
+      });
+    } catch { /* best-effort */ }
+  }
 
   // Deterministic report to the operator + the repair/coding team. Silent
   // deferrals (cooldown / waiting for evidence) don't email; real outcomes do.

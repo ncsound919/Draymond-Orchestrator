@@ -1,4 +1,9 @@
-import { describe, expect, it } from 'vitest';
+process.env.DRAYMOND_DB_PATH = ':memory:';
+
+import { describe, expect, it, beforeAll, afterAll } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
   dayPlan,
   currentPhase,
@@ -8,6 +13,16 @@ import {
   dayTokenBudget,
 } from '../src/lib/draymond/day-orchestrator';
 import { financialBrief } from '../src/lib/draymond/data-apis';
+
+let _doTmp: string;
+beforeAll(() => {
+  _doTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'draymond-day-orch-'));
+  process.env.DRAYMOND_REGISTRY_DIR = _doTmp;
+});
+afterAll(() => {
+  delete process.env.DRAYMOND_REGISTRY_DIR;
+  try { fs.rmSync(_doTmp, { recursive: true, force: true }); } catch { /* ignore */ }
+});
 
 describe('day orchestrator', () => {
   it('has a full daily flow across all phases', () => {

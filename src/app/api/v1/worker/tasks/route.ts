@@ -14,7 +14,7 @@ import { appendAuditLog } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
 
-// ── GET /api/v1/worker/tasks ────────────────────────────────────────────────
+// -- GET /api/v1/worker/tasks ------------------------------------------------
 export async function GET(request: NextRequest) {
   const authError = authorizeRequest(request);
   if (authError) return authError;
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ── POST /api/v1/worker/tasks ───────────────────────────────────────────────
+// -- POST /api/v1/worker/tasks -----------------------------------------------
 export async function POST(request: NextRequest) {
   const authError = authorizeRequest(request);
   if (authError) return authError;

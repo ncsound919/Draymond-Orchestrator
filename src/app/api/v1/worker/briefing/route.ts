@@ -13,7 +13,7 @@ import { createDraymondAdminClient } from '@/lib/draymond/client';
 
 export const dynamic = 'force-dynamic';
 
-// ── GET /api/v1/worker/briefing ─────────────────────────────────────────────
+// -- GET /api/v1/worker/briefing ---------------------------------------------
 export async function GET(request: NextRequest) {
   const authError = authorizeRequest(request);
   if (authError) return authError;

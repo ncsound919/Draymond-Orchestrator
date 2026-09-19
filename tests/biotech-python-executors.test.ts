@@ -16,7 +16,7 @@ describe('biotech python executors', () => {
   // These tests spawn a real Python subprocess (cold interpreter + numpy/pandas
   // imports). Under full-suite CPU load that can exceed vitest's 5s default
   // timeout, so give them a generous window.
-  const PY_TIMEOUT = 30_000;
+  const PY_TIMEOUT = 60_000;
 
   it('maps an onco_stat_crew run on a missing dataset to an error-shaped E1 result', async () => {
     const result = await runPythonAnalysis({ dataset: 'nonexistent.json' });

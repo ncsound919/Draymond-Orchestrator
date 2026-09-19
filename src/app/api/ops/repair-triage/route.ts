@@ -23,7 +23,7 @@ import { consumeRepairToken, publishIssueNotification } from '@/lib/draymond/ntf
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
-  // ── Auth: CRON_SECRET Bearer OR single-use repair token ──────────────────
+  // -- Auth: CRON_SECRET Bearer OR single-use repair token ------------------
   const cronAuthorized = authorizeRequest(request) === null;
 
   const headerToken = request.headers.get('x-repair-token');
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
 
   const startedAt = Date.now();
 
-  // ── Benign whitelist: record-and-return before any LLM scorers run ────────
+  // -- Benign whitelist: record-and-return before any LLM scorers run --------
   // Routed through attemptRepair (not a synthetic response) so the skipped
   // attempt is actually appended to repair-log.json — the audit trail holds
   // for every entry path, not just the scheduler/monitor callers.
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     }, { status: 200 });
   }
 
-  // ── 1. Diagnosis: RepoRank + Grader (best-effort, never blocks repair) ────
+  // -- 1. Diagnosis: RepoRank + Grader (best-effort, never blocks repair) ----
   const diagnosis: Array<{ scorer: string; score: number | null; grade?: string; summary: string; error?: string }> = [];
   if (effRepoUrl) {
     const { scoreWithReporank, scoreWithGrader } = await import('@/lib/draymond/deep-scorers');
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // ── 2. Repair team ────────────────────────────────────────────────────────
+  // -- 2. Repair team --------------------------------------------------------
   let repair: Record<string, unknown>;
   if (effKind === 'job') {
     const { repairFailedJob } = await import('@/lib/draymond/repair-team');
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
     repair = await attemptRepair(effSignal, effDetail) as unknown as Record<string, unknown>;
   }
 
-  // ── 3. Report the outcome back to Open-Chat via the results topic ─────────
+  // -- 3. Report the outcome back to Open-Chat via the results topic ---------
   const ok = repair?.status === 'applied' || repair?.action === 'fixed';
   await publishIssueNotification({
     title: ok ? 'Draymond · Repair applied' : 'Draymond · Repair escalated',

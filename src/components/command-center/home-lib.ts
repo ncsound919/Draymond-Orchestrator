@@ -9,7 +9,7 @@
 
 import { relativeTime } from './fleet-lib';
 
-// ── Feed shapes (defensive — field presence varies by API) ────────────────
+// -- Feed shapes (defensive — field presence varies by API) ----------------
 
 export type FeedSource = 'heartbeat' | 'repair' | 'job' | 'discovery' | 'metric';
 
@@ -66,7 +66,7 @@ export interface DiscoveryLike {
   gradedAt?: string;
 }
 
-// ── Epoch extraction ───────────────────────────────────────────────────────
+// -- Epoch extraction -------------------------------------------------------
 
 /** Best-effort numeric sort key (ms) from a timestamp; 0 when unparseable. */
 export function tsMs(at: string | null | undefined): number {
@@ -75,7 +75,7 @@ export function tsMs(at: string | null | undefined): number {
   return Number.isFinite(d) ? d : 0;
 }
 
-// ── Feed merging ───────────────────────────────────────────────────────────
+// -- Feed merging -----------------------------------------------------------
 
 /**
  * Merge heartbeats + repairs + jobs into a single newest-first feed capped at
@@ -133,7 +133,7 @@ export function mergeFeed(
     .slice(0, cap);
 }
 
-// ── Status pills ───────────────────────────────────────────────────────────
+// -- Status pills -----------------------------------------------------------
 
 const REPAIR_PILL: Record<string, string> = {
   applied: 'bg-green-500/20 text-green-400',
@@ -150,7 +150,7 @@ export function feedStatusPill(status: string | null | undefined): string {
   return REPAIR_PILL[status ?? ''] ?? 'bg-gray-500/20 text-gray-400';
 }
 
-// ── Discovery helpers ──────────────────────────────────────────────────────
+// -- Discovery helpers ------------------------------------------------------
 
 /** Short score label for a discovery (0–100 → letter-ish badge color). */
 export function discoveryScoreLabel(score: number): string {
@@ -178,7 +178,7 @@ export function sortDiscoveries(
     .slice(0, limit);
 }
 
-// ── Prometheus gauge extraction ────────────────────────────────────────────
+// -- Prometheus gauge extraction --------------------------------------------
 
 export interface GaugeLike {
   name: string;
@@ -222,6 +222,6 @@ export function gaugeValue(gauges: GaugeLike[], name: string, fallback = 0): num
   return gauges.find((g) => g.name === name)?.value ?? fallback;
 }
 
-// ── Re-export for the panel ────────────────────────────────────────────────
+// -- Re-export for the panel ------------------------------------------------
 
 export { relativeTime };

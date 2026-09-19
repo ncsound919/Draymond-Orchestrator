@@ -86,6 +86,7 @@ export default function IdeList() {
   }, []);
 
   useEffect(() => {
+     
     void load();
     void loadBench();
   }, [load, loadBench]);

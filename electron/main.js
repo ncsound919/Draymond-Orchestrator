@@ -78,6 +78,7 @@ function waitForServer(timeoutMs = 60_000) {
   const start = Date.now();
   return new Promise((resolve) => {
     const check = () => {
+      // nosemgrep: problem-based-packs.insecure-transport.js-node.using-http-server.using-http-server -- loopback-only health probe of the locally spawned Next server.
       const req = http.get({ host: '127.0.0.1', port: PORT, path: '/api/v1/health', timeout: 2000 }, (res) => {
         res.resume();
         resolve(true);

@@ -15,7 +15,7 @@ export default function QueueActions({ id }: { id: string }) {
       try {
         await resolveQueueItem(id, outcome);
       } catch (err) {
-        console.error(`[Benchmarks] failed to resolve queue item ${id}:`, err);
+        console.error('[Benchmarks] failed to resolve queue item %s:', id, err);
       }
     });
   };

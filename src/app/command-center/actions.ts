@@ -60,21 +60,36 @@ function isAllowed(endpoint: string): boolean {
 export async function ccFetch<T = unknown>(call: BridgeCall): Promise<BridgeResult<T>> {
   await requireDraymondActionAuth();
 
-  if (!isAllowed(call.endpoint)) {
-    return { ok: false, status: 403, error: 'Endpoint not allowed' };
-  }
-
-  const secret = process.env.CRON_SECRET;
   const baseUrl =
     process.env.DRAYMOND_INTERNAL_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
     'http://127.0.0.1:3444';
+  const cleanBase = baseUrl.replace(/\/$/, '');
+
+  if (typeof call.endpoint !== 'string' || !call.endpoint.startsWith('/') || call.endpoint.includes('..')) {
+    return { ok: false, status: 400, error: 'Invalid endpoint' };
+  }
+
+  // Normalize BEFORE allowlisting: a path like `/api/jobs/../seed` must not
+  // resolve to an unlisted route after URL normalization.
+  let normalized: string;
+  try {
+    const parsed = new URL(call.endpoint, `${cleanBase}/`);
+    normalized = parsed.pathname + parsed.search;
+  } catch {
+    return { ok: false, status: 400, error: 'Invalid endpoint' };
+  }
+  if (!isAllowed(new URL(normalized, `${cleanBase}/`).pathname)) {
+    return { ok: false, status: 403, error: 'Endpoint not allowed' };
+  }
+
+  const secret = process.env.CRON_SECRET;
   if (!secret) {
     return { ok: false, status: 503, error: 'CRON_SECRET not configured' };
   }
 
   try {
-    const targetUrl = new URL(call.endpoint, `${baseUrl.replace(/\/$/, '')}/`).toString();
+    const targetUrl = new URL(normalized, `${cleanBase}/`).toString();
     const res = await fetch(targetUrl, {
       method: call.method,
       headers: {

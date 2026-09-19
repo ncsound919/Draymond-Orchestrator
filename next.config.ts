@@ -49,12 +49,10 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
 
-  // Vendored agent repos (agents/**) are type-checked transitively when their
-  // modules are imported (e.g. scripts/local-codenexus.ts) even though tsconfig
-  // excludes them. Their TS errors must not gate the fleet's standalone build.
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // Type-checking is NOT disabled: `next build` runs the project `tsc` and will
+  // fail on real type errors. Vendored agent repos live under `agents/**`, which
+  // `tsconfig.json` excludes from the initial program; `npm run type-check`
+  // checks the same tree. (See CI: type-check runs before build.)
 
   // Emit a minimal self-contained server for the desktop (Electron) build —
   // `.next/standalone` + `.next/static`. Keeps the packaged EXE small and lets

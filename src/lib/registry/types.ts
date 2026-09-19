@@ -125,6 +125,13 @@ export interface RegisteredAgent {
   /** Workflows installed with this agent */
   workflows: WorkflowRef[];
 
+  /** Slugs of agents this one works alongside (team membership). */
+  team?: string[];
+  /** Mission role tag (e.g. 'E3 - audit delivery'). */
+  missionRole?: string;
+  /** Duty cadence (e.g. 'always-on', 'shift', 'on-call'). */
+  duty?: string;
+
   /** System prompt / instruction file content */
   systemPrompt?: string;
 

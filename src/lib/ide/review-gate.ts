@@ -43,7 +43,7 @@ async function resolveWorkspacePath(session: IdeSession, filePath: string): Prom
   const workspace = session.workspace ?? process.cwd();
   const abs = path.isAbsolute(filePath) ? filePath : path.resolve(workspace, filePath);
   try {
-    const realRoot = await fs.realpath(workspace);
+    const realRoot = await /*turbopackIgnore: true*/ fs.realpath(workspace);
     const realAbs = await fs.realpath(abs);
     const root = process.platform === 'win32' ? realRoot.toLowerCase() : realRoot;
     const target = process.platform === 'win32' ? realAbs.toLowerCase() : realAbs;
@@ -68,10 +68,10 @@ async function readChangedFiles(session: IdeSession): Promise<Array<{ path: stri
     const realAbs = await resolveWorkspacePath(session, rel);
     if (!realAbs) continue;
     try {
-      const stat = await fs.stat(realAbs);
+      const stat = await /*turbopackIgnore: true*/ fs.stat(realAbs);
       if (!stat.isFile()) continue;
       if (stat.size > 200_000) continue; // skip huge files
-      const content = await fs.readFile(realAbs, 'utf-8');
+      const content = await /*turbopackIgnore: true*/ fs.readFile(realAbs, 'utf-8');
       out.push({ path: rel, content });
     } catch {
       // file not readable — skip

@@ -149,7 +149,7 @@ export class BridgeStore {
     return Buffer.from(ndjsonSafeStringify(payload), 'utf-8').toString('base64url');
   }
 
-  // ── Environment lifecycle ───────────────────────────────────────────────
+  // -- Environment lifecycle -----------------------------------------------
 
   register(config: BridgeConfig, apiBaseUrl: string): RegisterResult {
     const environmentId = config.environmentId
@@ -210,7 +210,7 @@ export class BridgeStore {
     return true;
   }
 
-  // ── Work queue ──────────────────────────────────────────────────────────
+  // -- Work queue ----------------------------------------------------------
 
   /**
    * Enqueue a session work item for a worker environment. Returns the work
@@ -335,7 +335,7 @@ export class BridgeStore {
     return true;
   }
 
-  // ── Sessions ────────────────────────────────────────────────────────────
+  // -- Sessions ------------------------------------------------------------
 
   /** Append a session event (user / assistant / tool / error). */
   appendSessionEvent(
@@ -387,7 +387,7 @@ export class BridgeStore {
     session.updated_at = new Date().toISOString();
   }
 
-  // ── Maintenance ─────────────────────────────────────────────────────────
+  // -- Maintenance ---------------------------------------------------------
 
   /** Remove environments that have been idle longer than ENV_TTL_MS. */
   sweepIdleEnvironments(now: number = Date.now()): number {

@@ -98,7 +98,7 @@ export async function runRepairShift(options: RepairShiftOptions = {}): Promise<
     durationMs: 0,
   };
 
-  // ── Phase 1: AUDIT (code-review team) ─────────────────────────────────────
+  // -- Phase 1: AUDIT (code-review team) -------------------------------------
   const weakTargets: Array<{ slug: string; score: number; componentClass: string; reasons: string[] }> = [];
   try {
     const { runBenchmarkCycle } = await import("./run-benchmark");
@@ -133,7 +133,7 @@ export async function runRepairShift(options: RepairShiftOptions = {}): Promise<
   }
   result.audit.weakest = result.audit.weakest.slice(0, maxComponents);
 
-  // ── Phase 2: REPAIR (repair team) ─────────────────────────────────────────
+  // -- Phase 2: REPAIR (repair team) -----------------------------------------
   // 2a. Failed scheduler jobs.
   try {
     const { listJobs, updateJob } = await import("./scheduler");
@@ -174,19 +174,24 @@ export async function runRepairShift(options: RepairShiftOptions = {}): Promise<
     }
   }
 
-  // 2c. Start down services.
+// 2c. Start down services. Manual-cluster mode (DRAYMOND_AUTO_START_SERVICES=0):
+  // report what is down, never auto-start.
   try {
-    const { probeAllServices, startDownServices, startableDownServices } = await import("./service-manager");
-    const all = await probeAllServices();
-    const down = all.filter((s) => !s.up).map((s) => s.slug);
-    const startable = startableDownServices(down).slice(0, 5);
-    const started = await startDownServices(startable);
-    result.repair.servicesStarted = started.filter((s) => s.up).map((s) => s.slug);
+    if (process.env.DRAYMOND_AUTO_START_SERVICES !== '0') {
+      const { probeAllServices, startDownServices, startableDownServices } = await import("./service-manager");
+      const all = await probeAllServices();
+      const down = all.filter((s) => !s.up).map((s) => s.slug);
+      const startable = startableDownServices(down).slice(0, 5);
+      const started = await startDownServices(startable);
+      result.repair.servicesStarted = started.filter((s) => s.up).map((s) => s.slug);
+    } else {
+      result.repair.servicesStarted = [];
+    }
   } catch (err) {
     result.repair.failures.push(`services: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  // ── Phase 3: BENCHMARK IMPROVEMENTS ───────────────────────────────────────
+  // -- Phase 3: BENCHMARK IMPROVEMENTS ---------------------------------------
   // Compare each acted-on component's weakness score in THIS run vs its last
   // run. The audit phase already recorded this run's scores into the benchmark
   // history, so `getTrend`'s last value is the current score and the
@@ -223,7 +228,7 @@ export async function runRepairShift(options: RepairShiftOptions = {}): Promise<
     result.repair.failures.push(`improvements: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  // ── Phase 4: SELF-LEARNING (consistent optimization) ──────────────────────
+  // -- Phase 4: SELF-LEARNING (consistent optimization) ----------------------
   try {
     const { distillLessons } = await import("./self-learning");
     const lessons = await distillLessons();

@@ -24,6 +24,7 @@ import { routeAndClassify } from './router';
 import { logExecution } from './confidence';
 import { callLLM } from './llm';
 import { submitAction } from './index';
+import { checkGovernance } from './governance/gate';
 import { getSystemIntel, formatSystemIntel } from './system-intel';
 import { ingestTraceAsync } from './trace';
 import { createIdeSession, startIdeSession } from '@/lib/ide';
@@ -71,7 +72,7 @@ export interface ChatTurnResult {
 const UPLIFT_TIMEOUT_MS = 60_000;
 const COMPRESS_THRESHOLD = 12;
 
-// ── Small-talk / greeting detection ──────────────────────────────────────────
+// -- Small-talk / greeting detection ------------------------------------------
 // Low-value messages that don't warrant dispatching an agent. Routed to a
 // friendly conversational reply instead of a down agent's "will retry" dead-end.
 const SMALL_TALK_RE =
@@ -81,7 +82,7 @@ function isSmallTalk(task: string): boolean {
   return SMALL_TALK_RE.test(task.trim());
 }
 
-// ── Diagnostic signal detection ──────────────────────────────────────────────
+// -- Diagnostic signal detection ----------------------------------------------
 // Messages about failures/downtime should trigger the diagnostic + repair +
 // self-learning loop, not a blind "will retry".
 const DIAGNOSTIC_RE =
@@ -91,7 +92,7 @@ function isDiagnosticQuery(task: string): boolean {
   return DIAGNOSTIC_RE.test(task);
 }
 
-// ── Coding-team dispatch ─────────────────────────────────────────────────────
+// -- Coding-team dispatch -----------------------------------------------------
 
 /** Loose signal that a task is code work rather than an entity/chain/query. */
 const CODING_REQUEST_RE =
@@ -101,7 +102,7 @@ function isCodingRequest(task: string): boolean {
   return CODING_REQUEST_RE.test(task);
 }
 
-// ── On-device dispatch ───────────────────────────────────────────────────────
+// -- On-device dispatch -------------------------------------------------------
 
 /** Loose signal that a task should run on the user's phone (Open-Chat worker). */
 const ON_DEVICE_RE =
@@ -356,6 +357,49 @@ async function invokeEntityBySlug(
   const input = (metadata.input as Record<string, unknown>) ?? {};
   const startMs = Date.now();
 
+  // Governance pre-check (ACE policy kernel). Only scoped action types are
+  // evaluated — arbitrary entity actions pass untouched (see ./governance/gate).
+  const governance = await checkGovernance({
+    action_type: action,
+    subject: slug,
+    agent: (metadata.agent_id as string) ?? 'chat',
+    params: input,
+  });
+
+  if (governance.blocked) {
+    logExecution({
+      entity_id: entity.id,
+      entity_slug: entity.slug,
+      action,
+      success: false,
+      duration_ms: Date.now() - startMs,
+      error_message: `governance: ${governance.reason}`,
+    }).catch(() => {});
+    const msg = `Entity invocation blocked by governance gate: ${governance.reason}`;
+    await streamText(msg, onChunk);
+    return msg;
+  }
+
+  if (governance.needs_review) {
+    const agentId = metadata.agent_id as string | undefined;
+    if (agentId) {
+      const { action: submitted } = await submitAction({
+        agent_id: agentId,
+        action_type: action,
+        description: `Chat-invoked "${action}" on ${slug} requires governance review`,
+        payload: { entity_slug: slug, input },
+        confidence_score: 0.8,
+        risk_level: 'high',
+      });
+      const msg = `Queued for governance review (action ${submitted.id}).`;
+      await streamText(msg, onChunk);
+      return msg;
+    }
+    const msg = `Blocked by governance gate (review required, no agent context): ${governance.reason}`;
+    await streamText(msg, onChunk);
+    return msg;
+  }
+
   try {
     const result = await invokeEntity(
       {
@@ -418,6 +462,21 @@ async function invokeAetherDesk(
   if (!risk) {
     const supported = Object.keys(AETHERDESK_OPERATIONS).join(', ');
     const msg = `Unknown AetherDesk operation "${action}". Supported: ${supported}`;
+    await streamText(msg, onChunk);
+    return msg;
+  }
+
+  // Governance pre-check (ACE policy kernel). Only scoped action types are
+  // evaluated; a hard reject stops the operation before any side effect.
+  // needs_review/allow fall through to the existing risk-based handling.
+  const governance = await checkGovernance({
+    action_type: `aetherdesk:${action}`,
+    subject: 'aetherdesk',
+    agent: 'aetherdesk',
+    params: input,
+  });
+  if (governance.blocked) {
+    const msg = `AetherDesk ${action} blocked by governance gate: ${governance.reason}`;
     await streamText(msg, onChunk);
     return msg;
   }

@@ -51,7 +51,7 @@ const PRESET_TIMEOUT_MS: Record<CommandPreset, number> = {
   'pip-install': 600_000,
 };
 
-// ── Raw (repair) command mode — validated argv, no shell metacharacters ─────
+// -- Raw (repair) command mode — validated argv, no shell metacharacters -----
 
 const RAW_ALLOWED_BASE = new Set(['npm', 'npx', 'node', 'python', 'pip', 'pnpm', 'git', 'cmd', 'bun', 'npx.cmd', 'npm.cmd']);
 const RAW_BLOCKED_FLAGS = [/^(--eval|--print|-e|-p|--require|-r|--import|--input-type|-c|--exec|--command|--unsafe-perm)$/i];
@@ -116,9 +116,9 @@ function resolvePresetFromPrompt(prompt: string): CommandPreset {
 async function validateWorkspace(workspace?: string): Promise<string | null> {
   const root = workspace ?? process.cwd();
   try {
-    const stat = await fs.stat(path.resolve(root));
+    const stat = await /*turbopackIgnore: true*/ fs.stat(/*turbopackIgnore: true*/ path.resolve(root));
     if (!stat.isDirectory()) return null;
-    return path.resolve(root);
+    return /*turbopackIgnore: true*/ path.resolve(root);
   } catch {
     return null;
   }

@@ -55,7 +55,7 @@ export interface AppendMessageInput {
   metadata?: Record<string, unknown>;
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// -- Helpers ------------------------------------------------------------------
 
 function client(): LocalClient {
   return createLocalAdminClient();
@@ -72,7 +72,7 @@ function toConversation(row: Record<string, unknown> | null | undefined): Conver
   };
 }
 
-// ── Conversations ────────────────────────────────────────────────────────────
+// -- Conversations ------------------------------------------------------------
 
 export async function createConversation(
   userId: string,
@@ -224,7 +224,7 @@ export function deriveTitle(content: string): string {
   return text.slice(0, 60) || 'New chat';
 }
 
-// ── Messages ─────────────────────────────────────────────────────────────────
+// -- Messages -----------------------------------------------------------------
 
 /** Next `seq` for a conversation (max + 1, starting at 1). */
 export async function nextSeq(conversationId: string): Promise<number> {

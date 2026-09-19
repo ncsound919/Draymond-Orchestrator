@@ -89,7 +89,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     );
   }
 
-  // ── Auth: CRON_SECRET Bearer OR per-action review token ──────────────────
+  // -- Auth: CRON_SECRET Bearer OR per-action review token ------------------
   const cronAuthorized = authorizeRequest(request) === null;
 
   let tokenAuthorized = false;

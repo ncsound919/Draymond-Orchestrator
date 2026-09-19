@@ -79,6 +79,37 @@ export function classifyTokenError(err: Error | string): TokenErrorType {
     return TokenErrorType.SERVICE_UNAVAILABLE;
   }
 
+  // Transport-level failures. A dependency that is DOWN surfaces as a bare
+  // "fetch failed" (undici wraps ECONNREFUSED/ENOTFOUND/ETIMEDOUT/SOCKET_HANG_UP)
+  // and previously fell through to UNKNOWN, which is NOT escalated to the brain
+  // — so every chain backed by a stopped service hard-failed instead of
+  // self-healing. These are exactly the "service down" case the brain covers.
+  if (
+    msg.includes('fetch failed') ||
+    msg.includes('econnrefused') ||
+    msg.includes('econnreset') ||
+    msg.includes('enotfound') ||
+    msg.includes('eai_again') ||
+    msg.includes('etimedout') ||
+    msg.includes('socket hang up')
+  ) {
+    return TokenErrorType.SERVICE_UNAVAILABLE;
+  }
+
+  // Missing/blank credential presented at call time ("No access token provided",
+  // "no api key", "403 No access token"). Treated as a token error so the
+  // deterministic brain can still complete the task.
+  if (
+    msg.includes('no access token') ||
+    msg.includes('access token') ||
+    msg.includes('no api key') ||
+    msg.includes('api key required') ||
+    msg.includes('missing bearer') ||
+    msg.includes('forbidden')
+  ) {
+    return TokenErrorType.MISSING_API_KEY;
+  }
+
   // Configuration failures used to fall through to UNKNOWN and bypass brain
   // escalation entirely — the exact chains that kept failing ("template not
   // found", "invocation_config.url is required", SSRF blocks) are in this

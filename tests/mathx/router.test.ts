@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, afterEach } from 'vitest';
 import {
   preferredProviderForMode,
   checkOllamaHealth,
+  fetchLocalModels,
   maxTokensForMode,
   MODE_MAX_TOKENS,
   type MathProvider,
@@ -54,5 +55,33 @@ describe('checkOllamaHealth', () => {
   it('returns false when the endpoint is unreachable', async () => {
     const ok = await checkOllamaHealth('http://localhost:1', 200);
     expect(ok).toBe(false);
+  });
+});
+
+describe('fetchLocalModels', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('reads Ollama /api/tags', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: unknown) =>
+      String(url).endsWith('/api/tags')
+        ? { ok: true, json: async () => ({ models: [{ name: 'llama3.2' }] }) }
+        : { ok: false, json: async () => ({}) },
+    ));
+    expect(await fetchLocalModels('http://localhost:11434', 200)).toEqual(['llama3.2']);
+  });
+
+  it('falls back to /v1/models for llama.cpp (no /api/tags)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: unknown) =>
+      String(url).endsWith('/v1/models')
+        ? { ok: true, json: async () => ({ data: [{ id: 'minicpm5-2b' }] }) }
+        : { ok: false, json: async () => ({}) },
+    ));
+    expect(await fetchLocalModels('http://localhost:11434', 200)).toEqual(['minicpm5-2b']);
+    expect(await checkOllamaHealth('http://localhost:11434', 200)).toBe(true);
+  });
+
+  it('returns [] when both endpoints fail', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('ECONNREFUSED'); }));
+    expect(await fetchLocalModels('http://localhost:11434', 200)).toEqual([]);
   });
 });

@@ -25,7 +25,7 @@ export interface FindingLike {
   component_class?: string;
 }
 
-// ── Severity / status color maps ───────────────────────────────────────────
+// -- Severity / status color maps -------------------------------------------
 
 const SEVERITY_COLORS: Record<string, string> = {
   critical: 'bg-red-500/20 text-red-400',
@@ -53,7 +53,7 @@ export function findingStatusColor(status: string | null | undefined): string {
   return FINDING_STATUS_COLORS[status ?? ''] ?? 'bg-gray-500/20 text-gray-400';
 }
 
-// ── Sweep mode labels ──────────────────────────────────────────────────────
+// -- Sweep mode labels ------------------------------------------------------
 
 const SWEEP_MODES: Record<string, string> = {
   manual: 'Manual',
@@ -67,7 +67,7 @@ export function sweepModeLabel(mode: string | null | undefined): string {
   return SWEEP_MODES[mode ?? ''] ?? (mode ? `${mode[0].toUpperCase()}${mode.slice(1)}` : 'Manual');
 }
 
-// ── Coverage formatting ────────────────────────────────────────────────────
+// -- Coverage formatting ----------------------------------------------------
 
 /** 'covered/total (pct%)' compact label; '—' when total is 0. */
 export function formatCoverage(c: CoverageLike | null | undefined): string {
@@ -82,7 +82,7 @@ export function isFullCoverage(c: CoverageLike | null | undefined): boolean {
   return c.covered >= c.total;
 }
 
-// ── Finding helpers ────────────────────────────────────────────────────────
+// -- Finding helpers --------------------------------------------------------
 
 /** Sort findings by severity rank, then confidence desc. Never mutates input. */
 export function sortFindings(

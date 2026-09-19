@@ -57,7 +57,7 @@ const MAX_STEPS = 12;
 const MAX_REVIEW_PASSES = 2;
 const MAX_CONCURRENT = Number(process.env.IDE_MAX_CONCURRENT ?? 3);
 
-// ── Runtime registry (per-session control state) ────────────────────────────
+// -- Runtime registry (per-session control state) ----------------------------
 
 interface Runtime {
   /** True while a runner owns this session (prevents double-run). */
@@ -85,7 +85,7 @@ function runtimeFor(sessionId: string): Runtime | undefined {
   return runtimes.get(sessionId);
 }
 
-// ── Serialized per-session file saves ───────────────────────────────────────
+// -- Serialized per-session file saves ---------------------------------------
 // Parallel steps mutate the same session object; event pushes are synchronous
 // but file writes are async. Chain the writes per session so a fast step never
 // clobbers a slower step's freshly-appended events in the on-disk snapshot.
@@ -99,7 +99,7 @@ function enqueueSave(sessionId: string, write: () => Promise<void>): Promise<voi
   return next;
 }
 
-// ── Small helpers ───────────────────────────────────────────────────────────
+// -- Small helpers -----------------------------------------------------------
 
 const now = () => new Date().toISOString();
 
@@ -134,7 +134,7 @@ async function emitAndSave(session: IdeSession, type: IdeEvent['type'], data: Re
   } catch (err) {
     // Fail-soft: a disk write error must never kill the run — keep the live
     // in-memory session going and record the failure on the session.
-    console.error(`[IDE] save failed for ${session.id}:`, err instanceof Error ? err.message : err);
+    console.error('[IDE] save failed for %s:', session.id, err instanceof Error ? err.message : err);
     session.note = session.note ? `${session.note} — save error` : 'save error';
   }
 }
@@ -144,7 +144,7 @@ function appendChat(session: IdeSession, role: IdeChatMessage['role'], content: 
   if (session.chat.length > MAX_CHAT) session.chat = session.chat.slice(-MAX_CHAT);
 }
 
-// ── Goal classification + crew ──────────────────────────────────────────────
+// -- Goal classification + crew ----------------------------------------------
 
 type GoalKind = 'repair' | 'build' | 'refactor' | 'debug' | 'review' | 'other';
 
@@ -173,7 +173,7 @@ function buildCrew(goal: string, kind: GoalKind): IdeCrew {
   return { lead, members, reason };
 }
 
-// ── Plan decomposition ──────────────────────────────────────────────────────
+// -- Plan decomposition ------------------------------------------------------
 
 const ALLOWED_KINDS = new Set<IdeStepKind>(['plan', 'codegen', 'edit', 'scan', 'analyze', 'symbols', 'test', 'typecheck', 'build', 'review', 'browser-check', 'command', 'git-status', 'git-diff', 'git-commit', 'diagnose', 'repair', 'verify', 'message']);
 const ALLOWED_AGENTS = new Set<IdeStepAgent>(['uplift', 'mutly', 'agent-browser', 'megacode', 'big-homie', 'codegang', 'opencode']);
@@ -368,7 +368,7 @@ function fallbackPlan(kind: GoalKind, goal: string): IdeStep[] {
   return steps;
 }
 
-// ── Decision helpers ────────────────────────────────────────────────────────
+// -- Decision helpers --------------------------------------------------------
 
 async function createDecision(
   session: IdeSession,
@@ -401,7 +401,7 @@ function awaitDecision(sessionId: string, decisionId: string): Promise<IdeDecisi
   return waitForDecision(sessionId, decisionId);
 }
 
-// ── Step execution ──────────────────────────────────────────────────────────
+// -- Step execution ----------------------------------------------------------
 
 function extractUrl(prompt: string): string | null {
   const m = /https?:\/\/[^\s)">]+/.exec(prompt);
@@ -448,7 +448,7 @@ async function runStep(session: IdeSession, step: IdeStep): Promise<void> {
   await emitAndSave(session, 'step.started', { step: stepSummaries(session, step) }, step.id);
 
   try {
-    // ── Git + command kinds run regardless of the assigned agent ────────────
+    // -- Git + command kinds run regardless of the assigned agent ------------
     if (step.kind === 'git-status') {
       const res = await gitStatus(session.workspace);
       step.detail = res.success ? truncate(res.output) : `git status failed: ${res.error ?? 'unknown'}`;
@@ -505,7 +505,7 @@ async function runStep(session: IdeSession, step: IdeStep): Promise<void> {
       return;
     }
 
-    // ── Repair-team steps: diagnose → repair → verify ───────────────────────
+    // -- Repair-team steps: diagnose → repair → verify -----------------------
     if (step.kind === 'diagnose') {
       const slug = extractServiceSlug(step.prompt);
       if (!slug) {
@@ -517,7 +517,7 @@ async function runStep(session: IdeSession, step: IdeStep): Promise<void> {
       const diagnosis = await probeService(slug);
       const tool = TOOL_PORTS.find((t) => t.slug === slug);
       const remediation = await collectRemediation({
-        path: tool?.cwd ? path.resolve(process.cwd(), tool.cwd) : session.workspace,
+        path: tool?.cwd ? /*turbopackIgnore: true*/ path.resolve(process.cwd(), tool.cwd) : session.workspace,
         probe: diagnosis,
       });
       const lines = [
@@ -552,7 +552,7 @@ async function runStep(session: IdeSession, step: IdeStep): Promise<void> {
       const tool = TOOL_PORTS.find((t) => t.slug === slug);
       const diagnosis = slug ? await probeService(slug) : undefined;
       const remediation = await collectRemediation({
-        path: tool?.cwd ? path.resolve(process.cwd(), tool.cwd) : session.workspace,
+        path: tool?.cwd ? /*turbopackIgnore: true*/ path.resolve(process.cwd(), tool.cwd) : session.workspace,
         repoUrl: session.repoUrl,
         probe: diagnosis,
       });
@@ -750,7 +750,7 @@ async function gateOnPause(runtime: Runtime, session: IdeSession): Promise<boole
   return true;
 }
 
-// ── Review gate loop ────────────────────────────────────────────────────────
+// -- Review gate loop --------------------------------------------------------
 
 async function runReviewLoop(session: IdeSession, runtime: Runtime): Promise<void> {
   let reviewPass = 0;
@@ -823,7 +823,7 @@ async function runReviewLoop(session: IdeSession, runtime: Runtime): Promise<voi
   }
 }
 
-// ── Public API ──────────────────────────────────────────────────────────────
+// -- Public API --------------------------------------------------------------
 
 export interface CreateIdeSessionInput {
   goal: string;

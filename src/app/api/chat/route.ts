@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
         typeof (a as AttachmentInput).dataB64 === 'string',
     );
 
-  // ── Resolve the conversation + transcript ───────────────────────────────
+  // -- Resolve the conversation + transcript -------------------------------
   let conv = conversationId
     ? await getConversation(conversationId, auth.user.id).catch(() => null)
     : null;
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
 
   const rawContent = typeof body.content === 'string' ? body.content : '';
 
-  // ── Edit: truncate after the edited message, then resend the new text ────
+  // -- Edit: truncate after the edited message, then resend the new text ----
   if (mode === 'edit') {
     if (!conv || !editMessageId) {
       return NextResponse.json({ error: 'edit requires conversationId + editMessageId' }, { status: 400 });
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
       );
   }
 
-  // ── Load the transcript fresh (after any edit/regenerate mutations) ─────
+  // -- Load the transcript fresh (after any edit/regenerate mutations) -----
   let transcript: Awaited<ReturnType<typeof listMessages>> = [];
   let messageCount = 0;
 
@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
       .map(toChatMessage);
   }
 
-  // ── Create the conversation if needed, persist the user message ─────────
+  // -- Create the conversation if needed, persist the user message ---------
   let userMessageRecord: { id: string } | null = null;
 
   if (!conv) {
@@ -223,7 +223,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // ── Stream the turn ─────────────────────────────────────────────────────
+  // -- Stream the turn -----------------------------------------------------
   const encoder = new TextEncoder();
   const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
   const writer = writable.getWriter();

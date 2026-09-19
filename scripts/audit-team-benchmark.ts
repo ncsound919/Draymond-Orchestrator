@@ -32,7 +32,7 @@ async function main() {
         console.log(`  trend ${t.cls}:${slug} = [${trend.join(', ')}]`);
       }
     } catch (e) {
-      console.error(`cycle failed for ${t.cls}:`, e instanceof Error ? e.message : e);
+      console.error('cycle failed for %s:', t.cls, e instanceof Error ? e.message : e);
     }
   }
 }

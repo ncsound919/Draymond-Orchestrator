@@ -35,7 +35,7 @@ export interface DiscoveryLike {
   breakthroughClass?: string;
 }
 
-// ── Goal status pills ──────────────────────────────────────────────────────
+// -- Goal status pills ------------------------------------------------------
 
 const GOAL_STATUS_COLORS: Record<string, string> = {
   active: 'bg-green-500/20 text-green-400',
@@ -49,7 +49,7 @@ export function goalStatusPill(status: string | null | undefined): string {
   return GOAL_STATUS_COLORS[status ?? ''] ?? 'bg-gray-500/20 text-gray-400';
 }
 
-// ── Experiment status / type pills ─────────────────────────────────────────
+// -- Experiment status / type pills -----------------------------------------
 
 const EXPERIMENT_STATUS_COLORS: Record<string, string> = {
   queued: 'bg-blue-500/20 text-blue-400',
@@ -77,7 +77,7 @@ export function experimentTypeLabel(type: string | null | undefined): string {
   return EXPERIMENT_TYPE_LABELS[type ?? ''] ?? (type ?? '—');
 }
 
-// ── Priority labels ────────────────────────────────────────────────────────
+// -- Priority labels --------------------------------------------------------
 
 /** Descriptive label for a numeric priority score. */
 export function priorityLabel(priority: number | null | undefined): string {
@@ -98,7 +98,7 @@ export function priorityPill(priority: number | null | undefined): string {
   return 'bg-blue-500/20 text-blue-400';
 }
 
-// ── Discovery helpers ──────────────────────────────────────────────────────
+// -- Discovery helpers ------------------------------------------------------
 
 /** Score badge classes for a discovery. */
 export function discoveryPill(score: number | null | undefined): string {
@@ -119,7 +119,7 @@ export function sortDiscoveriesByScore(
     .slice(0, limit);
 }
 
-// ── Numeric clamps (pure) ──────────────────────────────────────────────────
+// -- Numeric clamps (pure) --------------------------------------------------
 
 /** Clamp simulation ticks into a sane range (1–10000); NaN → default. */
 export function clampTicks(n: number, def = 100): number {

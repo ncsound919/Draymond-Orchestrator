@@ -19,7 +19,7 @@ const VALID_STATUSES: ChainStatus[] = [
   'draft', 'active', 'running', 'paused', 'completed', 'failed', 'cancelled', 'archived',
 ];
 
-// ── GET /api/chains ─────────────────────────────────────────────────────────
+// -- GET /api/chains ---------------------------------------------------------
 export async function GET(request: NextRequest) {
   const authError = authorizeRequest(request);
   if (authError) return authError;
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ── POST /api/chains ────────────────────────────────────────────────────────
+// -- POST /api/chains --------------------------------------------------------
 export async function POST(request: NextRequest) {
   const authError = authorizeRequest(request);
   if (authError) return authError;

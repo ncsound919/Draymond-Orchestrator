@@ -491,7 +491,7 @@ async function persistSportsModelReport(
   }
 }
 
-export type SportsModelAction = 'backtest' | 'query' | 'totals' | 'player' | 'market' | 'experiment';
+export type SportsModelAction = 'backtest' | 'query' | 'totals' | 'player' | 'market' | 'experiment' | 'live-props' | 'live-ml' | 'settle';
 
 export interface SportsModelQuery {
   home?: string;
@@ -505,6 +505,8 @@ export interface SportsModelQuery {
   maxGames?: number;
   sessionId?: string;
   forward?: boolean;
+  edge?: number;
+  sport?: string;
 }
 
 /**
@@ -518,13 +520,14 @@ export async function runPythonSportsModel(
   action: SportsModelAction,
   opts: SportsModelQuery = {},
 ): Promise<PythonResult> {
-  if (!['backtest', 'query', 'totals', 'player', 'market', 'experiment'].includes(action)) {
+  if (!['backtest', 'query', 'totals', 'player', 'market', 'experiment', 'live-props', 'live-ml', 'settle'].includes(action)) {
     return { success: false, data: failureData('unknown action'), error: 'unknown action', evidence_tier: 'E4' };
   }
   // The betting experiment pipeline has its own runner (run_experiment.py).
   if (action === 'experiment') {
     return runPythonBettingExperiment(opts);
   }
+  // Live market edge actions run run_model.py subcommands.
   const args: string[] = [action];
   if (action === 'query') {
     if (!opts.home || !opts.away || !opts.date) {
@@ -541,6 +544,18 @@ export async function runPythonSportsModel(
       return { success: false, data: failureData('player requires player, line, date'), error: 'player requires player, line, date', evidence_tier: 'E4' };
     }
     args.push('--player', opts.player, '--line', String(opts.line), '--date', opts.date);
+  } else if (action === 'live-props') {
+    // Live player-prop edge test (real book props vs the model). No args are
+    // required; --edge can be tuned via opts.edge.
+    if (opts.edge !== undefined) args.push('--edge', String(opts.edge));
+    if (opts.maxGames) args.push('--max', String(opts.maxGames));
+  } else if (action === 'live-ml') {
+    // Live moneyline edge test: team model vs real closing lines.
+    if (opts.edge !== undefined) args.push('--edge', String(opts.edge));
+    if (opts.maxGames) args.push('--max', String(opts.maxGames));
+  } else if (action === 'settle') {
+    // Settle open ledger rows against real scores (Scores API).
+    if (opts.sport) args.push('--sport', opts.sport);
   } else if (action === 'market') {
     if (opts.from) args.push('--from', opts.from);
     if (opts.to) args.push('--to', opts.to);

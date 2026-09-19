@@ -21,7 +21,7 @@ import type {
   EntityKind,
 } from './types';
 
-// ── Cost Tracking ────────────────────────────────────────────────────────────
+// -- Cost Tracking ------------------------------------------------------------
 
 /**
  * Record a cost associated with an entity execution.
@@ -90,7 +90,7 @@ export async function getCostSummary(
   return { total_cents: total, by_type: byType, by_entity: byEntity };
 }
 
-// ── Performance Leaderboard ──────────────────────────────────────────────────
+// -- Performance Leaderboard --------------------------------------------------
 
 /**
  * Generate a leaderboard ranking entities by a composite score.
@@ -215,7 +215,7 @@ export async function getEntityLeaderboard(
   return entries.slice(0, limit);
 }
 
-// ── Execution Heatmap ────────────────────────────────────────────────────────
+// -- Execution Heatmap --------------------------------------------------------
 
 /**
  * Generate an execution heatmap showing activity patterns by hour and day of week.
@@ -293,7 +293,7 @@ export async function getExecutionHeatmap(
   return points;
 }
 
-// ── Latency Percentiles ──────────────────────────────────────────────────────
+// -- Latency Percentiles ------------------------------------------------------
 
 /**
  * Compute latency percentiles (P50, P95, P99) for an entity or globally.
@@ -345,7 +345,7 @@ export async function getLatencyPercentiles(
   };
 }
 
-// ── Full Analytics Summary ───────────────────────────────────────────────────
+// -- Full Analytics Summary ---------------------------------------------------
 
 /**
  * Generate a comprehensive analytics summary for a time period.
@@ -403,7 +403,7 @@ export async function getAnalyticsSummary(
   };
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// -- Helpers ------------------------------------------------------------------
 
 async function getChainRunCount(since: string): Promise<number> {
   const supabase = await createDraymondClient();
@@ -420,7 +420,7 @@ async function getChainRunCount(since: string): Promise<number> {
 
 // percentile(sorted, p) is provided by @/lib/mathx/stats (R type-7 interpolated).
 
-// ── Recent Execution Log Query ───────────────────────────────────────────────
+// -- Recent Execution Log Query -----------------------------------------------
 
 /**
  * Get recent execution logs with optional filtering.

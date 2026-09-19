@@ -24,7 +24,7 @@ const registryPath = path.join(
 );
 const avatarsDir = path.join(root, 'public', 'avatars');
 
-// ── .env.local loader ────────────────────────────────────────────────────────
+// -- .env.local loader -------------------------------------------------------
 function loadDotEnvLocal() {
   const file = path.join(root, '.env.local');
   if (!fs.existsSync(file)) return;

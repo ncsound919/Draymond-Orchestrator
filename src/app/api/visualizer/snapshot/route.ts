@@ -4,7 +4,7 @@ import { buildVisualizerSnapshot } from '@/lib/visualizer/snapshot';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
+export async function GET(_request: Request) {
   // Browser-session auth (the visualizer page fetches this directly, so the
   // Bearer CRON_SECRET path doesn't apply — cookie session does).
   const auth = await requireDraymondAuth();

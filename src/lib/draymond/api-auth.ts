@@ -161,7 +161,7 @@ export function sanitizeError(err: unknown): string {
   return 'An unexpected error occurred';
 }
 
-// ── ID validation ────────────────────────────────────────────────────────────
+// -- ID validation ------------------------------------------------------------
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

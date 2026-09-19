@@ -75,7 +75,7 @@ function countBy<T>(rows: T[], key: (r: T) => string): Record<string, number> {
   return out;
 }
 
-// ── Graphify knowledge graph (optional; present after `graphify .`) ─────────
+// -- Graphify knowledge graph (optional; present after `graphify .`) ---------
 
 function loadKnowledgeGraph(): { indexed: boolean; report_excerpt: string | null } {
   try {
@@ -88,7 +88,7 @@ function loadKnowledgeGraph(): { indexed: boolean; report_excerpt: string | null
   }
 }
 
-// ── Snapshot ────────────────────────────────────────────────────────────────
+// -- Snapshot ----------------------------------------------------------------
 
 /**
  * Build the full system intelligence snapshot. Bounded: recent rows and counts
@@ -229,7 +229,7 @@ export async function getSystemIntel(): Promise<SystemIntel> {
   return intel;
 }
 
-// ── Compact text formatter (LLM context + deterministic fallback) ───────────
+// -- Compact text formatter (LLM context + deterministic fallback) -----------
 
 export function formatSystemIntel(intel: SystemIntel): string {
   const lines: string[] = [];

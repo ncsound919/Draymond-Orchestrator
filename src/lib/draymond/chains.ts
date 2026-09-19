@@ -13,6 +13,7 @@ import { invokeEntity } from './invoker';
 import { recordChainStepCost } from './cost';
 import { shouldRetryStep, retryDelayMs } from './retry';
 import { validateStepInput, validateInputMapping } from './step-schemas';
+import { checkGovernance } from './governance/gate';
 import {
   emitChainStarted,
   emitChainStepCompleted,
@@ -705,6 +706,7 @@ function resolveJsonPath(
       return undefined;
     }
     if (current === undefined || current === null) return undefined;
+    // nosemgrep: javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop -- __proto__/constructor/prototype are rejected above; this is a read-only traversal.
     current = current[part];
   }
 
@@ -956,6 +958,79 @@ async function executeStep(
         }
       }
 
+      // Governance gate (ACE policy kernel) — policy/constraints, distinct from
+      // the confidence gate above. In enforce mode a reject blocks the step and
+      // a needs_review queues it for a human; shadow reports only; off (default)
+      // skips entirely. See ./governance/gate.
+      const governance = await checkGovernance({
+        action_type: `chain_step:${step.action}`,
+        subject: entity.slug,
+        agent: agentId ?? 'chain',
+        params: resolvedInput as Record<string, unknown>,
+      });
+
+      if (governance.blocked) {
+        await updateStepStatus(step.id, 'blocked', {
+          error_message: `Blocked by governance gate: ${governance.reason}`,
+          completed_at: new Date().toISOString(),
+          duration_ms: Date.now() - startTime,
+        }, supabaseClient);
+        return {
+          success: false,
+          output: {},
+          error: `Blocked by governance gate: ${governance.reason}`,
+          duration_ms: Date.now() - startTime,
+        };
+      }
+
+      if (governance.needs_review) {
+        // Same stale-approval guard as the confidence gate: if this exact action
+        // was already approved by a human, resume instead of re-queueing.
+        const alreadyApproved = step.action_id
+          ? await isActionApproved(step.action_id)
+          : false;
+
+        if (!alreadyApproved) {
+          if (!agentId) {
+            // No agent context means we cannot file a review row — fail closed
+            // rather than let a flagged action through unreviewed.
+            await updateStepStatus(step.id, 'blocked', {
+              error_message: `Governance review required but no agent context: ${governance.reason}`,
+              completed_at: new Date().toISOString(),
+              duration_ms: Date.now() - startTime,
+            }, supabaseClient);
+            return {
+              success: false,
+              output: {},
+              error: `Blocked by governance gate: ${governance.reason}`,
+              duration_ms: Date.now() - startTime,
+            };
+          }
+
+          const { action } = await submitAction({
+            agent_id: agentId,
+            action_type: `chain_step:${step.action}`,
+            description: `Chain step "${step.name}" requires governance review (entity: ${entity.name})`,
+            payload: resolvedInput,
+            confidence_score: DEFAULT_ENTITY_CONFIDENCE_SCORE,
+            risk_level: (step.risk_level || 'low') as ActionRiskLevel,
+          });
+
+          await updateStepStatus(step.id, 'pending_review', {
+            action_id: action.id,
+            error_message: `Queued for governance review: ${governance.reason}`,
+          }, supabaseClient);
+
+          return {
+            success: false,
+            output: {},
+            error: 'Step queued for governance review',
+            duration_ms: Date.now() - startTime,
+          };
+        }
+        // else: fall through — human approved this exact action for this run
+      }
+
       // Execute the entity via the invocation bridge
       emitAgentInvoked(entity.id, entity.name, step.action, entity.invocation_method);
       const invocationResult = await invokeEntity(
@@ -1107,7 +1182,7 @@ async function executeStep(
  * 6. The chain fails if a non-optional step fails (after retries)
  */
 
-// ── Chain run leases ──────────────────────────────────────────────────────────
+// -- Chain run leases ----------------------------------------------------------
 // Same lease/heartbeat pattern as the scheduler: a running chain carries a
 // lease_expires_at; the executing process heartbeats it so slow-but-alive chains
 // are never treated as crashed. Only an EXPIRED lease (process died) is
@@ -1373,7 +1448,7 @@ export async function resumeChain(
   agentId?: string,
   options?: { timeout_ms?: number }
 ): Promise<ChainExecutionContext> {
-  // ── 1. Validate chain ──────────────────────────────────────────────────
+  // -- 1. Validate chain --------------------------------------------------
   const chain = await getChain(chainId);
   if (!chain) throw new Error(`Chain ${chainId} not found`);
   if (chain.is_template) throw new Error('Cannot resume a template chain. Instantiate it first.');
@@ -1385,7 +1460,7 @@ export async function resumeChain(
     );
   }
 
-  // ── 2. Fetch all steps ─────────────────────────────────────────────────
+  // -- 2. Fetch all steps -------------------------------------------------
   const steps = await getChainSteps(chainId);
   if (steps.length === 0) throw new Error(`Chain ${chainId} has no steps`);
 
@@ -1405,7 +1480,7 @@ export async function resumeChain(
   // Single shared Supabase client for the entire resume operation
   const supabase = createDraymondAdminClient();
 
-  // ── 3. Build execution context from completed steps ────────────────────
+  // -- 3. Build execution context from completed steps --------------------
   // Rebuild context exclusively from completed step output_data (item 21)
   // to avoid stale partial data from the failed run.
   const ctx: ChainExecutionContext = {
@@ -1444,7 +1519,7 @@ export async function resumeChain(
     }
   }
 
-  // ── 4. Reset non-terminal steps to 'pending' ──────────────────────────
+  // -- 4. Reset non-terminal steps to 'pending' --------------------------
   // Also reset 'approved' steps that were never executed (item 22)
   const resetStatuses: StepStatus[] = ['failed', 'blocked', 'retrying', 'waiting', 'running', 'pending_review', 'rejected', 'approved'];
   for (const step of steps) {
@@ -1469,7 +1544,7 @@ export async function resumeChain(
     }
   }
 
-  // ── 5. Mark chain as running ───────────────────────────────────────────
+  // -- 5. Mark chain as running -------------------------------------------
   const chainStartTime = Date.now();
   const timeoutMs = options?.timeout_ms ?? DEFAULT_CHAIN_TIMEOUT_MS;
 
@@ -1500,7 +1575,7 @@ export async function resumeChain(
     });
   }
 
-  // ── 6. Execute remaining steps via shared loop ─────────────────────────
+  // -- 6. Execute remaining steps via shared loop -------------------------
   let completedSteps = 0;
   let failedSteps = 0;
   let stepError: unknown = null;
@@ -1538,7 +1613,7 @@ export async function resumeChain(
     throw stepError;
   }
 
-  // ── 7. Finalize chain status ───────────────────────────────────────────
+  // -- 7. Finalize chain status -------------------------------------------
   const totalDuration = Date.now() - chainStartTime;
   const finalStatus: ChainStatus =
     failedSteps > 0 ? 'failed' : 'completed';

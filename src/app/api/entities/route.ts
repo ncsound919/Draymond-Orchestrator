@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
 // Valid values for the `kind` filter
 const VALID_KINDS = ['agent', 'tool', 'skill', 'extension', 'mcp_server', 'service', 'workflow', 'data_source', 'integration'] as const;
 
-// ── GET /api/entities ───────────────────────────────────────────────────────
+// -- GET /api/entities -------------------------------------------------------
 
 export async function GET(request: NextRequest) {
   const authError = authorizeRequest(request);
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ── POST /api/entities ──────────────────────────────────────────────────────
+// -- POST /api/entities ------------------------------------------------------
 
 export async function POST(request: NextRequest) {
   const authError = authorizeRequest(request);

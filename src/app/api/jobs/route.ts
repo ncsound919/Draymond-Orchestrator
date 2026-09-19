@@ -36,7 +36,7 @@ const ALLOWED_PATCH_FIELDS = new Set([
   'is_enabled',
 ]);
 
-// ── GET — List scheduled jobs ─────────────────────────────────────────
+// -- GET — List scheduled jobs -----------------------------------------
 
 export async function GET(request: NextRequest) {
   const authError = authorizeRequest(request);
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ── POST — Create a scheduled job ────────────────────────────────────
+// -- POST — Create a scheduled job ------------------------------------
 
 export async function POST(request: NextRequest) {
   const authError = authorizeRequest(request);
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ── PATCH — Update, enable, or disable a scheduled job ───────────────
+// -- PATCH — Update, enable, or disable a scheduled job ---------------
 
 export async function PATCH(request: NextRequest) {
   const authError = authorizeRequest(request);
@@ -180,7 +180,7 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// ── DELETE — Delete a scheduled job ──────────────────────────────────
+// -- DELETE — Delete a scheduled job ----------------------------------
 
 export async function DELETE(request: NextRequest) {
   const authError = authorizeRequest(request);

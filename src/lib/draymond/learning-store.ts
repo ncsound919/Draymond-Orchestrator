@@ -105,13 +105,29 @@ export function emptyStore(): LearningStore {
   };
 }
 
-// ── Serialized write chain (one read-modify-write at a time) ────────────────
+// -- Serialized write chain (one read-modify-write at a time) ----------------
 let writeChain: Promise<unknown> = Promise.resolve();
 
 function enqueueWrite<T>(task: () => Promise<T>): Promise<T> {
   const next = writeChain.then(task, task);
   writeChain = next;
   return next as Promise<T>;
+}
+
+const OUTCOME_SUMMARY_CAP = 500;
+const OUTCOME_DETAIL_CAP = 2_000;
+const LESSON_TEXT_CAP = 2_000;
+
+function capLen(s: string, cap: number): string {
+  return s.length > cap ? s.slice(0, cap) + ' ...(truncated)' : s;
+}
+
+function capOutcome(o: Omit<LearningOutcome, 'id' | 'createdAt'>): Omit<LearningOutcome, 'id' | 'createdAt'> {
+  return {
+    ...o,
+    summary: capLen(o.summary, OUTCOME_SUMMARY_CAP),
+    detail: capLen(o.detail, OUTCOME_DETAIL_CAP),
+  };
 }
 
 export async function readLearningStore(dir?: string): Promise<LearningStore> {
@@ -121,17 +137,29 @@ export async function readLearningStore(dir?: string): Promise<LearningStore> {
       : await readJsonState<LearningStore>(STORE_NAME, emptyStore());
     const merged = { ...emptyStore(), ...s };
 
-    // Legacy migration: self-learning.ts used separate files.
+    // Legacy migration: self-learning.ts used separate files. Cap text on ingest
+    // so a poisoned/bloated legacy file cannot blow up every read.
     const legacyOutcomes = await readLegacyJson<LearningOutcome[]>('learning-outcomes.json', [], dir);
     const legacyLessons = await readLegacyJson<{ lessons?: Lesson[] }>('learning-lessons.json', { lessons: [] }, dir);
     if (legacyOutcomes.length > 0) {
+      const seenOutcomeIds = new Set(merged.outcomes.map((m) => m.id));
       for (const o of legacyOutcomes) {
-        if (!merged.outcomes.some((m) => m.id === o.id)) merged.outcomes.push(o);
+        if (!seenOutcomeIds.has(o.id)) {
+          merged.outcomes.push(o);
+          seenOutcomeIds.add(o.id);
+        }
       }
     }
     if (Array.isArray(legacyLessons.lessons)) {
+      const seenLessonIds = new Set(merged.lessons.map((m) => m.id));
       for (const l of legacyLessons.lessons) {
-        if (!merged.lessons.some((m) => m.id === l.id)) merged.lessons.push(l);
+        if (seenLessonIds.has(l.id)) continue;
+        seenLessonIds.add(l.id);
+        merged.lessons.push({
+          ...l,
+          lesson: capLen(l.lesson, LESSON_TEXT_CAP),
+          pattern: capLen(l.pattern ?? '', 300),
+        });
       }
     }
     return merged;
@@ -143,7 +171,7 @@ export async function readLearningStore(dir?: string): Promise<LearningStore> {
 /** Read a registry JSON file from an explicit dir (falls back to the default registry dir when omitted). */
 async function readJsonStateFromDir<T>(dir: string, name: string, fallback: T): Promise<T> {
   try {
-    const raw = await fs.readFile(path.join(dir, `${name}.json`), 'utf-8');
+    const raw = await /*turbopackIgnore: true*/ fs.readFile(/*turbopackIgnore: true*/ path.join(dir, `${name}.json`), 'utf-8');
     const parsed = JSON.parse(raw) as T;
     if (parsed && typeof parsed === 'object') return parsed;
     return fallback;
@@ -155,7 +183,7 @@ async function readJsonStateFromDir<T>(dir: string, name: string, fallback: T): 
 async function readLegacyJson<T>(name: string, fallback: T, dir?: string): Promise<T> {
   const base = dir ?? (process.env.DRAYMOND_REGISTRY_DIR ?? path.join(process.cwd(), '.draymond'));
   try {
-    const raw = await fs.readFile(path.join(base, name), 'utf-8');
+    const raw = await /*turbopackIgnore: true*/ fs.readFile(/*turbopackIgnore: true*/ path.join(base, name), 'utf-8');
     return JSON.parse(raw) as T;
   } catch {
     return fallback;
@@ -169,9 +197,10 @@ async function writeLearningStore(store: LearningStore): Promise<void> {
 
 export function addOutcome(input: Omit<LearningOutcome, 'id' | 'createdAt'>): Promise<LearningOutcome> {
   return enqueueWrite(async () => {
+    const capped = capOutcome(input);
     const store = await readLearningStore();
     const outcome: LearningOutcome = {
-      ...input,
+      ...capped,
       id: `lo_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       createdAt: nowIso(),
     };
@@ -185,11 +214,14 @@ export function addOutcome(input: Omit<LearningOutcome, 'id' | 'createdAt'>): Pr
 export function addOutcomesBatch(inputs: Array<Omit<LearningOutcome, 'id' | 'createdAt'>>): Promise<LearningOutcome[]> {
   return enqueueWrite(async () => {
     const store = await readLearningStore();
-    const created = inputs.map((i) => ({
-      ...i,
-      id: `lo_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      createdAt: nowIso(),
-    } as LearningOutcome));
+    const created = inputs.map((i) => {
+      const capped = capOutcome(i);
+      return {
+        ...capped,
+        id: `lo_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        createdAt: nowIso(),
+      } as LearningOutcome;
+    });
     store.outcomes.push(...created);
     store.outcomes = store.outcomes.slice(-500);
     await writeLearningStore(store);
@@ -300,14 +332,17 @@ export async function distillLessonsFromStore(limit = 200): Promise<Lesson[]> {
     const agentId = key.slice(0, idx);
     const failCount = group.filter((g) => !g.success).length;
     const last = group[group.length - 1]!;
+    const lessonText = capLen(
+      failCount >= group.length / 2
+        ? `Repeated failure: "${group[0]!.summary}" (${failCount}/${group.length}). ${group[0]!.detail}`
+        : `Repeated pattern: "${group[0]!.summary}" (${group.length}x).`,
+      LESSON_TEXT_CAP,
+    );
     lessons.push({
       id: `ls_${key.replace(/[^a-z0-9]/g, '').slice(0, 24)}`,
       agentId,
-      pattern: group[0]!.summary,
-      lesson:
-        failCount >= group.length / 2
-          ? `Repeated failure: "${group[0]!.summary}" (${failCount}/${group.length}). ${group[0]!.detail}`
-          : `Repeated pattern: "${group[0]!.summary}" (${group.length}x).`,
+      pattern: capLen(group[0]!.summary, 300),
+      lesson: lessonText,
       evidenceCount: group.length,
       lastSeen: last.createdAt,
     });

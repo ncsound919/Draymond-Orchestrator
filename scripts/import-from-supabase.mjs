@@ -60,7 +60,7 @@ const PRODUCT_FILES = {
 
 const DUMP_PATH = path.join(root, 'data', 'supabase-dump.json');
 
-// ── .env.local loader ────────────────────────────────────────────────────────
+// -- .env.local loader -------------------------------------------------------
 
 function loadDotEnvLocal() {
   const file = path.join(root, '.env.local');
@@ -80,7 +80,7 @@ function loadDotEnvLocal() {
   }
 }
 
-// ── dump ─────────────────────────────────────────────────────────────────────
+// -- dump ---------------------------------------------------------------------
 
 async function dump() {
   loadDotEnvLocal();
@@ -151,7 +151,7 @@ async function dump() {
   }
 }
 
-// ── import ───────────────────────────────────────────────────────────────────
+// -- import -------------------------------------------------------------------
 
 function toStored(value) {
   if (value == null) return null;
@@ -200,7 +200,7 @@ function importDump(dump) {
   console.log(`[import] done → ${dbPath}`);
 }
 
-// ── main ─────────────────────────────────────────────────────────────────────
+// -- main ---------------------------------------------------------------------
 
 const command = process.argv[2] ?? 'all';
 

@@ -70,7 +70,7 @@ function makeResult(input: Omit<IdeBenchmarkResult, 'ts'>): IdeBenchmarkResult {
   return { ...input, ts: new Date().toISOString() };
 }
 
-// ── Per-tool tasks ──────────────────────────────────────────────────────────
+// -- Per-tool tasks ----------------------------------------------------------
 
 async function benchmarkReachability(): Promise<IdeBenchmarkResult[]> {
   const results: IdeBenchmarkResult[] = await Promise.all(
@@ -291,7 +291,7 @@ async function benchmarkGitWorkflow(workspaceRoot: string): Promise<IdeBenchmark
   }
 }
 
-// ── Run + baseline persistence ──────────────────────────────────────────────
+// -- Run + baseline persistence ----------------------------------------------
 
 async function loadBaseline(): Promise<IdeBenchmarkBaseline> {
   try {

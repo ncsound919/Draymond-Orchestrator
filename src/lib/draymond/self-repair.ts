@@ -136,7 +136,7 @@ export function loadRepairMap(): Record<string, RepairAction> {
   }
 }
 
-// ── Failure-loop guard thresholds (controls > env > default) ────────────────
+// -- Failure-loop guard thresholds (controls > env > default) ----------------
 // The operator's Command Center knobs (stored via controls.json) win over the
 // env vars; falling back to env, then the built-in default. Never throws.
 const cooldownMs = () => syncRepairCooldownMs(process.env.DRAYMOND_REPAIR_COOLDOWN_MS);
@@ -259,7 +259,7 @@ export async function attemptRepair(signal: string, detail: string): Promise<Rep
   }
 
   const map = loadRepairMap();
-  let action = map[signal];
+  const action = map[signal];
 
   // monitor:down — resolve the concrete service and attempt a real start.
   // Uses the service-manager's proven start recipes (same path the bootstrap
@@ -267,6 +267,22 @@ export async function attemptRepair(signal: string, detail: string): Promise<Rep
   // which would kill draymond itself). Unresolvable/unstartable services
   // still escalate, but with a precise detail instead of "unknown".
   if (signal === "monitor:down" && (!action || !action.safe)) {
+    // Manual-cluster mode (2026-09-08): when the operator disables autonomous
+    // service auto-start (DRAYMOND_AUTO_START_SERVICES=0), services are loaded
+    // in clusters per task and a stopped service is deliberate, not a failure
+    // to self-heal. Default remains ENABLED (fail-closed to the old behavior).
+    if (process.env.DRAYMOND_AUTO_START_SERVICES === '0') {
+      const attempt: RepairAttempt = {
+        id: `rp_${Date.now()}`,
+        detectedAt: new Date().toISOString(),
+        signal,
+        action: { name: 'no-auto-start', service: 'unknown', command: [], safe: false },
+        status: 'skipped',
+        detail: `Auto-start disabled (manual cluster mode). ${detail}`,
+      };
+      await appendLog(attempt);
+      return attempt;
+    }
     const slug = await resolveServiceFromDetail(detail);
     if (slug) {
       const sm = await import("./service-manager");

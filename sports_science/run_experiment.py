@@ -20,8 +20,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from sports_science.betting_pipeline import run_experiment, run_forward_test  # noqa: E402
-from sports_science.validation_engine import require_honest, utc_now_iso  # noqa: E402
-from sports_science.evidence import worst_tier  # noqa: E402
+from sports_science.validation_engine import utc_now_iso  # noqa: E402
 
 
 def _metrics(results) -> list[dict]:
@@ -49,28 +48,6 @@ def _metrics(results) -> list[dict]:
     return out
 
 
-@require_honest
-def _run_experiment_inner(from_date: str, to_date: str, max_games: int) -> dict:
-    """Decorated with @require_honest — returns E4 UnavailableResult on any exception
-    (e.g. missing sports_model.db) instead of crashing. This changes the CLI exit code from
-    1 to 0 for previously-fatal FileNotFoundError; downstream consumers should check
-    the metrics' evidence_tier, not just the exit code."""
-    results, report = run_experiment(
-        from_date=from_date, to_date=to_date, max_games=max_games
-    )
-    metrics = _metrics(results)
-    tier = worst_tier({m.get("name", str(i)): m for i, m in enumerate(metrics)}) or "E4"
-    return {
-        "ok": True,
-        "kind": "betting_experiment",
-        "domain": "sports",
-        "metrics": metrics,
-        "evidence_tier": tier,
-        "report": report,
-        "generated_at": utc_now_iso(),
-    }
-
-
 def _main() -> int:
     parser = argparse.ArgumentParser(description="Overlay Science betting experiment pipeline")
     parser.add_argument("--from", dest="from_date", default="2010-01-01")
@@ -84,26 +61,31 @@ def _main() -> int:
             results, report = run_forward_test(
                 from_date=args.from_date, to_date=args.to_date, max_games=args.max_games
             )
-            metrics = _metrics(results)
-            for m in metrics:
-                m["name"] = m["name"].replace(
-                    "betting_experiment.", "betting_experiment.forward."
-                )
-            output = {
-                "ok": True,
-                "kind": "betting_experiment.forward",
-                "domain": "sports",
-                "metrics": metrics,
-                "evidence_tier": worst_tier({m.get("name", str(i)): m for i, m in enumerate(metrics)}),
-                "report": report,
-                "generated_at": utc_now_iso(),
-            }
-            print(json.dumps(output, default=str))
-            return 0
         else:
-            output = _run_experiment_inner(args.from_date, args.to_date, args.max_games)
-            print(json.dumps(output, default=str))
-            return 0
+            results, report = run_experiment(
+                from_date=args.from_date, to_date=args.to_date, max_games=args.max_games
+            )
+        metrics = _metrics(results)
+        for m in metrics:
+            m["name"] = m["name"].replace("betting_experiment.", "betting_experiment.forward." if args.forward else "betting_experiment.")
+        tiers = ["E1", "E2", "E3", "E4"]
+        worst = None
+        for m in metrics:
+            t = m.get("evidence_tier")
+            if isinstance(t, str) and t in tiers:
+                if worst is None or tiers.index(t) > tiers.index(worst):
+                    worst = t
+        output = {
+            "ok": True,
+            "kind": "betting_experiment" + (".forward" if args.forward else ""),
+            "domain": "sports",
+            "metrics": metrics,
+            "evidence_tier": worst or "E3",
+            "report": report,
+            "generated_at": utc_now_iso(),
+        }
+        print(json.dumps(output, default=str))
+        return 0
     except Exception as exc:  # noqa: BLE001
         print(json.dumps({"ok": False, "error": str(exc)}, default=str))
         return 1

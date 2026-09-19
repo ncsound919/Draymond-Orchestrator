@@ -113,7 +113,7 @@ export class LocalQueryBuilder {
     this.table = table;
   }
 
-  // ── thenable ──────────────────────────────────────────────────────────────
+  // -- thenable --------------------------------------------------------------
 
   then<T1 = QueryResult, T2 = never>(
     onfulfilled?: ((value: QueryResult) => T1 | PromiseLike<T1>) | null,
@@ -130,7 +130,7 @@ export class LocalQueryBuilder {
     return this.execute().finally(onfinally);
   }
 
-  // ── query construction ────────────────────────────────────────────────────
+  // -- query construction ----------------------------------------------------
 
   select(columns?: string | Record<string, unknown>, options?: { count?: 'exact' | 'planned' | 'estimated'; head?: boolean }): this {
     if (this.mode === 'select') {
@@ -263,7 +263,7 @@ export class LocalQueryBuilder {
     return this;
   }
 
-  // ── execution ─────────────────────────────────────────────────────────────
+  // -- execution -------------------------------------------------------------
 
   async execute(): Promise<QueryResult> {
     try {

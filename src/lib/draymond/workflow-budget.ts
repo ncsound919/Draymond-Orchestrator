@@ -8,8 +8,14 @@
  *   - Task lanes per agent: when an agent's in-flight count is at capacity,
  *     its lane is FROZEN until something opens (no new tasks assigned).
  *
- * Deterministic + in-memory (state resets on restart; budgets are conservative).
+ * Deterministic. Cooldowns are DURABLE (persisted under the registry dir) so a
+ * restart cannot re-dispatch/re-notify the same op — the in-memory version was
+ * wiped on every process bounce and was a root cause of duplicate repair
+ * emails. Token budgets + lanes stay in-memory and conservative.
  */
+
+import fs from 'node:fs';
+import path from 'node:path';
 
 interface AgentLane {
   maxConcurrency: number;
@@ -131,16 +137,53 @@ export function consumeTokens(provider: string, tokens: number): void {
   }
 }
 
-/** Cooldown: skip a repeated op within the window (e.g. don't re-run QA every minute). */
+/** Durable cooldown store — survives restarts so repairs/notifications can't
+ *  re-fire identical work just because the process bounced. */
+const COOLDOWN_FILE = (): string =>
+  path.join(process.env.DRAYMOND_REGISTRY_DIR ?? path.join(process.cwd(), '.draymond'), 'cooldowns.json');
+
+let cooldownsLoaded = false;
+
+function loadCooldowns(): void {
+  if (cooldownsLoaded) return;
+  cooldownsLoaded = true;
+  try {
+    const raw = JSON.parse(fs.readFileSync(COOLDOWN_FILE(), 'utf-8')) as Record<string, number>;
+    const now = Date.now();
+    for (const [k, v] of Object.entries(raw)) {
+      if (typeof v === 'number' && v > now) cooldowns.set(k, v);
+    }
+  } catch {
+    /* no cooldown file yet — start clean */
+  }
+}
+
+function persistCooldowns(): void {
+  try {
+    const now = Date.now();
+    const obj: Record<string, number> = {};
+    for (const [k, v] of cooldowns) if (v > now) obj[k] = v;
+    fs.mkdirSync(path.dirname(COOLDOWN_FILE()), { recursive: true });
+    fs.writeFileSync(COOLDOWN_FILE(), JSON.stringify(obj, null, 2));
+  } catch {
+    /* best-effort — cooldowns are a guard rail, not a correctness requirement */
+  }
+}
+
+/** Cooldown: skip a repeated op within the window (e.g. don't re-run QA every minute).
+ *  Records the cooldown on first call (check-and-set) and persists it. */
 export function isOnCooldown(agentId: string, op: string, cooldownMs: number): boolean {
+  loadCooldowns();
   const key = `${agentId}:${op}`;
+  const now = Date.now();
   const until = cooldowns.get(key) ?? 0;
-  if (Date.now() < until) return true;
-  cooldowns.set(key, Date.now() + cooldownMs);
+  if (now < until) return true;
+  cooldowns.set(key, now + cooldownMs);
+  persistCooldowns();
   return false;
 }
 
-// ── Task lanes (plate-full freezing) ────────────────────────────────────────
+// -- Task lanes (plate-full freezing) ----------------------------------------
 
 function laneOf(agentId: string, maxConcurrency: number): AgentLane {
   let lane = lanes.get(agentId);
@@ -192,12 +235,13 @@ export function resetBudget(): void {
   for (const k of Object.keys(providerTokens)) delete providerTokens[k];
   for (const k of Object.keys(rateCalls)) delete rateCalls[k];
   cooldowns.clear();
+  persistCooldowns();
   lanes.clear();
   fleetTokens = 0;
   fleetDay = '';
 }
 
-// ── S4 Budget Engine ─────────────────────────────────────────────────────────
+// -- S4 Budget Engine ---------------------------------------------------------
 //
 // Per-task model assignment based on treasury balance, system-goals weights,
 // and the free catalog mapping. Invariant: revenueCents === 0 means free/ollama

@@ -34,7 +34,7 @@ function cleanStaleWorkers(): void {
   }
 }
 
-// ── POST /api/v1/worker/heartbeat ───────────────────────────────────────────
+// -- POST /api/v1/worker/heartbeat -------------------------------------------
 export async function POST(request: NextRequest) {
   const authError = authorizeRequest(request);
   if (authError) return authError;

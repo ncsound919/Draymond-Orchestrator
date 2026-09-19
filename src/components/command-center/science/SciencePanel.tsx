@@ -80,7 +80,7 @@ export default function SciencePanel() {
   const [modelId, setModelId] = useState('');
   const [ticks, setTicks] = useState(100);
 
-  // ── Brain status banner (existing) ────────────────────────────────────────
+  // -- Brain status banner (existing) ----------------------------------------
   const statusQuery = useQuery({
     queryKey: ['command-center', 'science', 'status'],
     queryFn: async () => {
@@ -90,7 +90,7 @@ export default function SciencePanel() {
     },
   });
 
-  // ── Goals (CureMind / biotech) ────────────────────────────────────────────
+  // -- Goals (CureMind / biotech) --------------------------------------------
   const goalsQuery = useQuery({
     queryKey: ['command-center', 'science', 'goals'],
     queryFn: async () => {
@@ -117,7 +117,7 @@ export default function SciencePanel() {
     onError: (err) => toast.error(`Update failed: ${err instanceof Error ? err.message : String(err)}`),
   });
 
-  // ── Experiments ───────────────────────────────────────────────────────────
+  // -- Experiments -----------------------------------------------------------
   const experimentsQuery = useQuery({
     queryKey: ['command-center', 'science', 'experiments'],
     queryFn: async () => {
@@ -146,7 +146,7 @@ export default function SciencePanel() {
     onError: (err) => toast.error(`Experiment action failed: ${err instanceof Error ? err.message : String(err)}`),
   });
 
-  // ── Research grade ────────────────────────────────────────────────────────
+  // -- Research grade --------------------------------------------------------
   const gradeQuery = useQuery({
     queryKey: ['command-center', 'science', 'grade'],
     queryFn: async () => {
@@ -169,7 +169,7 @@ export default function SciencePanel() {
     onError: (err) => toast.error(`Grade failed: ${err instanceof Error ? err.message : String(err)}`),
   });
 
-  // ── Simulation ────────────────────────────────────────────────────────────
+  // -- Simulation ------------------------------------------------------------
   const runSim = useMutation({
     mutationFn: async (input?: { modelId?: string; ticksOverride?: number }) => {
       const targetModelId = (input?.modelId ?? modelId).trim();
@@ -190,7 +190,7 @@ export default function SciencePanel() {
     onError: (err) => toast.error(`Simulation failed: ${err instanceof Error ? err.message : String(err)}`),
   });
 
-  // ── Publish (existing) ────────────────────────────────────────────────────
+  // -- Publish (existing) ----------------------------------------------------
   const publish = useMutation({
     mutationFn: async (value: string) => {
       const res = await ccFetch<PublishResponse>({

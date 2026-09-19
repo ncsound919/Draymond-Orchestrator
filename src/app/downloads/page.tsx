@@ -69,10 +69,12 @@ export default function DownloadsPage() {
             Download from GitHub Releases
           </a>
           <a
-            href={`${OPENCHAT_RELEASE_URL}/download/v1.0.0/OpenChat-audited.apk`}
+            href="https://github.com/ncsound919/Open-Chat"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-white/10 hover:bg-white/15 text-white text-sm font-semibold transition-colors whitespace-nowrap"
           >
-            Android APK (v1.0.0)
+            Android APK &amp; source on GitHub
           </a>
         </div>
       </div>

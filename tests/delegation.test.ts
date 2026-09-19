@@ -17,7 +17,6 @@ import {
   PHASE_WEIGHT,
   canDelegateSector,
   sectorConsumed,
-  sectorRemaining,
   specSector,
   isRevenueSector,
 } from '../src/lib/draymond/delegation';
@@ -160,9 +159,12 @@ describe('delegation plan', () => {
   });
 
   it('specSector falls back to the corporate slug map', () => {
-    const spec = delegationFor('depscan');
+    // claw-protect is in the plan but has no explicit sector — resolution falls
+    // back to the corporate SLUG_SECTOR map (e3-tooling), proving the fallback.
+    const spec = delegationFor('claw-protect');
     expect(specSector(spec)).toBe('e3-tooling');
-    expect(specSector(undefined)).toBe(sectorFor(''));
+    // A spec with no slug at all resolves to the default (ops) sector.
+    expect(specSector(undefined)).toBe('ops');
   });
 
   it('classifies revenue sectors', () => {

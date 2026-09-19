@@ -14,10 +14,12 @@ import { writeBrainFile } from './journal';
  *   - sweep() escalates entries that never reached the required streak
  */
 
+// DRAYMOND_REGISTRY_DIR already points AT the .draymond dir (fleet-manifest),
+// so it must NOT be joined with another ".draymond" — that nested the gate
+// state one level too deep and split it from repair-team-log.json.
 const FILE = (): string =>
   path.join(
-    process.env.DRAYMOND_REGISTRY_DIR ?? process.cwd(),
-    '.draymond',
+    process.env.DRAYMOND_REGISTRY_DIR ?? path.join(process.cwd(), '.draymond'),
     'repair-verification.json'
   );
 

@@ -34,7 +34,8 @@ export default function ServiceCheckoutButtons({
           serviceId: serviceId as never,
           tierId: tier.id,
         });
-        if (res.ok && res.url) {
+        // Only follow an absolute https checkout URL (open-redirect guard).
+        if (res.ok && res.url && res.url.startsWith('https://')) {
           window.location.href = res.url;
         } else {
           setError(res.error ?? 'Checkout failed');

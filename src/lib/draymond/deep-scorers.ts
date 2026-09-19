@@ -46,7 +46,7 @@ function normalizeRepoUrl(repoUrl?: string): string | null {
   return trimmed;
 }
 
-// ── HTTP helpers ────────────────────────────────────────────────────────────
+// -- HTTP helpers ------------------------------------------------------------
 
 async function postJson(
   url: string,
@@ -98,7 +98,7 @@ function soft(result: Partial<DeepScoreResult> & { scorer: string }): DeepScoreR
   };
 }
 
-// ── RepoRank — async scan submit + poll ─────────────────────────────────────
+// -- RepoRank — async scan submit + poll -------------------------------------
 
 export async function scoreWithReporank(
   slug: string,
@@ -159,7 +159,7 @@ export async function scoreWithReporank(
   return soft({ scorer: 'reporank', error: `scan timed out (last status: ${lastStatus})` });
 }
 
-// ── Grader — synchronous /api/grade ─────────────────────────────────────────
+// -- Grader — synchronous /api/grade -----------------------------------------
 
 export async function scoreWithGrader(
   slug: string,
@@ -196,7 +196,7 @@ export async function scoreWithGrader(
   });
 }
 
-// ── Vibe-Reality — async /api/analyze + job poll ────────────────────────────
+// -- Vibe-Reality — async /api/analyze + job poll ----------------------------
 
 export async function scoreWithVibeReality(slug: string, repoUrl?: string): Promise<DeepScoreResult> {
   const base = process.env.VIBE_REALITY_URL;
@@ -269,7 +269,7 @@ export async function deepScore(
   return { reporank: a, grader: b, 'vibe-reality': c };
 }
 
-// ── Local engine scorers (tsx subprocess, OpenCode key) ─────────────────────
+// -- Local engine scorers (tsx subprocess, OpenCode key) ---------------------
 
 interface LocalScore {
   overallScore?: number;

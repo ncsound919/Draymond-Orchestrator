@@ -80,7 +80,7 @@ export function checkEnv(): { ok: boolean; missing: string[] } {
     }
   }
 
-  // ── Log results ──────────────────────────────────────────────────────────
+  // -- Log results ----------------------------------------------------------
   if (missing.length > 0) {
     console.error(
       `[Draymond] MISSING REQUIRED env vars:\n${missing.map((n) => `  - ${n}`).join('\n')}\n` +

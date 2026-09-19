@@ -1,82 +1,68 @@
 # ============================================================================
-# PM2 WATCHDOG - keeps the fleet supervisor alive
+# PM2 WATCHDOG - keeps the fleet supervisor + public services alive
 # ============================================================================
-# Root-cause fix for the 2026-08-20..25 outage: the pm2 daemon died silently
-# and nothing revived it, so every scheduler job, repair loop, and monitor was
-# dark for days while believing itself healthy.
+# Root-cause fix for the 2026-08-20..25 outage (daemon died silently). Also
+# extended 2026-09-12 to watch the public-facing services (bbtech-web-app,
+# cloudflared) that 502 the live sites when pm2 loses them.
 #
-# Registered as a Windows Scheduled Task (every 5 min). Logic:
-#   1. `pm2 jlist` returns [] or fails  -> daemon dead/empty -> `pm2 resurrect`
-#   2. Key primary apps not online      -> start them from their configs
-#   3. Every action is appended to data/logs/pm2-watchdog.log
+# Registered as a Windows Scheduled Task (UpliftPM2Watchdog). Logic:
+#   1. `pm2 jlist` empty/failed  -> daemon dead -> `pm2 resurrect` (restores dump)
+#   2. Any watched app has pid 0 -> `pm2 resurrect`
+#   Every action is appended to data/logs/pm2-watchdog.log.
+#
+# Deliberately does NOT `pm2 save` (a degraded save would destroy the last
+# known-good dump).
 # ============================================================================
 
 $ErrorActionPreference = "SilentlyContinue"
 $log = "C:\Users\User\Downloads\Uplift\Draymond-Orchestrator\data\logs\pm2-watchdog.log"
+$dump = "$env:USERPROFILE\.pm2\dump.pm2"
+
+# Public/edge services that must never be dark, and which ARE in the saved
+# dump (so `pm2 resurrect` can actually restore them). Do not add apps that
+# are not in the dump — they would false-trigger a resurrect every cycle.
+$watch = @("keywire", "cloudflared", "bbtech-web-app")
 
 function Log($msg) {
     $line = "{0} {1}" -f (Get-Date -Format s), $msg
     Add-Content -LiteralPath $log -Value $line
-    # rotate at 5MB
     if ((Test-Path $log) -and (Get-Item $log).Length -gt 5MB) {
         $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
         Move-Item -LiteralPath $log -Destination "$log.$stamp" -Force
     }
 }
 
-function Get-Jlist {
-    try {
-        $out = & pm2 jlist 2>$null
-        if ($null -eq $out -or @($out).Count -eq 0) { return @() }
-        return ($out -join "" | ConvertFrom-Json)
-    } catch { return @() }
+function PidOf($name) {
+    return (((& pm2 pid $name 2>$null) -join "") -replace "\s", "")
 }
 
-$apps = Get-Jlist
-
-# 1. Daemon dead or empty -> resurrect saved fleet.
-if (@($apps).Count -eq 0) {
-    Log "DAEMON DEAD/EMPTY - resurrecting"
+function Resurrect($why) {
+    if (-not (Test-Path $dump)) { Log "no dump at $dump - cannot resurrect ($why)"; return $false }
+    Log "resurrect ($why)"
     & pm2 resurrect 2>&1 | Out-Null
-    Start-Sleep -Seconds 10
-    $apps = Get-Jlist
-    Log ("resurrect complete, apps online: " + @($apps).Count)
+    Start-Sleep -Seconds 12
+    return $true
 }
 
-if (@($apps).Count -eq 0) {
-    Log "still empty after resurrect - giving up until next cycle"
-    exit 1
-}
+# 1. Daemon dead / empty?
+$raw = ((& pm2 jlist 2>$null) -join "").Trim()
+if ($raw -eq "" -or $raw -eq "[]") { [void](Resurrect "daemon dead/empty") }
 
-# 2. Primary tier must be online; restart any that are not.
-$primaries = @("draymond", "keywire", "dsh-harness", "litellm", "deterministic-brain")
-$repaired = @()
-foreach ($p in $primaries) {
-    $app = $apps | Where-Object { $_.name -eq $p }
-    if ($null -eq $app) {
-        Log "primary '$p' missing from process list"
-        $repaired += $p
-    } elseif ($app.pm2_env.status -ne "online") {
-        Log "primary '$p' status=$($app.pm2_env.status) - restarting"
-        & pm2 restart $p 2>&1 | Out-Null
-        $repaired += "$p(restart)"
-    }
+# 2. Watched apps online?
+$down = @()
+foreach ($app in $watch) {
+    $p = PidOf $app
+    if ($p -eq "" -or $p -eq "0") { $down += $app }
 }
-if ($repaired.Count -gt 0) {
-    Start-Sleep -Seconds 15
-    # GUARD (2026-08-25 outage): never persist a degraded fleet over the last
-    # known-good dump. This morning an empty-list save destroyed the only
-    # restore point while the daemon was crash-looping.
-    $appsAfterRepair = Get-Jlist
-    $dump = "$env:USERPROFILE\.pm2\dump.pm2"
-    if (@($appsAfterRepair).Count -ge 5 -or -not (Test-Path $dump)) {
-        Copy-Item -LiteralPath $dump -Destination "$dump.pre-save.bak" -Force -ErrorAction SilentlyContinue
-        & pm2 save 2>&1 | Out-Null
-        Log "pm2 save OK (apps=$(@($appsAfterRepair).Count))"
-    } else {
-        Log ("SKIPPED pm2 save - fleet degraded (apps=$(@($appsAfterRepair).Count) < 5); dump preserved")
+if ($down.Count -gt 0) {
+    Log ("down: " + ($down -join ", "))
+    [void](Resurrect ("down: " + ($down -join ",")))
+    $still = @()
+    foreach ($app in $down) {
+        $p = PidOf $app
+        if ($p -eq "" -or $p -eq "0") { $still += $app }
     }
-    Log ("repair actions: " + ($repaired -join ", "))
+    if ($still.Count -gt 0) { Log ("still down after resurrect: " + ($still -join ", ")) }
 }
 
 exit 0

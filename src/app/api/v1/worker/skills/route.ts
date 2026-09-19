@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 
 const VALID_REVIEW_STATUSES = ['draft', 'approved', 'rejected'] as const;
 
-// ── GET /api/v1/worker/skills ───────────────────────────────────────────────
+// -- GET /api/v1/worker/skills -----------------------------------------------
 export async function GET(request: NextRequest) {
   const authError = authorizeRequest(request);
   if (authError) return authError;
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ── POST /api/v1/worker/skills ──────────────────────────────────────────────
+// -- POST /api/v1/worker/skills ----------------------------------------------
 export async function POST(request: NextRequest) {
   const authError = authorizeRequest(request);
   if (authError) return authError;

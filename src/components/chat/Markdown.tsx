@@ -12,7 +12,7 @@
 import { useState, type ReactNode } from 'react';
 import { Check, Copy, Terminal } from './markdown-icons';
 
-// ── Inline parsing ───────────────────────────────────────────────────────────
+// -- Inline parsing -----------------------------------------------------------
 
 const INLINE_RE =
   /(`+)([\s\S]*?)\1|(\*\*|__)([\s\S]*?)\3|(\*|_)([^\s*_][\s\S]*?)\5|~~([\s\S]*?)~~|\[([^\]]+)\]\(([^)\s]+)\)/g;
@@ -66,7 +66,7 @@ function parseInline(text: string, keyBase = 0): ReactNode[] {
   return out;
 }
 
-// ── Fenced code block ────────────────────────────────────────────────────────
+// -- Fenced code block --------------------------------------------------------
 
 function CodeBlock({ code, lang }: { code: string; lang?: string }) {
   const [copied, setCopied] = useState(false);
@@ -104,7 +104,7 @@ function CodeBlock({ code, lang }: { code: string; lang?: string }) {
   );
 }
 
-// ── Lists (indentation-nested) ───────────────────────────────────────────────
+// -- Lists (indentation-nested) -----------------------------------------------
 
 type ListItem = {
   text: string;
@@ -190,7 +190,7 @@ function renderListBlock(lines: string[], index: number): { node: ReactNode; nex
   return { node: renderListItems(items, ordered), next };
 }
 
-// ── Table ────────────────────────────────────────────────────────────────────
+// -- Table --------------------------------------------------------------------
 
 function parseTable(lines: string[], index: number): { node: ReactNode; next: number } {
   const header = lines[index].split('|').map((c) => c.trim());
@@ -231,7 +231,7 @@ function parseTable(lines: string[], index: number): { node: ReactNode; next: nu
   };
 }
 
-// ── Block dispatcher ─────────────────────────────────────────────────────────
+// -- Block dispatcher ---------------------------------------------------------
 
 function Heading({
   level,
@@ -378,7 +378,7 @@ function renderBlocks(lines: string[]): ReactNode {
   return out;
 }
 
-// ── Public component ─────────────────────────────────────────────────────────
+// -- Public component ---------------------------------------------------------
 
 export default function Markdown({ source }: { source: string }) {
   if (!source) return null;

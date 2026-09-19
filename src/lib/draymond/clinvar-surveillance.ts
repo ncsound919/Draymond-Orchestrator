@@ -88,10 +88,10 @@ export async function runClinVarSurveillance(): Promise<ClinVarSurveillanceSumma
     }
 
     return { ok: true, checked: findings.length, reclassified, findings };
-  } catch (err: any) {
+  } catch (err) {
     return {
       ok: false, checked: 0, reclassified: 0, findings: [],
-      error: String(err?.message ?? err),
+      error: err instanceof Error ? err.message : String(err),
     };
   }
 }

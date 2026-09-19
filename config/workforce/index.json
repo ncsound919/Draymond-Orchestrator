@@ -1,0 +1,58 @@
+{
+  "pack": "draymond-workforce-personas",
+  "status": "canonical-identity-layer",
+  "version": "1.0.0",
+  "reconciled": "2026-09-17",
+  "canonical_orchestrator": {
+    "name": "Draymond",
+    "port": 3444,
+    "state_dir": ".draymond/",
+    "source_of_truth": [
+      "Draymond-Orchestrator/fleet-manifest.js",
+      "Draymond-Orchestrator/OPS-CATALOG.md",
+      "Draymond-Orchestrator/src/lib/draymond/ports.ts"
+    ]
+  },
+  "rescued_from": {
+    "path": "02_Pillars/Overlay Finance/Overlay Workforce",
+    "origin": "Overlay Workforce April 2026 prototype (superseded)",
+    "note": "Only the identity/tone layer survives; the prototype's orchestrator (Big-Homie router/scheduler) and its saas/ ventures were never materialized or were relocated."
+  },
+  "identity": {
+    "context": "tap-context.json",
+    "role": "Injected into lane-scoped prompts as the shared owner identity and tone guide. Not used by Draymond before 2026-09-17."
+  },
+  "axis_a_audience_lanes": {
+    "music": { "persona": "personas/music.json", "profile_id": "nc-sound-agent", "engine": "E4" },
+    "tech": { "persona": "personas/tech.json", "profile_id": "overlay365-dev-agent", "engine": "E3" },
+    "education": { "persona": "personas/education.json", "profile_id": "fintech-educator-agent", "engine": "E4" },
+    "brand": { "persona": "personas/brand.json", "profile_id": "brand-uplift-agent", "engine": "E2" }
+  },
+  "axis_b_revenue_engines": {
+    "E1": "Platform tiers (Overlay Health / Wealth / Justice)",
+    "E2": "B2B services (Aetherdesk, Marketing-as-a-Service, QA/monitoring)",
+    "E3": "Business tooling / API (audits, SCA, agent building)",
+    "E4": "Vertical products (music rights, sports intel, research, publishing)"
+  },
+  "routing": {
+    "implementation": "Draymond-native",
+    "files": [
+      "src/lib/draymond/delegation.ts",
+      "src/lib/draymond/business-chains.ts",
+      "src/lib/draymond/strategy-team.ts"
+    ],
+    "deprecated": "Big-Homie workforce_router.py / workforce_scheduler.py (never materialized; do not port)"
+  },
+  "lane_engine_map": {
+    "music": ["E4"],
+    "tech": ["E1", "E3"],
+    "education": ["E2", "E4"],
+    "brand": ["E2", "E4"],
+    "cross_cutting": {
+      "aetherdesk": "E2",
+      "platform_tiers": "E1",
+      "audits_and_qa": "E3"
+    }
+  },
+  "persona_consumption": "Personas supply voice, tone, and targeting only. Capability, cost, governance, and verification stay owned by Draymond (ports.ts, cost.ts, governance/, evidence-ledger.ts)."
+}

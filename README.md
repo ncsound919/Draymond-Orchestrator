@@ -5,10 +5,10 @@
 Draymond is not a DevOps control panel. It is an **autonomous business & agent orchestration platform** — part Marvel-style character roster dashboard, part self-healing fleet manager, part mission-control for a real business pipeline. Every AI agent, tool, skill, and service in the ecosystem gets a character bio card with capabilities, status indicators, and invocation controls. Underneath, a 24/7 scheduler, in-process cron engine, monitor fleet, self-repair loop, LLM router, and a cash-aware business pipeline run continuously.
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+![License](https://img.shields.io/badge/license-AGPL--3.0-blue)
 [![CI](https://img.shields.io/github/actions/workflow/status/ncsound919/Draymond-Orchestrator/ci.yml?label=CI)](https://github.com/ncsound919/Draymond-Orchestrator/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-1149%20passing-brightgreen)](https://github.com/ncsound919/Draymond-Orchestrator/actions)
-![Coverage](https://img.shields.io/badge/coverage-75%25%20lines-orange)
+[![Tests](https://img.shields.io/badge/tests-1688%20passing-brightgreen)](https://github.com/ncsound919/Draymond-Orchestrator/actions)
+![Coverage](https://img.shields.io/badge/coverage-69%25%20lines-yellow)
 
 ## 📦 Releases
 
@@ -44,11 +44,11 @@ fleets.
 ```bash
 npm run lint            # ESLint
 npm run type-check      # tsc --noEmit
-npm test                # 1149 tests across 115 files
+npm test                # 1688 tests across 185 files
 npm run test:coverage   # Coverage enforced on src/lib/draymond/**
 ```
 
-Coverage thresholds (`vitest.config.ts`): lines 75 / statements 70 / functions 75 /
+Coverage thresholds (`vitest.config.ts`): lines 69 / statements 67 / functions 68 /
 branches 55 — measured on `src/lib/draymond/**/*.ts` and `src/lib/mathx/**/*.ts`
 (the orchestration core: chains, scheduler, monitors, invoker, router, registry,
 confidence, llm, Kairos, service-manager, mission, treasury).
@@ -136,7 +136,7 @@ durations, per-run token budgets, and a shared fleet-wide daily token cap.
 ### Fleet Service Management (`service-manager.ts`)
 
 Draymond doesn't just *monitor* the fleet — it **starts, health-checks, and
-restarts** its own services. A canonical port registry (`ports.ts`, 36 services)
+restarts** its own services. A canonical port registry (`ports.ts`, 66 services)
 plus curated start recipes let the repair team actually FIX `fetch failed` jobs
 by booting the down service. The boot sequence (`bootstrap.ts`) auto-starts the
 core fleet: deterministic brain, BookBridge, **Uplift Agent (Hermes bridge)**,
@@ -243,7 +243,7 @@ against acceptance criteria and rejected back to the worker when they miss.
 
 ### Dashboard Pages
 
-`/` roster · `/agents` bios & invocation · `/chains` workflow templates ·
+`/` → Operations (redirect) · `/agents` bios & invocation · `/chains` workflow templates ·
 `/schedules` job management with catch-up/rerun controls · `/operations` fleet
 monitoring · `/approvals` human review · `/cognition` Kairos/AutoDream/Ultraplan ·
 `/mission` business pipeline & strategy · `/benchmarks` roster scoring ·
@@ -329,7 +329,7 @@ Draymond invokes registered entities through three mechanisms:
 | Grader | `grader` | `tool` | Data-backed grading (port 3201) |
 | Codegang | `codegang` | `tool` | Local deep analysis + agent pipeline (port 3204) |
 
-The full canonical port registry lives in `src/lib/draymond/ports.ts` (36 services).
+The full canonical port registry lives in `src/lib/draymond/ports.ts` (66 services).
 
 ---
 
@@ -388,13 +388,13 @@ be routed by natural language through the intelligent task router.
 
 ### Brand Colors
 
-| Token | Hex | Usage |
+| Token | Value | Usage |
 |---|---|---|
-| Forest Green | `#2d4a1a` | Primary background, nav, CTAs |
-| Warm Gold | `#c8a415` | Accent, highlights, CTAs |
-| Soft Cream | `#faf6e6` | Page background |
-| Deep Burgundy | `#6b2137` | Stats section |
-| Rich Brown | `#6b4226` | Text accents |
+| Background | `#0a0a0a` | App/page background (dark theme) |
+| Surface | `rgba(255,255,255,0.05)` | Cards, panels, nav hover |
+| Primary Green | `#22c55e` | CTAs, healthy status, success |
+| Accent Gold | `#c8a415` | Warnings, highlights, mid scores |
+| Danger Red | `#ef4444` | Errors, failed status, worst scores |
 
 ---
 
@@ -439,7 +439,7 @@ kept in `.env.example` only for the one-time data migration
 ```
 ├── src/
 │   ├── app/                     # Next.js App Router pages
-│   │   ├── page.tsx             # Dashboard home (roster)
+│   │   ├── page.tsx             # Dashboard home (redirects to Operations)
 │   │   ├── agents/              # Agent roster and detail pages
 │   │   ├── workflows/           # Workflow builder and runner
 │   │   ├── chains/              # Chain templates
@@ -453,7 +453,7 @@ kept in `.env.example` only for the one-time data migration
 │   │   ├── strategy/            # Strategy Team runner
 │   │   ├── math/                # Math Lab workspace
 │   │   ├── chat/                # Conversations
-│   │   └── api/                 # ~120 API routes (see below)
+│   │   └── api/                 # ~185 API routes (see below)
 │   ├── components/
 │   │   ├── Header.tsx           # Dashboard navigation
 │   │   ├── registry/            # Agent bio card components
@@ -468,7 +468,7 @@ kept in `.env.example` only for the one-time data migration
 │   │   │   ├── treasury.ts      # settled Stripe revenue pulse
 │   │   │   ├── llm.ts           # opencode → deepseek → gemini fallback chain
 │   │   │   ├── day-orchestrator.ts # daily phase plan + runner
-│   │   │   ├── ports.ts         # canonical fleet port registry (36 services)
+│   │   │   ├── ports.ts         # canonical fleet port registry (66 services)
 │   │   │   ├── seed.ts          # entity registry (120+ entities)
 │   │   │   └── business-chains.ts # 30+ chain templates
 │   │   ├── mathx/               # Pure-TS stats + token budgeting
@@ -505,7 +505,7 @@ kept in `.env.example` only for the one-time data migration
 - `src/lib/draymond/service-manager.ts` — Start / health-check / restart the fleet
 - `src/lib/draymond/kairos.ts` — Always-on proactive fleet scanner
 - `src/lib/draymond/llm.ts` — Provider-agnostic LLM fallback chain
-- `src/lib/draymond/ports.ts` — Canonical fleet port registry (36 services)
+- `src/lib/draymond/ports.ts` — Canonical fleet port registry (66 services)
 - `src/instrumentation.ts` — Boot sequence: scheduler, bootstrap, cognition, Sentry
 - `agents/Uplift-Agent/server.js` — Hermes-fork Uplift Agent HTTP bridge
 - `scripts/start-tools.ps1` — Boot the internal tool stack on canonical ports

@@ -15,6 +15,7 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
+import { postLedgerEvent } from "./ledger-sync";
 
 export type AffiliateRole = "referrer" | "recruiter" | "supervisor" | "agent";
 
@@ -250,6 +251,15 @@ export async function recordAttribution(
   }
 
   await writeState(state);
+  for (const c of created) {
+    await postLedgerEvent({
+      kind: "commission.accrued",
+      id: c.id,
+      amountCents: c.amountCents,
+      occurredAt: c.createdAt,
+      memo: `commission accrued (${c.role}${c.override ? ", override" : ""})`,
+    });
+  }
   return { attribution, commissions: created };
 }
 
@@ -298,6 +308,14 @@ export async function setCommissionStatus(
   if (!c) return null;
   c.status = status;
   await writeState(state);
+  const kind = status === "paid" ? "payout.paid" : status === "approved" ? "commission.approved" : "commission.accrued";
+  await postLedgerEvent({
+    kind,
+    id: c.id,
+    amountCents: c.amountCents,
+    occurredAt: new Date().toISOString(),
+    memo: `commission ${status}`,
+  });
   return c;
 }
 

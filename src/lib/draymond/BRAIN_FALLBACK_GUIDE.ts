@@ -33,21 +33,21 @@
 //
 //   Chain Execution
 //   ↓
-//   ├─→ [Success] ✓
-//   ├─→ [Error]
-//       ├─→ Error Classification (classifyTokenError)
-//       │   ├─→ MISSING_API_KEY → Escalate
-//       │   ├─→ MISSING_OAUTH_TOKEN → Escalate
-//       │   ├─→ EXPIRED_TOKEN → Escalate
-//       │   ├─→ INVALID_CREDENTIALS → Escalate
-//       │   ├─→ RATE_LIMITED → Escalate
-//       │   ├─→ SERVICE_UNAVAILABLE → Escalate
-//       │   └─→ Other → Fail
-//       ├─→ Escalate to Deterministic Brain
-//           ├─→ /task endpoint (general tasks)
-//           ├─→ /research/publish endpoint (research papers)
-//           └─→ Returns structured JSON output
-//       └─→ Complete Chain
+//   --→ [Success] ✓
+//   --→ [Error]
+//       --→ Error Classification (classifyTokenError)
+//       -   --→ MISSING_API_KEY → Escalate
+//       -   --→ MISSING_OAUTH_TOKEN → Escalate
+//       -   --→ EXPIRED_TOKEN → Escalate
+//       -   --→ INVALID_CREDENTIALS → Escalate
+//       -   --→ RATE_LIMITED → Escalate
+//       -   --→ SERVICE_UNAVAILABLE → Escalate
+//       -   --→ Other → Fail
+//       --→ Escalate to Deterministic Brain
+//           --→ /task endpoint (general tasks)
+//           --→ /research/publish endpoint (research papers)
+//           --→ Returns structured JSON output
+//       --→ Complete Chain
 //
 
 // INTEGRATION POINTS
@@ -115,7 +115,7 @@
 // ============================================================================
 //
 // Chain                      Handler                    Lane        Status
-// ─────────────────────────  ────────────────────────   ───────     ──────
+// -------------------------  ------------------------   -------     ------
 // morning-briefing           escalateMorningBriefing    briefing    ✓
 // full-content-creation      escalateFullContentCreation content    ✓
 // hemp-research-news         escalateHempResearchDigest research    ✓

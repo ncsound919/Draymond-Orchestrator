@@ -42,13 +42,13 @@ function registryDir(): string {
 }
 
 export function stateFile(name: string): string {
-  return path.join(registryDir(), `${name}.json`);
+  return /*turbopackIgnore: true*/ path.join(registryDir(), `${name}.json`);
 }
 
 /** Read `.draymond/<name>.json`; fail-soft to the fallback. */
 export async function readJsonState<T>(name: string, fallback: T): Promise<T> {
   try {
-    const raw = await fs.readFile(stateFile(name), 'utf-8');
+    const raw = await /*turbopackIgnore: true*/ fs.readFile(stateFile(name), 'utf-8');
     const parsed = JSON.parse(raw) as T;
     if (parsed && typeof parsed === 'object') return parsed;
     return fallback;

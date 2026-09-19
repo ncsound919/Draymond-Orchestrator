@@ -45,9 +45,6 @@ const D = loadEnvLocal();
 const PYTHON =
   process.env.PYTHON_PATH || "C:\\Program Files\\Python312\\python.exe";
 const NODE = process.env.NODE_PATH || "C:\\Program Files\\nodejs\\node.exe";
-const OPENCODE_BIN =
-  process.env.OPENCODE_BIN ||
-  "C:\\Users\\User\\AppData\\Roaming\\npm\\node_modules\\opencode-ai\\bin\\opencode";
 const CLOUDFLARED_BIN =
   process.env.CLOUDFLARED_BIN ||
   "C:\\Program Files (x86)\\cloudflared\\cloudflared.exe";
@@ -123,9 +120,37 @@ const CORE_APP = pm2App({
     GMAIL_USE_OAUTH: "1",
     ALLOW_LOCAL_AGENTS: "1",
     LOCAL_SERVICE_ALLOWLIST: process.env.LOCAL_SERVICE_ALLOWLIST || "",
-    DRAYMOND_FAILOVER_MATRIX: "1",
+    // Lean boot: do NOT autostart the 9 core services on boot — the sector
+    // lifecycle cold-starts them on demand and sweeps them when idle. The
+    // deterministic brain (native :3210) still comes up via its own service.
+    DRAYMOND_AUTOSTART_SERVICES: "0",
+    // Fleet auto-loading DISABLED 2026-09-08: Draymond was cold-starting the
+    // whole fleet (smd/bookbridge/opencode + E2/E3/E4) on every job, causing
+    // EADDRINUSE crash loops from orphaned port holders. The operator loads
+    // service clusters per task instead. Setting this to 0 stops BOTH the auto
+    // cold-start (ensureSectorForJob) and the idle sweep (sectorSweep).
+    DRAYMOND_SECTOR_LIFECYCLE: process.env.DRAYMOND_SECTOR_LIFECYCLE || "0",
+    // Autonomous repair/upgrade disabled 2026-09-08: the failover matrix +
+    // benchmark-olympics repair dispatch were auto-spawning/reconfiguring
+    // services the operator deliberately stopped. Operator loads service
+    // clusters per task; nothing self-heals the fleet on its own.
+    DRAYMOND_FAILOVER_MATRIX: "0",
+    DRAYMOND_REPAIR_BENCHMARK_ENABLED: "0",
+    // Master auto-start kill-switch (self-repair monitor:down path + any
+    // autonomous spawn): 0 = manual cluster mode, services never auto-start.
+    DRAYMOND_AUTO_START_SERVICES: "0",
     DRAYMOND_DAILY_COST_CAP_CENTS:
       process.env.DRAYMOND_DAILY_COST_CAP_CENTS || "5000",
+    // Governance gate (ACE policy kernel): off | shadow | enforce. Only the
+    // action types in DRAYMOND_GOVERNANCE_SCOPE are gated; everything else
+    // (arbitrary entity actions, chain_step:*) passes untouched. Downgrade to
+    // "shadow" (report only) or "off" in .env.local without a rebuild.
+    DRAYMOND_GOVERNANCE_GATE:
+      process.env.DRAYMOND_GOVERNANCE_GATE || D.DRAYMOND_GOVERNANCE_GATE || "enforce",
+    DRAYMOND_GOVERNANCE_SCOPE:
+      process.env.DRAYMOND_GOVERNANCE_SCOPE || D.DRAYMOND_GOVERNANCE_SCOPE || "",
+    ACE_GATE_SCRIPT: process.env.ACE_GATE_SCRIPT || path.join(UPLIFT_ROOT, "ACE", "gate.py"),
+    ACE_PYTHON: process.env.ACE_PYTHON || PYTHON,
   },
 });
 
@@ -139,38 +164,17 @@ const FLEET_SERVICES = [
     restart_delay: 5000,
     exp_backoff_restart_delay: 200,
   }),
-  pm2App({
-    name: "hermes-brain",
-    // The REAL NousResearch Hermes agent (api_server on 8642) — boots via the
-    // gateway launcher (regenerates ~/.hermes/config.yaml from .env.local,
-    // sets OPENCODE_ZEN/GO keys, then `hermes gateway`). The chat role moved
-    // off hermes-proxy to this api_server in Phase 1; Open-Chat's HermesClient
-    // talks to it on 8642.
-    script: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
-    args: "-NoProfile -ExecutionPolicy Bypass -File scripts/start-hermes-gateway.ps1",
-    cwd: ORCH_DIR,
-    memory: "1G",
-    env: {
-      NODE_ENV: "production",
-      API_SERVER_HOST: D.API_SERVER_HOST || "127.0.0.1",
-      API_SERVER_PORT: D.API_SERVER_PORT || "8642",
-      API_SERVER_KEY: D.API_SERVER_KEY || "",
-    },
-  }),
-  // Hermes Proxy — media + voice only (no chat). Chat moved to hermes-brain
-  // (8642); this runs the Node proxy on HERMES_PROXY_PORT=8648 so the two no
-  // longer collide on 8642. Open-Chat's phone UI voice goes here.
-  pm2App({
-    name: "hermes-proxy",
-    script: "server.js",
-    cwd: O("hermes-proxy"),
-    interpreter: NODE,
-    memory: "512M",
-    env: {
-      HERMES_PROXY_PORT: "8648",
-      NODE_ENV: "production",
-    },
-  }),
+  // hermes-brain and hermes-proxy were REMOVED from the fleet (operator
+  // decision 2026-09-17). Reasons:
+  //   - Hermes could not complete a turn on the local model tier within ~9 min
+  //     (large system prompt prefill at ~15 t/s on a throttling 15W CPU), and
+  //     its startup stalled on a failing `vibeserve` MCP connect.
+  //   - The consumers that justified it are gone: Open-Chat (phone chat/voice)
+  //     was dropped from the fleet earlier.
+  // Retained on disk, unused: scripts/start-hermes-gateway.ps1,
+  // scripts/start-hermes-proxy.ps1, scripts/hermes-config.mjs, hermes-proxy/,
+  // and ~/.hermes/. Note hermes-proxy/ also hosts squad-service (still in the
+  // fleet below) — do not delete that directory.
   pm2App({
     name: "squad-service",
     script: "squad-service.js",
@@ -224,7 +228,7 @@ const FLEET_SERVICES = [
     env: {
       ...D,
       NODE_ENV: "production",
-      PORT: "3010",
+      PORT: "3012",
       OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434",
       BOOKBRIDGE_URL: "http://127.0.0.1:8777",
     },
@@ -389,7 +393,7 @@ const FLEET_SERVICES = [
       GEMINI_API_KEY: D.GEMINI_API_KEY || "",
       COMIC_ENGINE_URL: process.env.COMIC_ENGINE_URL || "http://localhost:8100",
       HEMPFORGE_URL: "",
-      OMNIRESEARCH_URL: process.env.OMNI_RESEARCH_URL || "http://localhost:3010",
+      OMNIRESEARCH_URL: process.env.OMNI_RESEARCH_URL || "http://localhost:3012",
     },
   }),
 
@@ -429,6 +433,34 @@ const FLEET_SERVICES = [
     cwd: ORCH_DIR,
     memory: "256M",
     env: { PORT: "8420" },
+  }),
+  // Recourse — autonomous self-developing architecture OS (template-driven
+  // component building, sandboxed-verified tool registry, self-healing repair,
+  // dream engine, recursive-math loops, learner, provenance chain). Port 3050
+  // is canonical (ports.ts). Serves /api/recourse/* + /api/lego/* + /api/ollama/*.
+  // Generative features route through the LiteLLM seam (fleet-free) so the fleet
+  // model stack is used; when no key/model is reachable the app honestly reports
+  // offline and the deterministic engines still run.
+  pm2App({
+    name: "recourse",
+    // Canonical repo (C:\Users\User\Downloads\recourse). The vendored
+    // agents/recourse copy lacks /api/recourse/provider/chat and
+    // /api/recourse/memory/*, so it cannot serve the Open-Chat chat surface.
+    // The canonical repo's own .env is already local-first:
+    //   LOCAL_MODEL_BASE_URL=http://127.0.0.1:11434/v1, LOCAL_MODEL_NAME=minicpm5-2b,
+    //   with an api.pgsgrove.com fallback.
+    // Run from source via tsx so code changes (e.g. the /v1 OpenAI shim) take
+    // effect without a dist rebuild.
+    script: "C:/Users/User/Downloads/recourse/node_modules/tsx/dist/cli.mjs",
+    args: "server.ts",
+    cwd: "C:/Users/User/Downloads/recourse",
+    interpreter: NODE,
+    memory: "1G",
+    env: {
+      PORT: "3050",
+      NODE_ENV: "production",
+      ...D,
+    },
   }),
   pm2App({
     name: "buzz-relay",
@@ -484,23 +516,9 @@ const SMD_ENV = {
 };
 
 const MARKETING_SERVICES = [
-  // opencode - headless codegen serve (codegen fallback for the repair team).
-  // Pinned to the paid opencode Go tier (deepseek-v4-flash). Reads the Go key
-  // from ~/.local/share/opencode/account.json; OPENCODE_MODEL must stay pinned
-  // or the serve wedges.
-  pm2App({
-    name: "opencode",
-    script: OPENCODE_BIN,
-    args: "serve --port 4096",
-    cwd: ORCH_DIR,
-    interpreter: NODE,
-    memory: "512M",
-    env: {
-      OPENCODE_MODEL: "opencode/deepseek-v4-flash",
-      NODE_ENV: "production",
-      PORT: "4096",
-    },
-  }),
+  // opencode (headless codegen serve) RETIRED: codegen now routes through
+  // Axiom's OpenAI-compatible /v1/chat/completions (src/lib/ide/opencode-client.ts).
+  // Nothing in the fleet starts a local `opencode serve` anymore.
   // Redis â€” message broker and result backend for Celery.
   // The Windows service exists but is stopped by default; PM2 manages it here
   // so the whole SMD stack starts and stops together.
@@ -646,28 +664,29 @@ const MARKETING_SERVICES = [
 // Routes OpenCode (Ox Alpha free primary â†’ DeepSeek fallback) through the harness llm seam.
 // Ecosystem overlay: C:/Users/User/Downloads/Uplift/Deepseek Harness/ecosystem.patch.yml
 // Harness home: %DSH_HOME% (default ~/.dsh) or UPLIFT_ROOT-adjacent .dsh-home
-const DSH_DIR = process.env.DSH_DIR || path.join(UPLIFT_ROOT, "Deepseek Harness", "deepseek-harness-master");
+// The old dsh-harness web UI was CUT 2026-09-01: largest single CPU consumer
+// (735% CPU / 625MB) and overlapped litellm (the fleet LLM router).
+// Axiom (the OpenAI-compatible codegen endpoint) was re-added 2026-09-18 by
+// operator decision: Draymond dispatches repair codegen to AXIOM_URL (default
+// http://127.0.0.1:3198) via src/lib/ide/opencode-client.ts, and with no
+// managed engine every repair fell through to the deterministic escalation
+// plan and re-emailed the operator on a loop. Axiom loads its own .env
+// (AXIOM_PORT=3198, Keywire + model keys), so inject only NODE_ENV/AXIOM_PORT/
+// UPLIFT_ROOT and let its dotenv be authoritative.
+const AXIOM_DIR = P("Deepseek Harness/Axiom Agent");
 const DSH_SERVICES = [
   pm2App({
-    name: "dsh-harness",
-    script: NODE,
-    // NOTE: --patch must come directly after `web`; once the parser sees an
-    // unknown option (--port) everything after is passed to the web app.
-    args: "--import tsx apps/cli/src/bin.ts web --patch \"C:/Users/User/Downloads/Uplift/Deepseek Harness/ecosystem.patch.yml\" --port 3080",
-    cwd: DSH_DIR,
-    memory: "1G",
+    name: "axiom",
+    script: path.join(AXIOM_DIR, "node_modules", "tsx", "dist", "cli.mjs"),
+    args: "server.ts",
+    cwd: AXIOM_DIR,
+    interpreter: NODE,
+    memory: "2G",
+    restart_delay: 5000,
     env: {
-      ...D,
-      NODE_ENV: "production",
-      PORT: "3080",
-      DSH_HOME: process.env.DSH_HOME || path.join(UPLIFT_ROOT, ".dsh-home"),
+      NODE_ENV: "development",
+      AXIOM_PORT: "3198",
       UPLIFT_ROOT,
-      DRAYMOND_REGISTRY_DIR: path.join(ORCH_DIR, ".draymond"),
-      // LLM routing â€” Ox Alpha free primary, DeepSeek direct fallback
-      OPENCODE_API_KEY: D.OPENCODE_API_KEY || "",
-      DEEPSEEK_API_KEY: D.DEEPSEEK_API_KEY || "",
-      DEEPSEEK_BASE_URL: D.DEEPSEEK_BASE_URL || "https://api.deepseek.com",
-      OPENCODE_VIA_DSH: process.env.OPENCODE_VIA_DSH || "0",
     },
   }),
 ];
@@ -683,7 +702,10 @@ const BRAIN_SERVICES = [
     memory: "1G",
     env: {
       ...D,
-      API_PORT: D.API_PORT || "8000",
+      // The fleet brain lives on 3210 (BRAIN_URL in .env.local). The old
+      // default of 8000 collided with uplift-agent and crash-looped — fixed
+      // 2026-09-01 so pm2 can own the warm brain on the port draymond uses.
+      API_PORT: D.API_PORT || "3210",
       UVICORN_WORKERS: "1",
       SOUL_PATH: path.join(BRAIN_DIR, ".soul.yaml"),
       NODE_ENV: "production",

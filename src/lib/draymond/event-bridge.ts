@@ -97,7 +97,7 @@ export function emit(type: string, data: Record<string, unknown>): void {
   }
 }
 
-// ── Chain Events ─────────────────────────────────────────────────────────────
+// -- Chain Events -------------------------------------------------------------
 
 export function emitChainStarted(chainId: string, chainName: string, totalSteps: number, agentId?: string): void {
   emit('chain.started', { chain_id: chainId, chain_name: chainName, total_steps: totalSteps, agent_id: agentId ?? null });
@@ -119,7 +119,7 @@ export function emitChainFailed(chainId: string, chainName: string, completedSte
   emit('chain.failed', { chain_id: chainId, chain_name: chainName, completed_steps: completedSteps, failed_steps: failedSteps, duration_ms: durationMs, error });
 }
 
-// ── Agent/Entity Events ──────────────────────────────────────────────────────
+// -- Agent/Entity Events ------------------------------------------------------
 
 export function emitAgentInvoked(entityId: string, entityName: string, action: string, method: string): void {
   emit('agent.invoked', { entity_id: entityId, entity_name: entityName, action, method });
@@ -137,7 +137,7 @@ export function emitAgentUpdated(agentId: string, agentName: string, status: str
   emit('agent.updated', { agent: { id: agentId, name: agentName, status } });
 }
 
-// ── Monitor Events ───────────────────────────────────────────────────────────
+// -- Monitor Events -----------------------------------------------------------
 
 export function emitSiteDown(monitorId: string, monitorName: string, url: string, statusCode: number | null, responseTimeMs: number | null, consecutiveFailures: number): void {
   emit('monitor.site_down', { monitor_id: monitorId, monitor_name: monitorName, url, status_code: statusCode, response_time_ms: responseTimeMs, consecutive_failures: consecutiveFailures });
@@ -151,7 +151,7 @@ export function emitHealthCheckComplete(totalMonitors: number, upCount: number, 
   emit('monitor.health_check_complete', { total_monitors: totalMonitors, up_count: upCount, down_count: downCount });
 }
 
-// ── Scheduler Events ─────────────────────────────────────────────────────────
+// -- Scheduler Events ---------------------------------------------------------
 
 export function emitJobStarted(jobId: string, jobName: string, jobType: string): void {
   emit('scheduler.job_started', { job_id: jobId, job_name: jobName, job_type: jobType });
@@ -165,7 +165,7 @@ export function emitJobFailed(jobId: string, jobName: string, jobType: string, e
   emit('scheduler.job_failed', { job_id: jobId, job_name: jobName, job_type: jobType, error });
 }
 
-// ── Notification Events (forward email notifications to SSE) ─────────────────
+// -- Notification Events (forward email notifications to SSE) -----------------
 
 export function emitNotificationSent(notificationId: string, type: string, subject: string, priority: string, recipient: string): void {
   emit('notification.sent', { notification_id: notificationId, type, subject, priority, recipient });
@@ -175,7 +175,7 @@ export function emitNotificationFailed(notificationId: string, type: string, sub
   emit('notification.failed', { notification_id: notificationId, type, subject, error });
 }
 
-// ── Open Chat Client Status ──────────────────────────────────────────────────
+// -- Open Chat Client Status --------------------------------------------------
 
 export function emitClientConnected(clientId: string, clientCount: number): void {
   emit('client.connected', { client_id: clientId, client_count: clientCount });

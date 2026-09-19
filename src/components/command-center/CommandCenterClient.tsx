@@ -7,6 +7,7 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import HomePanel from './home/HomePanel';
 import AgentsPanel from './agents/AgentsPanel';
@@ -16,24 +17,43 @@ import BrainPanel from './brain/BrainPanel';
 import SciencePanel from './science/SciencePanel';
 import CrmPanel from './crm/CrmPanel';
 import SeoPanel from './seo/SeoPanel';
-import VisualizerTab from '@/components/visualizer/VisualizerApp';
+
+// The PixiJS graph is heavy — load it only when the Visualizer tab is opened,
+// never in the initial Command Center bundle.
+const VisualizerTab = dynamic(() => import('@/components/visualizer/VisualizerApp'), {
+  ssr: false,
+  loading: () => <div className="py-10 text-sm text-white/50">Loading visualizer…</div>,
+});
 
 const TABS = [
-  { value: 'home', label: 'Home', component: HomePanel },
-  { value: 'agents', label: 'Agents', component: AgentsPanel },
-  { value: 'tasks', label: 'Tasks', component: TasksPanel },
-  { value: 'sites', label: 'Sites', component: SitesPanel },
-  { value: 'brain', label: 'Brain', component: BrainPanel },
-  { value: 'science', label: 'Science', component: SciencePanel },
-  { value: 'crm', label: 'CRM', component: CrmPanel },
-  { value: 'seo', label: 'SEO', component: SeoPanel },
-  { value: 'visualizer', label: 'Visualizer', component: VisualizerTab },
+  { value: 'home', label: 'Home' },
+  { value: 'agents', label: 'Agents' },
+  { value: 'tasks', label: 'Tasks' },
+  { value: 'sites', label: 'Sites' },
+  { value: 'brain', label: 'Brain' },
+  { value: 'science', label: 'Science' },
+  { value: 'crm', label: 'CRM' },
+  { value: 'seo', label: 'SEO' },
+  { value: 'visualizer', label: 'Visualizer' },
 ] as const;
+
+function ActivePanel({ tab }: { tab: string }) {
+  switch (tab) {
+    case 'agents': return <AgentsPanel />;
+    case 'tasks': return <TasksPanel />;
+    case 'sites': return <SitesPanel />;
+    case 'brain': return <BrainPanel />;
+    case 'science': return <SciencePanel />;
+    case 'crm': return <CrmPanel />;
+    case 'seo': return <SeoPanel />;
+    case 'visualizer': return <VisualizerTab />;
+    default: return <HomePanel />;
+  }
+}
 
 export default function CommandCenterClient() {
   const [queryClient] = useState(() => new QueryClient());
   const [tab, setTab] = useState<string>('home');
-  const Active = TABS.find((t) => t.value === tab)?.component ?? HomePanel;
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -51,10 +71,14 @@ export default function CommandCenterClient() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1 mb-6">
+          <div role="tablist" aria-label="Command Center sections" className="flex flex-wrap items-center gap-1 mb-6">
             {TABS.map((t) => (
               <button
                 key={t.value}
+                role="tab"
+                id={`cc-tab-${t.value}`}
+                aria-selected={tab === t.value}
+                aria-controls={`cc-panel-${t.value}`}
                 onClick={() => setTab(t.value)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   tab === t.value
@@ -67,7 +91,9 @@ export default function CommandCenterClient() {
             ))}
           </div>
 
-          <Active />
+          <div role="tabpanel" id={`cc-panel-${tab}`} aria-labelledby={`cc-tab-${tab}`}>
+            <ActivePanel tab={tab} />
+          </div>
         </div>
       </div>
     </QueryClientProvider>

@@ -109,7 +109,7 @@ async function main() {
     findings.push({ severity: sev, category, title, description, file, line: undefined, fixSuggestion, engine: 'supply-chain' });
   };
 
-  // ── 1. OSV scanner over lockfiles ──
+  // -- 1. OSV scanner over lockfiles --
   const osv = resolveTool('osv-scanner');
   const lockfiles = findLockfiles(root);
   if (osv && lockfiles.length > 0) {
@@ -139,7 +139,7 @@ async function main() {
     }
   }
 
-  // ── 2. Trivy container scan over Dockerfiles ──
+  // -- 2. Trivy container scan over Dockerfiles --
   const trivy = resolveTool('trivy');
   const dockerfiles = findDockerfiles(root);
   if (trivy && dockerfiles.length > 0) {
@@ -172,7 +172,7 @@ async function main() {
     }
   }
 
-  // ── 3. License summary (osv licenses) ──
+  // -- 3. License summary (osv licenses) --
   if (osv && lockfiles.length > 0) {
     tools.push('osv-licenses');
     const output = await run(osv, ['scan', '--format', 'json', '--licenses', ...lockfiles], root, 180_000).catch(() => '');

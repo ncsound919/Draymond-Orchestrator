@@ -22,7 +22,7 @@ function register(entitySlug: string, action: string, schema: StepSchema): void 
   SCHEMAS.set(`${entitySlug}/${action}`, schema);
 }
 
-// ── Known offenders ──────────────────────────────────────────────────────────
+// -- Known offenders ----------------------------------------------------------
 
 // Image generation must receive a non-empty prompt. The historical failure
 // sent `{ action: "generate_image" }` with no prompt (422 from the upstream).
@@ -37,7 +37,7 @@ register(
   z.object({ prompt: z.string().min(1, 'prompt is required') }),
 );
 
-// ── Lookup + validation ──────────────────────────────────────────────────────
+// -- Lookup + validation ------------------------------------------------------
 
 export function getStepSchema(entitySlug: string, action: string): StepSchema | undefined {
   return SCHEMAS.get(`${entitySlug}/${action}`);

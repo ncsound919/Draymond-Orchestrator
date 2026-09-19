@@ -68,7 +68,6 @@ function renameWithRetry(tmp: string, target: string): void {
       // Busy-wait briefly — concurrent local renames resolve in milliseconds.
       const deadline = Date.now() + RETRY_MS;
       // Light synchronous back-off; avoids pulling an async import into this hot path.
-      // eslint-disable-next-line no-empty
       while (Date.now() < deadline) { /* spin */ }
     }
   }
@@ -100,7 +99,7 @@ export function recoverBrainFile(fileName: string): string | null {
   if (digest !== row.content_sha256) {
     throw new Error(`journal integrity failure for ${fileName}: sha256 mismatch`);
   }
-  const target = path.join(BRAIN_DIR, fileName);
+  const target = /*turbopackIgnore: true*/ path.join(BRAIN_DIR, fileName);
   fs.mkdirSync(path.dirname(target), { recursive: true });
   const tmp = `${target}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   fs.writeFileSync(tmp, row.content, 'utf-8');

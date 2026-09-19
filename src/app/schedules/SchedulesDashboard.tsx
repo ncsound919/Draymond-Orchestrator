@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition, useEffect } from 'react';
+import { useOrchestratorHealth } from '@/hooks/useOrchestratorHealth';
 import { createScheduledJob, updateScheduledJob, toggleJob, removeJob, runScheduledJob, catchUpMissedJobs, runAllFailedJobs } from './actions';
 
 // ---------------------------------------------------------------------------
@@ -172,6 +173,7 @@ type FilterTab = 'all' | 'enabled' | 'disabled' | 'failed';
 // ---------------------------------------------------------------------------
 
 export default function SchedulesDashboard({ initialJobs, chainOptions, customHandlers }: Props) {
+  const health = useOrchestratorHealth();
   const [showForm, setShowForm] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -186,11 +188,13 @@ export default function SchedulesDashboard({ initialJobs, chainOptions, customHa
 
   // Hydration-safe timestamp — only runs on client
   useEffect(() => {
+     
     setLoadedAt(new Date().toISOString().replace('T', ' ').slice(0, 19));
   }, []);
 
   // Keep jobs in sync when server re-renders with fresh initialJobs
   useEffect(() => {
+     
     setJobs(initialJobs);
   }, [initialJobs]);
 
@@ -411,7 +415,7 @@ export default function SchedulesDashboard({ initialJobs, chainOptions, customHa
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-10 space-y-8">
-      {/* ── Header ──────────────────────────────────────────────────── */}
+      {/* -- Header ---------------------------------------------------- */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Schedules</h1>
@@ -435,11 +439,18 @@ export default function SchedulesDashboard({ initialJobs, chainOptions, customHa
         </button>
       </div>
 
-      {/* ── Fleet controls ─────────────────────────────────────────────── */}
+      {/* -- Fleet controls ----------------------------------------------- */}
       <div className="flex flex-wrap items-center gap-3 rounded-xl bg-white/5 border border-white/10 p-4">
         <div className="flex items-center gap-2 text-sm">
-          <span className="inline-flex h-2 w-2 rounded-full bg-[#22c55e]" />
-          <span className="text-white/70">Draymond running</span>
+          <span
+            role="status"
+            className={`inline-flex h-2 w-2 rounded-full ${
+              health === 'online' ? 'bg-[#22c55e]' : health === 'offline' ? 'bg-red-500' : 'bg-gray-500'
+            }`}
+          />
+          <span className="text-white/70">
+            {health === 'online' ? 'Draymond online' : health === 'offline' ? 'Draymond unreachable' : 'Checking Draymond…'}
+          </span>
         </div>
         <div className="ml-auto flex flex-wrap gap-2">
           <button
@@ -463,7 +474,7 @@ export default function SchedulesDashboard({ initialJobs, chainOptions, customHa
         </div>
       </div>
 
-      {/* ── Filter tabs ─────────────────────────────────────────────── */}
+      {/* -- Filter tabs ----------------------------------------------- */}
       <div className="flex flex-wrap gap-2">
         {(['all', 'enabled', 'disabled', 'failed'] as FilterTab[]).map((tab) => (
           <button
@@ -481,7 +492,7 @@ export default function SchedulesDashboard({ initialJobs, chainOptions, customHa
         ))}
       </div>
 
-      {/* ── New / Edit Job Form ────────────────────────────────────── */}
+      {/* -- New / Edit Job Form -------------------------------------- */}
       {showForm && (
         <div className="rounded-xl bg-white/5 border border-white/10 p-5">
           <h2 className="text-xs font-bold tracking-widest uppercase text-white/40 mb-3">
@@ -673,9 +684,9 @@ export default function SchedulesDashboard({ initialJobs, chainOptions, customHa
         </div>
       )}
 
-      {/* ── Action Error / Result Banner ────────────────────────────── */}
+      {/* -- Action Error / Result Banner ------------------------------ */}
       {actionError && (
-        <div className="rounded-xl bg-red-500/10 border border-red-500/20 px-5 py-3 flex items-center justify-between">
+        <div role="alert" className="rounded-xl bg-red-500/10 border border-red-500/20 px-5 py-3 flex items-center justify-between">
           <p className="text-sm text-red-400">{actionError}</p>
           <button
             type="button"
@@ -687,7 +698,7 @@ export default function SchedulesDashboard({ initialJobs, chainOptions, customHa
         </div>
       )}
       {runResult && (
-        <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-5 py-3 flex items-center justify-between">
+        <div role="status" aria-live="polite" className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-5 py-3 flex items-center justify-between">
           <p className="text-sm text-emerald-400 font-mono">{runResult}</p>
           <button
             type="button"
@@ -699,7 +710,7 @@ export default function SchedulesDashboard({ initialJobs, chainOptions, customHa
         </div>
       )}
       {batchResult && (
-        <div className="rounded-xl bg-cyan-500/10 border border-cyan-500/20 px-5 py-3">
+        <div role="status" aria-live="polite" className="rounded-xl bg-cyan-500/10 border border-cyan-500/20 px-5 py-3">
           <div className="flex items-center justify-between">
             <p className="text-sm text-cyan-300 font-mono whitespace-pre-line">{batchResult}</p>
             <button
@@ -713,7 +724,7 @@ export default function SchedulesDashboard({ initialJobs, chainOptions, customHa
         </div>
       )}
 
-      {/* ── Job List ────────────────────────────────────────────────── */}
+      {/* -- Job List -------------------------------------------------- */}
       <section>
         <h2 className="text-xs font-bold tracking-widest uppercase text-white/40 mb-3">
           {filter === 'all' ? 'All Jobs' : `${filter} (${counts[filter]})`}
@@ -892,7 +903,7 @@ export default function SchedulesDashboard({ initialJobs, chainOptions, customHa
         )}
       </section>
 
-      {/* ── Footer ──────────────────────────────────────────────────── */}
+      {/* -- Footer ---------------------------------------------------- */}
       <div className="border-t border-white/5 pt-6 pb-4">
         <p className="text-xs text-white/20 text-center">
           Draymond Scheduler &mdash; Last loaded:{' '}

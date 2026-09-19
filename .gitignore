@@ -44,6 +44,8 @@ build_error.log
 
 # runtime audit log
 /.audit/
+# The Deep / CodeNexus generated audit reports
+/deep-audit-reports/
 
 # vercel
 .vercel

@@ -23,10 +23,10 @@ export async function GET(request: NextRequest) {
 
   try {
     const fs = await import('node:fs');
-    if (!fs.existsSync(SMD_QUEUE_FILE)) {
+    if (!/*turbopackIgnore: true*/ fs.existsSync(SMD_QUEUE_FILE)) {
       return NextResponse.json({ ok: true, total: 0, queue: [] });
     }
-    const raw = fs.readFileSync(SMD_QUEUE_FILE, 'utf8');
+    const raw = /*turbopackIgnore: true*/ fs.readFileSync(SMD_QUEUE_FILE, 'utf8');
     const queue = JSON.parse(raw);
     const items = Array.isArray(queue) ? queue : [];
     return NextResponse.json({ ok: true, total: items.length, queue: items });

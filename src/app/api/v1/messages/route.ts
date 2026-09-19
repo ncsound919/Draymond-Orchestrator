@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
 const VALID_ROLES = ['user', 'assistant', 'system'] as const;
 type MessageRole = (typeof VALID_ROLES)[number];
 
-// ── GET /api/v1/messages ────────────────────────────────────────────────────
+// -- GET /api/v1/messages ----------------------------------------------------
 export async function GET(request: NextRequest) {
   const authError = authorizeRequest(request);
   if (authError) return authError;
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ── POST /api/v1/messages ───────────────────────────────────────────────────
+// -- POST /api/v1/messages ---------------------------------------------------
 export async function POST(request: NextRequest) {
   const authError = authorizeRequest(request);
   if (authError) return authError;

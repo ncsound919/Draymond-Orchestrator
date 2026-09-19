@@ -38,7 +38,7 @@ export interface ApiKeyEntry {
 }
 
 export const FREE_API_REGISTRY: ApiKeyEntry[] = [
-  // ── E1 · Platform tiers ─────────────────────────────────────────────────
+  // -- E1 · Platform tiers -------------------------------------------------
   { name: 'Finnhub', engine: 'E1', envVars: ['FINNHUB_API_KEY'], noKey: false, signupUrl: 'https://finnhub.io/register', use: 'Wealth: US stock prices/fundamentals', fetcher: 'data-apis.finnhubQuote' },
   { name: 'Alpha Vantage', engine: 'E1', envVars: ['ALPHAVANTAGE_API_KEY'], noKey: false, signupUrl: 'https://www.alphavantage.co/support/#api-key', use: 'Wealth: stocks/forex/crypto' },
   { name: 'CoinGecko', engine: 'E1', envVars: [], noKey: true, use: 'Wealth: crypto prices', fetcher: 'data-apis.cryptoPrices' },
@@ -49,7 +49,7 @@ export const FREE_API_REGISTRY: ApiKeyEntry[] = [
   { name: 'Caselaw Access Project', engine: 'E1', envVars: ['CASELAW_TOKEN'], noKey: false, signupUrl: 'https://api.case.law/v1/signup', use: 'Justice: court opinions', fetcher: 'data-apis.caselawCases' },
   { name: 'CourtListener', engine: 'E1', envVars: ['COURTLISTENER_API_KEY'], noKey: false, signupUrl: 'https://www.courtlistener.com/accounts/register/', use: 'Justice: dockets/cases' },
 
-  // ── E2 · B2B (Aetherdesk + marketing) ──────────────────────────────────
+  // -- E2 · B2B (Aetherdesk + marketing) ----------------------------------
   { name: 'Stripe (billing)', engine: 'E2', envVars: ['STRIPE_SECRET_KEY'], noKey: false, signupUrl: 'https://dashboard.stripe.com/apikeys', use: 'Billing — settled revenue for the Treasurer (treasury.ts)', fetcher: 'treasury.fetchStripeCharges' },
   { name: 'Resend', engine: 'E2', envVars: ['RESEND_API_KEY'], noKey: false, signupUrl: 'https://resend.com/api-keys', use: 'Agentmail + client comms' },
   { name: 'Twilio SendGrid', engine: 'E2', envVars: ['SENDGRID_API_KEY'], noKey: false, signupUrl: 'https://signup.sendgrid.com/', use: 'Notifications' },
@@ -58,7 +58,7 @@ export const FREE_API_REGISTRY: ApiKeyEntry[] = [
   { name: 'Abstract Email Validation', engine: 'E2', envVars: ['ABSTRACT_EMAIL_API_KEY'], noKey: false, signupUrl: 'https://www.abstractapi.com/api/email-validation', use: 'Lead quality' },
   { name: 'ip-api.com', engine: 'E2', envVars: [], noKey: true, use: 'Geotag inbound calls' },
 
-  // ── E3 · Tooling / security ────────────────────────────────────────────
+  // -- E3 · Tooling / security --------------------------------------------
   { name: 'VirusTotal', engine: 'E3', envVars: ['VIRUSTOTAL_API_KEY'], noKey: false, signupUrl: 'https://www.virustotal.com/gui/join-us', use: 'Malware/url intel in audits', fetcher: 'data-apis.virusTotalUrlReport' },
   { name: 'Shodan', engine: 'E3', envVars: ['SHODAN_API_KEY'], noKey: false, signupUrl: 'https://account.shodan.io/register', use: 'Internet exposure' },
   { name: 'AbuseIPDB', engine: 'E3', envVars: ['ABUSEIPDB_API_KEY'], noKey: false, signupUrl: 'https://www.abuseipdb.com/register', use: 'IP reputation' },
@@ -66,7 +66,7 @@ export const FREE_API_REGISTRY: ApiKeyEntry[] = [
   { name: 'UrlScan.io', engine: 'E3', envVars: ['URLSCAN_API_KEY'], noKey: false, signupUrl: 'https://urlscan.io/user/sign_up', use: 'Web page intel' },
   { name: 'SecurityTrails', engine: 'E3', envVars: ['SECURITYTRAILS_API_KEY'], noKey: false, signupUrl: 'https://securitytrails.com/app/signup', use: 'Domain/DNS intel' },
 
-  // ── E4 · Vertical (sports / music / research) ──────────────────────────
+  // -- E4 · Vertical (sports / music / research) --------------------------
   { name: 'TheSportsDB', engine: 'E4', envVars: ['THESPORTSDB_API_KEY'], noKey: false, signupUrl: 'https://www.thesportsdb.com/free_api.php', use: 'Sports stats/intel (Sports Steve)', fetcher: 'data-apis.theSportsDb' },
   { name: 'MusicBrainz', engine: 'E4', envVars: [], noKey: true, use: 'Music metadata (music-rights)', fetcher: 'data-apis.musicArtist' },
   { name: 'iTunes Search API', engine: 'E4', envVars: [], noKey: true, use: 'Music lookup' },
@@ -74,7 +74,7 @@ export const FREE_API_REGISTRY: ApiKeyEntry[] = [
   { name: 'PubMed E-utilities', engine: 'E4', envVars: [], noKey: true, use: 'Bio/health research', fetcher: 'data-apis.pubmedSearch' },
   { name: 'Crossref', engine: 'E4', envVars: [], noKey: true, use: 'DOI/citations (BookBridge)' },
 
-  // ── Operations / LLM ───────────────────────────────────────────────────
+  // -- Operations / LLM ---------------------------------------------------
   { name: 'OpenRouter', engine: 'ops', envVars: ['OPENROUTER_API_KEY'], noKey: false, signupUrl: 'https://openrouter.ai/keys', use: 'LLM routing (litellm)' },
   { name: 'Groq', engine: 'ops', envVars: ['GROQ_API_KEY'], noKey: false, signupUrl: 'https://console.groq.com/keys', use: 'Fast inference fallback' },
   { name: 'HuggingFace Inference', engine: 'ops', envVars: ['HF_API_KEY'], noKey: false, signupUrl: 'https://huggingface.co/settings/tokens', use: 'Open models' },
@@ -84,15 +84,15 @@ export const FREE_API_REGISTRY: ApiKeyEntry[] = [
   { name: 'Nominatim (OSM)', engine: 'ops', envVars: [], noKey: true, use: 'Geocoding local biz' },
   { name: 'ExchangeRate-API', engine: 'ops', envVars: ['EXCHANGERATE_API_KEY'], noKey: false, signupUrl: 'https://www.exchangerate-api.com/sign-up', use: 'Finance conversions' },
 
-  // ── News (already wired in src/lib/draymond/news.ts) ───────────────────
+  // -- News (already wired in src/lib/draymond/news.ts) -------------------
   { name: 'NewsAPI', engine: 'ops', envVars: ['NEWSAPI_KEY'], noKey: false, signupUrl: 'https://newsapi.org/register', use: 'News ingest', fetcher: 'news.ingestNews' },
   { name: 'GNews', engine: 'ops', envVars: ['GNEWS_API_KEY'], noKey: false, signupUrl: 'https://gnews.io/register', use: 'News ingest', fetcher: 'news.ingestNews' },
   { name: 'WorldNews API', engine: 'ops', envVars: ['WORLDNEWS_API_KEY'], noKey: false, signupUrl: 'https://worldnewsapi.com/register', use: 'News ingest', fetcher: 'news.ingestNews' },
 
-  // ── Kaggle (new-style KGAT_ token) ─────────────────────────────────────
+  // -- Kaggle (new-style KGAT_ token) -------------------------------------
   { name: 'Kaggle', engine: 'E4', envVars: ['KAGGLE_API_TOKEN'], noKey: false, signupUrl: 'https://www.kaggle.com/settings/api', use: 'Datasets/competitions for research + backtesting', fetcher: 'data-apis.kaggleSearchDatasets' },
 
-  // ── Hermes api_server (mission brain) ───────────────────────────────────
+  // -- Hermes api_server (mission brain) -----------------------------------
   { name: 'Hermes api_server', engine: 'ops', envVars: ['API_SERVER_HOST', 'API_SERVER_PORT', 'API_SERVER_KEY'], noKey: false, use: 'Open-Chat brain: real NousResearch Hermes on 8642' },
 ];
 

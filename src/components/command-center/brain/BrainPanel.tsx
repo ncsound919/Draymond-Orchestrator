@@ -63,7 +63,7 @@ export default function BrainPanel() {
   const [taskQuery, setTaskQuery] = useState('');
   const [taskLane, setTaskLane] = useState('');
 
-  // ── Status / agenda ──────────────────────────────────────────────────
+  // -- Status / agenda --------------------------------------------------
   const brainQuery = useQuery({
     queryKey: ['command-center', 'ops-brain'],
     queryFn: async () => {
@@ -73,7 +73,7 @@ export default function BrainPanel() {
     },
   });
 
-  // ── Fallback coverage (brain = Draymond's fallback) ───────────────────
+  // -- Fallback coverage (brain = Draymond's fallback) -------------------
   const fallbackQuery = useQuery({
     queryKey: ['command-center', 'ops-brain-fallback'],
     queryFn: async () => {
@@ -87,7 +87,7 @@ export default function BrainPanel() {
     refetchInterval: 30_000,
   });
 
-  // ── Sweep ─────────────────────────────────────────────────────────────
+  // -- Sweep -------------------------------------------------------------
   const runSweep = useMutation({
     mutationFn: async () => {
       const res = await ccFetch<SweepResponse>({
@@ -106,7 +106,7 @@ export default function BrainPanel() {
       toast.error(`Sweep failed: ${err instanceof Error ? err.message : String(err)}`),
   });
 
-  // ── Task send ─────────────────────────────────────────────────────────
+  // -- Task send ---------------------------------------------------------
   const runTask = useMutation({
     mutationFn: async () => {
       const res = await ccFetch<TaskResponse>({
@@ -126,7 +126,7 @@ export default function BrainPanel() {
       toast.error(`Brain task failed: ${err instanceof Error ? err.message : String(err)}`),
   });
 
-  // ── Decision cycle (existing) ─────────────────────────────────────────
+  // -- Decision cycle (existing) -----------------------------------------
   const runCycle = useMutation({
     mutationFn: async () => {
       const res = await ccFetch<BrainDecisionResult>({ endpoint: '/api/ops/brain', method: 'POST', body: {} });
@@ -141,7 +141,7 @@ export default function BrainPanel() {
       toast.error(`Decision cycle failed: ${err instanceof Error ? err.message : String(err)}`),
   });
 
-  // ── Degraded toggle ───────────────────────────────────────────────────
+  // -- Degraded toggle ---------------------------------------------------
   const setDegraded = useMutation({
     mutationFn: async (degraded: boolean) => {
       const res = await ccFetch<FallbackResponse>({
@@ -170,7 +170,7 @@ export default function BrainPanel() {
 
   return (
     <div className="space-y-6">
-      {/* ── Fallback banner (brain is Draymond's fallback) ────────────── */}
+      {/* -- Fallback banner (brain is Draymond's fallback) -------------- */}
       <section>
         <div className="rounded-xl border border-white/10 bg-white/5 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -215,7 +215,7 @@ export default function BrainPanel() {
         </div>
       </section>
 
-      {/* ── Brain status + decision cycle ─────────────────────────────── */}
+      {/* -- Brain status + decision cycle ------------------------------- */}
       <section>
         <h2 className="mb-3 text-lg font-semibold text-white">Brain Status</h2>
         {brainQuery.isLoading ? (
@@ -265,7 +265,7 @@ export default function BrainPanel() {
         )}
       </section>
 
-      {/* ── Sweep controls ────────────────────────────────────────────── */}
+      {/* -- Sweep controls ---------------------------------------------- */}
       <section>
         <h2 className="mb-3 text-lg font-semibold text-white">Brain Sweep</h2>
         <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-4">
@@ -333,7 +333,7 @@ export default function BrainPanel() {
         </div>
       </section>
 
-      {/* ── Findings ──────────────────────────────────────────────────── */}
+      {/* -- Findings ---------------------------------------------------- */}
       {findings.length > 0 && (
         <section>
           <h2 className="mb-3 text-lg font-semibold text-white">Findings</h2>
@@ -362,7 +362,7 @@ export default function BrainPanel() {
         </section>
       )}
 
-      {/* ── Brain task send ───────────────────────────────────────────── */}
+      {/* -- Brain task send --------------------------------------------- */}
       <section>
         <h2 className="mb-3 text-lg font-semibold text-white">Send Brain Task</h2>
         <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
@@ -393,7 +393,7 @@ export default function BrainPanel() {
         </div>
       </section>
 
-      {/* ── Agenda ────────────────────────────────────────────────────── */}
+      {/* -- Agenda ------------------------------------------------------ */}
       <section>
         <h2 className="mb-3 text-lg font-semibold text-white">Agenda</h2>
         {brainQuery.isLoading ? (

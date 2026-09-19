@@ -28,7 +28,7 @@ const EMAIL_TTL_MS = Number(process.env.IDE_DECISION_EMAIL_TTL_MS ?? 180_000);
 const POLL_MS = 5_000;
 const MAX_DECISION_TOKENS = 500;
 
-// ── Decision waiter registry (resolved by the decisions API or the ladder) ──
+// -- Decision waiter registry (resolved by the decisions API or the ladder) --
 
 type Waiter = { resolve: (d: IdeDecision) => void };
 const waiters = new Map<string, Waiter>();
@@ -77,7 +77,7 @@ export function hasDecisionWaiter(sessionId: string, decisionId: string): boolea
   return waiters.has(keyOf(sessionId, decisionId));
 }
 
-// ── Single-use decision review tokens (ntfy buttons) ────────────────────────
+// -- Single-use decision review tokens (ntfy buttons) ------------------------
 
 type DecisionToken = { sessionId: string; decisionId: string; expiresAt: number };
 const decisionTokens = new Map<string, DecisionToken>();
@@ -101,7 +101,7 @@ export function consumeDecisionToken(token: string): { sessionId: string; decisi
   return { sessionId: entry.sessionId, decisionId: entry.decisionId };
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// -- Helpers -----------------------------------------------------------------
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

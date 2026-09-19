@@ -86,9 +86,9 @@ function loadEnvMap(): Record<string, string> {
   // PRECEDENCE: .env.local first (operator-managed truth, matches runtime
   // injection); litellm.env (vault projection) fills in keys absent there.
   for (const rel of ['.env.local', 'data/litellm.env']) {
-    const p = path.join(root, rel);
-    if (!fs.existsSync(p)) continue;
-    for (const line of fs.readFileSync(p, 'utf8').split('\n')) {
+    const p = /*turbopackIgnore: true*/ path.join(root, rel);
+    if (!/*turbopackIgnore: true*/ fs.existsSync(p)) continue;
+    for (const line of /*turbopackIgnore: true*/ fs.readFileSync(p, 'utf8').split('\n')) {
       const t = line.trim();
       if (!t || t.startsWith('#') || !t.includes('=')) continue;
       const i = t.indexOf('=');
@@ -164,14 +164,12 @@ export async function runPoolHealth(opts: { restartLitellm?: boolean } = {}): Pr
     const key = env[name];
     if (!key) continue;
     const serving: string[] = [];
-    let anyOk = false;
     for (const m of probeModels) {
       const r = await postChat('https://opencode.ai/zen/v1/chat/completions', key, m);
       // 200 or 429 both prove entitlement (429 = valid key, quota window busy)
       if (r.ok || r.http === 429) {
         serving.push(m);
         freeModelAvailability[m].push(name);
-        anyOk = true;
       }
     }
     if (serving.length > 0) {
@@ -187,7 +185,7 @@ export async function runPoolHealth(opts: { restartLitellm?: boolean } = {}): Pr
   let openrouter: PoolProbeResult | null = null;
   if (env.OPENROUTER_API_KEY) {
     const r = await getJson('https://openrouter.ai/api/v1/key', env.OPENROUTER_API_KEY);
-    const data = (r.body as any)?.data;
+    const data = (r.body as { data?: { is_free_tier?: boolean } } | undefined)?.data;
     if (r.http === 200 && data) {
       openrouter = {
         provider: 'openrouter', credential: 'OPENROUTER_API_KEY', status: 'ok',
@@ -217,7 +215,7 @@ export async function runPoolHealth(opts: { restartLitellm?: boolean } = {}): Pr
   if (env.DEEPSEEK_API_KEY) {
     const r = await getJson('https://api.deepseek.com/user/balance', env.DEEPSEEK_API_KEY);
     if (r.http === 200) {
-      const bal = (r.body as any)?.balance_infos?.[0]?.total_balance;
+      const bal = (r.body as { balance_infos?: Array<{ total_balance?: string | number }> } | undefined)?.balance_infos?.[0]?.total_balance;
       deepseek = { provider: 'deepseek', credential: 'DEEPSEEK_API_KEY', status: 'ok', detail: `balance=${bal ?? '?'}` };
     } else {
       deepseek = { provider: 'deepseek', credential: 'DEEPSEEK_API_KEY', status: r.http === 402 ? 'payment_required' : r.http === 401 ? 'unauthorized' : 'error', detail: `http=${r.http}` };

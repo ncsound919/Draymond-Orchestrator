@@ -1,3 +1,5 @@
+process.env.DRAYMOND_DB_PATH = ':memory:';
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { callLLM, resolveLLMProvider } from '../src/lib/draymond/llm';
 

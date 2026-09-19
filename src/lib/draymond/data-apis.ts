@@ -21,7 +21,7 @@ function apiKey(name: string): string {
   return process.env[name] ?? "";
 }
 
-// ── No-key sources ─────────────────────────────────────────────────────────
+// -- No-key sources ---------------------------------------------------------
 
 export async function cryptoPrices(ids = "bitcoin,ethereum,solana"): Promise<Record<string, number>> {
   const data = (await getJson(
@@ -82,7 +82,7 @@ export async function caselawCases(query: string, pageSize = 5): Promise<{ ok: b
   }
 }
 
-// ── Key-gated sources ──────────────────────────────────────────────────────
+// -- Key-gated sources ------------------------------------------------------
 
 export async function finnhubQuote(symbol: string): Promise<{ ok: boolean; price?: number; change_pct?: number; detail?: string }> {  const key = apiKey("FINNHUB_API_KEY");
   if (!key) return { ok: false, detail: "FINNHUB_API_KEY not configured" };
@@ -145,7 +145,7 @@ export async function virusTotalUrlReport(url: string): Promise<{ ok: boolean; m
   }
 }
 
-// ── Kaggle data provider (new-style KGAT_ access token) ─────────────────────
+// -- Kaggle data provider (new-style KGAT_ access token) ---------------------
 // Kaggle's v1 REST API authenticates with a bearer access token. Two credential
 // styles are accepted:
 //   - KAGGLE_API_TOKEN (new KGAT_… token) → Authorization: Bearer <token>

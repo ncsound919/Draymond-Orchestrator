@@ -85,3 +85,22 @@ export async function settledRevenueUsd(): Promise<number> {
   const state = await readState();
   return Math.round(state.revenueCents / 100);
 }
+
+/**
+ * Settled revenue in USD for charges created at/after `sinceIso` (e.g. month to
+ * date). Used wherever a value is compared against a *periodic* target — never
+ * compare cumulative cash to a monthly target.
+ */
+export async function settledRevenueUsdSince(sinceIso: string): Promise<number> {
+  const state = await readState();
+  const sinceMs = Date.parse(sinceIso);
+  let cents = 0;
+  for (const c of Object.values(state.charges)) {
+    if (c.status !== "succeeded") continue;
+    const t = Date.parse(c.createdAt);
+    if (!Number.isFinite(t)) continue;
+    if (Number.isFinite(sinceMs) && t < sinceMs) continue;
+    cents += c.amountCents;
+  }
+  return Math.round(cents / 100);
+}

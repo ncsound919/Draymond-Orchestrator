@@ -40,7 +40,7 @@ async function applyPatch(root: string, file: string, find: string, replace: str
   if (!real) return { ok: false, detail: `patch target escapes the workspace: ${file}` };
   let content: string;
   try {
-    content = await fs.readFile(real, 'utf-8');
+    content = await /*turbopackIgnore: true*/ fs.readFile(real, 'utf-8');
   } catch {
     return { ok: false, detail: `cannot read ${file}` };
   }
@@ -55,15 +55,21 @@ async function applyPatch(root: string, file: string, find: string, replace: str
 }
 
 async function applyEnvSet(root: string, envFile: string | undefined, key: string, value: string): Promise<RepairOutcome> {
+  // Env keys are restricted to the POSIX identifier grammar. This both rejects
+  // malformed input and guarantees `key` is regex-safe before interpolation.
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+    return { ok: false, detail: `invalid env key: ${key}` };
+  }
   const file = envFile ?? '.env';
   const real = await safeRealPath(root, file);
   if (!real) return { ok: false, detail: `env file escapes the workspace: ${file}` };
   let content = '';
   try {
-    content = await fs.readFile(real, 'utf-8');
+    content = await /*turbopackIgnore: true*/ fs.readFile(real, 'utf-8');
   } catch {
     // missing file → create it
   }
+  // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp -- key is validated to the env-identifier grammar above.
   const re = new RegExp(`^${key}=.*$`, 'm');
   const next = re.test(content) ? content.replace(re, `${key}=${value}`) : `${content.replace(/\n*$/, '')}\n${key}=${value}\n`;
   await fs.writeFile(real, next, 'utf-8');
@@ -76,7 +82,8 @@ async function restartService(service: string): Promise<RepairOutcome> {
   if (!tool || !tool.start) {
     return { ok: false, detail: `no start command in the registry for "${service}"` };
   }
-  const cwd = tool.cwd ? path.resolve(process.cwd(), tool.cwd) : process.cwd();
+  const cwd = tool.cwd ? /*turbopackIgnore: true*/ path.resolve(process.cwd(), tool.cwd) : process.cwd();
+  // nosemgrep: javascript.lang.security.audit.spawn-shell-true.spawn-shell-true, javascript.lang.security.detect-child-process.detect-child-process -- tool.start is a static command from the curated ports.ts registry and `service` is resolved via toolBySlug (never interpolated into the command), so there is no injection path.
   const child = spawn(tool.start, {
     cwd,
     detached: true,
@@ -107,14 +114,14 @@ export async function applyRemediationAction(action: IdeRepairAction, workspace:
       return applyEnvSet(root, action.envFile, action.key, action.value);
 
     case 'command':
-      return runRawCommand(action.dir ? path.resolve(process.cwd(), action.dir) : root, action.args ?? []).then((r) => ({
+      return runRawCommand(action.dir ? /*turbopackIgnore: true*/ path.resolve(process.cwd(), action.dir) : root, action.args ?? []).then((r) => ({
         ok: r.success,
         detail: `${r.command} → ${r.success ? 'ok' : r.error ?? 'failed'}${r.output ? `\n${r.output.split('\n').slice(-3).join('\n').slice(0, 300)}` : ''}`,
       }));
 
     case 'preset': {
       if (!action.preset) return { ok: false, detail: 'preset action requires a preset' };
-      const r = await runWorkspaceCommand(action.dir ? path.resolve(process.cwd(), action.dir) : root, action.preset as CommandPreset);
+      const r = await runWorkspaceCommand(action.dir ? /*turbopackIgnore: true*/ path.resolve(process.cwd(), action.dir) : root, action.preset as CommandPreset);
       return { ok: r.success, detail: `${action.preset} → ${r.success ? 'ok' : r.error ?? 'failed'}${r.output ? `\n${r.output.split('\n').slice(-3).join('\n').slice(0, 300)}` : ''}` };
     }
 

@@ -15,7 +15,7 @@
 
 import { callLLM, hasKey } from '../draymond/llm';
 import type { LLMProvider } from '../draymond/llm';
-import { preferredProviderForMode, maxTokensForMode } from './router';
+import { preferredProviderForMode, maxTokensForMode, fetchLocalModels } from './router';
 import { buildSymPyVerificationCode, computeSummary } from './verify';
 import {
   MATHX_SYSTEM,
@@ -27,7 +27,7 @@ import {
 } from './index';
 import type { ExecutionPlan } from './types';
 
-// ── LLM dispatch helper ─────────────────────────────────────────────────────
+// -- LLM dispatch helper -----------------------------------------------------
 
 interface MathxLlmOptions {
   mode: string;
@@ -65,7 +65,7 @@ function parseJson<T>(raw: string, fallback: T): T {
   }
 }
 
-// ── Chat (Math X narrative answer — non-streaming) ─────────────────────────
+// -- Chat (Math X narrative answer — non-streaming) -------------------------
 
 export interface MathChatInput {
   messages: Array<{ role: 'user' | 'assistant'; content: string }>;
@@ -107,7 +107,7 @@ export async function mathChat(input: MathChatInput): Promise<{ text: string }> 
   return { text };
 }
 
-// ── Plan ────────────────────────────────────────────────────────────────────
+// -- Plan --------------------------------------------------------------------
 const PLANNER_SYSTEM = `You are a query planner for a mathematical intelligence system. Given a user query, return a JSON plan.
 
 Respond with ONLY valid JSON, no markdown, no explanation.
@@ -156,7 +156,7 @@ export async function planMath(
   }
 }
 
-// ── Codegen ─────────────────────────────────────────────────────────────────
+// -- Codegen -----------------------------------------------------------------
 
 const CODEGEN_SYSTEM = `You are a Python code generator for mathematical and scientific computation.
 
@@ -217,7 +217,7 @@ export async function generateMathCode(
   return code.trim();
 }
 
-// ── Verify (derivation extraction + SymPy codegen) ─────────────────────────
+// -- Verify (derivation extraction + SymPy codegen) -------------------------
 
 const STEP_EXTRACTION_SYSTEM = `You are a mathematical derivation formatter.
 Given any mathematical derivation or proof, extract each step as a structured JSON array.
@@ -292,7 +292,7 @@ export function mergeVerifyResults(
   return { steps: annotated, summary: computeSummary(annotated) };
 }
 
-// ── Hypothesis ──────────────────────────────────────────────────────────────
+// -- Hypothesis --------------------------------------------------------------
 
 const HYPOTHESIS_SYSTEM = `You are a mathematical hypothesis engine. Given a mathematical statement or
 observation, generate a precisely stated, falsifiable conjecture and a Python
@@ -356,7 +356,7 @@ export async function refineHypothesis(
   return { text };
 }
 
-// ── Analogies ───────────────────────────────────────────────────────────────
+// -- Analogies ---------------------------------------------------------------
 
 const ANALOGIES_SYSTEM = `You are a cross-domain mathematical analogy engine. Given a mathematical equation
 or concept, identify 3–5 structurally isomorphic equations from different scientific domains.
@@ -406,7 +406,7 @@ export async function runAnalogies(
   });
 }
 
-// ── Domain expert ───────────────────────────────────────────────────────────
+// -- Domain expert -----------------------------------------------------------
 
 export async function runDomainExpert(
   domain: string,
@@ -425,7 +425,7 @@ export async function runDomainExpert(
   return { text };
 }
 
-// ── Export ──────────────────────────────────────────────────────────────────
+// -- Export ------------------------------------------------------------------
 
 const FORMAT_SYSTEM: Record<string, string> = {
   latex: `You are a LaTeX formatter. Convert the provided mathematical content into a clean, compilable LaTeX document.
@@ -490,7 +490,7 @@ export async function exportContent(
   return { body, contentType: meta.contentType, filename };
 }
 
-// ── OCR (vision) ────────────────────────────────────────────────────────────
+// -- OCR (vision) ------------------------------------------------------------
 
 const OCR_SYSTEM = `You are a mathematical OCR engine. Given an image containing mathematical notation,
 extract ALL mathematical content and return it as clean LaTeX.
@@ -526,7 +526,7 @@ export async function extractLatex(
   return { latex: latex.trim() };
 }
 
-// ── Literature (pure fetch — no LLM) ────────────────────────────────────────
+// -- Literature (pure fetch — no LLM) ----------------------------------------
 
 const NCBI_BASE = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils';
 const ARXIV_BASE = 'https://export.arxiv.org/api/query';
@@ -707,7 +707,7 @@ export async function getGenes(query: string): Promise<{ genes: GeneResult[] }> 
   return { genes };
 }
 
-// ── Bio (pure fetch — no LLM) ───────────────────────────────────────────────
+// -- Bio (pure fetch — no LLM) -----------------------------------------------
 
 export async function searchNcbi(
   query: string,
@@ -788,7 +788,7 @@ export async function searchUniprot(
   return { results, total: results.length };
 }
 
-// ── Models (provider probe) ─────────────────────────────────────────────────
+// -- Models (provider probe) -------------------------------------------------
 
 export async function probeMathModels(): Promise<{
   claude: boolean;
@@ -797,23 +797,16 @@ export async function probeMathModels(): Promise<{
   ollama: { available: boolean; model: string; models: string[] };
 }> {
   const ollamaURL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
-  let models: string[] = [];
-  try {
-    const res = await fetch(`${ollamaURL}/api/tags`, { signal: AbortSignal.timeout(1500) });
-    if (res.ok) {
-      const json = (await res.json()) as { models?: Array<{ name: string }> };
-      models = (json.models || []).map((m) => m.name);
-    }
-  } catch {
-    models = [];
-  }
+  // Speaks /api/tags (Ollama) AND /v1/models (llama.cpp / LM Studio / vLLM), so
+  // a llama-server serving e.g. minicpm5-2b is detected instead of seen as down.
+  const models = await fetchLocalModels(ollamaURL, 1500);
   return {
     claude: hasKey('anthropic'),
     deepseek: hasKey('deepseek'),
     qwen: hasKey('qwen'),
     ollama: {
-      available: models.some((m) => m.toLowerCase().includes('deepseek')),
-      model: process.env.OLLAMA_MODEL || 'deepseek-r1:8b',
+      available: models.length > 0,
+      model: process.env.OLLAMA_MODEL || models[0] || '',
       models,
     },
   };

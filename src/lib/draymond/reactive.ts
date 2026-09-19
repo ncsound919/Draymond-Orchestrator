@@ -24,7 +24,7 @@ import type {
   EventSubscriptionInsert,
 } from './types';
 
-// ── In-memory subscription cache ─────────────────────────────────────────────
+// -- In-memory subscription cache ---------------------------------------------
 // Subscriptions are cached to avoid DB hits on every event.
 // Cache is invalidated on create/update/delete.
 
@@ -59,7 +59,7 @@ export function invalidateSubscriptionCache(): void {
   _cacheExpires = 0;
 }
 
-// ── Debounce tracking ────────────────────────────────────────────────────────
+// -- Debounce tracking --------------------------------------------------------
 
 const _lastTriggered = new Map<string, number>();
 const _DEBOUNCE_MAP_MAX_SIZE = 10_000;
@@ -94,7 +94,7 @@ function recordTrigger(subscriptionId: string): void {
   pruneDebounceMap();
 }
 
-// ── Subscription CRUD ────────────────────────────────────────────────────────
+// -- Subscription CRUD --------------------------------------------------------
 
 /**
  * Create a new event subscription.
@@ -190,7 +190,7 @@ export async function deleteSubscription(subscriptionId: string): Promise<void> 
   invalidateSubscriptionCache();
 }
 
-// ── Pattern matching ─────────────────────────────────────────────────────────
+// -- Pattern matching ---------------------------------------------------------
 
 /**
  * Check if an event matches a subscription pattern.
@@ -209,10 +209,12 @@ function matchesPattern(
   const patternType = pattern.event_type;
 
   if (patternType.includes('*')) {
-    // Wildcard pattern: "chain.*" → /^chain\..+$/
-    const regex = new RegExp(
-      '^' + patternType.replace(/\./g, '\\.').replace(/\*/g, '.+') + '$'
-    );
+    // Wildcard pattern: "chain.*" → /^chain\..+$/. Escape every regex
+    // metacharacter first (except the wildcard) so a pattern can never widen
+    // the match or cause catastrophic backtracking.
+    const escaped = patternType.replace(/[.*+?^${}()|[\]\\]/g, (m) => (m === '*' ? '.+' : `\\${m}`));
+    // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp -- `escaped` is fully regex-escaped above and the pattern is developer-defined config.
+    const regex = new RegExp('^' + escaped + '$');
     if (!regex.test(eventType)) return false;
   } else {
     if (eventType !== patternType) return false;
@@ -238,14 +240,16 @@ function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
   let current: unknown = obj;
 
   for (const part of parts) {
+    if (part === '__proto__' || part === 'constructor' || part === 'prototype') return undefined;
     if (current == null || typeof current !== 'object') return undefined;
+    // nosemgrep: javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop -- dangerous keys are rejected above; read-only traversal.
     current = (current as Record<string, unknown>)[part];
   }
 
   return current;
 }
 
-// ── Event processing ─────────────────────────────────────────────────────────
+// -- Event processing ---------------------------------------------------------
 
 /**
  * Process an event through the reactive system.
@@ -365,7 +369,7 @@ export async function processEvent(
   return { matched: matched.length, triggered, errors };
 }
 
-// ── Action execution ─────────────────────────────────────────────────────────
+// -- Action execution ---------------------------------------------------------
 
 /**
  * Execute the action defined by a subscription.
@@ -536,7 +540,7 @@ function resolveInputMapping(
   return resolved;
 }
 
-// ── Convenience: hook into event-bridge ──────────────────────────────────────
+// -- Convenience: hook into event-bridge --------------------------------------
 
 /**
  * Adapter to connect the reactive system to the existing event-bridge.
@@ -550,7 +554,8 @@ export async function onBridgeEvent(
     await processEvent(type, 'event-bridge', data);
   } catch (err) {
     console.error(
-      `[Draymond/Reactive] Failed to process bridge event "${type}":`,
+      '[Draymond/Reactive] Failed to process bridge event "%s":',
+      type,
       err instanceof Error ? err.message : err
     );
   }

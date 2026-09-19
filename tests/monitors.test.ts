@@ -41,6 +41,21 @@ vi.mock('../src/lib/draymond/event-bridge', () => ({
 vi.mock('../src/lib/draymond/notifications', () => ({
   sendNotification: vi.fn(async () => ({ id: 'n1' })),
 }));
+// The reconcile logic decides service presence from local checkout dirs. CI and
+// fresh clones have no /agents tree, so pin presence deterministically instead
+// of depending on the operator's filesystem.
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    existsSync: vi.fn((p: string) => {
+      const s = String(p).replace(/\\/g, '/');
+      if (s.endsWith('agents/Uplift-Agent')) return true; // present → re-enable
+      if (s.endsWith('agents/Indy-Music')) return false; // absent → disable
+      return actual.existsSync(p);
+    }),
+  };
+});
 
 type MonitorsMod = typeof import('../src/lib/draymond/monitors');
 let mod: MonitorsMod;

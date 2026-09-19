@@ -1,0 +1,19 @@
+# Gitleaks config — reviewed allowlist for deterministic false positives.
+# Keep default rules active; only the reviewed patterns below are suppressed.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Reviewed false positives: LiteLLM pool env-var NAMES (not values) and .env.example placeholders."
+# Env-var identifiers that merely end in _KEY / _TOKEN and are compared by name
+# in the key-pool code — these are variable names, never credential values.
+regexes = [
+  '''(?:OLLAMA|OPENCODE)_KEY_[A-Z0-9_]+''',
+  '''(?i)(?:API_KEY|_TOKEN|_SECRET)=\s*$''',
+  '''(?i)(?:API_KEY|_TOKEN|_SECRET)=\s*your-''',
+]
+# .env.example is a placeholder template by contract (real values live in the
+# gitignored .env.local / KeyWire vault).
+paths = [
+  '''\.env\.example$''',
+]

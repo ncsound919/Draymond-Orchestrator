@@ -25,14 +25,26 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from sports_science.sports_model import TeamFormModel  # noqa: E402
-from sports_science.validation_engine import require_honest, utc_now_iso  # noqa: E402
-from sports_science.evidence import worst_tier  # noqa: E402
+from sports_science.validation_engine import utc_now_iso  # noqa: E402
+
+def _e4(name: str, reason: str) -> list[dict[str, Any]]:
+    """Honest E4 unavailable metric for any failure path."""
+    return [{
+        "name": name,
+        "status": "unavailable",
+        "reason": reason,
+        "evidence_tier": "E4",
+        "modeled": False,
+    }]
 
 
-@require_honest
-def _win_prob_metrics(home: str, away: str, date: str) -> list[dict[str, Any]]:
-    model = TeamFormModel()
-    result = model.win_probability(home, away, date)
+def _win_prob_metrics(home: str, away: str, date: str, model: TeamFormModel | None = None) -> list[dict[str, Any]]:
+    if model is None:
+        model = TeamFormModel()
+    try:
+        result = model.win_probability(home, away, date)
+    except Exception as exc:  # noqa: BLE001
+        return _e4("sports_model.win_probability", str(exc))
     if result.get("status") != "ok":
         return [
             {
@@ -62,10 +74,13 @@ def _win_prob_metrics(home: str, away: str, date: str) -> list[dict[str, Any]]:
     ]
 
 
-@require_honest
-def _totals_metrics(team: str, line: float, date: str) -> list[dict[str, Any]]:
-    model = TeamFormModel()
-    result = model.total_over_probability(team, line, date)
+def _totals_metrics(team: str, line: float, date: str, model: TeamFormModel | None = None) -> list[dict[str, Any]]:
+    if model is None:
+        model = TeamFormModel()
+    try:
+        result = model.total_over_probability(team, line, date)
+    except Exception as exc:  # noqa: BLE001
+        return _e4("sports_model.total_over_probability", str(exc))
     if result.get("status") != "ok":
         return [
             {
@@ -92,10 +107,13 @@ def _totals_metrics(team: str, line: float, date: str) -> list[dict[str, Any]]:
     ]
 
 
-@require_honest
-def _player_metrics(player: str, line: float, date: str) -> list[dict[str, Any]]:
-    model = TeamFormModel()
-    result = model.player_points_over_probability(player, line, date)
+def _player_metrics(player: str, line: float, date: str, model: TeamFormModel | None = None) -> list[dict[str, Any]]:
+    if model is None:
+        model = TeamFormModel()
+    try:
+        result = model.player_points_over_probability(player, line, date)
+    except Exception as exc:  # noqa: BLE001
+        return _e4("sports_model.player_points_over_probability", str(exc))
     if result.get("status") != "ok":
         return [
             {
@@ -122,10 +140,13 @@ def _player_metrics(player: str, line: float, date: str) -> list[dict[str, Any]]
     ]
 
 
-@require_honest
-def _market_metrics(from_date: str, to_date: str, max_games: int) -> list[dict[str, Any]]:
-    model = TeamFormModel()
-    result = model.market_benchmark(from_date=from_date, to_date=to_date, max_games=max_games)
+def _market_metrics(from_date: str, to_date: str, max_games: int, model: TeamFormModel | None = None) -> list[dict[str, Any]]:
+    if model is None:
+        model = TeamFormModel()
+    try:
+        result = model.market_benchmark(from_date=from_date, to_date=to_date, max_games=max_games)
+    except Exception as exc:  # noqa: BLE001
+        return _e4("sports_model.market_benchmark", str(exc))
     if result.get("status") != "ok":
         return [
             {
@@ -155,10 +176,13 @@ def _market_metrics(from_date: str, to_date: str, max_games: int) -> list[dict[s
     ]
 
 
-@require_honest
-def _backtest_metrics(from_date: str, to_date: str, max_games: int) -> list[dict[str, Any]]:
-    model = TeamFormModel()
-    result = model.backtest(from_date=from_date, to_date=to_date, max_games=max_games)
+def _backtest_metrics(from_date: str, to_date: str, max_games: int, model: TeamFormModel | None = None) -> list[dict[str, Any]]:
+    if model is None:
+        model = TeamFormModel()
+    try:
+        result = model.backtest(from_date=from_date, to_date=to_date, max_games=max_games)
+    except Exception as exc:  # noqa: BLE001
+        return _e4("sports_model.backtest", str(exc))
     if result.get("status") != "ok":
         return [
             {
@@ -188,13 +212,147 @@ def _backtest_metrics(from_date: str, to_date: str, max_games: int) -> list[dict
     ]
 
 
+def _live_props_metrics(sport: str, max_legs: int, edge: float) -> list[dict[str, Any]]:
+    """Live player-prop edge test: real book props vs the model. Degrades to an
+    honest E4 unavailable metric when no Odds API key is configured."""
+    import asyncio
+
+    from sports_science.live_props import LivePropEngine
+
+    async def _run() -> dict[str, Any]:
+        engine = LivePropEngine(edge_threshold=edge)
+        if not engine.available():
+            return {
+                "name": "sports_model.live_props",
+                "status": "unavailable",
+                "reason": "Odds API key not set (set THE_ODDS_API_KEY or add to Keywire)",
+                "evidence_tier": "E4",
+                "modeled": False,
+            }
+        result = await engine.run(sport=sport, max_legs=max_legs)
+        return {
+            "name": "sports_model.live_props",
+            "value": result.get("avg_edge"),
+            "unit": "edge",
+            "fetched_legs": result.get("fetched_legs"),
+            "scored_legs": result.get("scored_legs"),
+            "edges_above_threshold": result.get("edges_above_threshold"),
+            "status": result.get("status"),
+            "reason": result.get("reason"),
+            "evidence_tier": result.get("evidence_tier", "E4"),
+            "modeled": result.get("modeled", False),
+            "ledger_rows": result.get("ledger_rows", [])[:10],
+        }
+
+    try:
+        return [asyncio.run(_run())]
+    except Exception as exc:  # noqa: BLE001
+        return [{
+            "name": "sports_model.live_props",
+            "status": "unavailable",
+            "reason": str(exc),
+            "evidence_tier": "E4",
+            "modeled": False,
+        }]
+
+
+def _live_ml_metrics(sport: str, max_games: int, edge: float) -> list[dict[str, Any]]:
+    """Live moneyline edge test: team model vs real live closing lines."""
+    import asyncio
+
+    from sports_science.live_props import LivePropEngine
+
+    async def _run() -> dict[str, Any]:
+        engine = LivePropEngine(edge_threshold=edge)
+        if not engine.available():
+            return {
+                "name": "sports_model.live_ml",
+                "status": "unavailable",
+                "reason": "Odds API key not set (set THE_ODDS_API_KEY or add to Keywire)",
+                "evidence_tier": "E4",
+                "modeled": False,
+            }
+        result = await engine.run_ml(sport=sport, max_games=max_games, edge_threshold=edge)
+        return {
+            "name": "sports_model.live_ml",
+            "value": result.get("avg_edge"),
+            "unit": "edge",
+            "fetched_events": result.get("fetched_events"),
+            "scored_edges": result.get("scored_edges"),
+            "status": result.get("status"),
+            "reason": result.get("reason"),
+            "evidence_tier": result.get("evidence_tier", "E4"),
+            "modeled": result.get("modeled", False),
+            "ledger_rows": result.get("ledger_rows", [])[:10],
+        }
+
+    try:
+        return [asyncio.run(_run())]
+    except Exception as exc:  # noqa: BLE001
+        return [{
+            "name": "sports_model.live_ml",
+            "status": "unavailable",
+            "reason": str(exc),
+            "evidence_tier": "E4",
+            "modeled": False,
+        }]
+
+
+def _settle_metrics(sport: str) -> list[dict[str, Any]]:
+    """Settle open ledger rows against real scores via the Scores API."""
+    import asyncio
+
+    from sports_science.live_props import LivePropEngine
+
+    async def _run() -> dict[str, Any]:
+        engine = LivePropEngine()
+        if not engine.available():
+            return {
+                "name": "sports_model.settle",
+                "status": "unavailable",
+                "reason": "Odds API key not set (set THE_ODDS_API_KEY or add to Keywire)",
+                "evidence_tier": "E4",
+                "modeled": False,
+            }
+        result = await engine.settle(sport=sport)
+        return {
+            "name": "sports_model.settle",
+            "value": result.get("settled"),
+            "unit": "bets",
+            "settled": result.get("settled"),
+            "open": result.get("open"),
+            "status": result.get("status"),
+            "reason": result.get("reason"),
+            "evidence_tier": result.get("evidence_tier", "E4"),
+            "modeled": result.get("modeled", False),
+        }
+
+    try:
+        return [asyncio.run(_run())]
+    except Exception as exc:  # noqa: BLE001
+        return [{
+            "name": "sports_model.settle",
+            "status": "unavailable",
+            "reason": str(exc),
+            "evidence_tier": "E4",
+            "modeled": False,
+        }]
+
+
 def build_output(kind: str, metrics: list[dict[str, Any]], domain: str) -> dict[str, Any]:
+    tiers = ["E1", "E2", "E3", "E4"]
+    worst = None
+    for m in metrics:
+        t = m.get("evidence_tier")
+        if isinstance(t, str) and t in tiers:
+            if worst is None or tiers.index(t) > tiers.index(worst):
+                worst = t
     return {
         "ok": True,
         "kind": kind,
         "domain": domain,
         "metrics": metrics,
-        "evidence_tier": worst_tier({m.get("name", str(i)): m for i, m in enumerate(metrics)}) or "E4",
+        "evidence_tier": worst or "E4",
         "generated_at": utc_now_iso(),
     }
 
@@ -223,6 +381,19 @@ def _main() -> int:
     m.add_argument("--to", dest="to_date", default="2018-06-01")
     m.add_argument("--max", dest="max_games", type=int, default=600)
 
+    l = sub.add_parser("live-props", help="live player-prop edge test vs real book odds")
+    l.add_argument("--sport", default="NBA")
+    l.add_argument("--max", dest="max_legs", type=int, default=200)
+    l.add_argument("--edge", type=float, default=0.03)
+
+    lm = sub.add_parser("live-ml", help="live moneyline edge test: team model vs real closing lines")
+    lm.add_argument("--sport", default="NBA")
+    lm.add_argument("--max", dest="max_games", type=int, default=30)
+    lm.add_argument("--edge", type=float, default=0.03)
+
+    st = sub.add_parser("settle", help="settle open ledger rows against real scores")
+    st.add_argument("--sport", default="NBA")
+
     b = sub.add_parser("backtest", help="validate the model on historical games")
     b.add_argument("--from", dest="from_date", default="2013-01-01")
     b.add_argument("--to", dest="to_date", default="2023-06-01")
@@ -230,16 +401,23 @@ def _main() -> int:
 
     args = parser.parse_args()
     try:
+        model = TeamFormModel()
         if args.command == "query":
-            metrics = _win_prob_metrics(args.home, args.away, args.date)
+            metrics = _win_prob_metrics(args.home, args.away, args.date, model)
         elif args.command == "totals":
-            metrics = _totals_metrics(args.team, args.line, args.date)
+            metrics = _totals_metrics(args.team, args.line, args.date, model)
         elif args.command == "player":
-            metrics = _player_metrics(args.player, args.line, args.date)
+            metrics = _player_metrics(args.player, args.line, args.date, model)
         elif args.command == "market":
-            metrics = _market_metrics(args.from_date, args.to_date, args.max_games)
+            metrics = _market_metrics(args.from_date, args.to_date, args.max_games, model)
         elif args.command == "backtest":
-            metrics = _backtest_metrics(args.from_date, args.to_date, args.max_games)
+            metrics = _backtest_metrics(args.from_date, args.to_date, args.max_games, model)
+        elif args.command == "live-props":
+            metrics = _live_props_metrics(args.sport, args.max_legs, args.edge)
+        elif args.command == "live-ml":
+            metrics = _live_ml_metrics(args.sport, args.max_games, args.edge)
+        elif args.command == "settle":
+            metrics = _settle_metrics(args.sport)
         else:  # pragma: no cover
             metrics = []
         print(json.dumps(build_output(args.command, metrics, "sports"), default=str))

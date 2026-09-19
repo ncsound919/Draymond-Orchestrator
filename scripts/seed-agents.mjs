@@ -118,37 +118,9 @@ const AGENTS = [
     ],
     endpoint: process.env.UPLIFT_BASE_URL || 'http://localhost:8000',
   }),
-  agent({
-    slug: 'hermes',
-    name: 'Hermes Agent',
-    codename: 'The Self-Improver',
-    role: 'Self-Improving Autonomous Agent (Nous Research)',
-    tagline: 'Self-improving AI agent with a closed learning loop, multi-platform gateway, cron scheduling, and subagent delegation',
-    personality: 'strategic',
-    voice: 'calm, direct, quietly confident',
-    backstory:
-      'Hermes is Nous Research\'s self-improving agent. Unlike lightweight stand-ins, the real Hermes carries a closed learning loop: skill creation from experience, self-improvement during use, persistent memory with nudges, FTS5 cross-session recall, and dialectic user modeling via Honcho. It runs on any provider, delegates to isolated subagents, and schedules automations in natural language.',
-    bio: 'The real Hermes Agent from Nous Research: the only agent with a built-in learning loop. It creates skills from experience, improves them during use, persists knowledge, searches its own past conversations, and builds a deepening model of its user across sessions. Runs locally or serverless, talks to you from Telegram/Discord/Slack/WhatsApp/Signal/CLI via a single gateway process, and supports any model provider with no lock-in.',
-    specialties: ['Self-Improving Agent', 'Learning Loop', 'Multi-Platform Gateway', 'Skills System', 'Cron Scheduling', 'Subagent Delegation'],
-    skills: ["skill-memory","skill-ecc","skill-fastmcp","skill-docker-management"],
-    capabilities: [
-      { id: 'learning-loop', label: 'Closed Learning Loop', description: 'Creates skills from experience, improves them during use, persists knowledge across sessions.' },
-      { id: 'gateway', label: 'Multi-Platform Gateway', description: 'Telegram, Discord, Slack, WhatsApp, Signal, and CLI from a single gateway process.' },
-      { id: 'cron', label: 'Scheduled Automations', description: 'Natural-language cron: daily reports, nightly backups, weekly audits, unattended.' },
-      { id: 'subagents', label: 'Subagent Delegation', description: 'Spawns isolated subagents for parallel workstreams; Python RPC tool calls.' },
-      { id: 'memory', label: 'Persistent Memory', description: 'Agent-curated memory, FTS5 session search, Honcho user modeling.' },
-      { id: 'model-agnostic', label: 'Model-Agnostic', description: 'Nous Portal, OpenRouter, OpenAI, or any endpoint; switch with hermes model.' },
-    ],
-    stats: [
-      { label: 'Autonomy', value: 95 },
-      { label: 'Learning', value: 98 },
-      { label: 'Tooling', value: 94 },
-      { label: 'Reliability', value: 90 },
-    ],
-    endpoint: process.env.HERMES_URL || 'http://127.0.0.1:8642',
-    healthPath: '/v1/health',
-    tags: ['nous-research', 'self-improving', 'gateway'],
-  }),
+  // Hermes Agent seed removed (operator decision 2026-09-17). Hermes was dropped
+  // from the fleet: it could not complete a turn on the local model tier and its
+  // only consumers (Open-Chat chat/voice) are gone. See fleet-manifest.js.
   agent({
     slug: 'sports-steve',
     name: 'Sports Steve',
@@ -450,6 +422,38 @@ const AGENTS = [
     endpoint: 'http://localhost:3200',
   }),
   agent({
+    slug: 'codegang',
+    name: 'Codegang',
+    codename: 'The Inspector',
+    role: 'Deterministic Deep-Analysis Engine',
+    tagline: 'Multi-scanner local analysis — security, bugs, prompt-injection, edge-cases, deps',
+    personality: 'analytical',
+    voice: 'deterministic, evidence-first, no LLM where a rule will do',
+    backstory:
+      'Codegang was assembled to review code that has no GitHub URL — an on-disk workspace, a single file, a partial diff. It runs a fixed suite of scanners and returns findings plus 0-100 scores, so the review gate never has to guess.',
+    bio: 'A deterministic multi-scanner suite and agent pipeline. Six scanners (security, bugs, prompt-injection, edge-cases, dependencies, deep) and six innovation engines produce 0-100 scores and findings without needing a remote repo. Serves the run-review gate locally and feeds RepoRank.',
+    specialties: ['Deep Analysis', 'Security Scanning', 'Bug Detection', 'Local Scoring', 'Multi-Agent Pipeline'],
+    skills: ['coding-agent', 'sp-code-review', 'ecc-security-review'],
+    capabilities: [
+      { id: 'analyze', label: 'Deep Analysis', description: 'Content-based analyzer over files or diffs' },
+      { id: 'security', label: 'Security Scanning', description: 'Deterministic secret/injection/exposure checks' },
+      { id: 'bugs', label: 'Bug Detection', description: 'Rule-based defect taxonomy' },
+      { id: 'pipeline', label: 'Multi-Agent Pipeline', description: 'scout → planner → executor → validator → committer' },
+    ],
+    stats: [
+      { label: 'Determinism', value: 96 },
+      { label: 'Coverage', value: 90 },
+      { label: 'Speed', value: 88 },
+      { label: 'Signal', value: 89 },
+    ],
+    runtimeType: 'http',
+    endpoint: 'http://localhost:3204',
+    healthPath: '/api',
+    tags: ['audit-team', 'audit', 'review', 'analysis', 'scoring'],
+    missionRole: 'E3 - deterministic local audit for repos and agent workspaces',
+    team: ['overlay-auditor', 'grader', 'reporank', 'codenexus', 'claw-protect', 'depscan', 'nuclei-scanner', 'the-deep', 'deterministic-brain', 'vibe-reality', 'benchmark-olympics', 'audit-chain'],
+  }),
+  agent({
     slug: 'youtube-shorts',
     name: 'AI YouTube Shorts',
     codename: 'The Clipper',
@@ -624,7 +628,7 @@ const AGENTS = [
     command: 'python',
     args: ['agents/Book-Synthesis-Engine-main/knowledge_synthesizer.py'],
   }),
-  // ── Overlay365 business-operations team ────────────────────────────────────
+  // -- Overlay365 business-operations team ------------------------------------
   agent({
     slug: 'overlay-strategist',
     name: 'The Strategist',
@@ -749,8 +753,9 @@ const AGENTS = [
     args: ['tsx', '../overlay365/agent-team/agents/auditor/index.ts'],
     tags: ['overlay365', 'monitoring', 'uptime', 'audit'],
     missionRole: 'Delivery QA - all shipped Overlay sites pass weekly',
+    team: ['codegang', 'grader', 'reporank', 'codenexus', 'claw-protect', 'depscan', 'nuclei-scanner', 'the-deep', 'deterministic-brain', 'vibe-reality', 'benchmark-olympics', 'audit-chain'],
   }),
-  // ── Overlay365 deterministic marketing team (led by The Observer) ───────────
+  // -- Overlay365 deterministic marketing team (led by The Observer) -----------
   agent({
     slug: 'overlay-marketing-voice',
     name: 'The Voice Keeper',
@@ -861,7 +866,7 @@ const AGENTS = [
     tags: ['marketing', 'analytics', 'engagement'],
     team: [],
   }),
-  // ── KEEPs from the ecosystem integration (integrations/) ───────────────────
+  // -- KEEPs from the ecosystem integration (integrations/) -------------------
   agent({
     slug: 'dca-brain',
     name: 'Deterministic Brain',
@@ -1036,7 +1041,7 @@ const AGENTS = [
     missionRole: 'E3 - SBOM/dependency audit delivery',
     team: [],
   }),
-  // ── Next KEEP batch (integrations/ round 2) ───────────────────────────────
+  // -- Next KEEP batch (integrations/ round 2) -------------------------------
   agent({
     slug: 'browser-use',
     name: 'Browser Use',
@@ -1181,7 +1186,7 @@ const AGENTS = [
     missionRole: 'E1 - Wealth tier analytics engine',
     team: [],
   }),
-  // ── Final KEEP batch (integrations/ round 3) ───────────────────────────────
+  // -- Final KEEP batch (integrations/ round 3) -------------------------------
   agent({
     slug: 'composio',
     name: 'Composio',
@@ -1345,7 +1350,7 @@ const AGENTS = [
     tags: ['pdf', 'documents', 'infra'],
     team: [],
   }),
-  // ── Mission Control: Aetherdesk (E2 B2B engine, being finalized) ────────────
+  // -- Mission Control: Aetherdesk (E2 B2B engine, being finalized) ------------
   agent({
     slug: 'aetherdesk',
     name: 'Aetherdesk Call Center',

@@ -43,7 +43,7 @@ const REPAIR_FEED_LIMIT = 30;
 export default function HomePanel() {
   const queryClient = useQueryClient();
 
-  // ── Fetch fleet pulse (same as before) ────────────────────────────────
+  // -- Fetch fleet pulse (same as before) --------------------------------
   const agentsQuery = useQuery({
     queryKey: ['command-center', 'agents'],
     queryFn: async () => {
@@ -71,7 +71,7 @@ export default function HomePanel() {
     },
   });
 
-  // ── New live feeds (polling) ──────────────────────────────────────────
+  // -- New live feeds (polling) ------------------------------------------
   const controlsQuery = useQuery({
     queryKey: ['command-center', 'controls'],
     queryFn: async () => {
@@ -142,11 +142,12 @@ export default function HomePanel() {
     refetchInterval: 20_000,
   });
 
-  // ── Local knob state (init from controls) ─────────────────────────────
+  // -- Local knob state (init from controls) -----------------------------
   const storedControls = controlsQuery.data?.controls;
   const [draft, setDraft] = useState<FleetControls | null>(null);
 
   useEffect(() => {
+     
     if (storedControls && !draft) setDraft(storedControls);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storedControls]);
@@ -169,7 +170,7 @@ export default function HomePanel() {
     onError: (err) => toast.error(`Save failed: ${err instanceof Error ? err.message : String(err)}`),
   });
 
-  // ── Quick action mutations ────────────────────────────────────────────
+  // -- Quick action mutations --------------------------------------------
   const runPhase = useMutation({
     mutationFn: async (phase: DayPhase) => {
       const res = await ccFetch<PhaseRunResult>({ endpoint: `/api/ops/day?phase=${phase}`, method: 'POST', body: {} });
@@ -265,7 +266,7 @@ export default function HomePanel() {
     onError: (err) => toast.error(`Fleet start failed: ${err instanceof Error ? err.message : String(err)}`),
   });
 
-  // ── Derived data ──────────────────────────────────────────────────────
+  // -- Derived data ------------------------------------------------------
   const agents = agentsQuery.data ?? [];
   const jobs = jobsQuery.data ?? [];
   const brain = brainQuery.data?.brain ?? null;
@@ -290,7 +291,7 @@ export default function HomePanel() {
 
   return (
     <div className="space-y-8">
-      {/* ── Quick actions ─────────────────────────────────────────────── */}
+      {/* -- Quick actions ----------------------------------------------- */}
       <section>
         <h2 className="mb-3 text-lg font-semibold text-white">Quick Actions</h2>
         <div className="flex flex-wrap items-center gap-2">
@@ -325,7 +326,7 @@ export default function HomePanel() {
         </div>
       </section>
 
-      {/* ── Pulse ─────────────────────────────────────────────────────── */}
+      {/* -- Pulse ------------------------------------------------------- */}
       <section>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Pulse label="Agents" value={String(agents.length)} sub={`${activeCount} active`} dot="bg-green-400" loading={agentsQuery.isLoading} />
@@ -336,7 +337,7 @@ export default function HomePanel() {
         </div>
       </section>
 
-      {/* ── Fleet activation controls ─────────────────────────────────── */}
+      {/* -- Fleet activation controls ----------------------------------- */}
       <section>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Fleet activation</h2>
@@ -393,7 +394,7 @@ export default function HomePanel() {
         )}
       </section>
 
-      {/* ── Controls (knobs & sliders) ────────────────────────────────── */}
+      {/* -- Controls (knobs & sliders) ---------------------------------- */}
       <section>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Controls</h2>
@@ -505,7 +506,7 @@ export default function HomePanel() {
         )}
       </section>
 
-      {/* ── Happenings ────────────────────────────────────────────────── */}
+      {/* -- Happenings -------------------------------------------------- */}
       <section>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Happenings</h2>
@@ -537,7 +538,7 @@ export default function HomePanel() {
         )}
       </section>
 
-      {/* ── Repair triage ─────────────────────────────────────────────── */}
+      {/* -- Repair triage ----------------------------------------------- */}
       <section>
         <h2 className="mb-3 text-lg font-semibold text-white">Repair Triage</h2>
         <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-4">
@@ -587,7 +588,7 @@ export default function HomePanel() {
         )}
       </section>
 
-      {/* ── Trend discoveries ─────────────────────────────────────────── */}
+      {/* -- Trend discoveries ------------------------------------------- */}
       <section>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Trend Discoveries</h2>
@@ -637,7 +638,7 @@ export default function HomePanel() {
   );
 }
 
-// ── Small presentational pieces ────────────────────────────────────────────
+// -- Small presentational pieces --------------------------------------------
 
 function Pulse({
   label, value, sub, dot, loading,

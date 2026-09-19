@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { readStrategy, unitEconomics } from '@/lib/draymond/mission-strategy';
 import { missionDashboard } from '@/lib/draymond/mission-pipeline';
 import { listOpportunities } from '@/lib/draymond/business-pipeline';
-import { settledRevenueUsd } from '@/lib/draymond/treasury-state';
+import { settledRevenueUsdSince } from '@/lib/draymond/treasury-state';
 import ServiceCheckoutButtons from '@/components/mission/ServiceCheckoutButtons';
 
 export const metadata: Metadata = {
@@ -32,12 +32,17 @@ export default async function MissionPage() {
   let dash;
   let opportunities;
   let revenue;
+  // The target is MONTHLY, so compare against month-to-date settled cash —
+  // never cumulative cash.
+  const monthStart = new Date();
+  monthStart.setUTCDate(1);
+  monthStart.setUTCHours(0, 0, 0, 0);
   try {
     [strategy, dash, opportunities, revenue] = await Promise.all([
       readStrategy(),
       missionDashboard(),
       listOpportunities(),
-      settledRevenueUsd(),
+      settledRevenueUsdSince(monthStart.toISOString()),
     ]);
   } catch (err) {
     console.error('[MissionPage] failed to load mission data:', err);
@@ -57,18 +62,18 @@ export default async function MissionPage() {
 
   return (
     <div className="min-h-screen">
-      {/* ── Header ─────────────────────────────────────────────────────── */}
+      {/* -- Header ------------------------------------------------------- */}
       <div className="border-b border-white/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <h1 className="text-3xl font-bold tracking-tight text-white">Mission Control</h1>
           <p className="mt-1 text-sm text-gray-400">
-            Revenue service lines · pipeline automaton · settled cash vs target
+            Revenue service lines · pipeline automaton · settled cash this month vs target
           </p>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
-        {/* ── Revenue banner ───────────────────────────────────────────── */}
+        {/* -- Revenue banner --------------------------------------------- */}
         <div
           className={`rounded-xl border bg-gradient-to-r p-5 ${
             onTarget
@@ -87,7 +92,7 @@ export default async function MissionPage() {
             </div>
             <div className="flex items-center gap-6 text-sm text-gray-300">
               <span>
-                <span className="font-mono font-semibold text-white">{usd(revenue)}</span> Settled to date
+                <span className="font-mono font-semibold text-white">{usd(revenue)}</span> Settled this month
               </span>
               <span>
                 <span className="font-mono font-semibold text-white">{usd(target)}</span> Monthly target (day {strategy.runwayDays})
@@ -96,7 +101,7 @@ export default async function MissionPage() {
           </div>
         </div>
 
-        {/* ── Pipeline velocity ────────────────────────────────────────── */}
+        {/* -- Pipeline velocity ------------------------------------------ */}
         <section>
           <h2 className="text-xl font-semibold text-white mb-4">Pipeline Velocity</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -116,7 +121,7 @@ export default async function MissionPage() {
           </div>
         </section>
 
-        {/* ── Service lines ────────────────────────────────────────────── */}
+        {/* -- Service lines ---------------------------------------------- */}
         <section>
           <h2 className="text-xl font-semibold text-white mb-4">Service Lines</h2>
           <div className="overflow-x-auto rounded-xl border border-white/[0.06]">
@@ -154,7 +159,7 @@ export default async function MissionPage() {
           </div>
         </section>
 
-        {/* ── Opportunities ────────────────────────────────────────────── */}
+        {/* -- Opportunities ---------------------------------------------- */}
         <section>
           <h2 className="text-xl font-semibold text-white mb-4">
             Opportunities <span className="text-sm font-normal text-gray-500">({opportunities.length})</span>
@@ -195,7 +200,7 @@ export default async function MissionPage() {
           )}
         </section>
 
-        {/* ── Buy / Invoice ───────────────────────────────────────────── */}
+        {/* -- Buy / Invoice --------------------------------------------- */}
         <section>
           <h2 className="text-xl font-semibold text-white mb-1">Buy / Invoice</h2>
           <p className="text-xs text-gray-500 mb-4">
@@ -222,7 +227,7 @@ export default async function MissionPage() {
           </div>
         </section>
 
-        {/* ── Footer ───────────────────────────────────────────────────── */}
+        {/* -- Footer ----------------------------------------------------- */}
         <div className="border-t border-white/5 pt-6 pb-4">
           <p className="text-xs text-gray-600 text-center">
             Mission engine · settled revenue only counts toward the target · pipeline is not revenue

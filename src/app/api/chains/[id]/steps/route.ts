@@ -14,7 +14,7 @@ import type { DraymondChainStepInsert } from '@/lib/draymond/types';
 
 export const dynamic = 'force-dynamic';
 
-// ── GET /api/chains/[id]/steps ──────────────────────────────────────────────
+// -- GET /api/chains/[id]/steps ----------------------------------------------
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -32,7 +32,7 @@ export async function GET(
   }
 }
 
-// ── POST /api/chains/[id]/steps ─────────────────────────────────────────────
+// -- POST /api/chains/[id]/steps ---------------------------------------------
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },

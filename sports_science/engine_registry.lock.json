@@ -1,0 +1,234 @@
+[
+  {
+    "engine": "adjusted_plus_minus",
+    "inputsHash": "6109f13ce8880c24c5250ac7feab2ff1a2a1d4804cf26afd7fbedb50cec24ba2",
+    "output": {
+      "alpha": 1.0,
+      "code_version": "player_decon-1.0.0",
+      "coefficients": {
+        "A": 1.583333,
+        "B": -0.75,
+        "C": -0.416667,
+        "D": -0.416667
+      },
+      "evidence_tier": "E3",
+      "n": 8,
+      "p": 4,
+      "r_squared": 0.724062
+    },
+    "version": "1.0.0"
+  },
+  {
+    "engine": "banister_series",
+    "inputsHash": "a1adf8ef40546f2a3f280ffed9b687c5e12937d26281f89baaf0d31d3c7586bf",
+    "output": {
+      "code_version": "form_lab-1.0.0",
+      "n": 5,
+      "series": [
+        {
+          "day": 0,
+          "fatigue": 100.0,
+          "fitness": 100.0,
+          "performance": -100.0
+        },
+        {
+          "day": 1,
+          "fatigue": 92.004441463,
+          "fitness": 97.647168665,
+          "performance": -86.361714261
+        },
+        {
+          "day": 2,
+          "fatigue": 234.648172489,
+          "fitness": 245.349695483,
+          "performance": -223.946649495
+        },
+        {
+          "day": 3,
+          "fatigue": 215.886740502,
+          "fitness": 239.577030968,
+          "performance": -192.196450035
+        },
+        {
+          "day": 4,
+          "fatigue": 198.625389791,
+          "fitness": 233.940187513,
+          "performance": -163.310592069
+        }
+      ]
+    },
+    "version": "1.0.0"
+  },
+  {
+    "engine": "beta_posterior",
+    "inputsHash": "f584ad93ae8813aa3bce8513ccbb7b307538b3dbc019fd69647da58333c1756a",
+    "output": {
+      "alpha": 50.0,
+      "beta": 70.0,
+      "ci_high": 0.505661719,
+      "ci_low": 0.330303541,
+      "failures": 60.0,
+      "mean": 0.416666667,
+      "sd": 0.044818786,
+      "successes": 40.0,
+      "width": 0.175358178
+    },
+    "version": "1.0.0"
+  },
+  {
+    "engine": "cusum",
+    "inputsHash": "a547a275cd6d4f08a853bf99e7a2322651d505d0b5ff85e1aa4ce076b70aa79c",
+    "output": {
+      "alarms": [],
+      "direction": "high",
+      "last_high": 3.5,
+      "last_low": 0.0
+    },
+    "version": "1.0.0"
+  },
+  {
+    "engine": "ewma",
+    "inputsHash": "726dfe7370ad958724eb6c3ccfb527f9e2ab92db419f24fde658721b121e52b0",
+    "output": {
+      "halflife": 1.94335821,
+      "last": 12.96496,
+      "series": [
+        10.0,
+        10.6,
+        10.72,
+        11.704,
+        12.0928,
+        12.96496
+      ]
+    },
+    "version": "1.0.0"
+  },
+  {
+    "engine": "four_factors_from_performance",
+    "inputsHash": "456906aac101bdf426ce9e41cbd2e3f910d177ac184465ee552cb989466d679e",
+    "output": {
+      "clearance": 35.0,
+      "metastasis": 31.0,
+      "proliferation": 44.0,
+      "resource": 62.5
+    },
+    "version": "1.0.0"
+  },
+  {
+    "engine": "fuzz_verdict",
+    "inputsHash": "05fd4765dbb93f27963c88597ff8d8290c75d5753e82b4db35081776f8fbc971",
+    "output": {
+      "code_version": "strategy_verify-1.0.0",
+      "evidence_tier": "E2",
+      "n_seeds": 5,
+      "stable": true,
+      "status": "ok",
+      "verdicts": [
+        "passed",
+        "passed",
+        "passed",
+        "passed",
+        "passed"
+      ]
+    },
+    "version": "1.0.0"
+  },
+  {
+    "engine": "kalman_local_level",
+    "inputsHash": "97627ad9c1026053499c8c67d1fa0ef54d4cff7f1d5341cbb1248fe7584f7319",
+    "output": {
+      "code_version": "form_lab-1.0.0",
+      "log_likelihood": -9.05128418,
+      "n": 8,
+      "states": [
+        10.0,
+        11.047619048,
+        11.023529412,
+        12.014662757,
+        12.007326007,
+        13.00384545,
+        13.001922637,
+        14.000972752
+      ],
+      "variances": [
+        0.6,
+        0.523809524,
+        0.505882353,
+        0.501466276,
+        0.5003663,
+        0.500091558,
+        0.500022889,
+        0.500005722
+      ]
+    },
+    "version": "1.0.0"
+  },
+  {
+    "engine": "pace_adjusted_rate",
+    "inputsHash": "3309ec1d6e46f196c5c91b5972b46eced385fa0387c71fbaf73b1ef26b3320ef",
+    "output": 111.1111,
+    "version": "1.0.0"
+  },
+  {
+    "engine": "player_impact_estimate",
+    "inputsHash": "5eebb6637e252005bff53a8350055233c4a7ec7d450841c33ee451d75307b53d",
+    "output": 0.096153846,
+    "version": "1.0.0"
+  },
+  {
+    "engine": "shrinkage",
+    "inputsHash": "ed543535be9738bd614d2abd9d1f11727d92bf384d700e34ddaf45e532cfea1b",
+    "output": 0.71,
+    "version": "1.0.0"
+  },
+  {
+    "engine": "ter_score",
+    "inputsHash": "a4ea98edd4a8918617e8d26e28ba47e44c55ed84b666a967cf4ac1a0bf8deadd",
+    "output": 7.203333333,
+    "version": "1.0.0"
+  },
+  {
+    "engine": "validate_predictor",
+    "inputsHash": "e85d37b10051d8c6ed01a6d3615f4e868493638d35c61309333c847d5494c36c",
+    "output": {
+      "calibration_error": 0.25,
+      "ci_high": 1.0,
+      "ci_low": 1.0,
+      "concordance": 1.0,
+      "evidence_tier": "E2",
+      "k": 5,
+      "lift": 2.0,
+      "n": 40
+    },
+    "version": "1.0.0"
+  },
+  {
+    "engine": "verify_strategy",
+    "inputsHash": "22ef0dc0def3afda1d4e33b26675bbcb0353dbeba3178082f4291cf77037179a",
+    "output": {
+      "brier": 0.135266,
+      "code_version": "strategy_verify-1.0.0",
+      "evidence_tier": "E2",
+      "falsifiers": {
+        "calibrated": true,
+        "enough_test_bets": true,
+        "positive_in_sample_roi": true,
+        "positive_roi": true,
+        "roi_ci_excludes_zero": true
+      },
+      "n_bets": 30,
+      "n_test": 60,
+      "n_train": 60,
+      "roi_ci": [
+        1.0,
+        1.0
+      ],
+      "status": "passed",
+      "test_roi": 1.0,
+      "threshold": 0.6158,
+      "train_roi": 1.0,
+      "verdict": "passed"
+    },
+    "version": "1.0.0"
+  }
+]

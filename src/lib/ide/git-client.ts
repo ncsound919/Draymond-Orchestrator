@@ -67,7 +67,7 @@ async function workspacePath(workspace: string | undefined, filePath: string): P
   const root = workspace ?? process.cwd();
   const abs = path.isAbsolute(filePath) ? filePath : path.resolve(root, filePath);
   try {
-    const realRoot = await fs.realpath(root);
+    const realRoot = await /*turbopackIgnore: true*/ fs.realpath(root);
     const realAbs = await fs.realpath(abs);
     const a = process.platform === 'win32' ? realAbs.toLowerCase() : realAbs;
     const r = process.platform === 'win32' ? realRoot.toLowerCase() : realRoot;
@@ -113,9 +113,9 @@ export async function gitDiff(workspace?: string, filePath?: string): Promise<Gi
   for (const rel of untracked) {
     if (abs && rel !== filePath) continue;
     try {
-      const stat = await fs.stat(path.resolve(root, rel));
+      const stat = await /*turbopackIgnore: true*/ fs.stat(path.resolve(root, rel));
       if (!stat.isFile()) continue;
-      const content = await fs.readFile(path.resolve(root, rel), 'utf-8');
+      const content = await /*turbopackIgnore: true*/ fs.readFile(path.resolve(root, rel), 'utf-8');
       extra += `\n\ndiff --git a/${rel} b/${rel}\nnew file mode 100644\n--- /dev/null\n+++ b/${rel}\n${content
         .split('\n')
         .map((l) => `+${l}`)

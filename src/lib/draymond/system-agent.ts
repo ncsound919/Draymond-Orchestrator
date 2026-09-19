@@ -162,7 +162,7 @@ export async function systemAgentStatus(): Promise<SystemAgentResult<unknown>> {
   return agentGet('/api/v1/agent/health');
 }
 
-// ── Control actions (require an approval token) ─────────────────────────────
+// -- Control actions (require an approval token) -----------------------------
 
 export async function controlLaunch(input: { path: string; args?: string[]; cwd?: string; hidden?: boolean }, approvalToken: string): Promise<SystemAgentResult<unknown>> {
   return agentPost('/api/v1/control/launch', input, approvalToken);

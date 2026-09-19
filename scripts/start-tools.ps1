@@ -55,7 +55,7 @@ $TOOLS = @{
   # Hemp-OS / HempForge live in the Uplift repo root (sibling of Draymond-Orchestrator).
   # Hemp-OS is a Node/tsx app (server.ts) — needs `npm install` before first run.
   "hemp-os"       = @{ cmd = "npm";      args = @("run", "dev");                           cwd = "..\potential\Hemp-OS-main"; port = 3100; health = "/health" }
-  "hempforge"     = @{ cmd = "npm";      args = @("run", "dev");                           cwd = "..\potential\HempForge-main"; port = 3110; health = "/api/health" }
+  "hempforge"     = @{ cmd = "npm";      args = @("run", "dev");                           cwd = "..\02_Pillars\Overlay Science\Biotech\HempForge-main"; port = 3110; health = "/api/health" }
   # Kaggle rides on the deterministic-brain (already started above); its health
   # endpoint is /kaggle/status on 3210. Requires KAGGLE_USERNAME + KAGGLE_KEY.
 }

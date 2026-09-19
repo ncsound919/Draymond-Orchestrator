@@ -20,7 +20,7 @@ function resolveCoreBin(): string {
     path.join(repo, 'core', 'target', 'release', 'sports-cli'),
   ];
   for (const c of candidates) {
-    if (fs.existsSync(c)) return c;
+    if (/*turbopackIgnore: true*/ fs.existsSync(c)) return c;
   }
   throw new Error('sports-cli binary not found. Run `cargo build --workspace` in core/ (or set SPORTS_CORE_BIN).');
 }
@@ -29,6 +29,7 @@ function resolveCoreBin(): string {
 // a plain execFile can't feed it — use spawn with piped stdin/stdout/stderr.
 function runFile(bin: string, payload: string, timeoutMs: number): Promise<{ stdout: string }> {
   return new Promise((resolve, reject) => {
+    // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process -- bin is an operator-configured path (SPORTS_CORE_BIN) or a discovered build artifact, never request input.
     const child = spawn(bin, [], {
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,

@@ -173,7 +173,7 @@ export function decomposeGoal(goal: string, agents: Record<string, string>): str
   }
 }
 
-// ── IDE steps adapter ─────────────────────────────────────────────────────────
+// -- IDE steps adapter ---------------------------------------------------------
 // The IDE session-manager wants {"steps":[{"id","title","kind","agent","prompt",
 // "dependsOn"}],"note"}. Emits it deterministically, constrained to the IDE's
 // allowed kinds and agents. Returns null when unusable.
@@ -221,7 +221,7 @@ export function decomposeGoalToIdeSteps(
   }
 }
 
-// ── Chain blueprint adapter ───────────────────────────────────────────────────
+// -- Chain blueprint adapter ---------------------------------------------------
 // The chain-builder wants a ChainBlueprint referencing real catalog entities.
 // Emits it deterministically by matching category hints against catalog
 // slug/name. Steps with no matching entity get an empty entity_slug and are

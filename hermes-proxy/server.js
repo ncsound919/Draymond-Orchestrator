@@ -75,6 +75,7 @@ const LOOPBACK_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
 function setCors(req, res) {
   const origin = req.headers.origin;
   if (typeof origin === 'string' && LOOPBACK_ORIGIN.test(origin)) {
+    // nosemgrep: javascript.express.security.cors-misconfiguration.cors-misconfiguration -- origin is constrained to the loopback regex above.
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
   }

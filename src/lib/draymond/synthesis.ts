@@ -96,8 +96,8 @@ export async function runSynthesis(): Promise<SynthesisRunSummary> {
       breakthroughCount: breakthroughs.length,
       thresholdsChanged: Boolean(data.thresholds),
     };
-  } catch (err: any) {
+  } catch (err) {
     // Fail-soft: never throw the Draymond cron because synthesis is unreachable.
-    return { ok: false, synthesized: [], outlookCount: 0, breakthroughCount: 0, thresholdsChanged: false, error: String(err?.message ?? err) };
+    return { ok: false, synthesized: [], outlookCount: 0, breakthroughCount: 0, thresholdsChanged: false, error: err instanceof Error ? err.message : String(err) };
   }
 }

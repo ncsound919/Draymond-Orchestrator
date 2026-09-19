@@ -45,34 +45,34 @@ export interface ToolPort {
 }
 
 export const TOOL_PORTS: ToolPort[] = [
-  // ── Control plane ────────────────────────────────────────────────────────
+  // -- Control plane --------------------------------------------------------
   { slug: 'draymond', name: 'Draymond Orchestrator', category: 'control', port: 3444, env: 'DRAYMOND_PUBLIC_URL', health: '/', cwd: '.', start: 'npm run dev', notes: 'The dashboard / API host.' },
 
-  // ── Coding & IDE ─────────────────────────────────────────────────────────
+  // -- Coding & IDE ---------------------------------------------------------
   { slug: 'mutly', name: 'Mutly', category: 'coding', port: 4000, env: 'MUTLY_URL', health: '/api/agent/public-config', cwd: 'agents/Mutly-Daemon-Agent', start: 'npm run dev', notes: 'Codebase index, semantic search, sandboxed tests, RepoRank/VibeServe/Claw-Protect proxy. Health uses the public (unauthenticated) config route — /api/health requires X-Mutly-API-Key.' },
   { slug: 'litellm', name: 'LiteLLM Proxy', category: 'coding', port: 4100, env: 'LITELLM_URL', health: '/health', start: 'litellm --config litellm.yaml --port 4100', notes: 'Model gateway (moved off 4000 to free it for Mutly).' },
   { slug: 'megacode', name: 'Megacode', category: 'coding', port: null, env: 'MEGACODE_URL', cwd: 'agents/Megacode-main', notes: 'Claude Code fork + MCP manager + task router. Current checkout is the overcoat CLI (no HTTP server) — no port to health-check.' },
   { slug: 'opencode', name: 'opencode', category: 'coding', port: 4096, env: 'OPENCODE_SERVE_PORT', health: '/', start: 'opencode serve --port 4096', notes: 'Headless codegen engine (deepseek-v4-flash 0731). Dispatch via `opencode run --attach http://127.0.0.1:4096 --model opencode/deepseek-v4-flash`. Runs in the Draymond cwd.' },
 
-  // ── Review & grading ─────────────────────────────────────────────────────
+  // -- Review & grading -----------------------------------------------------
   { slug: 'reporank', name: 'RepoRank', category: 'review', port: 3200, env: 'REPORANK_URL', health: '/health', cwd: 'agents/reporank', start: 'pnpm dev:local', notes: 'Repo depth scoring + remediation + milestones/gates/drift progress. Health route is GET /health (not /api/health). Moved off 3001 (Bet Buddy).' },
   { slug: 'grader', name: 'Grader', category: 'review', port: 3201, env: 'GRADER_URL', health: '/api/health', cwd: 'agents/Grader-main', start: 'npm run dev', notes: 'Data-backed grade (sync /api/grade). Moved off 3000.' },
   { slug: 'vibe-reality', name: 'Vibe-Reality', category: 'review', port: 3202, env: 'VIBE_REALITY_URL', health: '/api/health', cwd: 'agents/Vibe-Reality-main', start: 'npx tsx server.ts', notes: 'Gemini "reality-check" repo auditor (realityScore, hallucination detection, gap analysis) — third deep scorer. Binds PORT env (3202); /api/analyze requires a Firebase idToken unless VIBE_REALITY_LOCAL=1 (loopback fleet scoring).' },
   { slug: 'codegang', name: 'Codegang', category: 'review', port: 3204, env: 'CODEGANG_URL', health: '/api', cwd: 'agents/Codegang', start: 'npx next dev --webpack -p 3204', notes: 'Local deep analysis + agent pipeline (scout→planner→executor→validator→committer). Content-based /api/analyze-comprehensive is the review-gate local scorer. Bearer auth via CODEGANG_API_KEY (Codegang SECRET_KEY).' },
   { slug: 'codenexus', name: 'CodeNexus', category: 'review', port: 3205, env: 'CODENEXUS_URL', health: '/health', cwd: 'agents/CodeNexus-main', start: 'npm run dev', notes: 'Agentic PR review + fix platform (webhook → diff → security scan → comment → auto-fix → verify → push). Health route is /health (node-adapter only serves /health, not /api/health). Deterministic deep-audit lenses run credential-free via scripts/local-codenexus.ts in the benchmark loop.' },
 
-  // ── Knowledge graph ──────────────────────────────────────────────────────
+  // -- Knowledge graph ------------------------------------------------------
   { slug: 'graphify', name: 'Graphify', category: 'knowledge', port: 3203, env: 'GRAPHIFY_URL', health: '/health', cwd: 'graphify-out', start: 'python scripts/serve-graphify.py graphify-out/graph.json --transport http --port 3203 --json-response --stateless', notes: 'Codebase knowledge graph (tree-sitter AST, no vector store). MCP endpoint /mcp (POST only; GET /mcp is the SSE handshake and 406s by spec). Health probe: GET /health (served by scripts/serve-graphify.py). Query via MCP: query_graph / shortest_path / explain. Index with: scripts/graphify-index.ps1. Graph built by: graphify . --code-only --no-viz, then cluster-only.' },
   { slug: 'deterministic-brain', name: 'Deterministic Brain', category: 'knowledge', port: 3210, env: 'BRAIN_URL', health: '/health', cwd: 'agents/deterministic-brain', start: 'python main.py --serve', notes: 'Metacognitive observer (Recognition → Labeling → Intervention). API_PORT=3210. Sweep: POST /brain/sweep · Status: GET /brain/status.' },
 
-  // ── Security scanning ────────────────────────────────────────────────────
+  // -- Security scanning ----------------------------------------------------
   { slug: 'claw-protect', name: 'Claw-Protect', category: 'security', port: 3300, env: 'CLAW_PROTECT_URL', health: '/api/health', cwd: 'agents/Claw-Protect-main', start: 'npm run dev', notes: 'Secrets / prompt-injection scanner. Service-mode port is 3300 (see server.ts); CLAW_PORT overrides.' },
   { slug: 'depscan', name: 'dep-scan', category: 'security', port: 3301, env: 'DEPScan_URL', health: '/health', notes: 'Dependency CVE scanner.' },
   { slug: 'nuclei-scanner', name: 'Nuclei Scanner', category: 'security', port: 3302, env: 'NUCLEI_URL', health: '/health', notes: 'External vuln surface scanner.' },
   { slug: 'system-agent', name: 'System Agent', category: 'security', port: 3405, env: 'SYSTEM_AGENT_URL', health: '/api/health', cwd: 'agents/system-agent', start: 'npm run dev', notes: 'Resident Windows bridge — real-time OS telemetry (process/network/USB/Defender/files) + laptop control (launch/kill/power/file/service) for Draymond and endpoint protection for Claw-Protect. Loopback only; auth via SYSTEM_AGENT_KEY.' },
   { slug: 'cai', name: 'CAI (Cybersecurity AI)', category: 'security', port: 3303, env: 'CAI_URL', health: '/health', cwd: 'agents/CAI-main', start: 'wsl bash -lc "cd ~/cai-src && ~/.venvs/cai-wsl/bin/cai run"', notes: 'Offensive/defensive AI security agent framework (aliasrobotics/cai v1.1.5, 38 agents). Unix-only REPL — run via WSL venv ~/.venvs/cai-wsl (native fs; source ~/cai-src). Red/blue/purple team, web pentest, bug bounty, DFIR, APT, compliance, guardrails.' },
 
-  // ── Orchestration backends ───────────────────────────────────────────────
+  // -- Orchestration backends -----------------------------------------------
   { slug: 'big-homie', name: 'Big Homie', category: 'orchestration', port: 8888, env: 'BIG_HOMIE_URL', health: '/tools/status', cwd: 'agents/AgentBrowser-main/Big-Homie-main', start: 'python big_homie_web.py', notes: 'Task supervision / evidence checks / QA harness backend. FastAPI web server binds 8888 (big_homie_web.py, config.py server_port). No /health route; /tools/status is the JSON status endpoint AgentBrowser consumers hit.' },
   { slug: 'vibeserve', name: 'VibeServe', category: 'orchestration', port: 3600, env: 'VIBESERVE_URL', health: '/health', cwd: 'agents/VibeServe-main', start: 'python -m vibeserve', notes: 'FastMCP tool router (stdio; 3600 is its optional HTTP bridge). Moved off 8000.' },
   { slug: 'agent-browser', name: 'AgentBrowser', category: 'orchestration', port: 3700, env: 'AGENTBROWSER_URL', health: '/api/system/health', cwd: 'agents/AgentBrowser-main', start: 'npm run dev -- -p 3700', notes: 'Playwright browser automation + ecosystem gateway + Overlay365 QA harness (/api/testing). Moved off 3000 (Overlay Justice / HempForge).' },
@@ -83,12 +83,12 @@ export const TOOL_PORTS: ToolPort[] = [
   { slug: 'buzz-relay', name: 'Buzz Relay', category: 'service', port: 3206, env: 'BUZZ_URL', health: '/', cwd: '04_Integrations/github-awesome/buzz', start: 'node pm2-buzz-relay.cjs', notes: 'Nostr agent-native workspace relay (ghcr.io/block/buzz) — web UI + Nostr WS on 3206. Moved off 3000: Keywire owns 3000 (its pm2 canonical port). Infra via docker compose (buzz/); relay via pm2 wrapper.' },
   { slug: 'rome', name: 'Rome', category: 'service', port: 7663, env: 'ROME_URL', health: '/', cwd: '04_Integrations/github-awesome/rome', start: 'node pm2-rome.cjs', notes: 'Environment-first agent OS (yunfanye/rome:latest) — dashboard on 7663. Container supervised via pm2 wrapper.' },
 
-  // ── Hermes / mission brain ───────────────────────────────────────────────
+  // -- Hermes / mission brain -----------------------------------------------
   { slug: 'hermes-brain', name: 'Hermes Agent (Mission Brain)', category: 'orchestration', port: 8642, env: 'HERMES_BRAIN_URL', health: '/health', notes: 'Real NousResearch Hermes api_server (OpenAI SSE /v1/chat/completions). Started via scripts/start-hermes-gateway.ps1. Auth via API_SERVER_KEY env.' },
   { slug: 'hermes-proxy', name: 'Hermes Proxy (media+voice)', category: 'service', port: 8648, env: 'HERMES_PROXY_PORT', health: '/v1/health', notes: 'Node hermes-proxy: /media/* static + /api/v1/voice/* AetherDesk proxy. Chat role moved to hermes-brain (8642).' },
   { slug: 'squad-service', name: 'Squad Service', category: 'service', port: 8650, env: 'SQUAD_SERVICE_PORT', health: '/health', notes: 'Specialists riggs/moss/scribe/echo/hype (part of hermes-proxy backend). Health is GET /health (squad-service.js only answers /health, not /v1/health).' },
 
-  // ── Ecosystem app services ───────────────────────────────────────────────
+  // -- Ecosystem app services -----------------------------------------------
   { slug: 'omniresearch-pro', name: 'OmniResearch Pro', category: 'service', port: 3010, env: 'OMNI_RESEARCH_URL', health: '/api/health', notes: 'Deep research agent.' },
   { slug: 'overlay-chain', name: 'Overlay Chain', category: 'service', port: 3020, env: 'OVERLAY_CHAIN_URL', health: '/api', notes: 'Supply chain intelligence.' },
   { slug: 'hemp-os', name: 'Hemp-OS', category: 'service', port: 3100, env: 'HEMP_OS_URL', health: '/health', notes: 'Scientific research OS.' },
@@ -96,10 +96,12 @@ export const TOOL_PORTS: ToolPort[] = [
   { slug: 'ghostfolio', name: 'Ghostfolio', category: 'service', port: 3333, env: 'GHOSTFOLIO_URL', health: '/api/v1/health', notes: 'Portfolio tracker (kept; Claw-Protect moved off 3333).' },
   { slug: 'phoenix', name: 'Phoenix', category: 'service', port: 6006, env: 'PHOENIX_URL', health: '/health', notes: 'LLM/agent observability & evaluation. Started via docker (arize/phoenix) or `python -m phoenix.server.main serve --port 6006`.' },
   { slug: 'generative-video-ai', name: 'Generative Video AI', category: 'service', port: 8055, env: 'GENERATIVE_VIDEO_URL', health: '/', notes: 'Image/video generation studio (Next.js). Absorbs AI YouTube Shorts + Content Creation Engine.' },
+  { slug: 'image-gen', name: 'Image Generation (keyless)', category: 'service', port: null, env: 'IMAGE_GEN_BASE', health: 'https://image.pollinations.ai/', notes: 'Keyless AI image generation for marketing/social graphics (pollinations, verified live). No API key, no login. Driven by agent-team marketing imageGen.ts; normalized via UFC-MCP ImageProcessor. Every output is labeled AI-generated, never a photo or chart of real data.' },
   { slug: 'open-notebook', name: 'Open Notebook', category: 'service', port: 3030, env: 'OPEN_NOTEBOOK_URL', health: '/', cwd: '04_Integrations/integrations/open-notebook', start: 'python -m uvicorn api.main:app --host 127.0.0.1 --port 3030', notes: 'NotebookLM-style research workspace (folded into omniresearch-pro pipeline).' },
   { slug: 'stirling-pdf', name: 'Stirling PDF', category: 'service', port: 8083, env: 'STIRLING_PDF_URL', health: '/', notes: 'Local PDF operations (folded into ufc-mcp pipeline). Registered on 8083 — the canonical 8080 host port is owned by the OSS Shlink container (oss-marketing-stack).' },
   { slug: 'tap919-middleman', name: 'Tap919 Middleman', category: 'service', port: 8021, env: 'MIDDLEMAN_URL', health: '/internal/ping', cwd: '06_Resources/tap919-middleman-main', start: 'python -m uvicorn app.main:app --host 0.0.0.0 --port 8021', notes: 'Metered agent-to-agent gateway (E3 cash register). Budget-engine meter.ts emits UsageEvents to /internal/execute when MIDDLEMAN_URL is set. Health: GET /internal/ping.' },
   { slug: 'recursive-ip', name: 'Recursive IP', category: 'service', port: 3410, env: 'RECURSIVE_IP_URL', health: '/api/v1/health', notes: 'Moved off 8000.' },
+  { slug: 'recourse', name: 'Recourse', category: 'service', port: 3050, env: 'RECOURSE_URL', health: '/api/recourse/status', cwd: 'agents/recourse', start: 'node dist/server.cjs', notes: 'Autonomous self-developing architecture OS — template-driven component building, sandboxed-verified tool registry, self-healing repair, dream engine, recursive-math loops, learner, provenance chain. Serves /api/recourse/* + /api/lego/*. Port 3050 canonical (dev default 3000 was a Keywire collision).' },
   { slug: 'cureforge', name: 'CureForge', category: 'service', port: 3060, env: 'CUREFORGE_URL', health: '/api/health', cwd: '02_Pillars/Overlay Science/Biotech/CureForge', start: 'npm run dev', notes: 'Deterministic verification agent lab — JSON IR → JS compile → vm sandbox → fast-check fuzzing → WebGPU Monte Carlo.' },
   { slug: 'bbtech-web-app', name: 'BBTech Web App', category: 'service', port: 3061, env: 'BBTECH_URL', health: '/health', cwd: '02_Pillars/Overlay Science/Shared/bb_tech_core/bbtech-web-app', start: 'npm run dev', notes: 'Runnable BBTech web stack — Express+Firebase+alasql server, React/Vite frontend, Python oncology_platform.' },
   { slug: 'overlay-oncology', name: 'Overlay Oncology', category: 'service', port: 3070, env: 'OVERLAY_ONCOLOGY_URL', health: '/api/calibration/state', cwd: '02_Pillars/Overlay Science/Overlay Oncology', start: 'npm run dev -- -p 3070', notes: 'Cancer research & biotech engines (Next.js) — calibrated to live public data (CCLE IC50, TCGA survival). Calibration state via /api/calibration/state (consumed by Overlay Global Lens publication). Runtime manifest runs it on :3070.' },
@@ -108,7 +110,7 @@ export const TOOL_PORTS: ToolPort[] = [
   { slug: 'sports-steve', name: 'Sports Steve', category: 'service', port: 8010, env: 'SPORTS_STEVE_URL', health: '/api/v1/health', notes: 'Sports analytics agent.' },
   { slug: 'indy-music', name: 'Indy Music Platform', category: 'service', port: 8020, env: 'INDY_MUSIC_URL', health: '/health', notes: 'Music industry automation.' },
   { slug: 'social-media-dashboard', name: 'Social Media Dashboard', category: 'service', port: 8030, env: 'SOCIAL_MEDIA_URL', health: '/api/ai/health', notes: 'Content creation service.' },
-  // ── OSS marketing stack (docker compose, 04_Integrations/oss-marketing-stack) ──
+  // -- OSS marketing stack (docker compose, 04_Integrations/oss-marketing-stack) --
   { slug: 'oss-shlink', name: 'Shlink (link tracking)', category: 'service', port: 8080, env: 'SHLINK_URL', health: '/rest/v2/health', notes: 'Self-hosted URL shortener (MIT). Managed via oss-marketing-stack docker-compose.yml.' },
   { slug: 'oss-postiz', name: 'Postiz (social scheduling)', category: 'service', port: 4007, env: 'POSTIZ_URL', health: '/', notes: 'Agentic social media scheduling (AGPL). Official OAuth. Managed via oss-marketing-stack/postiz.yml.' },
   { slug: 'oss-temporal-ui', name: 'Temporal UI (Postiz backend)', category: 'service', port: 8090, env: 'TEMPORAL_UI_URL', health: '/', notes: 'Temporal workflow UI for Postiz scheduling. Managed via postiz.yml.' },
@@ -124,7 +126,7 @@ export const TOOL_PORTS: ToolPort[] = [
   { slug: 'aetherdesk', name: 'Aetherdesk Call Center', category: 'service', port: 8002, env: 'AETHERDESK_URL', health: '/api/v1/health', cwd: '../04_Integrations/Aetherdesk-Call-Center', start: 'python -m uvicorn src.api.main:app --host 127.0.0.1 --port 8002', notes: 'AI call center flagship (B2B). Health route is /api/v1/health (health router mounts under /api/v1). Moved off 8000 — Uplift Agent owns 8000.' },
   { slug: 'openchat', name: 'Open Chat', category: 'service', port: 5175, env: 'OPENCHAT_URL', health: '/', cwd: '../Open-Chat', start: 'npm run dev -- --port 5175 --strictPort', notes: 'Local-first fleet messaging SPA (Vite, binds ::1). Health probe is the root route. Moved off 5173 — RepoRank web Vite owns 5173.' },
 
-  // ── MCP servers (stdio — no HTTP port) ───────────────────────────────────
+  // -- MCP servers (stdio — no HTTP port) -----------------------------------
   { slug: 'ufc-mcp', name: 'UFC-MCP', category: 'mcp', port: null, env: 'UFC_MCP_CMD', notes: 'Universal file converter over stdio MCP.' },
   { slug: 'mcp-cis-assistant', name: 'CIS Assistant', category: 'mcp', port: null, env: 'CIS_MCP_CMD', notes: 'UK CIS compliance over stdio MCP.' },
 ];
@@ -179,5 +181,5 @@ export function portRegistrySummary(): string {
     collisions.length > 0
       ? `\n!! PORT COLLISIONS: ${collisions.map((c) => `${c.port} (${c.slugs.join(', ')})`).join('; ')}`
       : '';
-  return `Tool port registry — ${TOOL_PORTS.length} tools\n${'─'.repeat(58)}\n${lines.join('\n')}${collisionNote}`;
+  return `Tool port registry — ${TOOL_PORTS.length} tools\n${'-'.repeat(58)}\n${lines.join('\n')}${collisionNote}`;
 }

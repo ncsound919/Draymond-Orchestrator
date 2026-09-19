@@ -58,23 +58,63 @@ function defaultHasKey(p: MathProvider): boolean {
   return Boolean(process.env[keyEnv[p]]);
 }
 
+/** GET a URL as JSON with a hard per-request timeout. Returns null on any error. */
+async function getJson(url: string, timeoutMs: number): Promise<unknown | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
- * Probe an Ollama-compatible endpoint and return whether it is healthy.
+ * List models from a LOCAL OpenAI/Ollama-compatible server.
+ *
+ * Speaks both wire formats because the fleet's local tier is whichever server
+ * the operator runs on :11434:
+ *   - Ollama        → GET /api/tags   → { models: [{ name }] }
+ *   - llama.cpp     → GET /v1/models  → { data:  [{ id }] }
+ *   - LM Studio / vLLM → GET /v1/models
+ * llama-server does NOT implement /api/tags, so probing only that endpoint
+ * reports a healthy llama.cpp server as down (the local lane was invisible).
+ * Returns [] when the server is unreachable or unhealthy.
+ */
+export async function fetchLocalModels(
+  baseURL = 'http://localhost:11434',
+  timeoutMs = 2000,
+): Promise<string[]> {
+  const base = baseURL.replace(/\/+$/, '');
+
+  const tags = (await getJson(`${base}/api/tags`, timeoutMs)) as
+    | { models?: Array<{ name?: string }> }
+    | null;
+  const names = (tags?.models ?? [])
+    .map((m) => m.name)
+    .filter((n): n is string => Boolean(n));
+  if (names.length > 0) return names;
+
+  const list = (await getJson(`${base}/v1/models`, timeoutMs)) as
+    | { data?: Array<{ id?: string }> }
+    | null;
+  return (list?.data ?? []).map((m) => m.id).filter((n): n is string => Boolean(n));
+}
+
+/**
+ * Probe a local (Ollama / llama.cpp / LM Studio / vLLM) endpoint for health.
  * Times out after `timeoutMs` (default 2 000 ms).
  */
 export async function checkOllamaHealth(
   baseURL = 'http://localhost:11434',
   timeoutMs = 2000,
 ): Promise<boolean> {
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    const res = await fetch(`${baseURL}/api/tags`, { signal: controller.signal });
-    clearTimeout(timer);
-    return res.ok;
-  } catch {
-    return false;
-  }
+  const models = await fetchLocalModels(baseURL, timeoutMs);
+  return models.length > 0;
 }
 
 /**

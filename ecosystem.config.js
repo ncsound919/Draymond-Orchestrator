@@ -9,15 +9,12 @@
 //   pm2 startup && pm2 save       # one-time: survive reboot
 //   pm2 logs draymond
 //
-// The app must be built first (npm run build → next start).
+// The app must be built first (npm run build → produces .next/standalone
+// server.js which this config launches in production).
 // ============================================================================
 
+const { CORE_APP } = require("./fleet-manifest");
+
 module.exports = {
-  apps: [{
-    name: "draymond",
-    script: "node_modules/next/dist/bin/next",
-    args: "dev -p 3444",
-    cwd: ".",
-    env: { NODE_ENV: "development" }
-  }],
+  apps: [CORE_APP],
 };

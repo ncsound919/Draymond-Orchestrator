@@ -755,7 +755,7 @@ export async function logEvent(input: DraymondEventInsert): Promise<void> {
 
   if (error) {
     // Audit logging should never crash the main flow
-    console.error(`[Draymond] Failed to log event: ${error.message}`, input);
+    console.error('[Draymond] Failed to log event: %s', error.message, input);
   }
 }
 
@@ -1111,7 +1111,8 @@ export async function checkAllAgentHealth(): Promise<{
         }
       } catch (err) {
         console.error(
-          `[Draymond] checkAllAgentHealth: recovery failed for "${report.agent_name}":`,
+          '[Draymond] checkAllAgentHealth: recovery failed for "%s":',
+          report.agent_name,
           err instanceof Error ? err.message : err
         );
       }

@@ -30,13 +30,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unknown product' }, { status: 404 });
     }
 
-    // ── 1. Verify a local session ─────────────────────────────────────────
+    // -- 1. Verify a local session -----------------------------------------
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: 'No purchase found for this product. Complete checkout to unlock the download.' }, { status: 402 });
     }
 
-    // ── 2. Verify a purchase record for this user + product ───────────────
+    // -- 2. Verify a purchase record for this user + product ---------------
     const purchase = getDb()
       .prepare('SELECT id FROM purchases WHERE product_id = ? AND user_id = ?')
       .get(productId, user.id);
@@ -47,9 +47,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── 3. Confirm the release file exists locally ────────────────────────
-    const filePath = path.join(releasesDir(), objectKey);
-    if (!fs.existsSync(filePath)) {
+    // -- 3. Confirm the release file exists locally ------------------------
+    const filePath = /*turbopackIgnore: true*/ path.join(releasesDir(), objectKey);
+    if (!/*turbopackIgnore: true*/ fs.existsSync(filePath)) {
       console.error('Local release file missing:', filePath);
       return NextResponse.json({ error: 'Failed to generate download link' }, { status: 500 });
     }

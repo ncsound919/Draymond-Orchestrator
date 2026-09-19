@@ -112,6 +112,8 @@ const makeExecutor: Executor = (task, upstream) => {
       maxGames: task.inputs?.max_games !== undefined ? Number(task.inputs.max_games) : undefined,
       sessionId: task.inputs?.session_id ? String(task.inputs.session_id) : undefined,
       forward: task.inputs?.forward === true || task.inputs?.forward === 'true',
+      edge: task.inputs?.edge !== undefined ? Number(task.inputs.edge) : undefined,
+      sport: task.inputs?.sport ? String(task.inputs.sport) : undefined,
     };
     return runPythonSportsModel(action, opts);
   }

@@ -226,7 +226,7 @@ export async function bootstrapEcosystem(): Promise<{
         console.warn(`[bootstrap] ${slug} down after start attempt: ${after[0]?.detail ?? 'no detail'}`);
       }
     } catch (err) {
-      console.warn(`[bootstrap] ${slug} start skipped:`, err instanceof Error ? err.message : err);
+      console.warn('[bootstrap] %s start skipped:', slug, err instanceof Error ? err.message : err);
     }
   }
 

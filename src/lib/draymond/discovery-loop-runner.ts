@@ -70,7 +70,7 @@ export async function runDiscoveryLoopScript(
   opts: { iterations?: number; repair?: boolean; timeoutMs?: number; script?: string } = {},
 ): Promise<DiscoveryLoopRunResult> {
   const script = opts.script ?? resolveDiscoveryLoopScript();
-  if (!script || !fs.existsSync(script)) {
+  if (!script || !/*turbopackIgnore: true*/ fs.existsSync(script)) {
     return { ok: false, stdout: "", error: "Benchmark Olympics discovery-loop-run.ts not found (sibling app missing?)", durationMs: 0 };
   }
   const appRoot = path.resolve(path.dirname(script), "..");

@@ -1,3 +1,5 @@
+process.env.DRAYMOND_DB_PATH = ':memory:';
+
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import fs from 'node:fs';

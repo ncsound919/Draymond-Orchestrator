@@ -3,6 +3,7 @@
     "main": "electron/main.js",
     "version": "1.0.0",
     "private": false,
+    "license": "AGPL-3.0-only",
     "description": "Draymond Orchestrator — the central nervous system for AI agents: registry, chains, scheduler, monitors, approvals, and LLM provider routing",
     "engines": {
         "node": ">=20.19.0"
@@ -32,6 +33,7 @@
         "memory:rebuild": "tsx scripts/rebuild-memory-projections.ts",
         "brain:journal": "tsx scripts/brain-journal.ts",
         "brain:recover": "tsx scripts/brain-journal.ts recover --",
+        "circle:report": "tsx scripts/circle-report.ts",
         "seed:mcp": "tsx scripts/seed-reference-mcp-servers.ts",
         "audit:skills": "tsx scripts/audit-skill-frontmatter.ts",
         "gate": "npm run type-check && npm run lint && npm test",
@@ -100,7 +102,7 @@
         "idb-keyval": "^6.3.0",
         "katex": "^0.18.1",
         "lucide-react": "^1.31.0",
-        "next": "^16.3.0",
+        "next": "^16.3.1",
         "next-themes": "^0.4.6",
         "nodemailer": "^9.0.4",
         "nuqs": "^2.8.9",
@@ -124,14 +126,18 @@
         "@types/nodemailer": "^7.0.11",
         "@types/react": "^19",
         "@types/react-dom": "^19",
-        "@vitest/coverage-v8": "^4.1.10",
+        "@vitest/coverage-v8": "^4.1.11",
         "electron": "^43.3.0",
         "electron-builder": "^26.15.3",
         "eslint": "^9",
-        "eslint-config-next": "^16.3.0",
+        "eslint-config-next": "^16.3.1",
         "tailwindcss": "^4",
         "tsx": "^4.23.11",
         "typescript": "^5",
-        "vitest": "^4.1.10"
+        "vitest": "^4.1.11"
+    },
+    "overrides": {
+        "sharp": "0.35.4",
+        "protobufjs": "^7.6.6"
     }
 }

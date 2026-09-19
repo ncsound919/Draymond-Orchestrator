@@ -71,7 +71,7 @@ async function main() {
         `${row.component_slug} score=${row.weakness_score} action=${report.action}${report.detail ? ` detail=${report.detail}` : ''}`
       );
     } catch (err) {
-      console.error(`${row.component_slug} FAILED:`, err instanceof Error ? err.message : err);
+      console.error('%s FAILED:', row.component_slug, err instanceof Error ? err.message : err);
     }
   }
 }

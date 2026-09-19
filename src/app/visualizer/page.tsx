@@ -1,3 +1,5 @@
+'use client';
+
 import { Suspense } from 'react';
 import dynamic from 'next/dynamic';
 
@@ -5,8 +7,6 @@ const VisualizerApp = dynamic(() => import('@/components/visualizer/VisualizerAp
   ssr: false,
   loading: () => <div className="grid h-screen place-items-center bg-[#0b0b1a] text-white">LOADING CITY…</div>,
 });
-
-export const metadata = { title: 'Ecosystem Visualizer' };
 
 export default function VisualizerPage() {
   return (

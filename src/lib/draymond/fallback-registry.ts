@@ -18,6 +18,7 @@ import {
   type FallbackContext,
   type BrainResolver,
 } from './fallbacks';
+import { buildDeterministicNarrative, type EcosystemSnapshot } from './ecosystem-status';
 
 /** Async brain escalation helper: finish the degraded task via /task. */
 function brain(queryFrom: (ctx: FallbackContext) => string): BrainResolver {
@@ -442,6 +443,19 @@ registerFallback(
     'vision — honest degraded reply when both local lane and cloud are down',
     'Vision analysis is temporarily unavailable (local Ollama lane and cloud vision providers unreachable). Continuing without image interpretation — please describe the image in text if possible.'
   )
+);
+
+// ---------------------------------------------------------------------------
+// ecosystem-status.ts
+// ---------------------------------------------------------------------------
+
+declareLlmFunction('status.ecosystem-narrative');
+registerFallback(
+  'status.ecosystem-narrative',
+  computed('ecosystem status — deterministic narrative from live snapshot numbers', (ctx) => {
+    const snap = ctx.snapshot as EcosystemSnapshot | undefined;
+    return snap ? buildDeterministicNarrative(snap) : 'Status narrative unavailable.';
+  })
 );
 
 /** Register everything at import time. Safe to call multiple times. */

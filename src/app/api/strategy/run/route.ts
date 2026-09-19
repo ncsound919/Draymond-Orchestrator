@@ -55,6 +55,19 @@ export async function POST(req: NextRequest) {
     } catch {
       return NextResponse.json({ ok: false, error: 'Unparseable output from strategy runner' }, { status: 500 });
     }
+    // Advisory Dev-Brain scoring for proposals (never blocks the response).
+    // When the strategist returns proposals, weight them deterministically via
+    // Dev-Brain so callers get a ranked advisory alongside the raw output.
+    try {
+      const maybe = parsed as { proposals?: unknown[] };
+      if (Array.isArray(maybe.proposals) && maybe.proposals.length >= 2) {
+        const { rankProposalsViaDevBrain } = await import('@/lib/draymond/strategy-team');
+        const scored = await rankProposalsViaDevBrain(maybe.proposals);
+        if (scored) {
+          (parsed as Record<string, unknown>).devBrain = scored;
+        }
+      }
+    } catch { /* advisory — never fail the strategy run */ }
     return NextResponse.json(parsed);
   } catch (err) {
     const isTimeout =

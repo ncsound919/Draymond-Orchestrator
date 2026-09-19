@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     const safeName = name.toLowerCase().endsWith('.png') || name.toLowerCase().endsWith('.jpg')
       ? name
       : `${name.replace(/\.(png|jpe?g)$/i, '')}.png`;
-    const filePath = path.join(SMD_IMAGES_DIR, safeName);
+    const filePath = /*turbopackIgnore: true*/ path.join(SMD_IMAGES_DIR, safeName);
     fs.writeFileSync(filePath, Buffer.from(b64, 'base64'));
 
     await appendAuditLog({ event: 'marketing.media_stored', path: safeName });
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       ok: true,
       filename: safeName,
       path: filePath,
-      size: fs.statSync(filePath).size,
+      size: /*turbopackIgnore: true*/ fs.statSync(filePath).size,
     });
   } catch (err) {
     console.error('[API /api/v1/marketing/media]', err instanceof Error ? err.message : err);

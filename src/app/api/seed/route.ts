@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
   const startTime = Date.now();
 
-  // ── Run seed ────────────────────────────────────────────────────────
+  // -- Run seed --------------------------------------------------------
   try {
     // Order matters: registerEntities(SEED_ENTITIES) first, then
     // seedBusinessAutomation() LAST so the business-chain entity configs

@@ -12,6 +12,7 @@ import {
   serviceUrl,
   startDownServices,
   startService,
+  stopService,
 } from '../src/lib/draymond/service-manager';
 
 vi.mock('node:child_process', () => ({ spawn: vi.fn(), execFileSync: vi.fn() }));
@@ -234,28 +235,41 @@ describe('startService', () => {
   });
 });
 
+function seedTrackedPid(slug: string, pid: number): void {
+  fs.mkdirSync(path.join(tmp, 'data'), { recursive: true });
+  fs.writeFileSync(
+    path.join(tmp, 'data', 'server-pids.json'),
+    JSON.stringify({
+      [slug]: { slug, pid, startedAt: new Date().toISOString(), cwd: tmp, command: 'python main.py' },
+    }),
+  );
+}
+
+const killedByImageName = () =>
+  mockExecFileSync.mock.calls.some(
+    (c) => c[0] === 'taskkill' && Array.isArray(c[1]) && (c[1] as string[]).includes('/IM'),
+  );
+
 describe('restartService', () => {
-  it('kills on win32 (pkill elsewhere) then starts the service', async () => {
+  it('starts the service without ever killing by image name', async () => {
     fs.mkdirSync(path.join(tmp, 'agents', 'BookBridge--main'), { recursive: true });
-    mockExecFileSync.mockReturnValue(Buffer.from('killed'));
+    mockExecFileSync.mockReturnValue(Buffer.from('closed'));
     fetchMock
       .mockReset()
-      .mockResolvedValueOnce(new Response('{}', { status: 500 }))
+      .mockResolvedValueOnce(new Response('{}', { status: 500 })) // stopService post-probe
+      .mockResolvedValueOnce(new Response('{}', { status: 500 })) // startService pre-probe
       .mockResolvedValue(new Response('{}', { status: 200 }));
-    vi.useFakeTimers();
-    const pending = restartService('bookbridge');
-    await vi.advanceTimersByTimeAsync(800 + 1500);
-    const r = await pending;
+    // Real timers: restart waits 800ms for the close, then startService waits
+    // 1500ms for the first health probe. Fake timers deadlock against the
+    // AbortSignal.timeout inside probeService, so this test runs on real time.
+    const r = await restartService('bookbridge');
     expect(r.up).toBe(true);
-    if (process.platform === 'win32') {
-      expect(mockExecFileSync).toHaveBeenCalledWith('taskkill', ['/F', '/IM', 'node.exe'], expect.objectContaining({ timeout: 5000 }));
-    } else {
-      expect(mockExecFileSync).toHaveBeenCalledWith('pkill', ['-f', 'bookbridge'], expect.objectContaining({ timeout: 5000 }));
-    }
+    expect(killedByImageName()).toBe(false);
+    expect(mockExecFileSync.mock.calls.some((c) => c[0] === 'pkill')).toBe(false);
     expect(mockSpawn).toHaveBeenCalledTimes(1);
-  });
+  }, 15000);
 
-  it('continues to start even when the kill fails', async () => {
+  it('continues to start even when the close fails', async () => {
     fs.mkdirSync(path.join(tmp, 'agents', 'BookBridge--main'), { recursive: true });
     mockExecFileSync.mockImplementation(() => {
       throw new Error('access denied');
@@ -263,6 +277,7 @@ describe('restartService', () => {
     fetchMock
       .mockReset()
       .mockResolvedValueOnce(new Response('{}', { status: 500 }))
+      .mockResolvedValueOnce(new Response('{}', { status: 500 }))
       .mockResolvedValue(new Response('{}', { status: 200 }));
     vi.useFakeTimers();
     const pending = restartService('bookbridge');
@@ -272,22 +287,40 @@ describe('restartService', () => {
     expect(mockSpawn).toHaveBeenCalledTimes(1);
   });
 
-  it('uses pkill on non-win32 platforms', async () => {
+  it('records the spawned pid so the service can be closed later', async () => {
     fs.mkdirSync(path.join(tmp, 'agents', 'BookBridge--main'), { recursive: true });
+    mockSpawn.mockReturnValue({ unref: vi.fn(), pid: 7777 } as unknown as ChildProcess);
+    fetchMock
+      .mockReset()
+      .mockResolvedValueOnce(new Response('{}', { status: 500 }))
+      .mockResolvedValue(new Response('{}', { status: 200 }));
+    vi.useFakeTimers();
+    const pending = startService('bookbridge');
+    await vi.advanceTimersByTimeAsync(1500);
+    await pending;
+    const reg = JSON.parse(fs.readFileSync(path.join(tmp, 'data', 'server-pids.json'), 'utf-8')) as Record<string, { pid: number }>;
+    expect(reg.bookbridge.pid).toBe(7777);
+  });
+});
+
+describe('stopService', () => {
+  it('kills only the recorded pid tree, never by image name, and clears the registry', async () => {
     const original = process.platform;
-    Object.defineProperty(process, 'platform', { value: 'linux' });
+    Object.defineProperty(process, 'platform', { value: 'win32' });
     try {
-      mockExecFileSync.mockReturnValue(Buffer.from('killed'));
-      fetchMock
-        .mockReset()
-        .mockResolvedValueOnce(new Response('{}', { status: 500 }))
-        .mockResolvedValue(new Response('{}', { status: 200 }));
-      vi.useFakeTimers();
-      const pending = restartService('bookbridge');
-      await vi.advanceTimersByTimeAsync(800 + 1500);
-      const r = await pending;
-      expect(r.up).toBe(true);
-      expect(mockExecFileSync).toHaveBeenCalledWith('pkill', ['-f', 'bookbridge'], expect.objectContaining({ timeout: 5000 }));
+      seedTrackedPid('bookbridge', process.pid);
+      mockExecFileSync.mockReturnValue(Buffer.from('closed'));
+      fetchMock.mockReset().mockResolvedValue(new Response('{}', { status: 500 }));
+      const r = await stopService('bookbridge');
+      expect(r.up).toBe(false);
+      expect(killedByImageName()).toBe(false);
+      expect(mockExecFileSync).toHaveBeenCalledWith(
+        'taskkill',
+        ['/PID', String(process.pid), '/T', '/F'],
+        expect.objectContaining({ timeout: 8000 }),
+      );
+      const reg = JSON.parse(fs.readFileSync(path.join(tmp, 'data', 'server-pids.json'), 'utf-8')) as Record<string, unknown>;
+      expect('bookbridge' in reg).toBe(false);
     } finally {
       Object.defineProperty(process, 'platform', { value: original });
     }

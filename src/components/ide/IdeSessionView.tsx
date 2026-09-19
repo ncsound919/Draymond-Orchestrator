@@ -217,7 +217,7 @@ export default function IdeSessionView({ sessionId }: { sessionId: string }) {
       )}
 
       <div className="flex min-h-0 flex-1">
-        {/* ── Left: ChatGPT-style sidebar ─────────────────────────────── */}
+        {/* -- Left: ChatGPT-style sidebar ------------------------------- */}
         <aside className="flex w-80 shrink-0 flex-col border-r border-white/5 bg-black/40">
           {/* Session header */}
           <div className="border-b border-white/5 p-4">
@@ -316,7 +316,7 @@ export default function IdeSessionView({ sessionId }: { sessionId: string }) {
           </div>
         </aside>
 
-        {/* ── Center: live work view ──────────────────────────────────── */}
+        {/* -- Center: live work view ------------------------------------ */}
         <main className="flex min-w-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 overflow-y-auto" ref={feedRef}>
             <div className="mx-auto w-full max-w-2xl space-y-5 px-6 py-6">
@@ -383,7 +383,7 @@ export default function IdeSessionView({ sessionId }: { sessionId: string }) {
           </div>
         </main>
 
-        {/* ── Right: decisions + review + meta ────────────────────────── */}
+        {/* -- Right: decisions + review + meta -------------------------- */}
         <aside className="flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-l border-white/5 bg-black/30 p-4">
           {pendingDecision ? (
             <section className="rounded-xl border border-orange-500/30 bg-orange-500/[0.06] p-3">

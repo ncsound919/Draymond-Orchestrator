@@ -547,6 +547,101 @@ const tools: DraymondEntityInsert[] = [
     risk_level_default: 'low',
   },
   {
+    name: 'Vibe-Reality',
+    slug: 'vibe-reality',
+    kind: 'tool',
+    description: 'Reality-check repo auditor — realityScore, hallucination detection, and gap analysis over a GitHub repo. Runs on localhost:3202 (canonical port — see ports.ts). /api/analyze requires a Firebase idToken unless VIBE_REALITY_LOCAL=1 for loopback fleet scoring. Scores are AI (Gemini) output and are labeled as such.',
+    version: '1.0.0',
+    tags: ['audit-team', 'review', 'audit', 'hallucination-detection', 'reality-check'],
+    category: 'engineering',
+    sector: 'community',
+    invocation_method: 'http_api',
+    invocation_config: {
+      // URL set at runtime via env — do not hardcode localhost
+      url: 'http://localhost:3202', // VIBE_REALITY_URL
+      method: 'POST',
+      timeout_ms: 180000,
+      endpoints: {
+        health: { path: '/api/health', method: 'GET' },
+        analyze: { path: '/api/analyze', method: 'POST' },
+      },
+      requires_env: ['VIBE_REALITY_URL'],
+    },
+    capabilities: ['repo-audit', 'reality-score', 'hallucination-detection', 'gap-analysis'],
+    download_path: 'agents/Vibe-Reality-main',
+    is_integrated: true,
+    risk_level_default: 'low',
+  },
+  {
+    name: 'The Deep',
+    slug: 'the-deep',
+    kind: 'tool',
+    description: 'Audit-team static analysis engine — 3 passes (static-analysis + bug-taxonomy deterministic, deep-intent AI-capable) over a workspace, with a 20-bug taxonomy. Two deterministic passes; the deep-intent pass uses Gemini when a key is configured. Runs on localhost:3100 (DEEP_URL).',
+    version: '1.0.0',
+    tags: ['audit-team', 'audit', 'static-analysis', 'bug-taxonomy', 'deep-intent'],
+    category: 'engineering',
+    sector: 'community',
+    invocation_method: 'http_api',
+    invocation_config: {
+      // URL set at runtime via env — do not hardcode localhost
+      url: 'http://localhost:3100', // DEEP_URL
+      method: 'POST',
+      timeout_ms: 300000,
+      endpoints: {
+        health: { path: '/health', method: 'GET' },
+      },
+      requires_env: ['DEEP_URL'],
+    },
+    capabilities: ['static-analysis', 'bug-taxonomy', 'deep-intent', 'eslint', 'tsc'],
+    download_path: 'The Deep',
+    is_integrated: true,
+    risk_level_default: 'low',
+  },
+  {
+    name: 'Benchmark Olympics',
+    slug: 'benchmark-olympics',
+    kind: 'service',
+    description: 'Audit-team measured benchmarking + discovery loop — probes the fleet, matures discovery hypotheses, surfaces quick-upgrade insights, and dispatches weak components. Real measurements only; hypotheses are never presented as scores.',
+    version: '1.0.0',
+    tags: ['audit-team', 'benchmark', 'measurement', 'discovery-loop', 'hypotheses'],
+    category: 'engineering',
+    sector: 'community',
+    invocation_method: 'subprocess',
+    invocation_config: {
+      root: 'Benchmark Olympics', // BENCHMARK_OLYMPICS_ROOT
+      script: 'scripts/discovery-loop-run.ts',
+      timeout_ms: 1800000,
+      requires_env: ['BENCHMARK_OLYMPICS_ROOT'],
+    },
+    capabilities: ['fleet-benchmarking', 'discovery-loop', 'hypothesis-maturing', 'weakness-detection'],
+    download_path: 'Benchmark Olympics',
+    is_integrated: true,
+    risk_level_default: 'low',
+  },
+  {
+    name: 'Audit Chain',
+    slug: 'audit-chain',
+    kind: 'pipeline',
+    description: 'Audit-team orchestration — runs every configured auditor in parallel (grader, reporank, codegang, the-deep, olympics probe), merges into one canonical audit statement with honest provenance disclosures, seals it with trust-layer proofs, and renders the customer deliverable. Refuses to seal an audit with zero included auditors; excluded auditors appear with their reason. The seal certifies integrity + existence over time, never quality.',
+    version: '1.0.0',
+    tags: ['audit-team', 'audit', 'orchestration', 'provenance', 'trust-layer'],
+    category: 'engineering',
+    sector: 'community',
+    invocation_method: 'cli_command',
+    invocation_config: {
+      package: '@overlay365/audit-chain',
+      cwd: 'packages/audit-chain',
+      command: 'pnpm',
+      args: ['--filter', '@overlay365/audit-chain', 'audit'],
+      timeout_ms: 1800000,
+      requires_env: ['TRUST_URL'],
+    },
+    capabilities: ['audit-orchestration', 'provenance-disclosure', 'trust-layer-sealing', 'deliverable-rendering'],
+    download_path: 'packages/audit-chain',
+    is_integrated: true,
+    risk_level_default: 'low',
+  },
+  {
     name: 'Graphify',
     slug: 'graphify',
     kind: 'tool',
@@ -849,7 +944,7 @@ const tools: DraymondEntityInsert[] = [
     is_active: true,
     risk_level_default: 'low',
   },
-  // ── Github Awesome intake #46 (2026-08-26) — see 04_Integrations/github-awesome/LEDGER.md ──
+  // -- Github Awesome intake #46 (2026-08-26) — see 04_Integrations/github-awesome/LEDGER.md --
   // All entries are vendored-but-not-wired (is_integrated:false) so monitors stay quiet.
   {
     name: 'LatticeDB',
@@ -977,7 +1072,7 @@ const tools: DraymondEntityInsert[] = [
     is_active: true,
     risk_level_default: 'low',
   },
-  // ── Second intake wave (2026-08-26) — Eidos, Buzz, Rome, Gradient ─────────
+  // -- Second intake wave (2026-08-26) — Eidos, Buzz, Rome, Gradient ---------
   {
     name: 'Eidos',
     slug: 'eidos',
@@ -1050,7 +1145,7 @@ const tools: DraymondEntityInsert[] = [
     is_active: true,
     risk_level_default: 'low',
   },
-  // ── Third intake wave (2026-08-26) — kimodo.cpp, open-sheet, spec-ptc, ocr-it ──
+  // -- Third intake wave (2026-08-26) — kimodo.cpp, open-sheet, spec-ptc, ocr-it --
   {
     name: 'kimodo.cpp',
     slug: 'kimodo-cpp',
@@ -2324,7 +2419,7 @@ const services: DraymondEntityInsert[] = [
     is_integrated: true,
     risk_level_default: 'low',
   },
-  // ── Overlay Music components ──────────────────────────────────────────────
+  // -- Overlay Music components ----------------------------------------------
   {
     name: 'Sovereign Music Studio',
     slug: 'sovereign-music-studio',
@@ -2446,7 +2541,7 @@ const services: DraymondEntityInsert[] = [
     is_integrated: true,
     risk_level_default: 'low',
   },
-  // ── Overlay AI-Safety components ──────────────────────────────────────────
+  // -- Overlay AI-Safety components ------------------------------------------
   {
     name: 'Aegis',
     slug: 'aegis-safety',
@@ -2507,7 +2602,7 @@ const services: DraymondEntityInsert[] = [
     is_integrated: true,
     risk_level_default: 'low',
   },
-  // ── Overlay Finance components ────────────────────────────────────────────
+  // -- Overlay Finance components --------------------------------------------
   {
     name: 'Financial Strategy Agent',
     slug: 'fs-agent',
@@ -2584,7 +2679,7 @@ const services: DraymondEntityInsert[] = [
     is_integrated: true,
     risk_level_default: 'low',
   },
-  // ── Overlay Writing components ────────────────────────────────────────────
+  // -- Overlay Writing components --------------------------------------------
   {
     name: 'Book Publishing Platform',
     slug: 'book-publishing-platform',
@@ -2630,7 +2725,7 @@ const services: DraymondEntityInsert[] = [
     is_integrated: true,
     risk_level_default: 'low',
   },
-  // ── Overlay Science components ────────────────────────────────────────────
+  // -- Overlay Science components --------------------------------------------
   {
     name: 'Biotech IDE',
     slug: 'biotech-ide',
@@ -2701,6 +2796,53 @@ const services: DraymondEntityInsert[] = [
       'calibration_registry',
     ],
     download_path: '02_Pillars/Overlay Science/Overlay Oncology',
+    is_integrated: true,
+    risk_level_default: 'low',
+  },
+  {
+    name: 'Recourse',
+    slug: 'recourse',
+    kind: 'service',
+    description: 'Autonomous self-developing architecture OS — template-driven internal component building (self-healing templates), a versioned tool registry where every promoted version passes a real sandboxed test suite, self-healing code repair (repair only counts healed after the verifier passes), recursive learner with property-based gene evaluation, dreaming engine (REM counterfactual hypotheses), recursive-math loops, provenance hash chain, and a 7-layer Lego composable ML engine. Model-backed generators route through the configured OpenAI-compatible provider and honestly report offline otherwise.',
+    version: '1.0.0',
+    tags: ['self-development', 'self-repair', 'registry', 'verifier', 'dream', 'recursion', 'lego', 'typescript', 'express'],
+    category: 'research',
+    sector: 'learn',
+    invocation_method: 'http_api',
+    invocation_config: {
+      url: 'http://localhost:3050', // RECOURSE_URL at runtime — port map = 3050 (dev default 3000 was a Keywire collision)
+      method: 'POST',
+      health_url: 'http://localhost:3050/api/recourse/status',
+      endpoints: {
+        status: '/api/recourse/status',
+        registry: '/api/recourse/registry',
+        provenance: '/api/recourse/provenance',
+        verify: '/api/recourse/verify',
+        execute: '/api/recourse/execute',
+        repair_single: '/api/recourse/repair/single',
+        repair_scan_heal: '/api/recourse/repair/scan-heal',
+        evolve: '/api/recourse/evolve',
+        templates: '/api/recourse/templates',
+        templates_build: '/api/recourse/templates/build',
+        learn_status: '/api/recourse/learn/status',
+        math_state: '/api/recourse/math/state',
+        math_step: '/api/recourse/math/step',
+        lego_state: '/api/lego/state',
+        lego_assemble: '/api/lego/assemble',
+      },
+    },
+    capabilities: [
+      'self_repair',
+      'sandboxed_verifier',
+      'tool_registry',
+      'template_component_building',
+      'recursive_learner',
+      'dream_engine',
+      'recursive_math',
+      'lego_composition',
+      'provenance_chain',
+    ],
+    download_path: 'agents/recourse',
     is_integrated: true,
     risk_level_default: 'low',
   },
@@ -2826,7 +2968,7 @@ const services: DraymondEntityInsert[] = [
     is_integrated: true,
     risk_level_default: 'low',
   },
-  // ── sports_science components ─────────────────────────────────────────────
+  // -- sports_science components ---------------------------------------------
   {
     name: 'Codex Metrics',
     slug: 'codex-metrics',

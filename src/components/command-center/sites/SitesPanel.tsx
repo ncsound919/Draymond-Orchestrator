@@ -115,7 +115,7 @@ function toForm(m: MonitorLike): MonitorForm {
 export default function SitesPanel() {
   const queryClient = useQueryClient();
 
-  // ── Monitor list ───────────────────────────────────────────────────────────
+  // -- Monitor list -----------------------------------------------------------
   const monitorsQuery = useQuery({
     queryKey: ['command-center', 'monitors'],
     queryFn: async () => {
@@ -130,7 +130,7 @@ export default function SitesPanel() {
     },
   });
 
-  // ── Toggle enable (optimistic) ────────────────────────────────────────────
+  // -- Toggle enable (optimistic) --------------------------------------------
   const toggleEnabled = useMutation({
     mutationFn: async ({ id, is_enabled }: { id: string; is_enabled: boolean }) => {
       const res = await ccFetch<{ ok?: boolean; monitor?: MonitorLike }>({
@@ -160,7 +160,7 @@ export default function SitesPanel() {
     },
   });
 
-  // ── Check all now ─────────────────────────────────────────────────────────
+  // -- Check all now ---------------------------------------------------------
   const checkAll = useMutation({
     mutationFn: async () => {
       const res = await ccFetch<CheckAllResult>({
@@ -183,7 +183,7 @@ export default function SitesPanel() {
     },
   });
 
-  // ── Create / edit monitor dialogs ─────────────────────────────────────────
+  // -- Create / edit monitor dialogs -----------------------------------------
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -254,7 +254,7 @@ export default function SitesPanel() {
     saveMonitor.mutate({ id: editingId, body: formBody(form) });
   };
 
-  // ── Delete monitor ────────────────────────────────────────────────────────
+  // -- Delete monitor --------------------------------------------------------
   const [deleteTarget, setDeleteTarget] = useState<MonitorLike | null>(null);
   const deleteMonitor = useMutation({
     mutationFn: async (id: string) => {
@@ -274,7 +274,7 @@ export default function SitesPanel() {
     },
   });
 
-  // ── Deploy ────────────────────────────────────────────────────────────────
+  // -- Deploy ----------------------------------------------------------------
   const [processName, setProcessName] = useState('');
   const [deployUrl, setDeployUrl] = useState('');
   const [deployResult, setDeployResult] = useState<DeployLike | null>(null);
@@ -311,7 +311,7 @@ export default function SitesPanel() {
 
   const monitors = monitorsQuery.data ?? [];
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // -- Render ----------------------------------------------------------------
   return (
     <div className="space-y-6">
       {/* Monitor list */}

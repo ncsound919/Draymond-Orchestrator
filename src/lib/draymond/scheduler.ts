@@ -6,14 +6,15 @@
 // checks, notifications, or custom handlers), and records results.
 // ============================================================================
 
+import path from 'node:path';
 import { createDraymondAdminClient } from './client';
 import { instantiateChain, executeChain } from './chains';
 import { checkAllAgentHealth } from './index';
 import { sendNotification, sendAlertEmail } from './notifications';
 import { emitJobStarted, emitJobCompleted, emitJobFailed } from '@/lib/draymond/event-bridge';
-import { delegationTimeoutSeconds, delegationFor, isWithinWindow, delegationWindow } from './delegation';
+import { delegationTimeoutSeconds, delegationFor, isWithinWindow, delegationWindow, canDelegateSector } from './delegation';
 import { sectorFor } from './corporate';
-import { sectorSweep, touchSector } from './sector-lifecycle';
+import { sectorSweep, ensureSectorForJob } from './sector-lifecycle';
 import { classifyRetryable, retryDelayMs } from './retry';
 import type { BbtechInsightSyncResult } from '@/lib/science/trendsFeed';
 import type { DrainResult as GapDrainResult } from '@/lib/science/researchEscalation';
@@ -105,6 +106,19 @@ function delegationWindowLabel(job: ScheduledJob): string {
   if (typeof handler !== 'string') return 'unplanned';
   const window = delegationWindow(handler);
   return `${window.start}-${window.end}`;
+}
+
+/**
+ * Sector-cap gate: when a due custom job's corporate sector has consumed its
+ * daily token cap, return the gate reason (defer the job) instead of running it.
+ * Returns null when the job should run (not custom, no handler, or budget left).
+ */
+function sectorCapExceeded(job: ScheduledJob, now: Date): string | null {
+  if (job.job_type !== 'custom') return null;
+  const handler = job.job_config?.handler;
+  if (typeof handler !== 'string') return null;
+  const gate = canDelegateSector(sectorFor(handler), now);
+  return gate.ok ? null : gate.reason ?? 'sector cap';
 }
 
 // ============================================================================
@@ -495,11 +509,20 @@ export async function runJobNow(id: string): Promise<JobRunResult> {
   const stopHeartbeat = startJobHeartbeat(job.id);
   emitJobStarted(job.id, job.name, job.job_type);
 
-  // Sector lifecycle: record this job's sector as active so the idle sweep
-  // keeps that sector's on-demand services warm while its tasks are running.
+  // Sector lifecycle: record this job's sector as active AND cold-start any
+  // on-demand services that sector needs, so the work can actually reach them.
+  // The idle sweep then stops them once the sector goes quiet.
   try {
     const handler = job.job_config?.handler;
-    if (typeof handler === 'string') touchSector(sectorFor(handler));
+    if (typeof handler === 'string') {
+      const sector = sectorFor(handler);
+      const result = await ensureSectorForJob(sector);
+      if (result.started.length > 0 || result.failed.length > 0) {
+        console.log(
+          `[sector-lifecycle] job "${job.name}" (${handler}) sector ${sector}: started=[${result.started.join(',')}] failed=[${result.failed.join(',')}] disabled=${result.disabled}`
+        );
+      }
+    }
   } catch {
     // best-effort — lifecycle must never block a job
   }
@@ -657,6 +680,7 @@ export const CUSTOM_HANDLERS: CustomHandlerDef[] = [
   { handler: 'evening_call_recap', label: 'Evening Call Recap', description: 'Open-Chat calls you with the day summary via ntfy.' },
   { handler: 'ingest_news', label: 'News Digest Ingest', description: 'Ingest news APIs and cache current items for the fleet.' },
   { handler: 'self_learning_loop', label: 'Self-Learning Loop', description: 'Distill lessons from outcomes (QA/jobs/incidents).' },
+  { handler: 'self_analysis_loop', label: 'Self-Analysis Loop', description: 'Ingest fleet telemetry, compute trends, produce prioritized improvement recommendations, close the learning loop on resolved findings.' },
   { handler: 'synthesis_midday', label: 'Synthesis Midday Check', description: 'Midday synthesis pass: evaluate sector thresholds and run synthesis for sectors ready to study combinations.' },
   { handler: 'clinvar_surveillance', label: 'ClinVar Variant Surveillance', description: 'Query real NCBI ClinVar (via BioComposable) for watched variants and flag reclassifications.' },
   { handler: 'rd_night', label: 'Night Mode R&D', description: 'Overnight research + dev planning from news + backlog.' },
@@ -704,6 +728,21 @@ export const CUSTOM_HANDLERS: CustomHandlerDef[] = [
     handler: 'commission_monthly_reset',
     label: 'Staffing Commission Monthly Reset',
     description: 'Reset all agents monthly_sales_volume to 0 and tier to bronze on the 1st of each month (00:05). Fires 1st at 00:05.',
+  },
+  {
+    handler: 'oncology_revalidation',
+    label: 'Oncology Revalidation (nightly)',
+    description: 'Nightly: run the Overlay Oncology literature diff (Europe PMC -> vector store), read the pooled-leaderboard gate status (Phase A 3/8), and report concordance/evidence drift. Phase E4 pre-work — real data, no LLM.',
+  },
+  {
+    handler: 'partner_outreach_tick',
+    label: 'Pilot-Partner Outreach Tick (daily)',
+    description: 'Daily: read AetherDesk campaign + lead state and report pipeline toward the Phase C#4 pilot-partner objective. Reports real state only — never fabricates leads or calls.',
+  },
+  {
+    handler: 'oncology_strategy_scan',
+    label: 'Oncology Strategy Scan (weekly)',
+    description: 'Weekly: run the strategy-team weeklyScan with oncology context (pilot-partner objective, EvidenceHub, versioned cohorts, discovery worklist) and report the venture-scan brief + Phase A gate status. Real strategist CLI, bounded 90s — never fabricates partners.',
   },
 ];
 
@@ -904,6 +943,121 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         const { runBenchmarkCycle } = await import('./run-benchmark');
         const r = await runBenchmarkCycle('entity', { queueLimit: 5 });
         return { handler, ...r };
+      }
+
+      if (handler === 'oncology_revalidation') {
+        // Phase E4 pre-work: nightly evidence revalidation for Overlay Oncology.
+        // Runs the real Europe PMC diff + reads the pooled leaderboard gate.
+        // Never fabricates: Europe PMC unreachable -> status unavailable.
+        const { exec } = await import('node:child_process');
+        const { promisify } = await import('node:util');
+        const run = promisify(exec);
+        const root = process.env.UPLIFT_ROOT ?? 'C:\\Users\\User\\Downloads\\Uplift';
+        const onco = path.join(root, '02_Pillars', 'Overlay Science', 'Overlay Oncology');
+        let diffOut = '';
+        let diffError: string | null = null;
+        try {
+          const r = await run(
+            `npx tsx scripts/literature-diff-nightly.ts --days 7`,
+            { cwd: onco, timeout: 240_000, maxBuffer: 10 * 1024 * 1024, windowsHide: true },
+          );
+          diffOut = (r.stdout || '').trim();
+        } catch (e) {
+          diffError = e instanceof Error ? e.message.slice(0, 400) : String(e);
+        }
+        // Leaderboard gate status from the freshest pooled artifact.
+        let gate: { cohorts: number; gateMet: boolean; artifact: string | null } = { cohorts: 0, gateMet: false, artifact: null };
+        try {
+          const { readdirSync, readFileSync } = await import('node:fs');
+          const reports = path.join(onco, 'reports');
+          const files = readdirSync(reports).filter((f) => /^2026-09-.*-pooled-A2.*\.json$/.test(f)).sort();
+          if (files.length) {
+            const f = files[files.length - 1]!;
+            const raw = JSON.parse(readFileSync(path.join(reports, f), 'utf-8')) as {
+              cells?: Array<{ unoC: number }>;
+              deconUsed?: boolean;
+            };
+            const at60 = (raw.cells ?? []).filter((c) => c.unoC >= 0.6).length;
+            gate = { cohorts: at60, gateMet: at60 >= 6, artifact: f };
+          }
+        } catch { /* leaderboard artifact absent — report 0 */ }
+        return {
+          handler,
+          literature: diffOut || diffError ? 'ran' : 'no-output',
+          literatureStatus: diffError ? 'error' : 'ok',
+          diffError,
+          leaderboard: gate,
+          note: 'Phase C#4 pilot partner still required for the closed loop; revalidation keeps the evidence current.',
+        };
+      }
+
+      if (handler === 'partner_outreach_tick') {
+        // Phase C#4: report AetherDesk pipeline state toward the pilot-partner
+        // objective. Reads real campaign/lead/call counts. Never fabricates.
+        const { executeAetherDeskOperation } = await import('./aetherdesk');
+        const campaigns = await executeAetherDeskOperation('list_campaigns', {});
+        const leads = await executeAetherDeskOperation('list_leads', {});
+        const calls = await executeAetherDeskOperation('list_calls', {});
+        const count = (o: { success: boolean; output: Record<string, unknown> }) =>
+          Array.isArray(o.output?.data) ? (o.output.data as unknown[]).length : 0;
+        const configured = Boolean(process.env.AETHERDESK_BASE_URL && process.env.AETHERDESK_API_KEY);
+        return {
+          handler,
+          configured,
+          campaigns: configured ? count(campaigns) : 0,
+          leads: configured ? count(leads) : 0,
+          calls: configured ? count(calls) : 0,
+          nextActions: [
+            'Load the outreach campaign def (plans/oncology-partner-outreach-campaign.json -> campaign) into AetherDesk',
+            'Run a 10-compound worklist against one academic oncology partner (design -> lab -> ingest)',
+          ],
+          note: configured ? 'Pipeline tracked from real AetherDesk state.' : 'AETHERDESK_BASE_URL / AETHERDESK_API_KEY not configured — pipeline reports 0.',
+        };
+      }
+
+      if (handler === 'oncology_strategy_scan') {
+        // Phase direction: run the strategy-team weeklyScan with oncology
+        // context and report the venture-scan brief + Phase A gate status.
+        // Real strategist CLI, bounded 90s, never fabricates partners.
+        const { runWeeklyScan } = await import('./strategy-team');
+        const end = new Date();
+        const start = new Date(end.getTime() - 7 * 86400_000);
+        const scan = await runWeeklyScan({
+          periodStart: start.toISOString(),
+          periodEnd: end.toISOString(),
+          hiddenInputs: [
+            {
+              source: 'oncology',
+              terms: ['pilot partner', 'evidence hub', 'versioned cohorts', 'discovery worklist'],
+              assets: ['evidence-hub', 'discovery-worklist', 'leaderboard'],
+            },
+          ],
+        });
+        // Leaderboard gate status from the freshest pooled artifact.
+        let gate: { cohorts: number; gateMet: boolean; artifact: string | null } = { cohorts: 0, gateMet: false, artifact: null };
+        try {
+          const { readdirSync, readFileSync } = await import('node:fs');
+          const root = process.env.UPLIFT_ROOT ?? 'C:\\Users\\User\\Downloads\\Uplift';
+          const onco = path.join(root, '02_Pillars', 'Overlay Science', 'Overlay Oncology');
+          const reports = path.join(onco, 'reports');
+          const files = readdirSync(reports).filter((f) => /^2026-09-.*-pooled-A2.*\.json$/.test(f)).sort();
+          if (files.length) {
+            const f = files[files.length - 1]!;
+            const raw = JSON.parse(readFileSync(path.join(reports, f), 'utf-8')) as {
+              cells?: Array<{ unoC: number }>;
+            };
+            const at60 = (raw.cells ?? []).filter((c) => c.unoC >= 0.6).length;
+            gate = { cohorts: at60, gateMet: at60 >= 6, artifact: f };
+          }
+        } catch { /* leaderboard artifact absent — report 0 */ }
+        return {
+          handler,
+          scanOk: scan.ok,
+          scanError: scan.error ?? null,
+          scanSummary: scan.summary ?? null,
+          leaderboard: gate,
+          note: 'Weekly venture scan with oncology context; reports real strategy output, not a partner. C#4 still needs a real lab via Aetherdesk outreach.',
+        };
       }
 
       if (handler === 'benchmark_sites') {
@@ -1147,7 +1301,8 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
           repairs.push(await attemptRepair('monitor:down', `${site.monitor_name || site.url} is down`));
         }
         // Ecosystem services down (BookBridge, brain, hemp stack) are started
-        // directly — the real fix, not a report.
+        // directly — the real fix, not a report. Manual-cluster mode
+        // (DRAYMOND_AUTO_START_SERVICES=0): report down services, never start.
         const servicesDown: string[] = [];
         const serviceSlugs = ['bookbridge', 'deterministic-brain', 'hemp-os', 'hempforge', 'sports-steve', 'uplift-agent'];
         for (const site of down.slice(0, 5)) {
@@ -1160,7 +1315,8 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
           }
         }
         const startedServices: Array<{ slug: string; up: boolean; detail: string }> = [];
-        if (servicesDown.length > 0) {
+        const autoStartDisabled = process.env.DRAYMOND_AUTO_START_SERVICES === '0';
+        if (servicesDown.length > 0 && !autoStartDisabled) {
           const { startDownServices } = await import('./service-manager');
           const started = await startDownServices([...new Set(servicesDown)].slice(0, 3));
           startedServices.push(...started.map((s) => ({ slug: s.slug, up: s.up, detail: s.detail })));
@@ -1175,6 +1331,24 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
           repairs: repairs.map((r) => ({ signal: r.signal, status: r.status, detail: r.detail })),
           servicesStarted: startedServices,
           loops: loops.map((l) => ({ signal: l.signal, attempts: l.attempts })),
+        };
+      }
+
+      if (handler === 'self_analysis_loop') {
+        // Fleet self-analysis: ingest telemetry breadth, derive trends across
+        // runs, emit prioritized improvement recommendations, and write
+        // resolved findings back into the learning store (closed loop).
+        const { runSelfAnalysis } = await import('./self-analysis');
+        const report = await runSelfAnalysis();
+        return {
+          handler,
+          ran_at: report.ranAt,
+          duration_ms: report.durationMs,
+          findings: report.findings.filter((f) => f.status === 'active').length,
+          recommendations: report.recommendations.length,
+          resolved: report.resolved.length,
+          source_errors: report.errors.length,
+          top: report.recommendations.slice(0, 5).map((r) => `[${r.severity}] ${r.title}`),
         };
       }
 
@@ -1319,6 +1493,14 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
       if (handler === 'service_health_repair') {
         // Probe the ecosystem services; auto-start the ones that are down
         // (BookBridge, brain, hemp stack, ...). The repair team's job handler.
+        // Manual-cluster mode: DRAYMOND_AUTO_START_SERVICES=0 means the operator
+        // loads clusters per task — report what is down, never start it.
+        if (process.env.DRAYMOND_AUTO_START_SERVICES === '0') {
+          const { probeAllServices } = await import('./service-manager');
+          const all = await probeAllServices();
+          const down = all.filter((s) => !s.up).map((s) => s.slug);
+          return { handler, checked: all.length, up: all.filter((s) => s.up).length, down, startable: [], started: [], autoStart: 'disabled (manual cluster mode)' };
+        }
         const { probeAllServices, startDownServices, startableDownServices } = await import('./service-manager');
         const all = await probeAllServices();
         const down = all.filter((s) => !s.up).map((s) => s.slug);
@@ -1606,6 +1788,87 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
             reason: 'bbtech insight sync failed',
           };
         }
+        // bbtech sports model step: validate the Sports Steve win-probability
+        // model (real NBA dataset + math-x stats) and persist the derived
+        // metrics into the SAME science_insights trends store under
+        // source='bbtech_sports_model'. Fail-soft — an unavailable dataset or
+        // python runtime is recorded, never thrown.
+        try {
+          const { runPythonSportsModel } = await import('@/lib/sports/pythonExecutors');
+          await runPythonSportsModel('backtest', {
+            sessionId: `sports-model-backtest-${new Date().toISOString().slice(0, 10)}`,
+          });
+        } catch (err) {
+          try {
+            console.warn(
+              '[scheduler] sports model backtest degraded',
+              err instanceof Error ? err.message : err,
+            );
+          } catch {
+            // logging itself must never throw
+          }
+        }
+        // bbtech betting experiment step: benchmark Elo / CARMELO / our model /
+        // fade-famous against the real money-line market and persist the honest
+        // verdict into the trends store (source='bbtech_betting_experiment').
+        // Fail-soft like every scheduler step.
+        try {
+          const { runPythonSportsModel } = await import('@/lib/sports/pythonExecutors');
+          await runPythonSportsModel('experiment', {
+            sessionId: `betting-experiment-${new Date().toISOString().slice(0, 10)}`,
+          });
+        } catch (err) {
+          try {
+            console.warn(
+              '[scheduler] betting experiment degraded',
+              err instanceof Error ? err.message : err,
+            );
+          } catch {
+            // logging itself must never throw
+          }
+        }
+        // bbtech live player-prop edge step: pull real book props (Odds API via
+        // Sports Steve's broker), score them against the player model, and
+        // persist edges to the trends store (source='bbtech_live_props').
+        // Degrades to an honest E4 when no Odds API key is configured.
+        try {
+          const { runPythonSportsModel } = await import('@/lib/sports/pythonExecutors');
+          await runPythonSportsModel('live-props', {
+            sessionId: `live-props-${new Date().toISOString().slice(0, 10)}`,
+            edge: 0.03,
+          });
+        } catch (err) {
+          try {
+            console.warn(
+              '[scheduler] live props degraded',
+              err instanceof Error ? err.message : err,
+            );
+          } catch {
+            // logging itself must never throw
+          }
+        }
+        // bbtech live moneyline edge step: score the team model against REAL
+        // current closing lines and settle any open ledger rows. The live
+        // forward ledger is the honest track record for the betting formula.
+        try {
+          const { runPythonSportsModel } = await import('@/lib/sports/pythonExecutors');
+          await runPythonSportsModel('live-ml', {
+            sessionId: `live-ml-${new Date().toISOString().slice(0, 10)}`,
+            edge: 0.03,
+          });
+          await runPythonSportsModel('settle', {
+            sessionId: `live-settle-${new Date().toISOString().slice(0, 10)}`,
+          });
+        } catch (err) {
+          try {
+            console.warn(
+              '[scheduler] live moneyline edge degraded',
+              err instanceof Error ? err.message : err,
+            );
+          } catch {
+            // logging itself must never throw
+          }
+        }
         // Research-gap drain step (fail-soft like bbtech_science): push open
         // science_gaps to OmniResearch so deep-research work never stalls.
         // Offline OmniResearch degrades honestly — gaps stay open (queued).
@@ -1857,7 +2120,7 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
   const results: JobRunResult[] = [];
   const recipient = getNotificationRecipient();
 
-  // ── 0. Recover stale 'running' locks ───────────────────────────────────
+  // -- 0. Recover stale 'running' locks -----------------------------------
   // If the process crashed while a job was mid-flight, its row stays
   // `last_run_status = 'running'` forever and the atomic claim below (which
   // filters `.neq('running')`) would permanently skip it. A run is dead when
@@ -1895,7 +2158,7 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
     console.error('[Draymond Scheduler] stale-running recovery failed:', err instanceof Error ? err.message : err);
   }
 
-  // ── 0b. Recover stale 'running' CHAINS ───────────────────────────────────
+  // -- 0b. Recover stale 'running' CHAINS -----------------------------------
   // Chain instances that crashed mid-run stay `status = 'running'` forever and
   // block re-execution of that instance (and clutter the chain history with
   // phantom in-flight rows). A chain is dead when its lease expired (process
@@ -1957,10 +2220,10 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
   // During a boot catch-up (`catchupMs` set) the horizon widens so jobs missed
   // while the server was off are EXECUTED instead of skipped — the work happens
   // when Draymond starts, bounded so ancient slots are not replayed.
-  const nowMs = now.getTime();
+const nowMs = now.getTime();
   const runnable: ScheduledJob[] = [];
   const stale: ScheduledJob[] = [];
-  const deferred: ScheduledJob[] = [];
+  const deferred: Array<{ job: ScheduledJob; reason: string }> = [];
   for (const raw of dueJobs) {
     const job = raw as ScheduledJob;
     const dueMs = job.next_run_at ? new Date(job.next_run_at).getTime() : nowMs;
@@ -1968,23 +2231,31 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
     if (isOutsideDelegationWindow(job, now)) {
       // The handler's delegation window is closed right now — defer instead of
       // burning tokens on work scheduled for another time of day.
-      deferred.push(job);
-    } else if (Number.isFinite(dueMs) && overdueMs > CATCH_UP_GRACE_MS) {
-      // Overdue beyond the strict grace. In catch-up mode, still run if within
-      // the horizon; otherwise treat as stale.
-      if (opts?.catchupMs && overdueMs <= opts.catchupMs) {
-        runnable.push(job);
-      } else {
-        stale.push(job);
-      }
+      deferred.push({ job, reason: `Delegation window closed (${delegationWindowLabel(job)})` });
     } else {
-      runnable.push(job);
+      const sectorGate = sectorCapExceeded(job, now);
+      if (sectorGate) {
+        // The job's corporate sector is at its daily token cap — defer so the
+        // allocation is real instead of advisory (see canDelegateSector).
+        deferred.push({ job, reason: `Sector daily token cap reached (${sectorGate})` });
+      } else if (Number.isFinite(dueMs) && overdueMs > CATCH_UP_GRACE_MS) {
+        // Overdue beyond the strict grace. In catch-up mode, still run if within
+        // the horizon; otherwise treat as stale.
+        if (opts?.catchupMs && overdueMs <= opts.catchupMs) {
+          runnable.push(job);
+        } else {
+          stale.push(job);
+        }
+      } else {
+        runnable.push(job);
+      }
     }
   }
 
-  // Defer jobs whose delegation window is closed. Same treatment as stale:
-  // skip execution, advance next_run_at, no notifications or token spend.
-  for (const job of deferred) {
+  // Defer jobs whose delegation window is closed or whose sector is at its
+  // daily token cap. Same treatment as stale: skip execution, advance
+  // next_run_at, no notifications or token spend.
+  for (const { job, reason } of deferred) {
     try {
       const nextRunAt = getNextRunTime(job.cron_expression, now).toISOString();
       await supabase
@@ -1992,7 +2263,7 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
         .update({
           last_run_at: now.toISOString(),
           last_run_status: 'skipped',
-          last_error: `Delegation window closed (${delegationWindowLabel(job)}) — deferred to next scheduled slot`,
+          last_error: `${reason} — deferred to next scheduled slot`,
           next_run_at: nextRunAt,
         })
         .eq('id', job.id);
@@ -2002,10 +2273,10 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
         job_type: job.job_type,
         status: 'skipped',
         duration_ms: 0,
-        error: `Delegation window closed (${delegationWindowLabel(job)}) — deferred`,
+        error: `${reason} — deferred`,
       });
     } catch (err) {
-      console.error(`[Draymond Scheduler] Failed to defer job "${job.name}":`, err);
+      console.error('[Draymond Scheduler] Failed to defer job "%s":', job.name, err);
     }
   }
 
@@ -2032,7 +2303,7 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
         error: 'Missed window — rescheduled',
       });
     } catch (err) {
-      console.error(`[Draymond Scheduler] Failed to reschedule stale job "${job.name}":`, err);
+      console.error('[Draymond Scheduler] Failed to reschedule stale job "%s":', job.name, err);
     }
   }
 
@@ -2055,7 +2326,7 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
       .maybeSingle();
 
     if (claimError) {
-      console.error(`[Draymond Scheduler] Failed to claim job "${job.name}":`, claimError.message);
+      console.error('[Draymond Scheduler] Failed to claim job "%s":', job.name, claimError.message);
       continue;
     }
 
@@ -2075,6 +2346,23 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
     const startTime = Date.now();
     const stopHeartbeat = startJobHeartbeat(job.id);
     emitJobStarted(job.id, job.name, job.job_type);
+
+    // Sector lifecycle: cold-start the job's sector services before it runs
+    // (same hook as runJobNow) so on-demand work can reach its dependencies.
+    try {
+      const handler = job.job_config?.handler;
+      if (typeof handler === 'string') {
+        const sector = sectorFor(handler);
+        const result = await ensureSectorForJob(sector);
+        if (result.started.length > 0 || result.failed.length > 0) {
+          console.log(
+            `[sector-lifecycle] job "${job.name}" (${handler}) sector ${sector}: started=[${result.started.join(',')}] failed=[${result.failed.join(',')}] disabled=${result.disabled}`
+          );
+        }
+      }
+    } catch {
+      // best-effort — lifecycle must never block a job
+    }
 
     // Execute with job-level retries (max_retries). The job was claimed above
     // so a single retry loop owns this slot; failed attempts back off before
@@ -2145,7 +2433,7 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
             { priority: 'low', metadata: { job_id: job.id, duration_ms: durationMs } }
           );
         } catch (notifyErr) {
-          console.error(`[Draymond Scheduler] Failed to send success notification for "${job.name}":`, notifyErr);
+          console.error('[Draymond Scheduler] Failed to send success notification for "%s":', job.name, notifyErr);
         }
       }
     } else {
@@ -2217,7 +2505,7 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
             { priority: 'high', metadata: { job_id: job.id, duration_ms: durationMs, error: errorMessage } }
           );
         } catch (notifyErr) {
-          console.error(`[Draymond Scheduler] Failed to send failure notification for "${job.name}":`, notifyErr);
+          console.error('[Draymond Scheduler] Failed to send failure notification for "%s":', job.name, notifyErr);
         }
       }
 
@@ -2239,7 +2527,7 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
             },
           });
         } catch (notifyErr) {
-          console.error(`[Draymond Scheduler] Failed to push failure chat alert for "${job.name}":`, notifyErr);
+          console.error('[Draymond Scheduler] Failed to push failure chat alert for "%s":', job.name, notifyErr);
         }
       }
 
@@ -2270,7 +2558,7 @@ export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Pr
             },
           );
         } catch (repairErr) {
-          console.error(`[Draymond Scheduler] Immediate repair dispatch failed for "${job.name}":`, repairErr);
+          console.error('[Draymond Scheduler] Immediate repair dispatch failed for "%s":', job.name, repairErr);
         }
       }
     }
@@ -2375,6 +2663,30 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     cron_expression: '30 0 * * *',
     job_type: 'custom',
     job_config: { handler: 'self_learning_loop' },
+    is_enabled: true,
+  },
+  {
+    name: 'Oncology Revalidation',
+    description: 'Nightly 02:00 Overlay Oncology evidence revalidation: Europe PMC literature diff -> vector store, pooled-leaderboard gate status, concordance/evidence drift. Phase E4 pre-work.',
+    cron_expression: '0 2 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'oncology_revalidation' },
+    is_enabled: true,
+  },
+  {
+    name: 'Pilot-Partner Outreach Tick',
+    description: 'Daily 09:30 AetherDesk pipeline read toward the Phase C#4 pilot-partner objective (campaigns/leads/calls). Reports real state only.',
+    cron_expression: '30 9 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'partner_outreach_tick' },
+    is_enabled: true,
+  },
+  {
+    name: 'Self-Analysis Loop',
+    description: 'Daily fleet self-analysis: ingest telemetry, compute trends, produce prioritized improvement recommendations, close the learning loop on resolved findings.',
+    cron_expression: '45 0 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'self_analysis_loop' },
     is_enabled: true,
   },
   {
@@ -2755,7 +3067,7 @@ export async function seedBasicJobs(): Promise<number> {
         created += 1;
       }
     } catch (err) {
-      console.error(`[Draymond Scheduler] Failed to seed job "${job.name}":`, err);
+      console.error('[Draymond Scheduler] Failed to seed job "%s":', job.name, err);
     }
   }
   return created;

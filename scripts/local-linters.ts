@@ -72,7 +72,7 @@ async function main() {
     findings.push({ severity: sev, category, title, description, file, line, engine: 'linters' });
   };
 
-  // ── ESLint (repo config) ──
+  // -- ESLint (repo config) --
   const hasESLint = hasFile(root, 'eslint.config.mjs') || hasFile(root, '.eslintrc') || hasFile(root, '.eslintrc.json') || hasFile(root, '.eslintrc.js');
   const eslint = resolveTool('npx');
   if (hasESLint && eslint) {
@@ -94,7 +94,7 @@ async function main() {
     }
   }
 
-  // ── Ruff (Python) ──
+  // -- Ruff (Python) --
   const ruff = resolveTool('ruff');
   if (ruff && (hasFile(root, 'pyproject.toml') || hasFile(root, 'setup.py') || hasFile(root, 'requirements.txt'))) {
     tools.push('ruff');
@@ -114,7 +114,7 @@ async function main() {
     }
   }
 
-  // ── Bandit (Python security) ──
+  // -- Bandit (Python security) --
   const bandit = resolveTool('bandit');
   if (bandit && (hasFile(root, 'pyproject.toml') || hasFile(root, 'setup.py') || hasFile(root, 'requirements.txt'))) {
     tools.push('bandit');
@@ -133,7 +133,7 @@ async function main() {
     }
   }
 
-  // ── Cargo clippy (Rust) ──
+  // -- Cargo clippy (Rust) --
   const cargo = resolveTool('cargo');
   if (cargo && hasFile(root, 'Cargo.toml')) {
     tools.push('cargo-clippy');
@@ -155,7 +155,7 @@ async function main() {
     }
   }
 
-  // ── Go vet ──
+  // -- Go vet --
   const go = resolveTool('go');
   if (go && (hasFile(root, 'go.mod'))) {
     tools.push('go-vet');

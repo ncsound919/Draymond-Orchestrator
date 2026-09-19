@@ -159,7 +159,7 @@ function gmailTokenFile(): string {
 async function gmailOAuthEnabled(): Promise<boolean> {
   if (process.env.GMAIL_USE_OAUTH !== '1') return false;
   try {
-    const raw = await readFile(gmailTokenFile(), 'utf8');
+    const raw = await /*turbopackIgnore: true*/ readFile(gmailTokenFile(), 'utf8');
     const tok = JSON.parse(raw) as GmailTokenFile;
     return !!(tok && tok.refresh_token);
   } catch {
@@ -170,7 +170,7 @@ async function gmailOAuthEnabled(): Promise<boolean> {
 /** Return a fresh Gmail access token, exchanging the refresh token when expired. */
 async function getGmailAccessToken(): Promise<{ access_token: string; token: GmailTokenFile }> {
   const file = gmailTokenFile();
-  const raw = await readFile(file, 'utf8');
+  const raw = await /*turbopackIgnore: true*/ readFile(file, 'utf8');
   const token = JSON.parse(raw) as GmailTokenFile;
   if (!token.refresh_token) throw new Error('[Gmail OAuth] no refresh_token in token file');
 

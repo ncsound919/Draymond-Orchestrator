@@ -429,7 +429,7 @@ export async function withRateLimitAndCost(
 ): Promise<InvocationResult> {
   const config = entity.invocation_config;
 
-  // ── Step 1: Rate Limit Check ──────────────────────────────────────────
+  // -- Step 1: Rate Limit Check ------------------------------------------
   // Validate rate_limit config shape at runtime (item 5)
   const rawRateLimit = config.rate_limit;
   const rateLimitConfig: RateLimitConfig | undefined =
@@ -462,7 +462,7 @@ export async function withRateLimitAndCost(
     }
   }
 
-  // ── Step 2: Budget Check ──────────────────────────────────────────────
+  // -- Step 2: Budget Check ----------------------------------------------
   // Validate budget config shape at runtime (item 5)
   const rawBudget = config.budget;
   const budgetConfig: BudgetConfig | undefined =
@@ -497,10 +497,10 @@ export async function withRateLimitAndCost(
     }
   }
 
-  // ── Step 3: Invoke ────────────────────────────────────────────────────
+  // -- Step 3: Invoke ----------------------------------------------------
   const result = await invokeEntity(entity, action, input, options);
 
-  // ── Step 4: Record Cost (after successful invocation) ─────────────────
+  // -- Step 4: Record Cost (after successful invocation) -----------------
   if (result.success) {
     const costPerCall =
       typeof config.cost_per_call_cents === 'number'

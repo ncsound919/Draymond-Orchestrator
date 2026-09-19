@@ -106,7 +106,7 @@ async function main() {
     findings.push({ severity: sev, category, title, description, file, line, fixSuggestion, engine: 'iac' });
   };
 
-  // ── 1. checkov (Terraform / K8s / CloudFormation / GHA) ──
+  // -- 1. checkov (Terraform / K8s / CloudFormation / GHA) --
   const checkov = resolveTool('checkov');
   if (checkov && hasIaCFiles(root)) {
     tools.push('checkov');
@@ -128,7 +128,7 @@ async function main() {
     }
   }
 
-  // ── 2. hadolint (Dockerfile) ──
+  // -- 2. hadolint (Dockerfile) --
   const hadolint = resolveTool('hadolint');
   const dockerfiles = findDockerfiles(root);
   if (hadolint && dockerfiles.length > 0) {
@@ -150,7 +150,7 @@ async function main() {
     }
   }
 
-  // ── 3. trivy misconfig (K8s / Docker compose) ──
+  // -- 3. trivy misconfig (K8s / Docker compose) --
   const trivy = resolveTool('trivy');
   if (trivy && (hasIaCFiles(root) || dockerfiles.length > 0)) {
     tools.push('trivy-misconfig');

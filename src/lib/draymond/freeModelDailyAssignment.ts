@@ -9,7 +9,7 @@
 // ============================================================================
 
 import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { runFreeCatalogSync } from './freeCatalogSync';
 
 export interface DailyAssignmentResult {
@@ -31,7 +31,7 @@ function patchEcosystemYaml(assignedModel: string): boolean {
     const bakPath = `${patchPath}.bak`;
     copyFileSync(patchPath, bakPath);
 
-    let content = readFileSync(patchPath, 'utf8');
+    const content = readFileSync(patchPath, 'utf8');
     // Capture the CURRENT model id from the agent-default-model `model:` line
     // so the `- id:` entry for the model is patched too — never hardcode the
     // old id (free models rotate). Only `model:` fields and the model's own

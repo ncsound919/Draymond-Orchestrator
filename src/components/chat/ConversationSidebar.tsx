@@ -64,6 +64,7 @@ export default function ConversationSidebar() {
   }, []);
 
   useEffect(() => {
+     
     void refresh();
     return onChatEvent(() => void refresh());
   }, [refresh]);

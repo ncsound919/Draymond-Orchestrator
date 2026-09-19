@@ -53,7 +53,7 @@ export interface MemorySeed {
   lessons: Lesson[];
 }
 
-// ── SQLite (FTS5) store, one handle per db file ─────────────────────────────
+// -- SQLite (FTS5) store, one handle per db file -----------------------------
 
 const handles = new Map<string, Database.Database>();
 
@@ -109,7 +109,7 @@ function getDb(): Database.Database {
   return db;
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// -- Helpers -----------------------------------------------------------------
 
 function reviewLine(session: IdeSession): string {
   const r = session.review;
@@ -144,7 +144,7 @@ function toRecord(row: Record<string, unknown>): IdeMemoryRecord {
   };
 }
 
-// ── Public API ──────────────────────────────────────────────────────────────
+// -- Public API --------------------------------------------------------------
 
 /**
  * Distill a completed session into L1 (facts) + L2 (scenario) memory assets.

@@ -13,7 +13,7 @@ import { authorizeRequest, sanitizeError } from '@/lib/draymond/api-auth';
 
 export const dynamic = 'force-dynamic';
 
-// ── GET /api/chains/[id] ────────────────────────────────────────────────────
+// -- GET /api/chains/[id] ----------------------------------------------------
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -36,7 +36,7 @@ export async function GET(
   }
 }
 
-// ── DELETE /api/chains/[id] ─────────────────────────────────────────────────
+// -- DELETE /api/chains/[id] -------------------------------------------------
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },

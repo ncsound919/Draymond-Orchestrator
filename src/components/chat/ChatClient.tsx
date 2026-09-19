@@ -13,6 +13,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useOrchestratorHealth } from '@/hooks/useOrchestratorHealth';
 import { emitChatEvent } from '@/lib/chat-events';
 import Markdown from './Markdown';
 import {
@@ -25,7 +26,7 @@ import {
   XMark,
 } from './markdown-icons';
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// -- Types --------------------------------------------------------------------
 
 interface ServerMessage {
   id: string;
@@ -87,7 +88,7 @@ interface ChatClientProps {
   initialMessages?: ServerMessage[];
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// -- Helpers ------------------------------------------------------------------
 
 function makeId(): string {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -179,7 +180,7 @@ function dataUrlToB64(dataUrl: string): string {
   return comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
 }
 
-// ── Component ────────────────────────────────────────────────────────────────
+// -- Component ----------------------------------------------------------------
 
 export default function ChatClient({
   userEmail,
@@ -188,6 +189,7 @@ export default function ChatClient({
   initialMessages,
 }: ChatClientProps) {
   const router = useRouter();
+  const health = useOrchestratorHealth();
   const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -203,7 +205,12 @@ export default function ChatClient({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const initialMessagesRef = useRef(initialMessages);
-  initialMessagesRef.current = initialMessages;
+  // Keep the ref current in an effect (writing refs during render is unsafe and
+  // flagged by react-hooks/refs). Declared before the reset effect so it runs
+  // first in the same commit.
+  useEffect(() => {
+    initialMessagesRef.current = initialMessages;
+  }, [initialMessages]);
 
   // Reset when navigating between conversations.
   useEffect(() => {
@@ -229,7 +236,7 @@ export default function ChatClient({
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, [input]);
 
-  // ── Message mutation helpers ─────────────────────────────────────────────
+  // -- Message mutation helpers ---------------------------------------------
 
   const appendChunk = useCallback((assistantId: string, chunk: string) => {
     setMessages((prev) =>
@@ -260,7 +267,7 @@ export default function ChatClient({
     setMessages((prev) => prev.map((m) => (m.id === fromId ? { ...m, id: toId } : m)));
   }, []);
 
-  // ── Turn runner ──────────────────────────────────────────────────────────
+  // -- Turn runner ----------------------------------------------------------
 
   const runTurn = useCallback(
     async (opts: { content?: string; mode?: 'send' | 'regenerate' | 'edit'; editMessageId?: string }) => {
@@ -432,7 +439,7 @@ export default function ChatClient({
     [appendChunk, composerAttachments, conversationId, finalizeAssistant, router, sending, updateMessageId],
   );
 
-  // ── Composer attachment handlers ─────────────────────────────────────────
+  // -- Composer attachment handlers -----------------------------------------
 
   const addFiles = useCallback(async (files: FileList | File[]) => {
     const list = Array.from(files);
@@ -472,7 +479,7 @@ export default function ChatClient({
     inputRef.current?.focus();
   }, []);
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  // -- Render ---------------------------------------------------------------
 
   const lastAssistantId = [...messages].reverse().find((m) => m.role === 'assistant')?.id;
 
@@ -503,7 +510,7 @@ export default function ChatClient({
         aria-hidden="true"
       />
 
-      {/* ── Header ─────────────────────────────────────────────────────── */}
+      {/* -- Header ------------------------------------------------------- */}
       <header className="relative z-10 border-b border-white/5 bg-black/40 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-3xl items-center justify-between px-4 py-3 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
@@ -515,8 +522,21 @@ export default function ChatClient({
                 {conversationTitle && conversationTitle !== 'New chat' ? conversationTitle : 'Draymond Assistant'}
               </p>
               <p className="flex items-center gap-1.5 text-[11px] leading-tight text-gray-500">
-                <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-                Online &middot; routes to the right tool
+                <span
+                  role="status"
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    health === 'online'
+                      ? 'bg-green-500 animate-pulse'
+                      : health === 'offline'
+                        ? 'bg-red-500'
+                        : 'bg-gray-500'
+                  }`}
+                />
+                {health === 'online'
+                  ? 'Online · routes to the right tool'
+                  : health === 'offline'
+                    ? 'Orchestrator unreachable'
+                    : 'Connecting…'}
               </p>
             </div>
           </div>
@@ -534,7 +554,7 @@ export default function ChatClient({
         </div>
       </header>
 
-      {/* ── Messages ───────────────────────────────────────────────────── */}
+      {/* -- Messages ----------------------------------------------------- */}
       <div
         ref={scrollRef}
         className={`relative z-0 flex-1 min-h-0 overflow-y-auto ${dragOver ? 'bg-[#22c55e]/5' : ''}`}
@@ -593,7 +613,7 @@ export default function ChatClient({
         </div>
       </div>
 
-      {/* ── Composer ───────────────────────────────────────────────────── */}
+      {/* -- Composer ----------------------------------------------------- */}
       <div className="relative z-10 border-t border-white/5 bg-black/40 backdrop-blur-xl">
         <div className="mx-auto w-full max-w-3xl px-4 py-4 sm:px-6">
           {composerAttachments.length > 0 && (
@@ -696,7 +716,7 @@ export default function ChatClient({
   );
 }
 
-// ── Message row ──────────────────────────────────────────────────────────────
+// -- Message row --------------------------------------------------------------
 
 interface MessageRowProps {
   message: LocalMessage;
@@ -854,7 +874,7 @@ function UserIcon() {
   );
 }
 
-// ── Suggestions ──────────────────────────────────────────────────────────────
+// -- Suggestions --------------------------------------------------------------
 
 const SUGGESTIONS = [
   { icon: <ActivityIcon />, label: 'System status', hint: 'Overview & health', task: 'Show me the current system status' },

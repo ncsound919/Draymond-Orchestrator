@@ -95,7 +95,7 @@ export async function runBrainDecision(input: BrainDecisionInput = {}): Promise<
   const actions: BrainDecision['actions'] = [];
   const priorities: BrainDecision['priorities'] = [];
 
-  // ── 1. Gather context (live unless overridden for tests) ───────────────
+  // -- 1. Gather context (live unless overridden for tests) ---------------
   const [agenda, intel, lessons] = await Promise.all([
     input.agenda ?? loadAgenda(),
     getSystemIntel().catch(() => null),
@@ -109,7 +109,7 @@ export async function runBrainDecision(input: BrainDecisionInput = {}): Promise<
   const downMonitors = input.downMonitors ?? intel?.monitors.down ?? [];
   const lessonList = lessons.map((l) => `${l.agentId}: ${l.lesson} (x${l.evidenceCount})`).slice(0, 10);
 
-  // ── 2. Build the decision context ──────────────────────────────────────────
+  // -- 2. Build the decision context ------------------------------------------
   const brainQuery = [
     'Business operations decision. Agenda:',
     agenda.map((g) => `- ${g.title} (${g.progress}%)`).join('\n') || '- none',
@@ -124,7 +124,7 @@ export async function runBrainDecision(input: BrainDecisionInput = {}): Promise<
     'Recommend the single highest-value focus + the top 3 hiccups to repair first, considering the agenda.',
   ].join('\n');
 
-  // ── 2a. PRIMARY: Dev-Brain (deterministic decision layer) ─────────────────
+  // -- 2a. PRIMARY: Dev-Brain (deterministic decision layer) -----------------
   // Dev-Brain is the fleet's primary decision advisor. When reachable, its
   // weighted decision matrix drives focus + repair ordering. Falls through to
   // the local harness when Dev-Brain is down — decisions never stall.
@@ -157,7 +157,7 @@ export async function runBrainDecision(input: BrainDecisionInput = {}): Promise<
     }
   } catch { /* fall through to local harness */ }
 
-  // ── 2b. Fallback: local harness / deterministic brain ─────────────────────
+  // -- 2b. Fallback: local harness / deterministic brain ---------------------
   if (!brainConsulted) {
     const { reasonLocal: local } = await import('./local-reason');
     localReason = await local(brainQuery);
@@ -172,13 +172,13 @@ export async function runBrainDecision(input: BrainDecisionInput = {}): Promise<
     sweepRan = Boolean(report);
   }
 
-  // ── 3. Focus goal: Dev-Brain recommendation, else least-progress agenda. ─
+  // -- 3. Focus goal: Dev-Brain recommendation, else least-progress agenda. -
   const focusGoal = focusOverride ?? (agenda.length ? [...agenda].sort((a, b) => a.progress - b.progress)[0]!.title : null);
   if (focusGoal) {
     priorities.push({ id: 'goal', label: `Advance agenda: ${focusGoal}`, why: 'lowest progress goal pulls the mission forward', agent: 'overlay-strategist' });
   }
 
-  // ── 4. Repair queue: hiccups → repair/coding teams, bounded. ────────────
+  // -- 4. Repair queue: hiccups → repair/coding teams, bounded. ------------
   const repairQueue: BrainDecision['repairQueue'] = [];
   for (const j of failingJobs) {
     repairQueue.push({
@@ -213,7 +213,7 @@ export async function runBrainDecision(input: BrainDecisionInput = {}): Promise<
     repairQueue.sort((a, b) => a.priority - b.priority);
   }
 
-  // ── 4b. Free-API key acquisition list (the "fill the API list" drive). ───
+  // -- 4b. Free-API key acquisition list (the "fill the API list" drive). ---
   // Missing mission-critical keys (E1-E4) become a priority so the fleet can
   // generate them (coding agent) or the human signs up. Never logs key values.
   const criticalMissing = missingCriticalKeys(10);
@@ -234,7 +234,7 @@ export async function runBrainDecision(input: BrainDecisionInput = {}): Promise<
     }
   }
 
-  // ── 5. Take bounded actions (repair/coding dispatch + learning feedback). ─
+  // -- 5. Take bounded actions (repair/coding dispatch + learning feedback). -
   const { isOnCooldown } = await import('./workflow-budget');
   const taken = new Set<string>();
 
@@ -276,7 +276,7 @@ export async function runBrainDecision(input: BrainDecisionInput = {}): Promise<
     }
   }
 
-  // ── 6. Self-learning feedback: record the decision outcome. ──────────────
+  // -- 6. Self-learning feedback: record the decision outcome. --------------
   const issueCount = failingJobs.length + downMonitors.length;
   const fixedCount = actions.filter((a) => a.ok).length;
   const deferredCount = Math.max(0, issueCount - actions.length);

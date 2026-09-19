@@ -27,7 +27,7 @@ export interface LoginResult {
   error: string | null;
 }
 
-// ── password hashing (scrypt) ────────────────────────────────────────────────
+// -- password hashing (scrypt) ------------------------------------------------
 
 const SCRYPT_KEYLEN = 64;
 
@@ -48,7 +48,7 @@ export function verifyPassword(password: string, stored: string): boolean {
   );
 }
 
-// ── users ────────────────────────────────────────────────────────────────────
+// -- users --------------------------------------------------------------------
 
 export function findUserByEmail(email: string): LocalUser | null {
   const row = getDb()
@@ -75,7 +75,7 @@ export function createUser(email: string, password: string, role = 'admin'): Loc
   return { id, email: email.toLowerCase().trim(), role, created_at: now, updated_at: now };
 }
 
-// ── sessions ─────────────────────────────────────────────────────────────────
+// -- sessions -----------------------------------------------------------------
 
 export function createSession(userId: string): string {
   const db = getDb();
@@ -114,7 +114,7 @@ export function pruneExpiredSessions(): void {
     .run(new Date().toISOString());
 }
 
-// ── login ────────────────────────────────────────────────────────────────────
+// -- login --------------------------------------------------------------------
 
 export function login(email: string, password: string): LoginResult {
   // Bootstrap the local admin account on a fresh database. Idempotent.
@@ -132,7 +132,7 @@ export function login(email: string, password: string): LoginResult {
   return { token, user, error: null };
 }
 
-// ── admin bootstrap ──────────────────────────────────────────────────────────
+// -- admin bootstrap ----------------------------------------------------------
 
 /**
  * Ensure at least one admin exists. On a fresh database, creates the account

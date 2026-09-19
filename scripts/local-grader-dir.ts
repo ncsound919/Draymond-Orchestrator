@@ -17,6 +17,7 @@ const EXCLUDE = new Set([
   'node_modules', 'dist', 'build', 'coverage', '.git', '.next', '.vite',
   'src-tauri', 'e2e', 'test-results', 'playwright-report', '.verification-sandbox',
   'test-docs', 'reports', 'docs', '.turbo', '.cache', '.github', 'public', 'assets',
+  'agents', '.draymond', '.audit', 'data', 'deep-audit-reports',
 ]);
 
 function collectFileList(root: string, limit = 80): string[] {

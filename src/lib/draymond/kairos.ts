@@ -219,7 +219,7 @@ export async function detectStaleHeartbeat(): Promise<DetectorHit[]> {
   const { getHeartbeats } = await import('./heartbeat');
   const hbs = await getHeartbeats();
 
-  // ── Monitor self-check ──────────────────────────────────────────────────
+  // -- Monitor self-check --------------------------------------------------
   // If the sweep stamp is missing or older than 3× the tick interval, the
   // heartbeat MONITOR itself has died — per-agent records are meaningless at
   // that point (the blind week: this file froze for days, zero alerts fired

@@ -42,14 +42,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No purchase found for this product.' }, { status: 402 });
   }
 
-  const filePath = path.join(releasesDir(), objectKey);
-  if (!fs.existsSync(filePath)) {
+  const filePath = /*turbopackIgnore: true*/ path.join(releasesDir(), objectKey);
+  if (!/*turbopackIgnore: true*/ fs.existsSync(filePath)) {
     console.error('Local release file missing:', filePath);
     return NextResponse.json({ error: 'File not found' }, { status: 404 });
   }
 
-  const stat = fs.statSync(filePath);
-  const stream = Readable.toWeb(fs.createReadStream(filePath)) as unknown as ReadableStream;
+  const stat = /*turbopackIgnore: true*/ fs.statSync(filePath);
+  const stream = Readable.toWeb(/*turbopackIgnore: true*/ fs.createReadStream(filePath)) as unknown as ReadableStream;
 
   return new NextResponse(stream as unknown as BodyInit, {
     status: 200,

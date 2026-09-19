@@ -15,7 +15,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { DelegationTier } from "@/lib/draymond/delegation";
 
-// ── Shape ────────────────────────────────────────────────────────────────────
+// -- Shape --------------------------------------------------------------------
 
 export interface RepairControls {
   /** Repair cooldown window in minutes (env: DRAYMOND_REPAIR_COOLDOWN_MS). */
@@ -50,7 +50,7 @@ export interface FleetControls {
   updatedAt: string | null;
 }
 
-// ── Defaults (mirror the env defaults in the fleet readers) ─────────────────
+// -- Defaults (mirror the env defaults in the fleet readers) -----------------
 
 export function defaultControls(): FleetControls {
   return {
@@ -61,7 +61,7 @@ export function defaultControls(): FleetControls {
   };
 }
 
-// ── Bounds / clamping (pure) ────────────────────────────────────────────────
+// -- Bounds / clamping (pure) ------------------------------------------------
 
 export const REPAIR_BOUNDS = { cooldownMinutes: [1, 1440], maxInCooldown: [1, 10], loopThreshold: [1, 10] } as const;
 export const DISCOVERY_BOUNDS = { intervalMinutes: [5, 480], iterations: [1, 3] } as const;
@@ -126,7 +126,7 @@ export function isControlsLike(input: unknown): boolean {
   return typeof o.repair === 'object' || typeof o.discovery === 'object' || typeof o.fleet === 'object';
 }
 
-// ── Env resolution (pure) ───────────────────────────────────────────────────
+// -- Env resolution (pure) ---------------------------------------------------
 
 /**
  * Resolve the effective fleet budget: stored value wins; otherwise the env
@@ -150,7 +150,7 @@ export function resolveCooldownMs(storedMinutes: number | undefined, envRaw: str
   return Number.isFinite(env) && env > 0 ? env : defMinutes * 60_000;
 }
 
-// ── Store path ──────────────────────────────────────────────────────────────
+// -- Store path --------------------------------------------------------------
 
 /** Resolve the controls file path (mirrors self-repair's DIR resolution). */
 export function controlsFilePath(): string {
@@ -158,7 +158,7 @@ export function controlsFilePath(): string {
   return path.join(dir, 'controls.json');
 }
 
-// ── Read / write (fs, best-effort) ──────────────────────────────────────────
+// -- Read / write (fs, best-effort) ------------------------------------------
 //
 // The fleet readers (`self-repair`, `discovery-loop-daemon`, `delegation`) are
 // synchronous and call-time. To wire knobs in without converting every caller
@@ -214,7 +214,7 @@ export async function readControlOverrides(): Promise<FleetControls> {
   return readControls();
 }
 
-// ── Sync getters for the fleet readers ──────────────────────────────────────
+// -- Sync getters for the fleet readers --------------------------------------
 // Precedence: in-memory snapshot (stored) > env > default. These never throw.
 
 /** Effective fleet daily budget (tokens) for `delegation.fleetDailyBudget`. */

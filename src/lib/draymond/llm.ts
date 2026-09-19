@@ -90,6 +90,11 @@ export interface LLMCallOptions {
   skillId?: string;
 }
 
+// Local OpenAI-compatible server base. The host runs llama.cpp (`llama-server`),
+// not Ollama, but the protocol is identical. Honors OLLAMA_BASE_URL so the fleet
+// can move the local tier without a code change.
+const OLLAMA_BASE = (process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434').replace(/\/+$/, '');
+
 const PROVIDER_URLS: Record<LLMProvider, string> = {
   // OpenCode Zen free tier — ecosystem primary. Data-driven model + key pool
   // (see freeModelList()/opencodeKeyPool()). Routed via DSH harness when DSH is up.
@@ -111,7 +116,7 @@ const PROVIDER_URLS: Record<LLMProvider, string> = {
   // historically preferred this; the harness value-add (persona/skills/hooks)
   // lives in the CLI session layer, not on an HTTP port.
   dsh: 'http://localhost:4100/v1/chat/completions',
-  ollama: 'http://localhost:11434/v1/chat/completions',
+  ollama: `${OLLAMA_BASE}/v1/chat/completions`,
 };
 
 const PROVIDER_ENV: Record<LLMProvider, string> = {
@@ -151,9 +156,11 @@ const DEFAULT_MODELS: Record<LLMProvider, string> = {
   qwen: 'qwen-plus',
   litellm: 'gpt-4o-mini',
   dsh: 'fleet-free',
-  // Local Ollama tier — qwen3:0.6b is the installed fast model (tool-calling
-  // capable, ~34 tok/s on this CPU vs ~7 for the 4.6B workhorse).
-  ollama: process.env.OLLAMA_MODEL ?? 'qwen3:0.6b',
+  // Local tier — an OpenAI-compatible llama.cpp server (`llama-server`) on
+  // OLLAMA_BASE_URL, currently MiniCPM5-2B. OLLAMA_MODEL selects the model;
+  // the local fast tier is a 2B model, so it is used for triage/short JSON,
+  // not heavy codegen (that goes to Axiom).
+  ollama: process.env.OLLAMA_MODEL ?? 'minicpm5-2b',
 };
 
 /** Resolution order when no explicit provider is requested. Free + local tiers first, paid last. */
@@ -218,7 +225,7 @@ function loadKeyPoolIntoEnv(): void {
   for (const rel of ['.env.local', 'data/litellm.env']) {
     let raw: string;
     try {
-      raw = readFileSync(join(root, rel), 'utf8');
+      raw = /*turbopackIgnore: true*/ readFileSync(/*turbopackIgnore: true*/ join(root, rel), 'utf8');
     } catch {
       continue; // file absent — try the next candidate
     }
@@ -249,11 +256,17 @@ function opencodeKeyPool(): string[] {
   return values;
 }
 
-let _catalog: Record<string, any> | null | undefined;
+interface FreeCatalog {
+  assignedFreeModel?: string;
+  freeModelList?: string[];
+  opencodeKeyPool?: string[];
+}
+
+let _catalog: FreeCatalog | null | undefined;
 let _catalogMtime = 0;
 
 /** Read .draymond/model-routing.json (fail-soft: {} when absent). */
-function readFreeCatalog(): Record<string, any> {
+function readFreeCatalog(): FreeCatalog {
   try {
     const p = join(registryDir(), 'model-routing.json');
     const raw = readFileSync(p, 'utf8');
@@ -262,7 +275,7 @@ function readFreeCatalog(): Record<string, any> {
       // Strip a UTF-8 BOM — PowerShell writers emit one and JSON.parse chokes,
       // which silently reverts the whole hot path to stale DEFAULT_FREE_MODEL.
       const clean = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw;
-      _catalog = JSON.parse(clean) as Record<string, any>;
+      _catalog = JSON.parse(clean) as FreeCatalog;
       _catalogMtime = mtime;
     }
   } catch {
@@ -539,6 +552,9 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
               ? { response_format: options.responseFormat }
               : {}),
           ...(options.reasoning ? { reasoning_effort: 'high' } : {}),
+          // llama.cpp hosts a thinking model (MiniCPM5): without this it emits
+          // everything into `reasoning_content` and returns empty `content`.
+          ...(provider === 'ollama' ? { chat_template_kwargs: { enable_thinking: false } } : {}),
         }),
         signal: controller.signal,
       });
@@ -557,8 +573,11 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
       return content;
     }
 
-    const choices = data.choices as Array<{ message?: { content?: string } }>;
+    const choices = data.choices as Array<{ message?: { content?: string; reasoning_content?: string } }>;
     let content = choices?.[0]?.message?.content ?? '';
+    // Reasoning models (llama.cpp MiniCPM) can leave `content` empty and place
+    // the answer in `reasoning_content` — accept it as a last resort.
+    if (!content) content = choices?.[0]?.message?.reasoning_content ?? '';
     // Some opencode/deepseek responses put the answer in `reasoning_content`
     // with empty `content` when max_tokens is small. Retry once with a larger
     // budget before giving up so the fallback chain isn't tripped.
@@ -599,7 +618,7 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
   }
 }
 
-// ── OpenCode Zen free tier: account × free-model cycling ─────────────────────
+// -- OpenCode Zen free tier: account × free-model cycling ---------------------
 // Data-driven: the Keywire-maintained catalog (.draymond/model-routing.json)
 // owns the free-model list and the account key pool. The runtime rotates the
 // STARTING account/model round-robin per call and retries across accounts then

@@ -66,7 +66,7 @@ interface EntitySeedDef {
 }
 
 const ENTITY_DEFS: EntitySeedDef[] = [
-  // ── 1. Uplift Agent ─────────────────────────────────────────────────
+  // -- 1. Uplift Agent -------------------------------------------------
   // Primary worker agent — Hermes fork with batch_server.py + Draymond bridge
   // Empowered with: Sub Team tools (5), MegaCode tools (3), 14 superpowers skills,
   // 179 Claude/CCE skills, and 52+ total registered tools.
@@ -107,7 +107,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     health_endpoint: '/health',
   },
 
-  // ── 2. TradingAgents ────────────────────────────────────────────────
+  // -- 2. TradingAgents ------------------------------------------------
   // LangGraph multi-agent stock analysis — Python library, no HTTP server
   {
     name: 'TradingAgents',
@@ -134,7 +134,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     category: 'finance',
   },
 
-  // ── 3. Sports Steve ─────────────────────────────────────────────────
+  // -- 3. Sports Steve -------------------------------------------------
   // FastAPI sports betting agent with APScheduler (daily runs + hourly resolution)
   {
     name: 'Sports Steve',
@@ -163,7 +163,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     health_endpoint: '/health',
   },
 
-  // ── 4. Bet Buddy ────────────────────────────────────────────────────
+  // -- 4. Bet Buddy ----------------------------------------------------
   // Express.js companion to Sports Steve — OCR, odds calc, Kelly, bankroll
   {
     name: 'Bet Buddy',
@@ -197,7 +197,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     health_endpoint: '/health',
   },
 
-  // ── 5. Social Media Dashboard (AI API) ──────────────────────────────
+  // -- 5. Social Media Dashboard (AI API) ------------------------------
   // FastAPI AI backend — text/image/video generation, podcast, voicebox
   {
     name: 'Social Media Dashboard',
@@ -237,7 +237,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     health_endpoint: '/api/ai/health',
   },
 
-  // ── 6. OmniResearch Pro ─────────────────────────────────────────────
+  // -- 6. OmniResearch Pro ---------------------------------------------
   // Express.js backend — Ollama/SearXNG proxy, Slack/Notion integrations
   // NOTE: Core Gemini research is client-side. Server proxies local models.
   {
@@ -271,7 +271,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     health_endpoint: '/api/health',
   },
 
-  // ── 6b. Overlay Global Lens ──────────────────────────────────────────
+  // -- 6b. Overlay Global Lens ------------------------------------------
   // Fleet publishing target: ecosystem news/insights/discoveries ingestion.
   // POST /api/publish inserts an article that flows through the Global Lens
   // AI pipeline (reframing, takeaways, backstory) like any RSS item.
@@ -296,7 +296,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     health_endpoint: '/api/health',
   },
 
-  // ── 7. Indy Music Platform (NC Studio) ──────────────────────────────
+  // -- 7. Indy Music Platform (NC Studio) ------------------------------
   // FastAPI + React — artist site builder, social scheduling, fan CRM
   {
     name: 'Indy Music Platform',
@@ -336,7 +336,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     health_endpoint: '/health',
   },
 
-  // ── 8. MegaCode (OverCoat) ──────────────────────────────────────────
+  // -- 8. MegaCode (OverCoat) ------------------------------------------
   // TypeScript IDE extension SDK with Draymond integration built in
   {
     name: 'MegaCode',
@@ -367,7 +367,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     health_endpoint: '/health',
   },
 
-  // ── 8b. Cheetah ─────────────────────────────────────────────────────
+  // -- 8b. Cheetah -----------------------------------------------------
   // Deterministic autocoding engine — template-driven scaffolding, UI
   // component generation, pinned dependencies, Docker, telemetry. No LLM.
   {
@@ -414,7 +414,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     health_endpoint: '/health',
   },
 
-  // ── 9. Overlay Chain (ChainFlow) ────────────────────────────────────
+  // -- 9. Overlay Chain (ChainFlow) ------------------------------------
   // Next.js supply chain intelligence — demand forecast, anomaly detection, blockchain
   {
     name: 'Overlay Chain',
@@ -451,7 +451,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     health_endpoint: '/api',
   },
 
-  // ── 10. Sub Team ────────────────────────────────────────────────────
+  // -- 10. Sub Team ----------------------------------------------------
   // Full-spectrum agentic workforce (8 CrewAI agents) + deterministic
   // CPU RTL generation + cross-disciplinary/business analysis.
   // HTTP server (FastAPI) — also supports subprocess fallback.
@@ -509,7 +509,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     category: 'engineering',
   },
 
-  // ── 11. Hemp-OS ─────────────────────────────────────────────────────
+  // -- 11. Hemp-OS -----------------------------------------------------
   // Deterministic hemp/biomanufacturing simulation OS with autonomous
   // intelligence cycles (insights → research tasks → public content)
   {
@@ -546,7 +546,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     health_endpoint: '/health',
   },
 
-  // ── 12. HempForge ───────────────────────────────────────────────────
+  // -- 12. HempForge ---------------------------------------------------
   // Compliance + COA verification + literature intelligence for the hemp division
   {
     name: 'HempForge',
@@ -585,7 +585,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     health_endpoint: '/api/health',
   },
 
-  // ── 12b. AetherDesk Call Center ─────────────────────────────────────
+  // -- 12b. AetherDesk Call Center -------------------------------------
   // Voice call-center platform: outbound/inbound calls, voice cloning,
   // campaigns, AI agent orchestration. The ecosystem's phone presence.
   {
@@ -627,7 +627,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     health_endpoint: '/health',
   },
 
-  // ── 13. Recursive IP Builder ────────────────────────────────────────
+  // -- 13. Recursive IP Builder ----------------------------------------
   // IP registry, grading, and tokenization platform (Ventures/Justice arm)
   {
     name: 'Recursive IP Builder',
@@ -666,7 +666,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     health_endpoint: '/api/v1/health',
   },
 
-  // ── 13. Kaggle ─────────────────────────────────────────────────────
+  // -- 13. Kaggle -----------------------------------------------------
   // Data provider — research datasets through the deterministic brain
   {
     name: 'Kaggle',
@@ -702,7 +702,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     health_endpoint: '/kaggle/status',
   },
 
-  // ── BookBridge service ──────────────────────────────────────────────
+  // -- BookBridge service ----------------------------------------------
   // Book library daemon (:8777 REST / :8778 MCP) — grounded research,
   // reading plans, citations. Used by the book-grounded-research chain.
   {
@@ -744,7 +744,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     health_endpoint: '/health',
   },
 
-  // ── Book-to-Skill Chain orchestrator ────────────────────────────────
+  // -- Book-to-Skill Chain orchestrator --------------------------------
   // Pipeline: ground with BookBridge -> synthesize -> convert to a skill
   // -> register. Used by the book-grounded-research chain final step.
   {
@@ -765,7 +765,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     category: 'research',
   },
 
-  // ── Open-Chat Worker (marketing phone arm) ───────────────────────────
+  // -- Open-Chat Worker (marketing phone arm) ---------------------------
   // The boss-side handle for the Open-Chat remote worker. Actions enqueue
   // skill-pack tasks (marketing_capture, marketing_post, queue_review) that
   // Open Chat pulls and executes on the phone.
@@ -787,7 +787,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     category: 'marketing',
   },
 
-  // ── Folded tool stages (dispatch through parent pipelines) ─────────────
+  // -- Folded tool stages (dispatch through parent pipelines) -------------
   // These are the tools absorbed into parent agents. Each is an invocable
   // entity whose invocation routes THROUGH the parent's fleet pipeline, so
   // chains/schedulers never call a disjointed one-off tool — the parent owns
@@ -947,7 +947,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     category: 'finance',
   },
 
-  // ── Overlay Global Lens ─────────────────────────────────────────────
+  // -- Overlay Global Lens ---------------------------------------------
   // Express/React publication (Global-Lens fork). The public news + research
   // outlet for Overlay365: news aggregation, research papers, trends,
   // discoveries, and comic-metaphor storylines. Read + sync endpoints.
@@ -985,7 +985,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     health_endpoint: '/api/health',
   },
 
-  // ── Overlay Oncology ────────────────────────────────────────────────
+  // -- Overlay Oncology ------------------------------------------------
   // Cancer research & biotech engines (Next.js on :3070). Runs the cumulative
   // multi-engine research pipeline (study → simulation → dataset signals →
   // deconvolution → cross-reference → verification) and the synthesis phase
@@ -1019,6 +1019,52 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     category: 'research',
     health_endpoint: '/api/calibration/state',
   },
+
+  // -- Recourse ---------------------------------------------------------
+  // Autonomous self-developing architecture OS (Express on :3050). Template-
+  // driven component building with real sandboxed verification, self-healing
+  // repair, a versioned tool registry, recursive learner, dream engine, and
+  // recursive-math loops. Serves /api/recourse/* + /api/lego/*.
+  {
+    name: 'Recourse',
+    slug: 'recourse',
+    kind: 'service',
+    description:
+      'Autonomous self-developing architecture OS (Express on :3050) — template-driven internal component building, a versioned tool registry where every promoted version passed a real sandboxed test suite, self-healing code repair, recursive learner with property-based gene evaluation, dream engine, recursive-math loops, and a 7-layer Lego composable ML engine. Generators route through the configured OpenAI-compatible provider and honestly report offline otherwise.',
+    invocation_method: 'http_api',
+    invocation_config: {
+      url: agentUrl('RECOURSE_URL', 'http://localhost:3050'),
+      method: 'POST',
+      health_url: `${agentUrl('RECOURSE_URL', 'http://localhost:3050')}/api/recourse/status`,
+      endpoints: {
+        status: { path: '/api/recourse/status', method: 'GET' },
+        registry: { path: '/api/recourse/registry', method: 'GET' },
+        verify: { path: '/api/recourse/verify', method: 'POST' },
+        execute: { path: '/api/recourse/execute', method: 'POST' },
+        repair_single: { path: '/api/recourse/repair/single', method: 'POST' },
+        repair_scan_heal: { path: '/api/recourse/repair/scan-heal', method: 'POST' },
+        templates_build: { path: '/api/recourse/templates/build', method: 'POST' },
+        math_step: { path: '/api/recourse/math/step', method: 'POST' },
+        math_state: { path: '/api/recourse/math/state', method: 'GET' },
+        lego_state: { path: '/api/lego/state', method: 'GET' },
+        lego_assemble: { path: '/api/lego/assemble', method: 'POST' },
+      },
+    },
+    capabilities: [
+      'self_repair',
+      'sandboxed_verifier',
+      'tool_registry',
+      'template_component_building',
+      'recursive_learner',
+      'dream_engine',
+      'recursive_math',
+      'lego_composition',
+      'provenance_chain',
+    ],
+    tags: ['self-development', 'self-repair', 'registry', 'verifier', 'dream', 'recursion', 'lego', 'express'],
+    category: 'research',
+    health_endpoint: '/api/recourse/status',
+  },
 ];
 
 // ============================================================================
@@ -1043,7 +1089,7 @@ interface ChainTemplateDef {
 }
 
 const CHAIN_TEMPLATES: ChainTemplateDef[] = [
-  // ── Chain 1: Daily Finance Analysis ─────────────────────────────────
+  // -- Chain 1: Daily Finance Analysis ---------------------------------
   {
     name: 'Daily Finance Analysis',
     slug: 'daily-finance-analysis',
@@ -1084,7 +1130,7 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
     ],
   },
 
-  // ── Chain 2: Daily Marketing Run ────────────────────────────────────
+  // -- Chain 2: Daily Marketing Run ------------------------------------
   {
     name: 'Daily Marketing Run',
     slug: 'daily-marketing-run',
@@ -1142,7 +1188,7 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
     ],
   },
 
-  // ── Chain 3: Sports Betting Daily ───────────────────────────────────
+  // -- Chain 3: Sports Betting Daily -----------------------------------
   {
     name: 'Sports Betting Daily',
     slug: 'sports-betting-daily',
@@ -1187,7 +1233,7 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
     ],
   },
 
-  // ── Chain 4: Music Business Automation ──────────────────────────────
+  // -- Chain 4: Music Business Automation ------------------------------
   {
     name: 'Music Business Automation',
     slug: 'music-business-automation',
@@ -1233,7 +1279,7 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
     ],
   },
 
-  // ── Chain 5: Code Automation Pipeline ───────────────────────────────
+  // -- Chain 5: Code Automation Pipeline -------------------------------
   {
     name: 'Code Automation Pipeline',
     slug: 'code-automation-pipeline',
@@ -1280,7 +1326,7 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
     ],
   },
 
-  // ── Chain 5b: CPU RTL Generation Pipeline ──────────────────────────
+  // -- Chain 5b: CPU RTL Generation Pipeline --------------------------
   // Uses Uplift Agent's Sub Team tools for end-to-end CPU design
   {
     name: 'CPU RTL Generation Pipeline',
@@ -1303,7 +1349,7 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
     ],
   },
 
-  // ── Chain 5c: Cheetah Scaffold Pipeline ─────────────────────────────
+  // -- Chain 5c: Cheetah Scaffold Pipeline -----------------------------
   // Deterministic codegen: Cheetah scaffold spec + UI preset (parallel),
   // then build the project and validate via Uplift Agent. No LLM in the
   // generation steps — fully reproducible output.
@@ -1366,7 +1412,7 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
     ],
   },
 
-  // ── Chain 6: Supply Chain Intelligence ──────────────────────────────
+  // -- Chain 6: Supply Chain Intelligence ------------------------------
   {
     name: 'Supply Chain Intelligence',
     slug: 'supply-chain-intelligence',
@@ -1424,7 +1470,7 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
     ],
   },
 
-  // ── Chain 7: Full Content Creation Pipeline ─────────────────────────
+  // -- Chain 7: Full Content Creation Pipeline -------------------------
   {
     name: 'Full Content Creation',
     slug: 'full-content-creation',
@@ -1484,7 +1530,7 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
     ],
   },
 
-  // ── Chain 8: Morning Briefing ───────────────────────────────────────
+  // -- Chain 8: Morning Briefing ---------------------------------------
   {
     name: 'Morning Briefing',
     slug: 'morning-briefing',
@@ -1545,7 +1591,7 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
     ],
   },
 
-  // ── Chain 9: Hemp Research & News Pipeline ──────────────────────────
+  // -- Chain 9: Hemp Research & News Pipeline --------------------------
   // Research front that reports as a news outlet. Grounds hemp/cannabis
   // literature via OmniResearch (keyless PubMed/OpenAlex/BookBridge), then
   // publishes the digest to the Overlay Global Lens platform.
@@ -1583,7 +1629,7 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
     ],
   },
 
-  // ── Chain 10: IP Portfolio Grading & Protection ─────────────────────
+  // -- Chain 10: IP Portfolio Grading & Protection ---------------------
   // Ventures/Justice arm: scan the IP portfolio, grade candidates, and
   // compile a protection report.
   {
@@ -1630,7 +1676,7 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
     ],
   },
 
-  // ── Chain 11: Research Data Pipeline ─────────────────────────────────
+  // -- Chain 11: Research Data Pipeline ---------------------------------
   // Research arm: pull a Kaggle dataset through the brain, feed it into the
   // knowledge bank, then hand the resulting knowledge to OmniResearch for
   // synthesis into a structured research brief.
@@ -1669,7 +1715,7 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
     ],
   },
 
-  // ── Chain 12: Book-Grounded Research ─────────────────────────────────
+  // -- Chain 12: Book-Grounded Research ---------------------------------
   // Research arm: ground a topic against the BookBridge library, synthesize
   // the author frameworks into a brief, and distill any targeted book into a
   // reusable agent skill so the knowledge compounds.
@@ -1720,7 +1766,7 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
     ],
   },
 
-  // ── Chain 12: Marketing Content Capture ──────────────────────────────
+  // -- Chain 12: Marketing Content Capture ------------------------------
   // Open-Chat phone arm: enqueues a marketing_capture worker task so the phone
   // grabs real in-app content (competitor posts, drafts, platform UI) and feeds
   // it to the content pipeline.
@@ -1746,7 +1792,7 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
     ],
   },
 
-  // ── Chain 13: News Outlet Ingest ────────────────────────────────────
+  // -- Chain 13: News Outlet Ingest ------------------------------------
   // Feeds the Overlay Global Lens publication with the latest ecosystem
   // research. Idempotent syncs pull evidence-tiered papers + trends +
   // discoveries into the outlet's SQLite for public serving, then confirm
@@ -1787,7 +1833,7 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
     ],
   },
 
-  // ── Chain 14: Cancer Research Deep-Dive ─────────────────────────────
+  // -- Chain 14: Cancer Research Deep-Dive -----------------------------
   // Orchestrates a multi-engine oncology research study around a given theme
   // (e.g. in-situ vaccination / cold-to-hot tumor conversion, per the six
   // Aug 2026 advances). Runs the Overlay Oncology pipeline (with cell-type
@@ -1864,7 +1910,7 @@ interface JobSeedDef {
 }
 
 const JOB_DEFS: JobSeedDef[] = [
-  // ── Core system jobs ────────────────────────────────────────────────
+  // -- Core system jobs ------------------------------------------------
   {
     name: 'Agent Health Check',
     cron_expression: '*/15 * * * *',
@@ -1892,7 +1938,7 @@ const JOB_DEFS: JobSeedDef[] = [
     notify_on_failure: true,
   },
 
-  // ── Memory Decay Sweep (every hour) ─────────────────────────────────
+  // -- Memory Decay Sweep (every hour) ---------------------------------
   {
     name: 'Memory Decay Sweep',
     cron_expression: '0 * * * *',
@@ -1901,7 +1947,7 @@ const JOB_DEFS: JobSeedDef[] = [
     notify_on_failure: true,
   },
 
-  // ── Morning Briefing (9AM daily) ────────────────────────────────────
+  // -- Morning Briefing (9AM daily) ------------------------------------
   {
     name: 'Morning Briefing',
     cron_expression: '0 9 * * *',
@@ -1917,7 +1963,7 @@ const JOB_DEFS: JobSeedDef[] = [
     notify_on_failure: true,
   },
 
-  // ── Finance (9:30AM weekdays) ───────────────────────────────────────
+  // -- Finance (9:30AM weekdays) ---------------------------------------
   {
     name: 'Daily Finance Analysis',
     cron_expression: '30 9 * * 1-5',
@@ -1931,7 +1977,7 @@ const JOB_DEFS: JobSeedDef[] = [
     notify_on_failure: true,
   },
 
-  // ── Marketing (10AM daily) ──────────────────────────────────────────
+  // -- Marketing (10AM daily) ------------------------------------------
   {
     name: 'Daily Marketing Run',
     cron_expression: '0 10 * * *',
@@ -1948,7 +1994,7 @@ const JOB_DEFS: JobSeedDef[] = [
     },
   },
 
-  // ── Sports Betting (12PM daily) ─────────────────────────────────────
+  // -- Sports Betting (12PM daily) -------------------------------------
   {
     name: 'Sports Betting Daily',
     cron_expression: '0 12 * * *',
@@ -1965,7 +2011,7 @@ const JOB_DEFS: JobSeedDef[] = [
     is_enabled: false,
   },
 
-  // ── Music Business (11AM daily) ─────────────────────────────────────
+  // -- Music Business (11AM daily) -------------------------------------
   {
     name: 'Music Business Automation',
     cron_expression: '0 11 * * *',
@@ -1981,7 +2027,7 @@ const JOB_DEFS: JobSeedDef[] = [
     is_enabled: false,
   },
 
-  // ── Supply Chain (8AM weekdays) ─────────────────────────────────────
+  // -- Supply Chain (8AM weekdays) -------------------------------------
   {
     name: 'Supply Chain Intelligence',
     cron_expression: '0 8 * * 1-5',
@@ -1998,7 +2044,7 @@ const JOB_DEFS: JobSeedDef[] = [
     is_enabled: false,
   },
 
-  // ── Full Content Creation (2PM Mon/Wed/Fri) ─────────────────────────
+  // -- Full Content Creation (2PM Mon/Wed/Fri) -------------------------
   {
     name: 'Full Content Creation',
     cron_expression: '0 14 * * 1,3,5',
@@ -2014,7 +2060,7 @@ const JOB_DEFS: JobSeedDef[] = [
     },
   },
 
-  // ── Hemp Research & News (7AM daily) ────────────────────────────────
+  // -- Hemp Research & News (7AM daily) --------------------------------
   {
     name: 'Hemp Research & News Digest',
     cron_expression: '0 7 * * *',
@@ -2031,7 +2077,7 @@ const JOB_DEFS: JobSeedDef[] = [
     is_enabled: false,
   },
 
-  // ── IP Portfolio Grading (9AM Mondays) ──────────────────────────────
+  // -- IP Portfolio Grading (9AM Mondays) ------------------------------
   {
     name: 'IP Portfolio Grading',
     cron_expression: '0 9 * * 1',
@@ -2046,7 +2092,7 @@ const JOB_DEFS: JobSeedDef[] = [
     notify_on_failure: true,
   },
 
-  // ── Research Data Pipeline (6AM Wednesdays) ─────────────────────────
+  // -- Research Data Pipeline (6AM Wednesdays) -------------------------
   {
     name: 'Research Data Feed',
     cron_expression: '0 6 * * 3',
@@ -2065,7 +2111,7 @@ const JOB_DEFS: JobSeedDef[] = [
     is_enabled: false,
   },
 
-  // ── Book-Grounded Research + Library Distill (5AM daily) ─────────────
+  // -- Book-Grounded Research + Library Distill (5AM daily) -------------
   {
     name: 'Book-Grounded Research',
     cron_expression: '0 5 * * *',
@@ -2081,7 +2127,7 @@ const JOB_DEFS: JobSeedDef[] = [
     notify_on_failure: true,
   },
 
-  // ── Brain Wiki sync (daily 3AM) ─────────────────────────────────────
+  // -- Brain Wiki sync (daily 3AM) -------------------------------------
   {
     name: 'Brain Wiki Sync',
     cron_expression: '0 3 * * *',
@@ -2092,7 +2138,7 @@ const JOB_DEFS: JobSeedDef[] = [
     notify_on_failure: true,
   },
 
-  // ── Benchmarking loop (staggered Mon–Fri) ───────────────────────────
+  // -- Benchmarking loop (staggered Mon–Fri) ---------------------------
   {
     name: 'Benchmark: Entities',
     cron_expression: '0 6 * * 1',
@@ -2143,7 +2189,7 @@ const JOB_DEFS: JobSeedDef[] = [
     notify_on_failure: true,
   },
 
-  // ── Staffing Commission Payout (Friday 09:00) ────────────────────────
+  // -- Staffing Commission Payout (Friday 09:00) ------------------------
   // Fires the commission engine's payout endpoint weekly. Eligibility rules
   // (settled + 7d dispute window + active agent + $5 min) live in the engine;
   // this job is just the trigger. 09:00 Friday gives operators time to review
@@ -2157,7 +2203,7 @@ const JOB_DEFS: JobSeedDef[] = [
     notify_on_success: true,
   },
 
-  // ── Staffing Commission Monthly Reset (1st 00:05) ────────────────────
+  // -- Staffing Commission Monthly Reset (1st 00:05) --------------------
   // Resets all agents' monthly_sales_volume + tier to bronze on the 1st.
   // Lazy reset in attribution covers idle engines, but this is the canonical
   // monthly boundary. Idempotent: safe to re-run.
@@ -2169,7 +2215,7 @@ const JOB_DEFS: JobSeedDef[] = [
     notify_on_failure: true,
   },
 
-  // ── Editorial Morning Push (7AM daily) ──────────────────────────────
+  // -- Editorial Morning Push (7AM daily) ------------------------------
   {
     name: 'Editorial Morning Push',
     cron_expression: '0 7 * * *',
@@ -2178,7 +2224,7 @@ const JOB_DEFS: JobSeedDef[] = [
     notify_on_failure: true,
   },
 
-  // ── Research Rotation (6AM daily) ───────────────────────────────────
+  // -- Research Rotation (6AM daily) -----------------------------------
   // Drains the highest-priority ready science experiment from the queue.
   {
     name: 'Research Rotation',
@@ -2188,7 +2234,7 @@ const JOB_DEFS: JobSeedDef[] = [
     notify_on_failure: true,
   },
 
-  // ── Science Campaign Seed (4PM daily) ───────────────────────────────
+  // -- Science Campaign Seed (4PM daily) -------------------------------
   // Re-fills the science/sports experiment backlog from the real datasets +
   // research-paper store so Research Rotation never runs dry.
   {
@@ -2199,7 +2245,7 @@ const JOB_DEFS: JobSeedDef[] = [
     notify_on_failure: true,
   },
 
-  // ── News Outlet Ingest (2:45AM Monday + Friday) ──────────────────────
+  // -- News Outlet Ingest (2:45AM Monday + Friday) ----------------------
   // Pushes the latest ecosystem research into Overlay Global Lens so the
   // public outlet mirrors fresh evidence-tiered papers, trends, discoveries.
   // Twice a week (Mon 1 + Fri 5) — the outlet's own crons + daily domain
@@ -2215,7 +2261,7 @@ const JOB_DEFS: JobSeedDef[] = [
     notify_on_failure: true,
   },
 
-  // ── Sector Productivity Persist (11:40PM daily) ──────────────────────
+  // -- Sector Productivity Persist (11:40PM daily) ----------------------
   // Snapshots the corporate sector productivity (real work units per sector)
   // into .draymond/sector-productivity.json for the weekly trend. Ops overhead
   // — cheap, deterministic, no LLM.
@@ -2226,7 +2272,7 @@ const JOB_DEFS: JobSeedDef[] = [
     job_config: { handler: 'sector_productivity_persist' },
   },
 
-  // ── Cancer Research Deep-Dive (5AM daily) ───────────────────────────
+  // -- Cancer Research Deep-Dive (5AM daily) ---------------------------
   // Runs a cumulative Overlay Oncology study + synthesis around the current
   // cancer-theme focus (in-situ vaccination / cold-to-hot conversion per the
   // six Aug 2026 advances), then produces an OmniResearch brief.
@@ -2276,7 +2322,7 @@ export async function seedBusinessAutomation(): Promise<BusinessSeedResult> {
   const supabase = createDraymondAdminClient();
   const errors: string[] = [];
 
-  // ── 1. Upsert entities ──────────────────────────────────────────────
+  // -- 1. Upsert entities ----------------------------------------------
   const entityMap = new Map<string, string>(); // slug → id
   const entitySlugs: string[] = [];
 
@@ -2318,7 +2364,7 @@ export async function seedBusinessAutomation(): Promise<BusinessSeedResult> {
     }
   }
 
-  // ── 2. Create chain templates ───────────────────────────────────────
+  // -- 2. Create chain templates ---------------------------------------
   const chainSlugs: string[] = [];
 
   for (const tpl of CHAIN_TEMPLATES) {
@@ -2435,7 +2481,7 @@ export async function seedBusinessAutomation(): Promise<BusinessSeedResult> {
     }
   }
 
-  // ── 3. Upsert scheduled jobs ────────────────────────────────────────
+  // -- 3. Upsert scheduled jobs ----------------------------------------
   const jobNames: string[] = [];
 
   for (const def of JOB_DEFS) {

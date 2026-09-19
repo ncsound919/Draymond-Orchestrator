@@ -118,9 +118,6 @@ export function MathRenderer({ text, accent = 'var(--gold)' }: MathRendererProps
   }, [text, accent]);
 
   return (
-    <div
-      style={{ lineHeight: 1.8, color: 'var(--text)', fontSize: '0.88rem' }}
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
+    <div style={{ lineHeight: 1.8, color: 'var(--text)', fontSize: '0.88rem' }} dangerouslySetInnerHTML={{ __html: html }} /> // nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- html is DOMPurify-sanitized with a strict tag/attr allowlist above.
   );
 }

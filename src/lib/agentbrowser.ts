@@ -64,7 +64,7 @@ export interface SiteTestReport {
   summary: { passed: number; failed: number; errored: number };
 }
 
-// ── Web search via AgentBrowser's Playwright browser ────────────────────────
+// -- Web search via AgentBrowser's Playwright browser ------------------------
 
 export interface WebSearchHit {
   title: string;

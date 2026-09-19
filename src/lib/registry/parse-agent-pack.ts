@@ -37,7 +37,7 @@ export interface FileMap {
   [relativePath: string]: string;
 }
 
-// ── Defaults ─────────────────────────────────────────────────────────────────
+// -- Defaults -----------------------------------------------------------------
 
 const DEFAULT_THEME: AgentTheme = {
   accentColor: '#6366f1',
@@ -63,7 +63,7 @@ const DEFAULT_STATS: AgentStat[] = [
   { label: 'Reliability', value: 75 },
 ];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// -- Helpers -------------------------------------------------------------------
 
 function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -112,7 +112,7 @@ function parseRuntime(files: FileMap, manifest: Record<string, unknown>): Runtim
   };
 }
 
-// ── Main parser ───────────────────────────────────────────────────────────────
+// -- Main parser ---------------------------------------------------------------
 
 export function parseAgentPack(
   files: FileMap,

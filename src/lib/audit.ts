@@ -25,10 +25,10 @@ const MAX_ROTATED_FILES = 3;
 function safeAuditPath(): string {
   const raw = process.env.AUDIT_LOG_PATH
     ?? path.join(process.cwd(), '.audit', 'audit.jsonl');
-  const resolved = path.resolve(raw);
+  const resolved = /*turbopackIgnore: true*/ path.resolve(raw);
   const allowed = [
-    path.resolve(process.cwd()),
-    path.resolve(process.env.HOME ?? process.env.USERPROFILE ?? process.cwd()),
+    /*turbopackIgnore: true*/ path.resolve(process.cwd()),
+    /*turbopackIgnore: true*/ path.resolve(process.env.HOME ?? process.env.USERPROFILE ?? process.cwd()),
   ];
   if (!allowed.some((base) => resolved.startsWith(base + path.sep) || resolved === base)) {
     console.warn('[audit] AUDIT_LOG_PATH outside allowed dirs — using default');
@@ -55,7 +55,7 @@ async function ensureAuditDir(): Promise<void> {
  */
 async function rotateIfNeeded(): Promise<void> {
   try {
-    const stat = await fs.stat(AUDIT_LOG_PATH);
+    const stat = await /*turbopackIgnore: true*/ fs.stat(AUDIT_LOG_PATH);
     if (stat.size < MAX_LOG_BYTES) return;
   } catch {
     return; // File doesn't exist yet — nothing to rotate
@@ -94,7 +94,7 @@ export async function appendAuditLog(entry: Partial<AuditEntry>): Promise<void> 
 export async function readAuditLog(): Promise<AuditEntry[]> {
   try {
     await ensureAuditDir();
-    const content = await fs.readFile(AUDIT_LOG_PATH, 'utf-8');
+    const content = await /*turbopackIgnore: true*/ fs.readFile(AUDIT_LOG_PATH, 'utf-8');
     return content
       .split('\n')
       .filter(Boolean)

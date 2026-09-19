@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
   const startTime = Date.now();
 
-  // ── Ensure the scheduled job set exists (idempotent) ──────────────────
+  // -- Ensure the scheduled job set exists (idempotent) ------------------
   let seededJobs = 0;
   try {
     seededJobs = await seedBasicJobs();
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     console.error('[Cron] seedBasicJobs failed:', message);
   }
 
-  // ── Execute due jobs ────────────────────────────────────────────────
+  // -- Execute due jobs ------------------------------------------------
   const errors: string[] = [];
   let jobResults: Awaited<ReturnType<typeof runDueJobs>> = [];
   let healthResults: unknown = null;
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     errors.push(`runDueJobs: ${message}`);
   }
 
-  // ── Deploy the repair team on any failed jobs ──────────────────────────
+  // -- Deploy the repair team on any failed jobs --------------------------
   // The dedicated "Repair Team (failed jobs)" scheduler job does the deep
   // repair loop hourly. Here we only run a lightweight pass for jobs that
   // JUST failed this tick, so the cron response stays fast (the old inline
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
     console.error('[Cron] repair team failed:', message);
   }
 
-  // ── Run agent health checks ─────────────────────────────────────────
+  // -- Run agent health checks -----------------------------------------
   try {
     healthResults = await checkAllAgentHealth();
   } catch (err) {
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
     errors.push(`checkAllAgentHealth: ${message}`);
   }
 
-  // ── Response ────────────────────────────────────────────────────────
+  // -- Response --------------------------------------------------------
   const durationMs = Date.now() - startTime;
   const succeeded = jobResults.filter((r) => r.status === 'success').length;
   const failed = jobResults.filter((r) => r.status === 'failed').length;

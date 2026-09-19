@@ -4,6 +4,8 @@ import {
   probeAllServices,
   startDownServices,
   startService,
+  stopService,
+  stopServices,
   restartService,
   serviceCatalog,
 } from '@/lib/draymond/service-manager';
@@ -22,25 +24,34 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/** POST /api/ops/services — start a single service, restart it, or auto-start down services */
+/** POST /api/ops/services — start, stop (close), or restart services */
 export async function POST(request: NextRequest) {
   const authError = authorizeRequest(request);
   if (authError) return authError;
   try {
     const body = (await request.json().catch(() => ({}))) as {
       start?: boolean;
-      action?: 'start' | 'restart';
+      action?: 'start' | 'restart' | 'stop';
       slug?: string;
       slugs?: string[];
     };
 
     if (typeof body.slug === 'string' && body.slug.trim()) {
       const slug = body.slug.trim();
-      const result = body.action === 'restart' ? await restartService(slug) : await startService(slug);
+      const result =
+        body.action === 'stop'
+          ? await stopService(slug)
+          : body.action === 'restart'
+            ? await restartService(slug)
+            : await startService(slug);
       return NextResponse.json({ ok: result.up, slug: result.slug, service: result, action: body.action ?? 'start' });
     }
 
     if (Array.isArray(body.slugs) && body.slugs.length > 0) {
+      if (body.action === 'stop') {
+        const stopped = await stopServices(body.slugs.filter(Boolean));
+        return NextResponse.json({ checked: body.slugs.length, up: stopped.filter((s) => s.up).length, stopped });
+      }
       const started = await startDownServices(body.slugs.filter(Boolean));
       return NextResponse.json({ checked: body.slugs.length, up: started.filter((s) => s.up).length, started });
     }

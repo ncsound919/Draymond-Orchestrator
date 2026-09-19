@@ -226,7 +226,7 @@ export default async function OperationsPage() {
         <div className="max-w-6xl mx-auto px-4 py-24 text-center">
           <p className="text-5xl mb-4 opacity-40">&#x26A0;</p>
           <h1 className="text-xl font-bold mb-2">Failed to load operations data</h1>
-          <p className="text-white/40 text-sm">Could not connect to the database. Check your Supabase configuration and try again.</p>
+          <p className="text-white/60 text-sm">Could not read the local database. Check `DRAYMOND_DB_PATH` (default `data/draymond.db`) and try again.</p>
         </div>
       </div>
     );
@@ -248,41 +248,59 @@ export default async function OperationsPage() {
   const entityDegradedCount = entities.filter(
     (e: DraymondEntity) => e.health_status === 'unhealthy' || e.health_status === 'degraded',
   ).length;
+  // Anything not explicitly healthy/degraded is UNKNOWN and must not be counted
+  // as healthy â€” otherwise a never-probed fleet reads as all-green.
+  const entityUnknownCount = entities.filter(
+    (e: DraymondEntity) =>
+      e.health_status !== 'healthy' && e.health_status !== 'unhealthy' && e.health_status !== 'degraded',
+  ).length;
 
-  const healthyCount = agentHealthyCount + (entityActiveCount - entityDegradedCount);
+  const healthyCount = agentHealthyCount + (entityActiveCount - entityDegradedCount - entityUnknownCount);
   const degradedCount = agentDegradedCount + entityDegradedCount;
   const totalAgents = agents.length + entities.length;
+  const knownAgentStatuses = new Set(['active', 'degraded', 'crashed', 'stalled']);
+  const unknownCount =
+    entityUnknownCount + agents.filter((a) => !knownAgentStatuses.has(a.status)).length;
 
-  const systemHealth: 'green' | 'yellow' | 'red' =
-    degradedCount === 0 && agents.every((a) => a.status === 'active')
-      ? 'green'
-      : agents.some((a) => a.status === 'crashed' || a.status === 'stalled')
-        ? 'red'
-        : degradedCount > 0
-          ? 'yellow'
-          : 'green';
+  // Never report "All Systems Operational" for an empty or freshly-migrated
+  // fleet, and never treat unknown health as healthy.
+  let systemHealth: 'green' | 'yellow' | 'red' | 'unknown';
+  if (totalAgents === 0) {
+    systemHealth = 'unknown';
+  } else if (agents.some((a) => a.status === 'crashed' || a.status === 'stalled')) {
+    systemHealth = 'red';
+  } else if (degradedCount > 0) {
+    systemHealth = 'yellow';
+  } else if (unknownCount > 0) {
+    systemHealth = 'unknown';
+  } else {
+    systemHealth = 'green';
+  }
 
   const bannerStyles = {
     green: 'from-green-500/20 to-green-900/10 border-green-500/30',
     yellow: 'from-yellow-500/20 to-yellow-900/10 border-yellow-500/30',
     red: 'from-red-500/20 to-red-900/10 border-red-500/30',
+    unknown: 'from-white/10 to-white/[0.02] border-white/15',
   };
 
   const bannerLabels = {
     green: 'All Systems Operational',
     yellow: 'Degraded Performance',
     red: 'System Issues Detected',
+    unknown: 'Status unknown â€” no healthy fleet data',
   };
 
   const bannerDotColors = {
     green: 'bg-green-400',
     yellow: 'bg-yellow-400',
     red: 'bg-red-400',
+    unknown: 'bg-gray-400',
   };
 
   return (
     <div className="min-h-screen">
-      {/* ── Header ─────────────────────────────────────────────────────── */}
+      {/* -- Header ------------------------------------------------------- */}
       <div className="border-b border-white/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <h1 className="text-3xl font-bold tracking-tight text-white">
@@ -295,14 +313,14 @@ export default async function OperationsPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
-        {/* ── Section 1: System Status Banner ───────────────────────── */}
+        {/* -- Section 1: System Status Banner ------------------------- */}
         <div
           className={`rounded-xl border bg-gradient-to-r p-5 ${bannerStyles[systemHealth]}`}
         >
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-3">
               <span
-                className={`h-3 w-3 rounded-full ${bannerDotColors[systemHealth]} animate-pulse`}
+                className={`h-3 w-3 rounded-full ${bannerDotColors[systemHealth]} ${systemHealth === 'unknown' ? '' : 'animate-pulse'}`}
               />
               <span className="text-lg font-semibold text-white">
                 {bannerLabels[systemHealth]}
@@ -325,11 +343,19 @@ export default async function OperationsPage() {
                   Degraded
                 </span>
               )}
+              {unknownCount > 0 && (
+                <span>
+                  <span className="font-mono font-semibold text-gray-300">
+                    {unknownCount}
+                  </span>{' '}
+                  Unknown
+                </span>
+              )}
             </div>
           </div>
         </div>
 
-        {/* ── Section 2: Agent Fleet Status ──────────────────────────── */}
+        {/* -- Section 2: Agent Fleet Status ---------------------------- */}
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-white">
@@ -343,7 +369,7 @@ export default async function OperationsPage() {
             />
           </div>
           {agents.length === 0 ? (
-            <p className="text-sm text-gray-500">No agents registered.</p>
+            <p className="text-sm text-gray-400">No agents registered.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {agents.map((agent) => (
@@ -360,7 +386,7 @@ export default async function OperationsPage() {
                       title={agent.status}
                     />
                   </div>
-                  <p className="mt-1 text-xs text-gray-500 capitalize">
+                  <p className="mt-1 text-xs text-gray-400 capitalize">
                     {agent.status}
                   </p>
                   <div className="mt-3 space-y-1 text-xs text-gray-400">
@@ -389,7 +415,7 @@ export default async function OperationsPage() {
            )}
         </section>
 
-        {/* ── Section 2b: Entity Registry (Full Fleet) ───────────────── */}
+        {/* -- Section 2b: Entity Registry (Full Fleet) ----------------- */}
         <section>
           <div className="flex items-center justify-between mb-1">
             <h2 className="text-xl font-semibold text-white">
@@ -399,16 +425,16 @@ export default async function OperationsPage() {
               label="Entities"
               data={entities.map(({ id, name, category, kind, health_status, invocation_method, last_invoked_at, description, capabilities }) => ({
                 id, name, category, kind, health_status, invocation_method, last_invoked_at, description,
-                // capabilities may be null in the DB despite the TypeScript type saying string[] — guard defensively.
+                // capabilities may be null in the DB despite the TypeScript type saying string[] â€” guard defensively.
                 capabilities: (capabilities ?? []).join(', '),
               }))}
             />
           </div>
-          <p className="text-xs text-gray-500 mb-4">
+          <p className="text-xs text-gray-400 mb-4">
             {entities.length} registered entities across the Uplift Ecosystem
           </p>
           {entities.length === 0 ? (
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-400">
               No entities registered. Run &ldquo;Seed Business Data&rdquo; below.
             </p>
           ) : (
@@ -436,7 +462,7 @@ export default async function OperationsPage() {
                       title={entity.health_status}
                     />
                   </div>
-                  <p className="mt-1.5 text-xs text-gray-500 line-clamp-2">
+                  <p className="mt-1.5 text-xs text-gray-400 line-clamp-2">
                     {entity.description ?? 'No description'}
                   </p>
                   <div className="mt-3 space-y-1 text-xs text-gray-400">
@@ -469,7 +495,7 @@ export default async function OperationsPage() {
                         </span>
                       ))}
                       {(entity.capabilities ?? []).length > 3 && (
-                        <span className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-500">
+                        <span className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-400">
                           +{(entity.capabilities ?? []).length - 3}
                         </span>
                       )}
@@ -481,7 +507,7 @@ export default async function OperationsPage() {
           )}
         </section>
 
-        {/* ── Section 3: Active Chains ───────────────────────────────── */}
+        {/* -- Section 3: Active Chains --------------------------------- */}
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-white">
@@ -495,7 +521,7 @@ export default async function OperationsPage() {
             />
           </div>
           {chains.length === 0 ? (
-            <p className="text-sm text-gray-500">No recent chains.</p>
+            <p className="text-sm text-gray-400">No recent chains.</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-white/[0.06]">
               <table className="w-full text-sm">
@@ -559,7 +585,7 @@ export default async function OperationsPage() {
           )}
         </section>
 
-        {/* ── Section 4: Scheduled Jobs ──────────────────────────────── */}
+        {/* -- Section 4: Scheduled Jobs -------------------------------- */}
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-white">
@@ -574,7 +600,7 @@ export default async function OperationsPage() {
             />
           </div>
           {jobs.length === 0 ? (
-            <p className="text-sm text-gray-500">No scheduled jobs.</p>
+            <p className="text-sm text-gray-400">No scheduled jobs.</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-white/[0.06]">
               <table className="w-full text-sm">
@@ -631,7 +657,7 @@ export default async function OperationsPage() {
           )}
         </section>
 
-        {/* ── Section 5: Site Monitors ───────────────────────────────── */}
+        {/* -- Section 5: Site Monitors --------------------------------- */}
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-white">
@@ -646,7 +672,7 @@ export default async function OperationsPage() {
             />
           </div>
           {monitors.length === 0 ? (
-            <p className="text-sm text-gray-500">No site monitors configured.</p>
+            <p className="text-sm text-gray-400">No site monitors configured.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {monitors.map((monitor) => {
@@ -662,7 +688,7 @@ export default async function OperationsPage() {
                         <h3 className="text-sm font-semibold text-white truncate">
                           {monitor.name}
                         </h3>
-                        <p className="mt-0.5 text-xs text-gray-500 truncate">
+                        <p className="mt-0.5 text-xs text-gray-400 truncate">
                           {monitor.url}
                         </p>
                       </div>
@@ -718,7 +744,7 @@ export default async function OperationsPage() {
           )}
         </section>
 
-        {/* ── Section 6: Recent Notifications ────────────────────────── */}
+        {/* -- Section 6: Recent Notifications -------------------------- */}
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-white">
@@ -732,7 +758,7 @@ export default async function OperationsPage() {
             />
           </div>
           {notifications.length === 0 ? (
-            <p className="text-sm text-gray-500">No notifications yet.</p>
+            <p className="text-sm text-gray-400">No notifications yet.</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-white/[0.06]">
               <table className="w-full text-sm">
@@ -790,7 +816,7 @@ export default async function OperationsPage() {
                             Failed
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                          <span className="inline-flex items-center gap-1 text-xs text-gray-400">
                             <span className="h-1.5 w-1.5 rounded-full bg-gray-500" />
                             Pending
                           </span>
@@ -804,7 +830,7 @@ export default async function OperationsPage() {
           )}
         </section>
 
-        {/* ── Section 7: Quick Actions ───────────────────────────────── */}
+        {/* -- Section 7: Quick Actions --------------------------------- */}
         <section>
           <h2 className="text-xl font-semibold text-white mb-4">
             Quick Actions
@@ -846,12 +872,12 @@ export default async function OperationsPage() {
               href="/strategy"
               className="inline-flex items-center gap-2 rounded-lg border border-cyan-500/30 px-4 py-2.5 text-sm font-medium text-cyan-400 transition-colors hover:bg-cyan-500/10 hover:border-cyan-500/50"
             >
-              Open Strategy Team <span aria-hidden="true">→</span>
+              Open Strategy Team <span aria-hidden="true">â†’</span>
             </Link>
           </div>
         </section>
 
-        {/* ── Footer ─────────────────────────────────────────────────── */}
+        {/* -- Footer --------------------------------------------------- */}
         <div className="border-t border-white/5 pt-6 pb-4">
           <p className="text-xs text-gray-600 text-center">
             Last loaded: {new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC

@@ -15,7 +15,6 @@
 // ============================================================================
 
 import { runBrainTask } from './brain-task';
-import type { DraymondChain, DraymondChainResult } from './types';
 
 export interface BrainTaskFallbackOpts {
   /** The failed chain or task name. */
@@ -44,7 +43,7 @@ export interface BrainTaskFallbackResult {
 // ============================================================================
 
 /** Build the brain query for a morning briefing (news + agenda + todo synthesis). */
-function queryMorningBriefing(inputData?: Record<string, unknown>): string {
+function queryMorningBriefing(_inputData?: Record<string, unknown>): string {
   return `
 Generate a morning briefing that synthesizes:
 1. Top 3 news headlines from the past 24h
@@ -81,7 +80,7 @@ Return as JSON with keys: [${formats.join(', ')}], each containing the formatted
 }
 
 /** Build the brain query for hemp research & news digest. */
-function queryHempResearchDigest(inputData?: Record<string, unknown>): string {
+function queryHempResearchDigest(_inputData?: Record<string, unknown>): string {
   return `
 Synthesize a Hemp Research & News Digest covering:
 1. Recent regulatory changes (deterministic from cached knowledge)
@@ -96,7 +95,7 @@ Use only local data sources and deterministic reasoning.
 }
 
 /** Build the brain query for Overlay365 QA (quality assurance testing). */
-function queryOverlay365QA(inputData?: Record<string, unknown>): string {
+function queryOverlay365QA(_inputData?: Record<string, unknown>): string {
   return `
 Execute Overlay365 platform QA checklist deterministically:
 1. Core workflow integrity checks
@@ -112,7 +111,7 @@ Use deterministic tests only (no external APIs).
 }
 
 /** Build the brain query for daily marketing run (campaign status & metrics). */
-function queryDailyMarketingRun(inputData?: Record<string, unknown>): string {
+function queryDailyMarketingRun(_inputData?: Record<string, unknown>): string {
   return `
 Generate Daily Marketing Run report:
 1. Campaign performance summary (from cached metrics)
@@ -128,7 +127,7 @@ Use deterministic calculations from local data stores.
 }
 
 /** Build the brain query for research data feed (ongoing research ingestion). */
-function queryResearchDataFeed(inputData?: Record<string, unknown>): string {
+function queryResearchDataFeed(_inputData?: Record<string, unknown>): string {
   return `
 Ingest and process Research Data Feed:
 1. Parse cached research paper feeds
@@ -144,7 +143,7 @@ Use deterministic parsing and local knowledge base only.
 }
 
 /** Build the brain query for sports betting daily (odds & analysis). */
-function querySportsBettingDaily(inputData?: Record<string, unknown>): string {
+function querySportsBettingDaily(_inputData?: Record<string, unknown>): string {
   return `
 Generate Sports Betting Daily analysis:
 1. Overnight odds movements and line changes

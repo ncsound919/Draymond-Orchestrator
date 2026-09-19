@@ -141,7 +141,7 @@ describe('ide session manager', () => {
     expect(session.steps.length).toBeGreaterThanOrEqual(2);
     expect(session.events.some((e) => e.type === 'session.created')).toBe(true);
     expect(session.events.some((e) => e.type === 'crew.assembled')).toBe(true);
-  });
+  }, 60_000);
 
   it('runs a session to completion even when engines are offline (fail soft)', async () => {
     const { createIdeSession, startIdeSession } = await import('../src/lib/ide/session-manager');

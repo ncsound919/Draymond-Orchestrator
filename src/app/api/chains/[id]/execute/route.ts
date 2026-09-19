@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic';
 // Max timeout to prevent resource exhaustion (5 minutes)
 const MAX_TIMEOUT_MS = 300_000;
 
-// ── POST /api/chains/[id]/execute ───────────────────────────────────────────
+// -- POST /api/chains/[id]/execute -------------------------------------------
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },

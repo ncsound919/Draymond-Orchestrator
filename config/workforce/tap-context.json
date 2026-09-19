@@ -1,0 +1,113 @@
+{
+  "identity": {
+    "name": "Terrence Antonio Perry II",
+    "aliases": ["Tap", "tap919"],
+    "location": "Knightdale, NC (Raleigh Metro)",
+    "education": "Millbrook High School, NC",
+    "communication_style": "direct, no fluff, conversational, not corporate",
+    "core_mission": "Close gaps between music, tech, and financial literacy for real people"
+  },
+
+  "businesses": {
+    "nc_sound_publishing": {
+      "type": "music_label_publisher",
+      "role": "Producer / Rapper / Publisher",
+      "platforms": {
+        "spotify": "https://open.spotify.com/artist/6hywq1vKZbYx6CMsWtZ3AQ",
+        "bandcamp": "https://ncsound.bandcamp.com",
+        "waves_studioverse": "https://www.waves.com/studioverse/creator/ncsound"
+      },
+      "catalog": [
+        "Beat Stash Vol. 2", "Beat Stash Vol. 3", "I'm Different (19 songs)",
+        "The Remix Vol. 1", "Music Of Mars", "Abstractions", "Illusions",
+        "Disco Decay", "Shades", "Top 5"
+      ],
+      "genre": "Rhythm (experimental), Hip-Hop"
+    },
+    "overlay365": {
+      "type": "software_company",
+      "role": "Owner / Developer",
+      "services": ["Software Development", "Web Development", "Code Audit", "AI Integration"],
+      "linkedin": "https://www.linkedin.com/pub/dir/Terrence/Perry"
+    }
+  },
+
+  "projects": {
+    "the_uplift_lab": {
+      "type": "education_community",
+      "platform": "YouTube @tap919",
+      "subscribers": 48,
+      "videos": 15,
+      "focus": "Community education, financial literacy, empowerment"
+    },
+    "fintech_class": {
+      "type": "education_platform",
+      "repo": "Fintech-Class-main",
+      "focus": "Financial technology education",
+      "tone": "no_school_vibes"
+    }
+  },
+
+  "social": {
+    "facebook": "https://www.facebook.com/tap919",
+    "youtube": "https://www.youtube.com/@tap919",
+    "instagram": "@tap919",
+    "facebook_likes": 5678
+  },
+
+  "lanes": {
+    "music": {
+      "label": "NC Sound / Music",
+      "description": "Artist, producer, publisher — content creation and monetization",
+      "active": true
+    },
+    "tech": {
+      "label": "Overlay365 / Tech",
+      "description": "Software dev, code audit, SaaS platform, AI tooling",
+      "active": true
+    },
+    "education": {
+      "label": "Fintech Class / Education",
+      "description": "Financial literacy, tech education, community uplift",
+      "active": true
+    },
+    "brand": {
+      "label": "Uplift Lab / Brand",
+      "description": "Cross-platform content, publishing, advocacy, community",
+      "active": true
+    }
+  },
+
+  "tone_guide": {
+    "no_school_vibes": {
+      "description": "Strip academic language. Keep it street-smart and story-driven.",
+      "do": ["Use real-world analogies", "Reference music and pop culture", "Keep it conversational", "Use NC/Raleigh local context when relevant"],
+      "dont": ["Use corporate jargon", "Sound like a textbook", "Over-explain obvious concepts", "Be condescending"]
+    },
+    "music_finance_bridge": {
+      "description": "Find music/pop culture hooks to anchor financial concepts",
+      "examples": [
+        "Drake song → streaming royalties → fintech payment rails",
+        "Beat licensing → passive income → investment portfolios",
+        "Album rollout → product launch → go-to-market strategy"
+      ]
+    }
+  },
+
+  "momentum_2026": {
+    "declaration": "It's up in 2026 on all fronts",
+    "scoreboard": {
+      "music_releases": [],
+      "tech_launches": [],
+      "courses_published": [],
+      "content_drops": [],
+      "milestones": []
+    }
+  },
+
+  "gold_rush_position": {
+    "analogy": "Wells Fargo / The Railroads / The Towns",
+    "translation": "AI orchestration + middleware + vertical platforms — the infrastructure everyone depends on",
+    "strategy": "Don't mine the gold. Build the rails, the banks, and the towns the miners need."
+  }
+}

@@ -350,7 +350,8 @@ export async function checkSite(monitorId: string): Promise<SiteCheckResult> {
           });
         } catch (notifErr) {
           console.error(
-            `[Draymond Monitors] Failed to send site_down notification for ${monitor.name}:`,
+            '[Draymond Monitors] Failed to send site_down notification for %s:',
+            monitor.name,
             notifErr instanceof Error ? notifErr.message : notifErr
           );
         }
@@ -387,7 +388,8 @@ export async function checkSite(monitorId: string): Promise<SiteCheckResult> {
           });
         } catch (notifErr) {
           console.error(
-            `[Draymond Monitors] Failed to push site_down chat alert for ${monitor.name}:`,
+            '[Draymond Monitors] Failed to push site_down chat alert for %s:',
+            monitor.name,
             notifErr instanceof Error ? notifErr.message : notifErr
           );
         }
@@ -426,7 +428,8 @@ export async function checkSite(monitorId: string): Promise<SiteCheckResult> {
           });
         } catch (notifErr) {
           console.error(
-            `[Draymond Monitors] Failed to send site_recovered notification for ${monitor.name}:`,
+            '[Draymond Monitors] Failed to send site_recovered notification for %s:',
+            monitor.name,
             notifErr instanceof Error ? notifErr.message : notifErr
           );
         }
@@ -454,7 +457,8 @@ export async function checkSite(monitorId: string): Promise<SiteCheckResult> {
 
   if (updateError) {
     console.error(
-      `[Draymond Monitors] Failed to update monitor ${monitor.name}:`,
+      '[Draymond Monitors] Failed to update monitor %s:',
+      monitor.name,
       updateError.message
     );
   }
@@ -559,6 +563,7 @@ const LOCAL_SERVICE_DIRS: Record<string, string> = {
   'bookbridge': 'agents/BookBridge--main',
   'open-notebook': '04_Integrations/integrations/open-notebook',
   'stirling-pdf': '04_Integrations/integrations/Stirling-PDF',
+  'recourse': 'agents/recourse',
 };
 
 /**
@@ -591,6 +596,7 @@ const SERVICE_ENV_VARS: Record<string, string> = {
   'bookbridge': 'BOOKBRIDGE_URL',
   'open-notebook': 'OPEN_NOTEBOOK_URL',
   'stirling-pdf': 'STIRLING_PDF_URL',
+  'recourse': 'RECOURSE_URL',
 };
 
 function monitorShouldExist(slug: string): boolean {
@@ -609,7 +615,7 @@ function monitorShouldExist(slug: string): boolean {
   const dir = LOCAL_SERVICE_DIRS[slug];
   if (!dir) return true; // unknown slug — keep the monitor
   try {
-    return existsSync(resolve(process.cwd(), dir));
+    return existsSync(/*turbopackIgnore: true*/ resolve(process.cwd(), dir));
   } catch {
     return true;
   }
@@ -744,6 +750,14 @@ function getAgentMonitorDefs(): AgentMonitorDef[] {
       expected_status_code: 200,
       timeout_ms: 10000,
       metadata: { slug: 'stirling-pdf', category: 'conversion' },
+    },
+    {
+      name: 'Recourse',
+      url: `${process.env.RECOURSE_URL || 'http://localhost:3050'}/api/recourse/status`,
+      check_interval_seconds: 300,
+      expected_status_code: 200,
+      timeout_ms: 10000,
+      metadata: { slug: 'recourse', category: 'research' },
     },
   ];
 }

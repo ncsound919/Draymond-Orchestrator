@@ -28,22 +28,34 @@ afterEach(() => {
 describe('fleet-manifest (single source of truth for PM2)', () => {
   it('declares every pm2 service exactly once across groups', () => {
     const m = loadManifest();
-    const all = [m.CORE_APP, ...m.FLEET_SERVICES, ...m.MARKETING_SERVICES, ...m.BRAIN_SERVICES];
+    const all = [
+      m.CORE_APP,
+      ...m.FLEET_SERVICES,
+      ...m.MARKETING_SERVICES,
+      ...m.DSH_SERVICES,
+      ...m.BRAIN_SERVICES,
+    ];
     const names = all.map((a) => a.name);
     expect(new Set(names).size).toBe(names.length); // no duplicates
     expect(names).toContain('draymond');
     expect(names).toContain('deterministic-brain');
-    expect(names).toContain('opencode');
-    // The full fleet: 1 core + 27 fleet + 11 marketing + 1 brain = 40 apps.
-    // (omniresearch, overlay-oncology, comic-engine, the smd stack, opencode,
-    // big-homie, vibe-reality, hermes-proxy joined the manifest — bump this pin
-    // deliberately whenever the fleet grows.)
-    expect(all).toHaveLength(40);
+    expect(names).toContain('axiom');
+    // The full fleet: 1 core + 26 fleet + 10 marketing + 1 dsh + 1 brain = 39.
+    // `opencode` was deliberately RETIRED (codegen now routes through Axiom's
+    // /v1/chat/completions) and hermes-brain/hermes-proxy were removed — bump
+    // this pin deliberately whenever the fleet changes.
+    expect(all).toHaveLength(39);
   });
 
   it('gives every app the self-healing restart policy', () => {
     const m = loadManifest();
-    const all = [m.CORE_APP, ...m.FLEET_SERVICES, ...m.MARKETING_SERVICES, ...m.BRAIN_SERVICES];
+    const all = [
+      m.CORE_APP,
+      ...m.FLEET_SERVICES,
+      ...m.MARKETING_SERVICES,
+      ...m.DSH_SERVICES,
+      ...m.BRAIN_SERVICES,
+    ];
     for (const app of all) {
       expect(app.autorestart).toBe(true);
       expect(app.max_restarts).toBe(10);
@@ -56,11 +68,22 @@ describe('fleet-manifest (single source of truth for PM2)', () => {
 
   it('resolves every cwd under UPLIFT_ROOT (no scattered hardcoded roots)', () => {
     const uplift = 'C:\\Users\\User\\Downloads\\Uplift';
+    // Recourse is the one deliberate exception: its canonical repo lives
+    // outside UPLIFT_ROOT at C:\Users\User\Downloads\recourse.
+    const externalCwds = ['C:/Users/User/Downloads/recourse'];
     const m = loadManifest();
-    const all = [m.CORE_APP, ...m.FLEET_SERVICES, ...m.MARKETING_SERVICES, ...m.BRAIN_SERVICES];
+    const all = [
+      m.CORE_APP,
+      ...m.FLEET_SERVICES,
+      ...m.MARKETING_SERVICES,
+      ...m.DSH_SERVICES,
+      ...m.BRAIN_SERVICES,
+    ];
     for (const app of all) {
       if (app.cwd) {
-        expect(app.cwd.startsWith(uplift)).toBe(true);
+        const rooted =
+          app.cwd.startsWith(uplift) || externalCwds.some((p) => app.cwd.startsWith(p));
+        expect(rooted).toBe(true);
       }
     }
   });
@@ -75,12 +98,12 @@ describe('fleet-manifest (single source of truth for PM2)', () => {
     expect(bookbridge?.cwd.startsWith(fakeRoot)).toBe(true);
   });
 
-  it('keeps the codegen app pinned to the paid opencode Go tier', () => {
+  it('keeps the codegen app pinned to the Axiom endpoint', () => {
     const m = loadManifest();
-    const opencode = (m.MARKETING_SERVICES as Array<{ name: string; env: Record<string, string> }>).find(
-      (a: { name: string }) => a.name === 'opencode',
+    const axiom = (m.DSH_SERVICES as Array<{ name: string; env: Record<string, string> }>).find(
+      (a: { name: string }) => a.name === 'axiom',
     );
-    expect(opencode?.env.OPENCODE_MODEL).toBe('opencode/deepseek-v4-flash');
+    expect(axiom?.env.AXIOM_PORT).toBe('3198');
   });
 
   it('preserves the draymond env pins that protect live state', () => {

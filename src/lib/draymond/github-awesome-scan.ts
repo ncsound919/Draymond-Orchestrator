@@ -41,13 +41,13 @@ export interface IntakeScanResult {
   handoff: { kairos: boolean; hypotheses: boolean; appended: boolean };
 }
 
-// ── Episode resolution ───────────────────────────────────────────────────────
+// -- Episode resolution -------------------------------------------------------
 
 /** Latest uploads for the channel via the public YouTube RSS feed. */
 export function fetchChannelFeed(channelId: string): Array<{ videoId: string; title: string; publishedAt: string }> {
   const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
   const py = `import sys;sys.stdout.reconfigure(encoding='utf-8',errors='replace');import urllib.request;print(urllib.request.urlopen(sys.argv[1],timeout=30).read().decode('utf-8'))`;
-  const xml = execFileSync(PYTHON, ['-c', py, url], { timeout: 60_000, encoding: 'utf8' });
+  const xml = /*turbopackIgnore: true*/ execFileSync(PYTHON, ['-c', py, url], { timeout: 60_000, encoding: 'utf8' });
   const idRe = /<yt:videoId>([^<]+)<\/yt:videoId>/g;
   const titleRe = /<media:title>([^<]+)<\/media:title>/g;
   const pubRe = /<published>([^<]+)<\/published>/g;
@@ -68,7 +68,7 @@ export function resolveLatestWeekly(): { title: string; videoId: string; publish
   return weekly ? { title: weekly.title, videoId: weekly.videoId, publishedAt: weekly.publishedAt } : null;
 }
 
-// ── Transcript ───────────────────────────────────────────────────────────────
+// -- Transcript ---------------------------------------------------------------
 
 /** Pulls the (English auto) transcript for a video via Py3.12 youtube-transcript-api. */
 export function fetchTranscript(videoId: string): string {
@@ -79,10 +79,10 @@ export function fetchTranscript(videoId: string): string {
     `t=api.fetch('${videoId}');`,
     "print('\\n'.join(s.text for s in t.snippets))",
   ].join(' ');
-  return execFileSync(PYTHON, ['-c', py], { timeout: 90_000, encoding: 'utf8' });
+  return /*turbopackIgnore: true*/ execFileSync(PYTHON, ['-c', py], { timeout: 90_000, encoding: 'utf8' });
 }
 
-// ── Tool extraction ──────────────────────────────────────────────────────────
+// -- Tool extraction ----------------------------------------------------------
 
 const FILLER_STARTS = new Set([
   'this', 'that', 'these', 'those', 'it', 'its', 'the', 'a', 'an', 'and', 'but', 'so',
@@ -148,7 +148,7 @@ export function extractToolCandidates(transcript: string): IntakeToolCandidate[]
   return candidates;
 }
 
-// ── Scoring via Dev-Brain ────────────────────────────────────────────────────
+// -- Scoring via Dev-Brain ----------------------------------------------------
 
 export interface IntakeScored {
   ranked: Array<Record<string, unknown>>;
@@ -186,20 +186,20 @@ export async function scoreCandidates(candidates: IntakeToolCandidate[]): Promis
   return { ranked: data.ranked ?? [], topPicks: data.topPicks ?? [], pruned: data.pruned ?? [], pulled };
 }
 
-// ── Brain-state handoff ──────────────────────────────────────────────────────
+// -- Brain-state handoff ------------------------------------------------------
 
 function readJson(file: string): Record<string, unknown> {
-  const p = path.join(REGISTRY_DIR, file);
-  if (!existsSync(p)) return {};
+  const p = /*turbopackIgnore: true*/ path.join(REGISTRY_DIR, file);
+  if (!/*turbopackIgnore: true*/ existsSync(p)) return {};
   try {
-    return JSON.parse(readFileSync(p, 'utf8'));
+    return JSON.parse(/*turbopackIgnore: true*/ readFileSync(p, 'utf8'));
   } catch {
     return {};
   }
 }
 
 function writeJson(file: string, data: unknown): void {
-  const p = path.join(REGISTRY_DIR, file);
+  const p = /*turbopackIgnore: true*/ path.join(REGISTRY_DIR, file);
   writeFileSync(p, JSON.stringify(data, null, 2), 'utf8');
 }
 
@@ -287,7 +287,7 @@ export function appendIntakeHypothesis(result: IntakeScanResult): boolean {
   return true;
 }
 
-// ── Orchestration ────────────────────────────────────────────────────────────
+// -- Orchestration ------------------------------------------------------------
 
 export async function runGithubAwesomeScan(opts?: {
   videoId?: string;

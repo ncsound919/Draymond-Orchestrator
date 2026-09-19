@@ -9,7 +9,7 @@
 import { createDraymondAdminClient } from './client';
 import type { BenchmarkMetric, ComponentClass, DeepScoreResult } from './types';
 
-// ── Run id ──────────────────────────────────────────────────────────────────
+// -- Run id ------------------------------------------------------------------
 
 export function buildRunId(componentClass: ComponentClass, now = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -19,7 +19,7 @@ export function buildRunId(componentClass: ComponentClass, now = new Date()): st
   return `${componentClass}-${stamp}`;
 }
 
-// ── Slug helpers (mirror the existing registry slug conventions) ───────────
+// -- Slug helpers (mirror the existing registry slug conventions) -----------
 
 function toSlug(name: string): string {
   // Cap at 64 chars (component_slug is text but stays comfortably under
@@ -28,7 +28,7 @@ function toSlug(name: string): string {
   return slug || 'unknown';
 }
 
-// ── Collection ──────────────────────────────────────────────────────────────
+// -- Collection --------------------------------------------------------------
 
 /**
  * Collect metrics for one component class from raw rows.
@@ -153,7 +153,7 @@ function collectChainMetrics(rows: Array<Record<string, any>>): BenchmarkMetric[
   });
 }
 
-// ── Recording ───────────────────────────────────────────────────────────────
+// -- Recording ---------------------------------------------------------------
 
 /**
  * Insert a batch of metrics under one run_id.
@@ -209,7 +209,7 @@ export async function recordDeepScores(
   return updated;
 }
 
-// ── Trend ───────────────────────────────────────────────────────────────────
+// -- Trend -------------------------------------------------------------------
 
 /** Return the most recent `limit` weakness scores for a component, oldest-first. */
 export async function getTrend(

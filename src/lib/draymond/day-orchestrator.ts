@@ -28,8 +28,8 @@ export interface OrchestrationStep {
 }
 
 export const DAY_FLOW: OrchestrationStep[] = [
-  // ── Morning — data in, then deliver ─────────────────────────────────────
-  { id: 'sec-scan', phase: 'morning', time: '05:00', job: 'depscan', purpose: 'Dependency/SCA scan', feedsTo: ['overlay-auditor'] },
+  // -- Morning — data in, then deliver -------------------------------------
+  { id: 'sec-scan', phase: 'morning', time: '05:00', job: 'overlay-auditor', purpose: 'Site + dependency integrity scan (reassigned from depscan)', feedsTo: ['overlay-auditor'] },
   { id: 'news', phase: 'morning', time: '06:00', job: 'ingest_news', purpose: 'Current events into the fleet', feedsTo: ['overlay-strategist', 'omniresearch-pro'] },
   { id: 'research-rotation', phase: 'morning', time: '06:00', job: 'research_rotation', purpose: 'Drain the highest-priority ready science/sports experiment', feedsTo: ['deterministic-brain', 'overlay-strategist'] },
   { id: 'market', phase: 'morning', time: '07:00', job: 'fetch_market_data', purpose: 'Crypto + papers snapshot', feedsTo: ['overlay-treasurer', 'trading-agents', 'ghostfolio-engine', 'sports-steve'] },
@@ -40,21 +40,21 @@ export const DAY_FLOW: OrchestrationStep[] = [
   { id: 'finance-strategy', phase: 'morning', time: '08:15', job: 'finance_strategy_brief', purpose: 'Book-grounded daily finance strategy brief', feedsTo: ['overlay-treasurer', 'overlay-strategist', 'fs-agent'] },
   { id: 'finance-goals', phase: 'morning', time: '08:45', job: 'finance_goals_sync', purpose: 'Sync capability-grounded goals into draymond_goals' },
   { id: 'mission', phase: 'morning', time: '09:30', job: 'wf-mission-sync', purpose: 'Pipeline + revenue vs target' },
-  // ── Midday — steady state ───────────────────────────────────────────────
+  // -- Midday — steady state -----------------------------------------------
   { id: 'duty', phase: 'midday', time: 'hourly', job: 'fleet_duty_sync', purpose: 'On-duty roster check' },
   { id: 'repair', phase: 'midday', time: ':15', job: 'self_repair_check', purpose: 'Auto-repair failures / escalate' },
   { id: 'bmk', phase: 'midday', time: '13:00', job: 'benchmark_chains', purpose: 'Benchmark chain health', feedsTo: ['deterministic-brain'] },
   { id: 'science-seed', phase: 'midday', time: '16:00', job: 'science_campaign_seed', purpose: 'Top up the science/sports experiment backlog', feedsTo: ['deterministic-brain', 'research-rotation'] },
   { id: 'marketing', phase: 'midday', time: '10:00', job: 'marketing-pulse', purpose: 'Content + pipeline top-of-funnel' },
-  { id: 'media', phase: 'midday', time: '10:30', job: 'generative-video-ai', purpose: 'Media pipeline (shorts → episodes → studio)', feedsTo: ['social-media-dashboard'] },
+  { id: 'media', phase: 'midday', time: '10:30', job: 'social-media-dashboard', purpose: 'Media pipeline (reassigned from generative-video-ai)', feedsTo: ['social-media-dashboard'] },
   { id: 'web', phase: 'midday', time: '11:00', job: 'agent-browser', purpose: 'Web automation pipeline (browser → scrape → QA)' },
   { id: 'knowledge', phase: 'night', time: '02:20', job: 'bookbridge', purpose: 'Knowledge pipeline (library → synthesis → vector → memory)' },
-  // ── Evening — prepare next day ──────────────────────────────────────────
+  // -- Evening — prepare next day ------------------------------------------
   { id: 'eve-marketing', phase: 'evening', time: '20:00', job: 'marketing-pulse', purpose: 'Build next-day marketing tools' },
   { id: 'oss-marketing-status', phase: 'evening', time: '22:30', job: 'oss_marketing_stack', purpose: 'OSS marketing team status before night stop', feedsTo: ['mission-pipeline'] },
   { id: 'repair-shift', phase: 'evening', time: '18:00', job: 'repair_shift', purpose: 'Daily repair team shift — code-review audit, fix + upgrade the ecosystem, benchmark improvements, self-learn' },
   { id: 'research-grade', phase: 'evening', time: '18:30', job: 'research_grade_loop', purpose: 'Breakthrough-potential grading of CureMind/BB-Tech research output' },
-  // ── Night — learn + build while idle ────────────────────────────────────
+  // -- Night — learn + build while idle ------------------------------------
   { id: 'learn', phase: 'night', time: '00:30', job: 'self_learning_loop', purpose: 'Distill lessons from the day' },
   { id: 'rd', phase: 'night', time: '01:00', job: 'rd_night', purpose: 'Overnight research + dev plan' },
   { id: 'dream', phase: 'night', time: '02:00', job: 'dream_cycle', purpose: 'AutoDream memory consolidation (gated)', feedsTo: ['memory-intelligence'] },
@@ -234,7 +234,7 @@ export async function runPhase(phase: DayPhase, budgetTokens?: number): Promise<
       const dbFile =
         process.env.DRAYMOND_DB_PATH ??
         pathMod.default.join(process.cwd(), 'data', 'draymond.db');
-      if (!fs.default.existsSync(dbFile)) {
+      if (!/*turbopackIgnore: true*/ fs.default.existsSync(dbFile)) {
         return { skipped: 'wiki sync requires the local database (start the app once)' };
       }
       const { execFile } = await import('node:child_process');

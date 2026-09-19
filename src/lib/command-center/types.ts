@@ -51,7 +51,7 @@ export interface SeoTask {
 export type SeoTaskInsert = Partial<Omit<SeoTask, 'id' | 'created_at' | 'updated_at'>> &
   Pick<SeoTask, 'title'>;
 
-// ── Deploy ──────────────────────────────────────────────────────────────────
+// -- Deploy ------------------------------------------------------------------
 
 export interface DeployTarget {
   id: string;

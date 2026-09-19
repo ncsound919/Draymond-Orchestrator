@@ -27,13 +27,13 @@ import type {
   DraymondChainStepInsert,
 } from './types';
 
-// ── Configuration ────────────────────────────────────────────────────────────
+// -- Configuration ------------------------------------------------------------
 
 const BUILDER_MODEL = 'deepseek-v4-flash-free';
 const BUILDER_TIMEOUT_MS = 20_000;
 const MAX_STEPS = 10;
 
-// ── Registry snapshot for the builder ────────────────────────────────────────
+// -- Registry snapshot for the builder ----------------------------------------
 
 type BuilderEntityInfo = {
   slug: string;
@@ -80,7 +80,7 @@ async function getEntityCatalog(): Promise<BuilderEntityInfo[]> {
   return catalog;
 }
 
-// ── LLM-based chain generation ───────────────────────────────────────────────
+// -- LLM-based chain generation -----------------------------------------------
 
 function buildChainBuilderPrompt(catalog: BuilderEntityInfo[]): string {
   const entityDescriptions = catalog
@@ -305,7 +305,7 @@ function parseBlueprintResponse(
   };
 }
 
-// ── Validation ───────────────────────────────────────────────────────────────
+// -- Validation ---------------------------------------------------------------
 
 async function validateBlueprint(
   blueprint: ChainBlueprint,
@@ -423,7 +423,7 @@ function hasCycle(steps: ChainBlueprintStep[]): boolean {
   return false;
 }
 
-// ── Public API ───────────────────────────────────────────────────────────────
+// -- Public API ---------------------------------------------------------------
 
 /**
  * Build a chain from a natural language description.
@@ -514,7 +514,7 @@ export async function buildAndExecuteChain(
   }
 }
 
-// ── Chain creation from blueprint ────────────────────────────────────────────
+// -- Chain creation from blueprint --------------------------------------------
 
 async function createChainFromBlueprint(
   blueprint: ChainBlueprint,
