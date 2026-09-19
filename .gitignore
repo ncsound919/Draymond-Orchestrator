@@ -47,6 +47,11 @@ build_error.log
 # The Deep / CodeNexus generated audit reports
 /deep-audit-reports/
 
+# local backups + one-off debug scripts (never source)
+*.bak
+*.bak-*
+/scripts/tmp-*.ts
+
 # vercel
 .vercel
 
