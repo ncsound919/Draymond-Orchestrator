@@ -224,7 +224,9 @@ const FLEET_SERVICES = [
     args: "server.ts",
     cwd: O("agents/OmniResearch-Pro-main"),
     interpreter: NODE,
-    memory: "768M",
+    // The tsx wrapper + a long local-model run exceeded 768M and pm2 killed the
+    // process mid-report; 2G lets a run finish (DeepSeek runs need far less).
+    memory: "2G",
     env: {
       ...D,
       NODE_ENV: "production",
@@ -525,7 +527,7 @@ const MARKETING_SERVICES = [
   pm2App({
     name: "smd-redis",
     script: REDIS_BIN,
-    args: "--port 6379 --bind 127.0.0.1",
+    args: `--port 6379 --bind 127.0.0.1 --dir "${path.join(ORCH_DIR, "data", "redis")}" --stop-writes-on-bgsave-error no`,
     memory: "256M",
     restart_delay: 2000,
     logPrefix: "smd-redis",
@@ -592,7 +594,17 @@ const MARKETING_SERVICES = [
     cwd: O("agents/Grader-main"),
     interpreter: NODE,
     memory: "1G",
-    env: { PORT: "3201", NODE_ENV: "development" },
+    env: {
+      PORT: "3201",
+      NODE_ENV: "development",
+      // Grader's own .env does not reliably reach the process (its dotenv
+      // resolves via dotenvx and loads a different file), so inject the LLM
+      // gateway key from Draymond's canonical .env.local. Without it
+      // fleet-client skips the litellm/fleet-free tier and falls back to the
+      // small local model, which fails the strict grading schema.
+      LITELLM_MASTER_KEY: D.LITELLM_MASTER_KEY || "",
+      LITELLM_URL: process.env.LITELLM_URL || "http://127.0.0.1:4100",
+    },
   }),
   pm2App({
     name: "agent-browser",
@@ -642,11 +654,36 @@ const MARKETING_SERVICES = [
     env: {
       PORT: "3200",
       NODE_ENV: "development",
-      DATABASE_URL: "file:./reporank.db",
       REDIS_URL: "redis://127.0.0.1:6379",
       JWT_SECRET:
         D.JWT_SECRET || "local-reporank-dev-secret-0123456789abcdef0123456789abcdef",
       GEMINI_API_KEY: D.GEMINI_API_KEY || "",
+      // Route RepoRank's AI grading through the fleet litellm gateway rather
+      // than a standalone LM Studio. The gateway enforces auth, so the master
+      // key must be present (LMStudioProvider now forwards it).
+      LITELLM_MASTER_KEY: D.LITELLM_MASTER_KEY || "",
+      LOCAL_AI_PROVIDER: "lmstudio",
+      LOCAL_AI_ENDPOINT: "http://127.0.0.1:4100",
+      LOCAL_AI_MODEL: "deepseek",
+    },
+  }),
+  // CodeNexus — agentic PR review + fix platform (webhook → diff → Semgrep
+  // scan → comment → auto-fix → verify → push). Canonical port 3205 (ports.ts),
+  // health route is /health (node-adapter only; the wrangler worker serves
+  // :8787 and is not what the fleet probes). Runs from source via tsx so the
+  // deterministic deep-audit lenses and the real workspace Semgrep SAST are
+  // live without a turbo build. Same launch pattern as Grader/reporank.
+  pm2App({
+    name: "codenexus",
+    script: O("agents/CodeNexus-main/control-plane/node_modules/tsx/dist/cli.mjs"),
+    args: "src/node-adapter.ts",
+    cwd: O("agents/CodeNexus-main/control-plane"),
+    interpreter: NODE,
+    memory: "1G",
+    env: {
+      PORT: "3205",
+      NODE_ENV: "development",
+      CNX_GITHUB_WEBHOOK_SECRET: D.CNX_GITHUB_WEBHOOK_SECRET || "",
     },
   }),
   pm2App({

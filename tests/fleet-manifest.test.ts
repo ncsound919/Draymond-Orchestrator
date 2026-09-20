@@ -40,11 +40,23 @@ describe('fleet-manifest (single source of truth for PM2)', () => {
     expect(names).toContain('draymond');
     expect(names).toContain('deterministic-brain');
     expect(names).toContain('axiom');
-    // The full fleet: 1 core + 26 fleet + 10 marketing + 1 dsh + 1 brain = 39.
+    // The full fleet: 1 core + 26 fleet + 11 marketing + 1 dsh + 1 brain = 40.
     // `opencode` was deliberately RETIRED (codegen now routes through Axiom's
     // /v1/chat/completions) and hermes-brain/hermes-proxy were removed — bump
     // this pin deliberately whenever the fleet changes.
-    expect(all).toHaveLength(39);
+    expect(all).toHaveLength(40);
+  });
+
+  it('supervises CodeNexus on its canonical 3205 port', () => {
+    const m = loadManifest();
+    const codenexus = (
+      m.MARKETING_SERVICES as Array<{ name: string; script: string; cwd: string; env: Record<string, string> }>
+    ).find((a) => a.name === 'codenexus');
+    expect(codenexus, 'codenexus must be pm2-managed').toBeDefined();
+    expect(codenexus?.env.PORT).toBe('3205');
+    expect(codenexus?.cwd).toContain('CodeNexus-main');
+    // The node-adapter (not the wrangler worker) is what serves /health on 3205.
+    expect(codenexus?.script).toContain('tsx');
   });
 
   it('gives every app the self-healing restart policy', () => {

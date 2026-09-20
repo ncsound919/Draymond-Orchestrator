@@ -30,10 +30,42 @@ console.log(`[litellm-pool] spawning litellm on :${process.env.PORT} ` +
     'OLLAMA_KEY_PRIMARY', 'OLLAMA_KEY_TAP919BEATS', 'OLLAMA_KEY_TAP4500', 'OLLAMA_KEY_NCSOUND919',
     'OLLAMA_KEY_JOHNREDD888', 'OLLAMA_KEY_NCSOUND_ALT', 'OPENROUTER_API_KEY'].filter((k) => process.env[k]).length}/12)`);
 
-const child = spawn('litellm', ['--config', 'litellm.yaml', '--port', String(process.env.PORT)], {
+// Resolve the litellm proxy entrypoint. The console script (litellm.exe) is not
+// always installed even when the Python package is; in that case run the proxy
+// through the package's own `run_server` entrypoint instead of failing ENOENT.
+function resolveLitellm() {
+  const port = String(process.env.PORT);
+  const args = ['--config', 'litellm.yaml', '--port', port];
+  const explicit = process.env.LITELLM_BIN;
+  if (explicit && fs.existsSync(explicit)) return { cmd: explicit, args };
+
+  const python = process.env.PYTHON_PATH || 'python';
+  const scriptDirs = [
+    path.dirname(process.env.PYTHON_PATH || ''),
+    path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python312', 'Scripts'),
+    path.join(process.env.APPDATA || '', 'Python', 'Python312', 'Scripts'),
+    'C:\\Program Files\\Python312\\Scripts',
+  ].filter(Boolean);
+  for (const dir of scriptDirs) {
+    const exe = path.join(dir, 'litellm.exe');
+    if (fs.existsSync(exe)) return { cmd: exe, args };
+  }
+
+  return {
+    cmd: python,
+    args: ['-c', 'from litellm.proxy.proxy_cli import run_server; run_server()', ...args],
+  };
+}
+
+const entry = resolveLitellm();
+console.log(`[litellm-pool] entrypoint: ${entry.cmd}`);
+const child = spawn(entry.cmd, entry.args, {
   cwd: repoRoot,
   env: process.env,
   stdio: 'inherit',
   windowsHide: true,
+});
+child.on('error', (err) => {
+  console.error(`[litellm-pool] failed to spawn ${entry.cmd}: ${err.message}`);
 });
 child.on('exit', (code) => process.exit(code ?? 1));
