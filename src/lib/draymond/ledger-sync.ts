@@ -1,10 +1,18 @@
 /**
- * Fail-soft posting of money events to the finance-connect double-entry ledger.
+ * Fail-soft posting of money events to the ERPNext double-entry ledger.
+ *
+ * The target is the ERPNext-Ledger finance-connect adapter (02_Pillars/Overlay
+ * Finance/ERPNext-Ledger/adapter, port 4100): POST /api/v1/ledger/ingest with
+ * { kind, id, amount_cents, occurred_at?, memo? }. This is NOT the separate
+ * stale finance-connect under 04_Integrations (port 4000) — that one must not
+ * receive ledger posts. Draymond's .env.local/.env.example wire
+ * FINANCE_CONNECT_URL to http://127.0.0.1:4100.
  *
  * Idempotency is owned by the ledger: it keys every journal entry by
  * `${kind}:${id}`, so re-sending an event is safe and never double-posts.
  * This module must NEVER throw — a ledger outage cannot break the money flow
  * that produced the event. Follows the finance-sync.ts fail-soft pattern.
+ * Inert (returns false, no network call) until FINANCE_CONNECT_URL is set.
  */
 
 export type LedgerEventKind =

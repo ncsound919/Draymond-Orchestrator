@@ -39,10 +39,11 @@ export async function POST(request: NextRequest) {
     kind?: unknown;
     repoUrl?: unknown;
     job?: unknown;
+    preferredLead?: unknown;
   }>(request);
   if (bodyResult.error) return bodyResult.error;
 
-  const { signal, detail, kind, repoUrl, job } = bodyResult.data;
+  const { signal, detail, kind, repoUrl, job, preferredLead } = bodyResult.data;
 
   // A repair token carries the original signal/detail when the body omits them.
   const effSignal =
@@ -114,6 +115,10 @@ export async function POST(request: NextRequest) {
     if (jobPayload?.id) {
       repair = await repairFailedJob(jobPayload, effDetail, {
         updateJobConfig: (id, config) => updateJob(id, { job_config: config }),
+      }, [], {
+        // A caller-ranked lead (Axiom's outcome memory) — honoured only when it
+        // is a real coding candidate, so a mismatched lane is ignored, not installed.
+        ...(typeof preferredLead === 'string' && preferredLead.trim() ? { preferredLead: preferredLead.trim() } : {}),
       }) as unknown as Record<string, unknown>;
     } else {
       repair = { action: 'escalated', detail: 'no job payload provided — escalate for manual review', signal: effSignal };

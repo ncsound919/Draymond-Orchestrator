@@ -1048,6 +1048,10 @@ const ENTITY_DEFS: EntitySeedDef[] = [
         math_state: { path: '/api/recourse/math/state', method: 'GET' },
         lego_state: { path: '/api/lego/state', method: 'GET' },
         lego_assemble: { path: '/api/lego/assemble', method: 'POST' },
+        oncology_research_unified: { path: '/api/recourse/oncology/research/unified', method: 'GET' },
+        compose_suggest: { path: '/api/recourse/compose/suggest', method: 'GET' },
+        compose_rate: { path: '/api/recourse/compose/rate', method: 'POST' },
+        rating_variation: { path: '/api/recourse/rating/variation', method: 'POST' },
       },
     },
     capabilities: [
@@ -1893,6 +1897,104 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
       },
     ],
   },
+  // -- Oncology Night Shift (locked plan 2026-09-22 §4) -------------------
+  // 22:00–06:00: call up sidecars one at a time, run research, FieldBridge
+  // batch at 04:00, unified report at 05:00, publish to Global Lens at 05:30.
+  // Sequence contract: shift-oncology.ts (ONCOLOGY_SHIFT_SEQUENCE). Only the
+  // entity-level steps that resolve to real registered entities are seeded
+  // here; sidecar call-up/teardown runs through the overlay-oncology endpoints.
+  {
+    name: 'Oncology Night Shift',
+    slug: 'oncology-shift',
+    description:
+      'Night research shift: run Overlay Oncology research, produce the unified report, publish to Global Lens. Sidecar call-up is one-at-a-time per the locked plan.',
+    steps: [
+      {
+        name: 'Run Oncology Research Pipeline',
+        entitySlug: 'overlay-oncology',
+        action: 'run_pipeline',
+        input_mapping: {
+          topic: '$.input.topic',
+          cancerType: '$.input.cancerType',
+          ticks: '$.input.ticks',
+        },
+        output_key: 'research',
+        step_order: 1,
+        depends_on_indices: [],
+      },
+      {
+        name: 'Run Sector Synthesis',
+        entitySlug: 'overlay-oncology',
+        action: 'run_synthesis',
+        input_mapping: {
+          topic: '$.input.topic',
+          study: '$.steps.research.output',
+        },
+        output_key: 'synthesis',
+        step_order: 2,
+        depends_on_indices: [0],
+      },
+      {
+        name: 'Generate Unified Report',
+        entitySlug: 'recourse',
+        action: 'oncology_research_unified',
+        input_mapping: {
+          synthesis: '$.steps.synthesis.output',
+        },
+        output_key: 'unified_report',
+        step_order: 3,
+        depends_on_indices: [1],
+      },
+    ],
+  },
+  // -- Music Shift (locked plan 2026-09-22 §5) ---------------------------
+  // Recourse composer learner + ChordStudio rating loop, scheduled nightly.
+  // Sequence contract: shift-music.ts (MUSIC_SHIFT_SEQUENCE). Auto-rate is
+  // OFF by default; human ratings are the only taste signal.
+  {
+    name: 'Music Shift',
+    slug: 'music-shift',
+    description:
+      'Nightly Recourse composer + ChordStudio rating loop: suggest per style, learner rate (guarded), blind A/B variation, Elo write-back.',
+    steps: [
+      {
+        name: 'Compose Suggestions',
+        entitySlug: 'recourse',
+        action: 'compose_suggest',
+        input_mapping: {
+          styles: '$.input.styles',
+          count: 4,
+        },
+        output_key: 'suggestions',
+        step_order: 1,
+        depends_on_indices: [],
+      },
+      {
+        name: 'Learner Rate',
+        entitySlug: 'recourse',
+        action: 'compose_rate',
+        input_mapping: {
+          suggestions: '$.steps.suggestions.output',
+          autoRate: false,
+        },
+        output_key: 'rated',
+        step_order: 2,
+        depends_on_indices: [0],
+      },
+      {
+        name: 'Rating Variation',
+        entitySlug: 'recourse',
+        action: 'rating_variation',
+        input_mapping: {
+          source: 'chordstudio',
+          suggestions: '$.steps.suggestions.output',
+        },
+        output_key: 'variations',
+        step_order: 3,
+        depends_on_indices: [1],
+      },
+    ],
+  },
 ];
 
 // ============================================================================
@@ -1976,6 +2078,20 @@ const JOB_DEFS: JobSeedDef[] = [
     },
     notify_on_failure: true,
   },
+
+  // -- Night research shift boundary (22:00–06:00) ---------------------
+  // The oncology-shift research window runs 22:00–06:00 (plan §4). Only ONE
+  // heavy shift worker runs at a time, so heavy marketing/LLM content jobs
+  // must stay OUTSIDE this window. Verified 2026-09-22 (Agent D): all marketing
+  // jobs below already sit outside it — Daily Marketing Run 10:00, Full Content
+  // Creation 14:00 (Mon/Wed/Fri), Editorial Morning Push 07:00. No cron changes
+  // were needed. Jobs inside the window that DO exist here are non-marketing
+  // and either deterministic/cheap (News Outlet Ingest 02:45, Brain Wiki Sync
+  // 03:00, Sector Productivity Persist 23:40, benchmarks 06:00) or the night
+  // research shift's own work (Cancer Research Deep-Dive 05:00, Book-Grounded
+  // Research 05:00). Do not schedule new marketing content jobs in 22:00–06:00.
+  // (The 22:30 oss-marketing-status check in day-orchestrator.ts is a lightweight
+  // docker status/stop check, not heavy marketing — allowed.)
 
   // -- Marketing (10AM daily) ------------------------------------------
   {
@@ -2291,6 +2407,36 @@ const JOB_DEFS: JobSeedDef[] = [
         publish: true,
         context:
           'Six advances (Aug 2026): ASPIRE chemo-free HER2+ breast, Aliya PEF TLS induction, UC Irvine Treg mathematical modeling, intismeran mRNA melanoma vaccine phase 3, lysosomal nanoplatform cold-to-hot prostate, shikonin hydrogel + mild PTT cold TNBC.',
+      },
+    },
+    notify_on_failure: true,
+  },
+  // -- Oncology Night Shift (locked plan 2026-09-22 §4) ------------------
+  {
+    name: 'Oncology Night Shift',
+    cron_expression: '0 22 * * *',
+    job_type: 'chain',
+    job_config: {
+      chain_slug: 'oncology-shift',
+      input: {
+        topic: 'in-situ vaccination and cold-to-hot tumor microenvironment conversion for immunotherapy',
+        cancerType: 'tnbc',
+        ticks: 120,
+      },
+    },
+    notify_on_failure: true,
+    notify_on_success: true,
+  },
+  // -- Music Shift (locked plan 2026-09-22 §5) ---------------------------
+  {
+    name: 'Music Shift',
+    cron_expression: '30 3 * * *',
+    job_type: 'chain',
+    job_config: {
+      chain_slug: 'music-shift',
+      input: {
+        styles: ['steely-dan', 'jasper-ballad', 'dangelo-glasper', 'airplane'],
+        count: 4,
       },
     },
     notify_on_failure: true,

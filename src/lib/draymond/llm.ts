@@ -157,10 +157,10 @@ const DEFAULT_MODELS: Record<LLMProvider, string> = {
   litellm: 'gpt-4o-mini',
   dsh: 'fleet-free',
   // Local tier — an OpenAI-compatible llama.cpp server (`llama-server`) on
-  // OLLAMA_BASE_URL, currently MiniCPM5-2B. OLLAMA_MODEL selects the model;
-  // the local fast tier is a 2B model, so it is used for triage/short JSON,
-  // not heavy codegen (that goes to Axiom).
-  ollama: process.env.OLLAMA_MODEL ?? 'minicpm5-2b',
+  // OLLAMA_BASE_URL, currently MiniCPM5-1B "Fable" (alias minicpm5-fable).
+  // OLLAMA_MODEL selects the model; the local fast tier is a 1B model, so it is
+  // used for triage/short JSON, not heavy codegen (that goes to Axiom).
+  ollama: process.env.OLLAMA_MODEL ?? 'minicpm5-fable',
 };
 
 /** Resolution order when no explicit provider is requested. Free + local tiers first, paid last. */

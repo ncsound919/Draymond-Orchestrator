@@ -16,6 +16,7 @@
 
 import { randomBytes } from 'crypto';
 import type { DraymondAction } from './types';
+import { publishToOpenHubChannel } from './communicator';
 
 /** Published message title — kept in one place so consumers can filter on it. */
 export const NTFY_APPROVAL_TITLE = 'Draymond · Approval required';
@@ -144,6 +145,15 @@ export async function publishIssueNotification(input: {
   } catch (err) {
     console.warn(`[ntfy] Issue publish failed for "${input.title}": ${err instanceof Error ? err.message : err}`);
     return false;
+  } finally {
+    // Mirror to OpenHub's channel (openhub-reports) so the phone sees issue
+    // alerts in the same feed as the self-reports. Best-effort, no actions.
+    await publishToOpenHubChannel({
+      title: input.title,
+      message: input.message,
+      tags: input.tags ?? ['rotating_light'],
+      priority: input.priority ?? 5,
+    });
   }
 }
 
@@ -335,5 +345,15 @@ export async function publishResultNotification(input: {
   } catch (err) {
     console.warn(`[ntfy] Result publish failed for "${input.operation}": ${err instanceof Error ? err.message : err}`);
     return false;
+  } finally {
+    // Mirror to OpenHub's channel (openhub-reports).
+    await publishToOpenHubChannel({
+      title: input.success ? 'Draymond · AetherDesk result' : 'Draymond · AetherDesk failed',
+      message: input.success
+        ? `AetherDesk "${input.operation}" completed${input.status_code ? ` (HTTP ${input.status_code})` : ''}.`
+        : `AetherDesk "${input.operation}" failed: ${input.error ?? 'unknown error'}`,
+      tags: input.success ? ['white_check_mark'] : ['x'],
+      priority: input.success ? 3 : 5,
+    });
   }
 }

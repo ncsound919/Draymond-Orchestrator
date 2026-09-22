@@ -5,7 +5,7 @@ import path from 'node:path';
 import { postLedgerEvent, ledgerConfigured } from '../src/lib/draymond/ledger-sync';
 import { createAffiliate, recordAttribution, setCommissionStatus } from '../src/lib/draymond/affiliates';
 
-const BASE = 'http://localhost:4000';
+const BASE = 'http://127.0.0.1:4100';
 const dirs: string[] = [];
 
 beforeEach(() => {
@@ -26,7 +26,7 @@ afterAll(() => {
 });
 
 describe('ledger-sync', () => {
-  it('is inert when finance-connect is not configured', async () => {
+  it('is inert when the ERPNext ledger adapter is not configured', async () => {
     expect(ledgerConfigured()).toBe(false);
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
@@ -35,7 +35,7 @@ describe('ledger-sync', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('posts a normalized event to the ledger ingest endpoint', async () => {
+  it('posts a normalized event to the ERPNext adapter ingest endpoint', async () => {
     process.env.FINANCE_CONNECT_URL = BASE;
     process.env.FINANCE_CONNECT_TOKEN = 'secret';
     const fetchSpy = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ ok: true }), { status: 201 }));

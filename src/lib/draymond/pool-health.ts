@@ -399,9 +399,15 @@ export function buildLitellmConfig(
   lines.push('  allowed_fails: 2');
   lines.push('  num_retries: 2');
   lines.push('  fallbacks:');
-  lines.push('    - fleet-free: ["zen-free", "ollama-cloud", "openrouter-free", "deepseek"]');
-  lines.push('    - opencode-free: ["fleet-free", "zen-free", "ollama-cloud", "deepseek"]');
-  lines.push('    - zen-free: ["fleet-free", "ollama-cloud", "deepseek"]');
+  // Wanted order (locked plan 2026-09-22): opencode (Go tier) → deepseek
+  // (direct) → ollama-cloud (Keywire) → openrouter-free. Deepseek must precede
+  // ollama-cloud in every chain so free pools fall to the paid direct lane
+  // before the Keywire lane.
+  lines.push('    - fleet-free: ["deepseek", "ollama-cloud", "openrouter-free"]');
+  lines.push('    - opencode-free: ["fleet-free", "zen-free", "deepseek", "ollama-cloud"]');
+  lines.push('    - zen-free: ["deepseek", "ollama-cloud", "openrouter-free"]');
+  lines.push('    - deepseek: ["opencode", "ollama-cloud"]');
+  lines.push('    - opencode: ["deepseek", "ollama-cloud"]');
   lines.push('');
   lines.push('general_settings:');
   lines.push('  master_key: os.environ/LITELLM_MASTER_KEY');

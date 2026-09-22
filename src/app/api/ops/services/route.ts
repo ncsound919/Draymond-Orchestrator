@@ -9,6 +9,13 @@ import {
   restartService,
   serviceCatalog,
 } from '@/lib/draymond/service-manager';
+import {
+  decideSystemOne,
+  bringUpChoiceAdvisory,
+  buildBringUpChoiceAdvisory,
+  serviceLifecycleAdvisory,
+  buildServiceLifecycleAdvisory,
+} from '@/lib/draymond/jevClient';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,13 +45,20 @@ export async function POST(request: NextRequest) {
 
     if (typeof body.slug === 'string' && body.slug.trim()) {
       const slug = body.slug.trim();
+      const action = body.action ?? 'start';
       const result =
-        body.action === 'stop'
+        action === 'stop'
           ? await stopService(slug)
-          : body.action === 'restart'
+          : action === 'restart'
             ? await restartService(slug)
             : await startService(slug);
-      return NextResponse.json({ ok: result.up, slug: result.slug, service: result, action: body.action ?? 'start' });
+      // Jev advisory (non-authoritative): should this lifecycle action proceed?
+      const { state, questions } = serviceLifecycleAdvisory(
+        { slug: result.slug, name: result.name, port: null, health: result.up ? 'up' : 'down' },
+        action,
+      );
+      const jev = buildServiceLifecycleAdvisory(await decideSystemOne({ state, questions }));
+      return NextResponse.json({ ok: result.up, slug: result.slug, service: result, action, jev });
     }
 
     if (Array.isArray(body.slugs) && body.slugs.length > 0) {
@@ -60,7 +74,15 @@ export async function POST(request: NextRequest) {
     const down = all.filter((s) => !s.up).map((s) => s.slug);
     if (body.start !== false) {
       const started = await startDownServices(down.slice(0, 5));
-      return NextResponse.json({ checked: all.length, up: all.filter((s) => s.up).length, down, started });
+      // Jev advisory (non-authoritative): which down service to bring up first.
+      let jev;
+      if (down.length > 0) {
+        const { state, questions } = bringUpChoiceAdvisory(
+          all.filter((s) => !s.up).map((s) => ({ slug: s.slug, name: s.name, port: null, health: 'down' })),
+        );
+        jev = buildBringUpChoiceAdvisory(await decideSystemOne({ state, questions }));
+      }
+      return NextResponse.json({ checked: all.length, up: all.filter((s) => s.up).length, down, started, jev });
     }
     return NextResponse.json({ checked: all.length, up: all.filter((s) => s.up).length, down });
   } catch (err) {

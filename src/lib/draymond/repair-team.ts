@@ -104,8 +104,107 @@ export function classifyFailure(error: string): FailureKind {
   return "unknown";
 }
 
+/** Ordered coding leads the master stack can put in front of a repair. */
+export function codingLeadCandidates(): string[] {
+  const ordered = resolveCodingTools("codegen");
+  return ordered.length > 0 ? ordered : ["uplift-agent"];
+}
+
+export interface CrewOptions {
+  /** A caller-preferred lead. Honoured only when it is a real coding candidate,
+   *  so an unknown/mismatched lane (e.g. a service name from another vocabulary)
+   *  is ignored rather than silently installing a bogus lead. */
+  preferredLead?: string;
+  /** Deterministic round-robin across the coding candidates. Off unless the
+   *  operator enables it (DRAYMOND_REPAIR_EXPLORE=1): exploration changes which
+   *  engine leads live repairs, so it is never on by default. */
+  explore?: boolean;
+  /** lead -> attempt count for this failure kind, from the repair log. Drives
+   *  the round-robin: the least-attempted candidate leads next, so the
+   *  experiment stays balanced and reproducible from the log alone. */
+  attempts?: Record<string, number>;
+}
+
+/** The candidate with the fewest recorded attempts (ties → candidate order).
+ *  Deterministic given the log, so a run is reproducible. */
+export function leastAttempted(candidates: string[], attempts: Record<string, number> = {}): string {
+  let best = candidates[0];
+  let bestCount = attempts[best] ?? 0;
+  for (const c of candidates) {
+    const n = attempts[c] ?? 0;
+    if (n < bestCount) { best = c; bestCount = n; }
+  }
+  return best;
+}
+
+/** Per-lead attempt counts for one failure kind, from a repair log. Pure. */
+export function leadAttemptsFromLog(log: Array<{ failureKind?: string; crew?: { lead?: string } }>, kind: FailureKind): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of log) {
+    if (r?.failureKind !== kind) continue;
+    const lead = r?.crew?.lead;
+    if (typeof lead !== "string" || !lead) continue;
+    out[lead] = (out[lead] ?? 0) + 1;
+  }
+  return out;
+}
+
+export interface LeadStats {
+  /** lead -> attempts for this kind. */
+  attempts: Record<string, number>;
+  /** lead -> repairs that ended `fixed` for this kind. */
+  fixes: Record<string, number>;
+}
+
+/** Per-lead attempts AND fixes for one kind. Pure; `handed-off` counts as an
+ *  attempt but never a fix (its result is unknown, so it cannot be credited). */
+export function leadStatsFromLog(
+  log: Array<{ failureKind?: string; crew?: { lead?: string }; action?: string }>,
+  kind: FailureKind,
+): LeadStats {
+  const attempts: Record<string, number> = {};
+  const fixes: Record<string, number> = {};
+  for (const r of log) {
+    if (r?.failureKind !== kind) continue;
+    const lead = r?.crew?.lead;
+    if (typeof lead !== "string" || !lead) continue;
+    attempts[lead] = (attempts[lead] ?? 0) + 1;
+    if (r?.action === "fixed") fixes[lead] = (fixes[lead] ?? 0) + 1;
+  }
+  return { attempts, fixes };
+}
+
+/** Fix rate for a lead, 0 when it has no attempts. */
+function fixRate(stats: LeadStats, lead: string): number {
+  const a = stats.attempts[lead] ?? 0;
+  return a > 0 ? (stats.fixes[lead] ?? 0) / a : 0;
+}
+
+/**
+ * The challenger lead that measurably beats the stack primary for this kind, or
+ * undefined. Undefined means "keep the current behaviour" — either nothing is
+ * measured yet, the primary is already best, or no challenger strictly wins. This
+ * is the exploit half; the round-robin in `assembleCrew` is the explore half.
+ */
+export function bestLeadFromStats(
+  stats: LeadStats,
+  candidates: string[],
+  minMatches = Number(process.env.DRAYMOND_REPAIR_LEAD_MIN_MATCHES) || 3,
+): string | undefined {
+  const primary = candidates[0];
+  const measured = candidates.filter((l) => (stats.attempts[l] ?? 0) >= minMatches);
+  if (measured.length === 0) return undefined;
+  let best = measured[0];
+  for (const l of measured) {
+    if (fixRate(stats, l) > fixRate(stats, best)) best = l;
+  }
+  if (best === primary) return undefined;
+  if (fixRate(stats, best) <= fixRate(stats, primary)) return undefined;
+  return best;
+}
+
 /** Assemble the repair crew from the master coding stack. */
-export function assembleCrew(kind: FailureKind): RepairCrew {
+export function assembleCrew(kind: FailureKind, opts: CrewOptions = {}): RepairCrew {
   switch (kind) {
     case "chain_config":
     case "notification_config":
@@ -116,17 +215,26 @@ export function assembleCrew(kind: FailureKind): RepairCrew {
       const codegen = resolveCodingTools("codegen");
       const review = resolveCodingTools("review");
       const ide = resolveCodingTools("ide");
-      const lead = codegen[0] ?? "uplift-agent";
+      const candidates = codingLeadCandidates();
+      // Default (no options) is byte-identical to the historical behaviour:
+      // candidates[0] === codegen[0] === the layer primary.
+      const preferred = opts.preferredLead && candidates.includes(opts.preferredLead) ? opts.preferredLead : null;
+      const lead = preferred ?? (opts.explore ? leastAttempted(candidates, opts.attempts) : candidates[0]);
       const members = [
-        ...codegen.slice(1),
+        ...codegen.filter((t) => t !== lead),
         ...ide,
         review[0],
         "big-homie",
       ].filter((m) => m !== lead);
+      const why = preferred
+        ? `caller-preferred lead (${preferred})`
+        : opts.explore
+          ? `exploration round-robin (least-attempted lead)`
+          : `stack primary`;
       return {
         lead,
         members,
-        reason: `master coding stack (${codingStackSummary()}) | folded pipelines (${pipelineSummary()}) — coding agents apply the patch, Big Homie supervises`,
+        reason: `master coding stack (${codingStackSummary()}) | folded pipelines (${pipelineSummary()}) — coding agents apply the patch, Big Homie supervises | lead: ${why}`,
       };
     }
     case "missing_env":
@@ -143,6 +251,17 @@ export function assembleCrew(kind: FailureKind): RepairCrew {
       };
     default:
       return { lead: "omniresearch-pro", members: ["megacode", "big-homie"], reason: "investigate unknown failure" };
+  }
+}
+
+/** Read the repair log for per-lead attempts + fixes. Best-effort ({} on miss). */
+export async function readLeadStats(kind: FailureKind): Promise<LeadStats> {
+  try {
+    const raw = await fs.readFile(REPAIR_LOG, "utf-8");
+    const log = JSON.parse(raw) as Array<{ failureKind?: string; crew?: { lead?: string }; action?: string }>;
+    return Array.isArray(log) ? leadStatsFromLog(log, kind) : { attempts: {}, fixes: {} };
+  } catch {
+    return { attempts: {}, fixes: {} };
   }
 }
 
@@ -188,6 +307,9 @@ export interface RepairRepairOptions {
   dispatchTimeoutMs?: number;
   /** Override the immediate-dispatch mode for this call. */
   immediate?: boolean;
+  /** Caller-preferred coding lead (e.g. Axiom's outcome-ranked lane). Honoured
+   *  only when it is a real coding candidate; otherwise ignored. */
+  preferredLead?: string;
 }
 
 /**
@@ -220,7 +342,25 @@ export async function repairFailedJob(
       /* keep deterministic */
     }
   }
-  const crew = assembleCrew(kind);
+  // Lead selection. Exploration is opt-in (DRAYMOND_REPAIR_EXPLORE=1): it
+  // changes which engine leads live repairs, so the default stays the
+  // deterministic stack primary. When enabled: exploit a challenger that
+  // measurably beats the primary, else round-robin to the least-attempted
+  // candidate so contrasts keep being generated. A caller-supplied
+  // `preferredLead` always wins.
+  const explore = process.env.DRAYMOND_REPAIR_EXPLORE === "1";
+  let learnedLead: string | undefined;
+  let attempts: Record<string, number> | undefined;
+  if (explore) {
+    const stats = await readLeadStats(kind);
+    attempts = stats.attempts;
+    learnedLead = bestLeadFromStats(stats, codingLeadCandidates());
+  }
+  const crew = assembleCrew(kind, {
+    ...(options.preferredLead ?? learnedLead ? { preferredLead: options.preferredLead ?? learnedLead } : {}),
+    explore,
+    attempts,
+  });
   const base = { jobId: job.id, jobName: job.name, failureKind: kind, error, crew, repairedAt: new Date().toISOString(), lessonHints };
 
   if (job.job_type === 'chain' || typeof job.job_config?.chain_slug === 'string' || typeof job.job_config?.trigger_type === 'string') {

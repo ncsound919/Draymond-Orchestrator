@@ -99,8 +99,49 @@ export async function saveRecap(recap: PhaseRecap): Promise<PhaseRecap[]> {
 }
 
 /**
+ * Publish to OpenHub's own ntfy channel (topic `openhub-reports`) so the phone
+ * sees Draymond updates in the same feed as OpenHub's self-reports. Config:
+ *   OPENHUB_NTFY_URL    the OpenHub Cloudflare-tunnel URL + /ntfy
+ *   OPENHUB_NTFY_TOPIC  default `openhub-reports`
+ *   OPENHUB_NTFY_TOKEN  must match OpenHub's OPENHUB_NTFY_TOKEN
+ * Best-effort; a failure never breaks the caller. Honest about the result.
+ */
+export async function publishToOpenHubChannel(input: {
+  title: string;
+  message: string;
+  tags?: string[];
+  priority?: number;
+}): Promise<{ published: boolean; detail: string }> {
+  const base = (process.env.OPENHUB_NTFY_URL || '').replace(/\/+$/, '');
+  const topic = process.env.OPENHUB_NTFY_TOPIC || 'openhub-reports';
+  const token = process.env.OPENHUB_NTFY_TOKEN || '';
+  if (!base) return { published: false, detail: 'OPENHUB_NTFY_URL not configured' };
+  try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(base, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        topic,
+        title: input.title,
+        message: input.message,
+        ...(Array.isArray(input.tags) ? { tags: input.tags.slice(0, 5) } : {}),
+        ...(input.priority != null ? { priority: Number(input.priority) } : {}),
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    return res.ok ? { published: true, detail: `openhub ntfy HTTP ${res.status}` } : { published: false, detail: `openhub ntfy HTTP ${res.status}: ${(await res.text()).slice(0, 120)}` };
+  } catch (err) {
+    return { published: false, detail: `openhub ntfy: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
+/**
  * Send a recap to the configured channels:
  *   - Open-Chat (via its incoming webhook, if OPENCHAT_WEBHOOK set)
+ *   - ntfy (recaps/results topic) — reaches Open-Chat on the phone
+ *   - OpenHub's own ntfy channel (openhub-reports), if OPENHUB_NTFY_URL set
  *   - Email (Gmail nodemailer, if GMAIL_USER set)
  * Returns per-channel status.
  */
@@ -152,6 +193,17 @@ export async function sendRecap(recap: PhaseRecap): Promise<{ channels: string[]
     }
   } else {
     detail.push("ntfy: NTFY_URL/TOPIC not configured");
+  }
+
+  // OpenHub's own ntfy channel (openhub-reports) — same feed as self-reports.
+  if (process.env.OPENHUB_NTFY_URL) {
+    const r = await publishToOpenHubChannel({ title: `Draymond ${recap.phase} recap`, message: markdown, tags: ['recap', 'draymond'], priority: 3 });
+    if (r.published) {
+      channels.push('openhub');
+      detail.push(r.detail);
+    } else {
+      detail.push(r.detail);
+    }
   }
 
   // Email via the existing Gmail memo path.

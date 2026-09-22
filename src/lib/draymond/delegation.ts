@@ -1,5 +1,7 @@
 // ============================================================================
 import { writeBrainFile } from './journal';
+import { ONCOLOGY_SHIFT_SLUGS } from './shift-oncology';
+import { MUSIC_SHIFT_SLUGS } from './shift-music';
 
 // DRAYMOND ORCHESTRATION SYSTEM — Delegation Plan
 // ============================================================================
@@ -163,8 +165,15 @@ export const DELEGATION_PLAN: DelegationSpec[] = [
   { slug: 'systemic_consolidate', label: 'Systemic consolidation', phase: 'night', timeBudgetMs: 600_000, tokenBudgetPerRun: 48_000, tokenBudgetPerDay: 48_000, tier: 'flash', priority: 2, duty: 'night' },
   { slug: 'systemic_interconnect', label: 'Systemic interconnect', phase: 'night', window: { start: '00:00', end: '06:00', days: [7] }, timeBudgetMs: 1_200_000, tokenBudgetPerRun: 96_000, tokenBudgetPerDay: 96_000, tier: 'pro', priority: 2, duty: 'night' },
   { slug: 'self_learning_loop', label: 'Self-learning loop', phase: 'night', timeBudgetMs: 300_000, tokenBudgetPerRun: 32_000, tokenBudgetPerDay: 32_000, tier: 'flash', priority: 2, duty: 'night' },
-  { slug: 'synthesis_midday', label: 'Synthesis midday check', phase: 'midday', timeBudgetMs: 300_000, tokenBudgetPerRun: 32_000, tokenBudgetPerDay: 64_000, tier: 'flash', priority: 2, duty: 'always-on' },
+{ slug: 'synthesis_midday', label: 'Synthesis midday check', phase: 'midday', timeBudgetMs: 300_000, tokenBudgetPerRun: 32_000, tokenBudgetPerDay: 64_000, tier: 'flash', priority: 2, duty: 'always-on' },
   { slug: 'clinvar_surveillance', label: 'ClinVar variant surveillance', phase: 'morning', timeBudgetMs: 120_000, tokenBudgetPerRun: 16_000, tokenBudgetPerDay: 16_000, tier: 'flash', priority: 3, duty: 'always-on' },
+
+  // -- Oncology / FieldBridge night shift (locked plan 2026-09-22 §4) ------
+  // One heavy worker at a time, 22:00–06:00. Contracts in shift-oncology.ts.
+  ...ONCOLOGY_SHIFT_SLUGS,
+  // -- Music / Recourse shift (locked plan 2026-09-22 §5) --------------------
+  // Composer learner + ChordStudio rating loop. Contracts in shift-music.ts.
+  ...MUSIC_SHIFT_SLUGS,
 
   // -- Benchmarks / audits — midday, compressed ----------------------------
   { slug: 'benchmark_roster', label: 'Roster benchmark', phase: 'morning', timeBudgetMs: 900_000, tokenBudgetPerRun: 96_000, tokenBudgetPerDay: 96_000, tier: 'flash', priority: 2, duty: 'always-on' },

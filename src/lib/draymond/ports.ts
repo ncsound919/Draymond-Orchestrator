@@ -89,7 +89,7 @@ export const TOOL_PORTS: ToolPort[] = [
   { slug: 'squad-service', name: 'Squad Service', category: 'service', port: 8650, env: 'SQUAD_SERVICE_PORT', health: '/health', notes: 'Specialists riggs/moss/scribe/echo/hype (part of hermes-proxy backend). Health is GET /health (squad-service.js only answers /health, not /v1/health).' },
 
   // -- Ecosystem app services -----------------------------------------------
-  { slug: 'omniresearch-pro', name: 'OmniResearch Pro', category: 'service', port: 3010, env: 'OMNI_RESEARCH_URL', health: '/api/health', notes: 'Deep research agent.' },
+  { slug: 'omniresearch-pro', name: 'OmniResearch Pro', category: 'service', port: 3012, env: 'OMNI_RESEARCH_URL', health: '/api/health', notes: 'Deep research agent. Port 3012 (fleet manifest) — 3010 is claimed by the OpenHub operator console.' },
   { slug: 'overlay-chain', name: 'Overlay Chain', category: 'service', port: 3020, env: 'OVERLAY_CHAIN_URL', health: '/api', notes: 'Supply chain intelligence.' },
   { slug: 'hemp-os', name: 'Hemp-OS', category: 'service', port: 3100, env: 'HEMP_OS_URL', health: '/health', notes: 'Scientific research OS.' },
   { slug: 'hempforge', name: 'HempForge', category: 'service', port: 3110, env: 'HEMPFORGE_URL', health: '/api/health', notes: 'Moved off 3000.' },

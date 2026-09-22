@@ -45,6 +45,7 @@ const D = loadEnvLocal();
 const PYTHON =
   process.env.PYTHON_PATH || "C:\\Program Files\\Python312\\python.exe";
 const NODE = process.env.NODE_PATH || "C:\\Program Files\\nodejs\\node.exe";
+const BUN = process.env.BUN_PATH || "C:\\Users\\User\\.bun\\bin\\bun.exe";
 const CLOUDFLARED_BIN =
   process.env.CLOUDFLARED_BIN ||
   "C:\\Program Files (x86)\\cloudflared\\cloudflared.exe";
@@ -417,7 +418,7 @@ const FLEET_SERVICES = [
     cwd: P("Dev-Brain"),
     interpreter: NODE,
     memory: "256M",
-    env: { PORT: "3450", HOST: "127.0.0.1", NODE_ENV: "production" },
+    env: { PORT: "3450", HOST: "127.0.0.1", NODE_ENV: "production", ...D },
   }),
   pm2App({
     name: "halofy",
@@ -449,7 +450,7 @@ const FLEET_SERVICES = [
     // agents/recourse copy lacks /api/recourse/provider/chat and
     // /api/recourse/memory/*, so it cannot serve the Open-Chat chat surface.
     // The canonical repo's own .env is already local-first:
-    //   LOCAL_MODEL_BASE_URL=http://127.0.0.1:11434/v1, LOCAL_MODEL_NAME=minicpm5-2b,
+    //   LOCAL_MODEL_BASE_URL=http://127.0.0.1:11434/v1, LOCAL_MODEL_NAME=minicpm5-fable,
     //   with an api.pgsgrove.com fallback.
     // Run from source via tsx so code changes (e.g. the /v1 OpenAI shim) take
     // effect without a dist rebuild.
@@ -751,6 +752,92 @@ const BRAIN_SERVICES = [
   }),
 ];
 
+// â”€â”€ Always-on infrastructure (ecosystem.infra.config.js) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Three services the operator depends on surviving reboot but that had NO pm2
+// ownership before 2026-09-22 (locked plan section 3c). Added as a separate
+// config so they can be supervised independently of the fleet/marketing stacks.
+const LLAMA_SERVER_BIN =
+  process.env.LLAMA_SERVER_BIN ||
+  "C:\\Users\\User\\AppData\\Local\\Microsoft\\WinGet\\Packages\\ggml.llamacpp_Microsoft.Winget.Source_8wekyb3d8bbwe\\llama-server.exe";
+
+const INFRA_SERVICES = [
+  // localjev — Jev-compatible System One API (Bun, :8080). LocalJev wraps the
+  // local DiffusionGemma endpoint with prompted-probability inference. Bun app:
+  // entry is `bun run src/index.ts` (package.json start); pm2 runs the entry
+  // directly through the Bun interpreter (same code path, no npm wrapper).
+  // LOCALJEV_UPSTREAM / LOCALJEV_UPSTREAM_MODEL come from localjev's own .env;
+  // only the port is pinned here. Memory 256M per operator gate.
+  pm2App({
+    name: "localjev",
+    script: "src/index.ts",
+    cwd: P("localjev"),
+    interpreter: BUN,
+    memory: "256M",
+    env: { LOCALJEV_PORT: "8080", LOCALJEV_HOST: "127.0.0.1" },
+  }),
+  // openhub — Axiom/OpenHub operating console (Express + Vite, :3010).
+  // UNMANAGED before this config (operator console must survive reboot).
+  // Entry `server.ts` via tsx (npm run dev), env PORT=3010. OpenHub loads its
+  // own .env (OPENHUB_DB_PATH, session secrets, Keywire keys), so inject only
+  // PORT/NODE_ENV/UPLIFT_ROOT and let its dotenv be authoritative — same
+  // pattern as the axiom entry above.
+  pm2App({
+    name: "openhub",
+    script: path.join(
+      P("Deepseek Harness/Axiom Agent/openhub"),
+      "node_modules",
+      "tsx",
+      "dist",
+      "cli.mjs"
+    ),
+    args: "server.ts",
+    cwd: P("Deepseek Harness/Axiom Agent/openhub"),
+    interpreter: NODE,
+    memory: "1G",
+    restart_delay: 5000,
+    env: {
+      NODE_ENV: "development",
+      PORT: "3010",
+      UPLIFT_ROOT,
+    },
+  }),
+  // llama-server — llama.cpp OpenAI-compatible server for the DiffusionGemma
+  // (:8000) lane feeding LocalJev (`diffusiongemma-26B-A4B-it-4bit`).
+  //
+  // HONEST NOTES (verified 2026-09-22):
+  //   - Binary path VERIFIED on disk (also on PATH via the ggml.llamacpp winget
+  //     shim; `start-local.ps1` in C:\Users\User\models uses the same binary).
+  //   - The diffusiongemma-26B-A4B-it-4bit GGUF is NOT present on this machine
+  //     (searched C:\Users\User\models + the repo; only MiniCPM5 fable + nomic
+  //     embed are on disk). The `-m` path below is therefore a documented
+  //     default, NOT a verified start command — the entry stays stopped until
+  //     the operator downloads the GGUF and confirms the model path. The localjev
+  //     README's DiffusionGemma bake-off ran on a Mac (oMLX); the llama.cpp
+  //     lane on Windows was never captured with a start command.
+  //   - The llama-server process actually running today (PID captured in
+  //     data/logs/llama-server-error.log notes) is the :11434 minicpm5-fable
+  //     lane, started by start-minicpm.ps1 / start-local.ps1 — a DIFFERENT
+  //     unmanaged process. Its exact cmdline:
+  //       llama-server.exe -m C:\Users\User\models\MiniCPM5-1B-Claude-Opus-Fable5-V2-Thinking-Q8_0.gguf
+  //         --port 11434 --host 127.0.0.1 -t 8 -b 2048 -ub 512 --cache-prompt
+  //         --parallel 1 -c 8192 --reasoning off -ngl 0
+  //   - Memory: 2G restart ceiling. The live llama-server (1B model) measures
+  //     ~1.7 GB private; the plan's "400MB" figure understated reality. A 26B
+  //     A4B-4bit DiffusionGemma needs far more than this 16 GB laptop's ~5 GB
+  //     headroom — treat this lane as best-effort/occasional, not always-on.
+  // Args mirror start-local.ps1 discipline: --load-mode mmap+mlock keeps the
+  // model resident, -t pins threads on this 4C/8T i7, -c 8192 context.
+  pm2App({
+    name: "llama-server",
+    script: LLAMA_SERVER_BIN,
+    args:
+      "-m C:\\Users\\User\\models\\diffusiongemma-26B-A4B-it-4bit.gguf --port 8000 --host 127.0.0.1 -c 8192 -np 1 -t 6 --load-mode mmap+mlock --alias diffusiongemma-26B-A4B-it-4bit",
+    memory: "2G",
+    restart_delay: 5000,
+    env: { NODE_ENV: "production" },
+  }),
+];
+
 module.exports = {
   UPLIFT_ROOT,
   ORCH_DIR,
@@ -761,5 +848,6 @@ module.exports = {
   MARKETING_SERVICES,
   DSH_SERVICES,
   BRAIN_SERVICES,
+  INFRA_SERVICES,
 };
 
