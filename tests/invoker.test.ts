@@ -266,6 +266,59 @@ describe('invokeEntity subprocess / cli_command', () => {
     expect(result.error).toMatch(/Blocked dangerous argument/);
     expect(execFileMock).not.toHaveBeenCalled();
   });
+
+  it('cli_command merges invocation_config.args after inline command args', async () => {
+    execFileMock.mockImplementation((_cmd, _args, _opts, cb) => {
+      cb(null, '{}', '');
+      return { stdin: { write: () => {}, end: () => {} } };
+    });
+    await invokeEntity(
+      entity({
+        invocation_method: 'cli_command',
+        invocation_config: { command: 'node script.js', args: ['--flag', 'value'] },
+      }),
+      'run',
+      {},
+    );
+    expect(execFileMock).toHaveBeenCalledTimes(1);
+    const [cmd, args] = execFileMock.mock.calls[0];
+    expect(cmd).toBe('node');
+    expect(args).toEqual(['script.js', '--flag', 'value']);
+  });
+
+  it('cli_command passes invocation_config.cwd to execFile', async () => {
+    execFileMock.mockImplementation((_cmd, _args, _opts, cb) => {
+      cb(null, '{}', '');
+      return { stdin: { write: () => {}, end: () => {} } };
+    });
+    await invokeEntity(
+      entity({
+        invocation_method: 'cli_command',
+        invocation_config: { command: 'node script.js', cwd: 'agents/x' },
+      }),
+      'run',
+      {},
+    );
+    const opts = execFileMock.mock.calls[0][2] as { cwd?: string };
+    expect(opts.cwd).toBe('agents/x');
+  });
+
+  it('subprocess passes invocation_config.cwd to execFile', async () => {
+    execFileMock.mockImplementation((_cmd, _args, _opts, cb) => {
+      cb(null, '{}', '');
+      return { stdin: { write: () => {}, end: () => {} } };
+    });
+    await invokeEntity(
+      entity({
+        invocation_method: 'subprocess',
+        invocation_config: { command: 'node', args: ['x.js'], cwd: 'agents/y' },
+      }),
+      'run',
+      {},
+    );
+    const opts = execFileMock.mock.calls[0][2] as { cwd?: string };
+    expect(opts.cwd).toBe('agents/y');
+  });
 });
 
 describe('invokeEntity webhook / internal / manual / python_module', () => {

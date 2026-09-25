@@ -1,21 +1,18 @@
 // ============================================================================
-// GET /api/v1/marketing/queue — SMD publish queue snapshot for Open Chat review
+// GET /api/v1/marketing/queue — marketing publish queue snapshot for Open Chat
 // ============================================================================
-// Returns the Social Media Dashboard publish queue (pending posts) so Open
-// Chat can present them for human approval. Read-only.
+// Returns the marketing publish queue (pending posts) so Open Chat can present
+// them for human approval. Read-only. The Social Media Dashboard was
+// decommissioned 2026-09-24; Postiz is the publisher.
 //
 // Auth: CRON_SECRET Bearer.
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeRequest } from '@/lib/draymond/api-auth';
+import { MARKETING_QUEUE_FILE } from '@/lib/draymond/marketing-team';
 
 export const dynamic = 'force-dynamic';
-
-/** The SMD queue file path (mirrors SMD src/ai/api.py SCHEDULE_FILE). */
-const SMD_QUEUE_FILE =
-  process.env.SMD_QUEUE_FILE ??
-  'C:/Users/User/Downloads/Uplift/Draymond-Orchestrator/agents/Social-Media-Dashboard--main/media/schedule/queue.json';
 
 export async function GET(request: NextRequest) {
   const authError = authorizeRequest(request);
@@ -23,10 +20,10 @@ export async function GET(request: NextRequest) {
 
   try {
     const fs = await import('node:fs');
-    if (!/*turbopackIgnore: true*/ fs.existsSync(SMD_QUEUE_FILE)) {
+    if (!/*turbopackIgnore: true*/ fs.existsSync(MARKETING_QUEUE_FILE)) {
       return NextResponse.json({ ok: true, total: 0, queue: [] });
     }
-    const raw = /*turbopackIgnore: true*/ fs.readFileSync(SMD_QUEUE_FILE, 'utf8');
+    const raw = /*turbopackIgnore: true*/ fs.readFileSync(MARKETING_QUEUE_FILE, 'utf8');
     const queue = JSON.parse(raw);
     const items = Array.isArray(queue) ? queue : [];
     return NextResponse.json({ ok: true, total: items.length, queue: items });

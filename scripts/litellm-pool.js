@@ -22,7 +22,12 @@ for (const f of ['.env.local', path.join('data', 'litellm.env')]) {
 }
 
 process.env.PYTHONIOENCODING = 'utf-8';
-if (!process.env.PORT) process.env.PORT = '4100';
+// pm2 freezes env at start time — a host PORT=3444 (Draymond) must not steal
+// the gateway. LITELLM_PORT wins, else default 4100; only an explicit
+// LITELLM_POOL_PORT can override.
+if (process.env.LITELLM_PORT) process.env.PORT = String(process.env.LITELLM_PORT);
+else if (!process.env.LITELLM_POOL_PORT && process.env.PORT !== '4100') process.env.PORT = '4100';
+else if (process.env.LITELLM_POOL_PORT) process.env.PORT = String(process.env.LITELLM_POOL_PORT);
 
 console.log(`[litellm-pool] spawning litellm on :${process.env.PORT} ` +
   `(pool keys: ${['OPENCODE_API_KEY',

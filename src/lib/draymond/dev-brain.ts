@@ -193,3 +193,71 @@ export async function devBrainFusionDecide(request: DevBrainDecideRequest): Prom
 export async function devBrainSectors(): Promise<{ sectors: unknown[]; totalLeaders: number } | null> {
   return req('/api/sectors');
 }
+
+export interface DevBrainGenome {
+  key: string;
+  id: string;
+  name: string;
+  sector: string;
+  subBrain: string;
+  role: string;
+  voteScope: string;
+}
+
+/**
+ * Leader genomes for a sector (e.g. 'marketing') — the domain leaders whose
+ * documented frameworks drive a sector's deterministic votes. Never throws.
+ */
+export async function devBrainGenomes(
+  sector = 'all'
+): Promise<{ sector: string; count: number; genomes: DevBrainGenome[] } | null> {
+  return req(`/api/genomes?sector=${encodeURIComponent(sector)}`);
+}
+
+// -- Governance: Dev-Brain's deterministic policy gate (AgentIntegrationEngine) --
+
+export type DevBrainGovernanceStatus =
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'ESCALATE_TO_FOUNDER'
+  | 'CONDITIONAL_APPROVAL';
+
+export interface DevBrainGovernanceRequest {
+  /** DecisionDomain, e.g. 'public_communication'. */
+  actionType: string;
+  actionSummary?: string;
+  intent?: string;
+  agentId?: string;
+  agentName?: string;
+  parameters?: Record<string, unknown>;
+  callerEnvironment?: 'production' | 'staging' | 'development';
+}
+
+export interface DevBrainGovernanceVerdict {
+  evaluationId: string;
+  timestamp: string;
+  status: DevBrainGovernanceStatus;
+  riskTier: string;
+  overallRiskScore: number;
+  decisionTreeUsed?: { id: string; name: string };
+  humanSignoffRequired?: boolean;
+  requiredAuthorizations?: string[];
+  mitigationDirectives?: string[];
+  violatedGuardrails?: Array<{ ruleId: string; ruleName: string; severity: string; remediationAdvice: string }>;
+}
+
+/**
+ * Evaluate a proposed action against Dev-Brain's governance engine (hard
+ * guardrails + circuit breakers + the domain decision tree). Never throws —
+ * returns null when Dev-Brain is unreachable so callers apply their own
+ * fail-closed policy.
+ */
+export async function devBrainGovernanceEvaluate(
+  request: DevBrainGovernanceRequest
+): Promise<DevBrainGovernanceVerdict | null> {
+  const res = await req<{ verdict?: DevBrainGovernanceVerdict }>('/api/governance/evaluate', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+  return res?.verdict ?? null;
+}

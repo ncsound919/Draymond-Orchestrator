@@ -24,12 +24,23 @@ function register(entitySlug: string, action: string, schema: StepSchema): void 
 
 // -- Known offenders ----------------------------------------------------------
 
-// Image generation must receive a non-empty prompt. The historical failure
-// sent `{ action: "generate_image" }` with no prompt (422 from the upstream).
+// Text generation must receive a non-empty topic; image generation a non-empty
+// prompt; scheduling non-empty text. These guard the overlay marketing action
+// bridge (SMD decommissioned 2026-09-24).
 register(
-  'social-media-dashboard',
+  'overlay-marketing-actions',
+  'generate_text',
+  z.object({ topic: z.string().min(1, 'topic is required') }),
+);
+register(
+  'overlay-marketing-actions',
   'generate_image',
   z.object({ prompt: z.string().min(1, 'prompt is required') }),
+);
+register(
+  'overlay-marketing-actions',
+  'schedule_posts',
+  z.object({ text: z.string().min(1, 'text is required') }),
 );
 register(
   'generative-video-ai',

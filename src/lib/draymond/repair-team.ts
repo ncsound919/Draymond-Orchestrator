@@ -720,6 +720,28 @@ async function recordRepair(report: RepairReport): Promise<void> {
     } catch { /* best-effort */ }
   }
 
+  // OpenHub ecosystem-aware repair intake: mirror the repair to OpenHub so it
+  // audits the tool's PRELOADED local folder and dispatches the fix to Axiom
+  // with the same targetDir (no full-codebase rescan by Axiom/opencode).
+  // Best-effort — OpenHub being down never blocks the local repair path.
+  // Only report code/skill repairs with a real outcome, not silent deferrals.
+  const openHubReportable =
+    (report.action === 'fixed' || report.action === 'escalated' || report.action === 'handed-off') &&
+    report.failureKind !== 'unknown';
+  if (openHubReportable) {
+    try {
+      const { reportToOpenHubBestEffort } = await import('./openhub-report');
+      await reportToOpenHubBestEffort({
+        toolId: report.jobName.toLowerCase().replace(/[^a-z0-9-_]/g, '-') || 'draymond',
+        source: 'draymond',
+        severity: report.action === 'escalated' ? 'high' : report.action === 'fixed' ? 'medium' : 'medium',
+        kind: `repair:${report.failureKind}`,
+        detail: `${report.jobName} (${report.action}): ${report.detail.slice(0, 2000)}`,
+        preset: 'quick',
+      });
+    } catch { /* best-effort */ }
+  }
+
   // Deterministic report to the operator + the repair/coding team. Silent
   // deferrals (cooldown / waiting for evidence) don't email; real outcomes do.
   const shouldReport =

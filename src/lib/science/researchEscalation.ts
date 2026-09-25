@@ -301,8 +301,10 @@ export async function transitionGap(id: string, op: 'research' | 'resolve'): Pro
 }
 
 function omniResearchUrl(): string {
-  const base = process.env.OMNI_RESEARCH_URL ?? 'http://127.0.0.1:3010';
-  return `${base.replace(/\/+$/, '')}/deep-research`;
+  // Port 3010 is OpenHub; OmniResearch lives on 3012.
+  // Real route is /api/agent/deep-deterministic-research (no bare /deep-research).
+  const base = process.env.OMNI_RESEARCH_URL ?? 'http://127.0.0.1:3012';
+  return `${base.replace(/\/+$/, '')}/api/agent/deep-deterministic-research`;
 }
 
 /**

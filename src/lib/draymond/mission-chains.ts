@@ -34,9 +34,10 @@ export const MISSION_CHAIN_DEFS: MissionChainDef[] = [
     description: "Marketing-as-a-Service monthly deliverable: research trends, draft content + assets, QA gate, compile client package.",
     input: { niche: "local business", brand_voice: "professional", image_style: "modern" },
     steps: [
-      { name: "Research Trends", entitySlug: "omni-research", action: "trending_topics", input_mapping: { niche: "$.input.niche" }, output_key: "trending", step_order: 1, depends_on: [] },
-      { name: "Draft Content", entitySlug: "social-media-dashboard", action: "generate_text", input_mapping: { topics: "$.steps.trending.output", brand: "$.input.brand_voice" }, output_key: "content", step_order: 2, depends_on: ["Research Trends"] },
-      { name: "Generate Assets", entitySlug: "social-media-dashboard", action: "generate_image", input_mapping: { prompt: "$.steps.content.output.content", style: "$.input.image_style" }, output_key: "images", step_order: 2, parallel_group: "content_gen", depends_on: ["Research Trends"] },
+      // multi-harvest requires `query` (400s otherwise) — the chain input is `niche`.
+      { name: "Research Trends", entitySlug: "omni-research", action: "trending_topics", input_mapping: { query: "$.input.niche" }, output_key: "trending", step_order: 1, depends_on: [] },
+      { name: "Draft Content", entitySlug: "overlay-marketing-actions", action: "generate_text", input_mapping: { action: "generate_text", topic: "$.input.niche", template: "brief" }, output_key: "content", step_order: 2, depends_on: ["Research Trends"] },
+      { name: "Generate Assets", entitySlug: "overlay-marketing-actions", action: "generate_image", input_mapping: { action: "generate_image", prompt: "$.steps.content.output.content" }, output_key: "images", step_order: 2, parallel_group: "content_gen", depends_on: ["Research Trends"] },
       { name: "Format QA", entitySlug: "mutly", action: "analyze", input_mapping: { content: "$.steps.content.output", images: "$.steps.images.output" }, output_key: "qa", step_order: 3, depends_on: ["Draft Content", "Generate Assets"] },
       { name: "Compile Client Package", entitySlug: "uplift-agent", action: "batch", input_mapping: { task: "compile_maas_package", content: "$.steps.content.output", images: "$.steps.images.output", qa: "$.steps.qa.output" }, output_key: "package", step_order: 4, depends_on: ["Format QA"] },
     ],
@@ -59,7 +60,8 @@ export const MISSION_CHAIN_DEFS: MissionChainDef[] = [
     description: "Research brief deliverable: deep research + data feed, then synthesize a grounded brief.",
     input: { topic: "", dataset: "nathanlauga/nba-games", tags: "research", force: false },
     steps: [
-      { name: "Deep Research", entitySlug: "omni-research", action: "research_news", input_mapping: { query: "$.input.topic" }, output_key: "research", step_order: 1, depends_on: [] },
+      // deep-deterministic-research requires both `query` and `domain` (400s otherwise).
+      { name: "Deep Research", entitySlug: "omni-research", action: "research_news", input_mapping: { query: "$.input.topic", domain: "research" }, output_key: "research", step_order: 1, depends_on: [] },
       { name: "Data Feed", entitySlug: "kaggle", action: "research_feed", input_mapping: { dataset: "$.input.dataset", tags: "$.input.tags", force: "$.input.force" }, output_key: "feed", step_order: 1, parallel_group: "research_gather", depends_on: [] },
       { name: "Quality Check", entitySlug: "mutly", action: "analyze", input_mapping: { research: "$.steps.research.output", feed: "$.steps.feed.output" }, output_key: "qa", step_order: 2, depends_on: ["Deep Research", "Data Feed"] },
       { name: "Synthesize Brief", entitySlug: "uplift-agent", action: "batch", input_mapping: { task: "compile_research_brief", topic: "$.input.topic", research: "$.steps.research.output", feed: "$.steps.feed.output", qa: "$.steps.qa.output" }, output_key: "brief", step_order: 3, depends_on: ["Quality Check"] },

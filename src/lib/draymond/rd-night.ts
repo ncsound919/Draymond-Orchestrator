@@ -25,7 +25,7 @@ const FILE = path.join(DIR, "rd-night.json");
 export const RD_DEV_BACKLOG: Array<{ title: string; assignee: string; priority: 1 | 2 | 3 }> = [
   { title: "Wealth tier: ghostfolio portfolio page", assignee: "ghostfolio-engine", priority: 1 },
   { title: "Aetherdesk: multi-tenant onboarding flow", assignee: "aetherdesk", priority: 1 },
-  { title: "Marketing: next-day content calendar", assignee: "social-media-dashboard", priority: 2 },
+  { title: "Marketing: next-day content calendar", assignee: "overlay-content", priority: 2 },
   { title: "Auditor: add form-interaction tests to QA suite", assignee: "agent-browser", priority: 2 },
   { title: "BookBridge: wire zvec vector index for semantic search", assignee: "bookbridge", priority: 3 },
 ];

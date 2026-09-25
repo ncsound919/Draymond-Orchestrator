@@ -148,16 +148,22 @@ export async function ossTeamStatus(): Promise<Array<{ slug: string; name: strin
   return out;
 }
 
-/** Start one compose service (best-effort). Returns health after a short wait. */
-export async function ossServiceUp(member: OssService): Promise<{ slug: string; up: boolean; detail: string }> {
+/**
+ * Start one compose service (best-effort). `compose up -d` detaches quickly;
+ * `waitMs` bounds the health-wait loop only. Default ~3 min per service (Twenty
+ * runs DB migrations + 27 cron jobs on boot; Formbricks/Postiz need migrations).
+ * Pass a smaller waitMs for bounded callers (e.g. the scheduler job).
+ */
+export async function ossServiceUp(
+  member: OssService,
+  waitMs = 180_000
+): Promise<{ slug: string; up: boolean; detail: string }> {
   const pre = await probeService(member.slug, 1500);
   if (pre.up) return { slug: member.slug, up: true, detail: 'already up' };
   const res = await runCompose(['up', '-d', member.service], composePath(member));
   if (!res.ok) return { slug: member.slug, up: false, detail: `compose up failed: ${res.detail}` };
-  // Wait up to ~3 min for the service to become healthy. Twenty runs DB
-  // migrations + registers 27 cron jobs on boot (2-3 min); Formbricks runs
-  // schema migrations; Postiz compiles Temporal bundles. 30s is not enough.
-  for (let i = 0; i < 120; i++) {
+  const attempts = Math.max(1, Math.floor(waitMs / 1500));
+  for (let i = 0; i < attempts; i++) {
     await new Promise((r) => setTimeout(r, 1500));
     const now = await probeService(member.slug, 1500);
     if (now.up) return { slug: member.slug, up: true, detail: `up (${now.detail})` };
@@ -166,14 +172,17 @@ export async function ossServiceUp(member: OssService): Promise<{ slug: string; 
   return { slug: member.slug, up: false, detail: `started compose but health still failing: ${final.detail}` };
 }
 
-/** Start the whole team in dependency order (shlink → umami → listmonk → twenty → postiz → formbricks → windmill). */
-export async function ossTeamUp(): Promise<Array<{ slug: string; up: boolean; detail: string }>> {
+/**
+ * Start the whole team in dependency order (shlink → umami → listmonk → twenty
+ * → postiz → formbricks → windmill). `waitMs` bounds the per-service health wait.
+ */
+export async function ossTeamUp(waitMs = 180_000): Promise<Array<{ slug: string; up: boolean; detail: string }>> {
   const order = ['oss-shlink', 'oss-umami', 'oss-listmonk', 'oss-twenty', 'oss-postiz', 'oss-temporal-ui', 'oss-formbricks', 'oss-windmill'];
   const results: Array<{ slug: string; up: boolean; detail: string }> = [];
   for (const slug of order) {
     const member = OSS_MARKETING_TEAM.find((m) => m.slug === slug);
     if (!member) continue;
-    results.push(await ossServiceUp(member));
+    results.push(await ossServiceUp(member, waitMs));
   }
   return results;
 }

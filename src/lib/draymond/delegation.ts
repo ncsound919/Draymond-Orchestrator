@@ -137,7 +137,6 @@ export const DELEGATION_PLAN: DelegationSpec[] = [
   { slug: 'marketing-pulse', label: 'Marketing pulse', phase: 'morning', timeBudgetMs: 600_000, tokenBudgetPerRun: 64_000, tokenBudgetPerDay: 96_000, tier: 'flash', priority: 2, duty: 'shift' },
   { slug: 'oss_marketing_stack', label: 'OSS marketing stack (Shlink/Postiz/Listmonk/Twenty/Formbricks)', phase: 'morning', timeBudgetMs: 180_000, tokenBudgetPerRun: 4_000, tokenBudgetPerDay: 12_000, tier: 'free', priority: 2, duty: 'shift' },
   { slug: 'strategy_team', label: 'Strategy team (Overlay Strategist scan/report)', phase: 'morning', timeBudgetMs: 120_000, tokenBudgetPerRun: 24_000, tokenBudgetPerDay: 96_000, tier: 'flash', priority: 1, duty: 'shift' },
-  { slug: 'social-media-dashboard', label: 'Social media dashboard', phase: 'midday', window: { start: '09:00', end: '18:00', days: [1, 2, 3, 4, 5] }, timeBudgetMs: 900_000, tokenBudgetPerRun: 64_000, tokenBudgetPerDay: 160_000, tier: 'flash', priority: 2, duty: 'shift' },
   { slug: 'aetherdesk', label: 'Aetherdesk call center', phase: 'midday', window: { start: '09:00', end: '17:00' }, timeBudgetMs: 600_000, tokenBudgetPerRun: 48_000, tokenBudgetPerDay: 120_000, tier: 'flash', priority: 2, duty: 'shift' },
 
   // -- Trading / finance — market hours ------------------------------------

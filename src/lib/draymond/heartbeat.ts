@@ -62,7 +62,6 @@ function agentServiceSlug(agentSlug: string): string {
     'mutly': 'mutly',
     'megacode': 'megacode',
     'opencode': 'opencode',
-    'social-media-dashboard': 'social-media-dashboard',
     'indy-music-platform': 'indy-music',
     'overlay-chain': 'overlay-chain',
     'phoenix': 'phoenix',

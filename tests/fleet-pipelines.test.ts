@@ -24,7 +24,7 @@ describe('fleet pipelines', () => {
 
   it('has one pipeline per folded parent and wires every folded tool', () => {
     // The 9 parents that absorbed overlapping tools each own exactly one pipeline.
-    const parents = ['social-media-dashboard', 'generative-video-ai', 'bookbridge', 'omniresearch-pro', 'litellm', 'agent-browser', 'ufc-mcp', 'depscan', 'trading-agents'];
+    const parents = ['overlay-content', 'generative-video-ai', 'bookbridge', 'omniresearch-pro', 'litellm', 'agent-browser', 'ufc-mcp', 'depscan', 'trading-agents'];
     for (const p of parents) {
       const pl = pipelineFor(p);
       expect(pl, `missing pipeline for ${p}`).toBeDefined();
@@ -36,7 +36,7 @@ describe('fleet pipelines', () => {
   });
 
   it('resolves every folded tool back to its owning pipeline', () => {
-    const folded = ['overlay-marketing-voice', 'marketing-tool', 'youtube-shorts', 'content-creation-engine', 'book-synthesis', 'zvec', 'memagent', 'open-notebook', 'tap919-middleman', 'llmlingua', 'browser-use', 'scrapling', 'stirling-pdf', 'supply-chain-health', 'super-tool'];
+    const folded = ['overlay-marketing-voice', 'youtube-shorts', 'content-creation-engine', 'book-synthesis', 'zvec', 'memagent', 'open-notebook', 'tap919-middleman', 'llmlingua', 'browser-use', 'scrapling', 'stirling-pdf', 'supply-chain-health', 'super-tool'];
     const wired = wiredFoldedTools();
     for (const f of folded) {
       expect(wired, `folded tool ${f} not wired`).toContain(f);
@@ -58,6 +58,24 @@ describe('fleet pipelines', () => {
     expect(run?.args).toContain('-m');
   });
 
+  it('resolves the overlay marketing CLI stages to the Windows-safe node+tsx runner', () => {
+    for (const tool of [
+      'overlay-marketing-voice',
+      'overlay-marketing-scheduler',
+      'overlay-marketing-format',
+      'overlay-marketing-tracker',
+    ]) {
+      const { stage } = stageFor(tool)!;
+      const run = resolveStageRun(stage);
+      // npx.cmd cannot be spawned by execFile on Windows (ENOENT); run tsx's
+      // compiled CLI through the allowlisted `node` binary instead.
+      expect(run?.command, `${tool} command`).toBe('node');
+      expect(run?.args?.[0], `${tool} tsx entry`).toBe('node_modules/tsx/dist/cli.mjs');
+      expect(run?.args?.[1]).toMatch(/marketing[\\/]index\.ts$/);
+      expect(run?.args?.[2], `${tool} subcommand`).toBeTruthy();
+    }
+  });
+
   it('produces a pipeline summary that names the parents', () => {
     const summary = pipelineSummary();
     expect(summary).toContain('bookbridge');
@@ -67,7 +85,10 @@ describe('fleet pipelines', () => {
 
   it('points every pipeline at a consolidated dependency manifest', () => {
     const withReqs = pipelinesWithRequirements();
-    expect(withReqs.length).toBe(FLEET_PIPELINES.length);
+    const expected = FLEET_PIPELINES.filter((p) => p.requirements).length;
+    expect(withReqs.length).toBe(expected);
+    // overlay-content is a CLI-only pipeline (npx tsx) and ships no pip manifest.
+    expect(withReqs.length).toBeLessThan(FLEET_PIPELINES.length);
     for (const { parent, requirements } of withReqs) {
       expect(requirements, `${parent} should have a requirements path`).toBe(`pipelines/${parent}/requirements.txt`);
       expect(pipelineRequirements(parent)).toBe(requirements);
@@ -80,7 +101,7 @@ describe('fleet pipelines', () => {
 
   it('builds one install command per pipeline', () => {
     const cmds = installAllPipelinesCommand();
-    expect(cmds.length).toBe(FLEET_PIPELINES.length);
+    expect(cmds.length).toBe(pipelinesWithRequirements().length);
     expect(cmds[0]).toMatch(/^pip install -r pipelines\//);
   });
 });

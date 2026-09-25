@@ -91,13 +91,11 @@ const CWD_OVERRIDES: Record<string, string> = {
   'deterministic-brain': 'agents/deterministic-brain',
   'opencode': '.',
   'sports-steve': 'agents/Sports-Steve-main',
-  'social-media-dashboard': 'agents/Social-Media-Dashboard--main',
   'mutly': 'agents/Mutly-Daemon-Agent',
   'uplift-agent': 'agents/Uplift-Agent',
-  // OmniResearch: PM2 owns the REAL app (OmniResearch-Pro-main/server.ts).
-  // This override previously pointed at agents/OmniResearch-Replacement — an
-  // 8KB stub that repaired-into a port conflict with the live service.
-  // Health probes resolve via TOOL_PORTS slug; no local start override needed.
+  // OmniResearch 2 (agents/omniresearch 2) is PM2-managed via fleet-manifest.
+  // No CWD override needed — ports.ts carries cwd 'agents/omniresearch 2'.
+  // Health probes resolve via the TOOL_PORTS slug (omniresearch-pro).
   'phoenix': '../04_Integrations/integrations/phoenix',
   'generative-video-ai': '../04_Integrations/integrations/Generative-Video-AI',
   'open-notebook': '../04_Integrations/integrations/open-notebook',
@@ -123,10 +121,15 @@ const START_MAP: Record<string, { command: [string, string[]]; port: number; hea
     port: 8777,
     health: '/health',
   },
-  'omni-research': {
-    command: ['python', ['-m', 'uvicorn', 'main:app', '--host', '127.0.0.1', '--port', '3010']],
-    port: 3010,
+  // Keyed by the TOOL_PORTS slug (service-manager resolves START_MAP[slug]
+  // against TOOL_PORTS, so 'omniresearch-pro' is the key that actually matches).
+  'omniresearch-pro': {
+    // OmniResearch 2 (agents/omniresearch 2) — Node/tsx, not the legacy Python
+    // stub. PM2 owns it (fleet-manifest); this is the service-manager fallback.
+    command: ['node', ['--import', 'tsx', 'server.ts']],
+    port: 3012,
     health: '/api/health',
+    env: { PORT: '3012' },
   },
   'deterministic-brain': {
     // Full boot (soul + learning loop + cron chains + KAIROS + swarm worker +
@@ -165,14 +168,6 @@ const START_MAP: Record<string, { command: [string, string[]]; port: number; hea
     command: ['python', ['-m', 'uvicorn', 'src.main:app', '--host', '127.0.0.1', '--port', '8010']],
     port: 8010,
     health: '/api/v1/health',
-  },
-  'social-media-dashboard': {
-    // Managed by PM2 (ecosystem.marketing.config.js) — remote backends,
-    // survives reboots. This entry is a no-op: the port probe still reports
-    // health, but the service-manager never spawns it.
-    command: ['python', ['-m', 'uvicorn', 'src.ai.api:app', '--host', '127.0.0.1', '--port', '8030']],
-    port: 8030,
-    health: '/api/ai/health',
   },
   'tap919-middleman': {
     // Metered agent gateway (E3 cash register). Budget-engine meter.ts

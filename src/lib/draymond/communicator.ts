@@ -206,11 +206,21 @@ export async function sendRecap(recap: PhaseRecap): Promise<{ channels: string[]
     }
   }
 
-  // Email via the existing Gmail memo path.
+// Email via the existing Gmail memo path. Uses the JEV-framed humanized
+  // recap (varied subject + delivery voice) when available; falls back to the
+  // plain markdown recap when the voice module cannot load.
   if (process.env.GMAIL_USER || process.env.DRAYMOND_ALERT_EMAIL) {
     try {
       const { sendMemo } = await import("./notifications");
-      await sendMemo(`Overlay365 ${recap.phase} recap — ${recap.generatedAt.slice(0, 10)}`, markdown);
+      let subject = `Overlay365 ${recap.phase} recap — ${recap.generatedAt.slice(0, 10)}`;
+      let body = markdown;
+      try {
+        const { humanizedRecap } = await import("./recap-voice");
+        const h = await humanizedRecap(recap);
+        subject = h.subject;
+        body = h.body;
+      } catch { /* keep plain markdown recap */ }
+      await sendMemo(subject, body);
       channels.push("email");
       detail.push("email sent");
     } catch (err) {

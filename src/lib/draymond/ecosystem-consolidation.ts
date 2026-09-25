@@ -91,7 +91,7 @@ export const CONSOLIDATION_SOURCES: ConsolidationSource[] = [
     governedBy: ECOSYSTEM_GOVERNOR,
     summary:
       'Tool box of mostly upstream mirrors (composio, litellm, browser-use, Scrapling, ghostfolio, nuclei, dep-scan, phoenix, zvec, etc.). INTEGRATIONS.md already maps each to an ecosystem slot; they are referenced as tools, not merged.',
-    entitySlugs: ['deterministic-brain', 'marketing-tool', 'litellm', 'ghostfolio-engine', 'nuclei-scanner', 'depscan'],
+    entitySlugs: ['deterministic-brain', 'litellm', 'ghostfolio-engine', 'nuclei-scanner', 'depscan'],
     blockers: [
       'Vendored `-main` snapshots are upstream-owned and must not be refactored here.',
       'Several are registry-only (no runnable adapter yet), so Draymond can discover but not invoke them.',

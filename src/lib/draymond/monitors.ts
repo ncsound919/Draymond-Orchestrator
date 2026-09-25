@@ -550,10 +550,8 @@ interface AgentMonitorDef {
 const LOCAL_SERVICE_DIRS: Record<string, string> = {
   'uplift-agent': 'agents/Uplift-Agent',
   'sports-steve': 'agents/Sports-Steve-main',
-  'bet-buddy': 'agents/Sports-Steve-main/Bet-Buddy--main/backend',
-  'social-media-dashboard': 'agents/Social-Media-Dashboard--main',
   'megacode': 'agents/Megacode-main',
-  'omni-research': 'agents/OmniResearch-Replacement',
+  'omni-research': 'agents/omniresearch 2',
   'indy-music-platform': 'agents/Indy-Music',
   'overlay-chain': '01_Platforms/Overlay365',
   'phoenix': '04_Integrations/integrations/phoenix',
@@ -568,13 +566,12 @@ const LOCAL_SERVICE_DIRS: Record<string, string> = {
 
 /**
  * Services whose checkout exists but has NO runnable HTTP entrypoint on this
- * machine — either the deps are missing (bet-buddy has no node_modules) or
- * there is no start script / built output (megacode has no `start` script or
- * dist). Their monitors would fire "down" forever, so they are gated off.
- * Set the *_URL env override to point at a real deployment to re-enable.
+ * machine — either the deps are missing or there is no start script / built
+ * output (megacode has no `start` script or dist). Their monitors would fire
+ * "down" forever, so they are gated off. Set the *_URL env override to point
+ * at a real deployment to re-enable.
  */
 const NO_LOCAL_SERVER: Record<string, boolean> = {
-  'bet-buddy': true,
   'megacode': true,
 };
 
@@ -583,8 +580,6 @@ const NO_LOCAL_SERVER: Record<string, boolean> = {
 const SERVICE_ENV_VARS: Record<string, string> = {
   'uplift-agent': 'UPLIFT_BASE_URL',
   'sports-steve': 'SPORTS_STEVE_URL',
-  'bet-buddy': 'BET_BUDDY_URL',
-  'social-media-dashboard': 'SOCIAL_MEDIA_URL',
   'megacode': 'MEGACODE_URL',
   'omni-research': 'OMNI_RESEARCH_URL',
   'indy-music-platform': 'INDY_MUSIC_URL',
@@ -640,24 +635,8 @@ function getAgentMonitorDefs(): AgentMonitorDef[] {
       metadata: { slug: 'sports-steve', category: 'sports' },
     },
     {
-      name: 'Bet Buddy',
-      url: `${process.env.BET_BUDDY_URL || 'http://localhost:3001'}/health`,
-      check_interval_seconds: 300,
-      expected_status_code: 200,
-      timeout_ms: 10000,
-      metadata: { slug: 'bet-buddy', category: 'sports' },
-    },
-    {
-      name: 'Social Media Dashboard',
-      url: `${process.env.SOCIAL_MEDIA_URL || 'http://localhost:8030'}/api/ai/health`,
-      check_interval_seconds: 300,
-      expected_status_code: 200,
-      timeout_ms: 10000,
-      metadata: { slug: 'social-media-dashboard', category: 'marketing' },
-    },
-    {
       name: 'OmniResearch Pro',
-      url: `${process.env.OMNI_RESEARCH_URL || 'http://localhost:3010'}/api/health`,
+      url: `${process.env.OMNI_RESEARCH_URL || 'http://localhost:3012'}/api/health`,
       check_interval_seconds: 300,
       expected_status_code: 200,
       timeout_ms: 10000,

@@ -5,7 +5,7 @@ import { listVoices, agentVoice } from '@/lib/draymond/voices';
 export const dynamic = 'force-dynamic';
 
 const VOICED_AGENTS = [
-  'aetherdesk', 'social-media-dashboard', 'overlay-guardian', 'overlay-auditor',
+  'aetherdesk', 'overlay-marketing-actions', 'overlay-guardian', 'overlay-auditor',
   'overlay-treasurer', 'overlay-strategist', 'agent-browser', 'overlay365-qa',
 ];
 

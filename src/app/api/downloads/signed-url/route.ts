@@ -7,7 +7,6 @@ import { getDb } from '@/lib/db/connection';
 // Object keys in the local `paid-releases` releases directory.
 // Each key maps a product ID to the filename stored in the directory.
 const PRODUCT_FILES: Record<string, string> = {
-  'sports-steve-bet-buddy': 'SportsSteveAndBetBuddy-Windows-x64.exe',
   'draymond-orchestrator': 'DraymondOrchestrator-Windows-x64.exe',
   'open-chat': 'OpenChat-Windows-x64.exe', // placeholder — not yet uploaded
 };

@@ -684,6 +684,7 @@ async function invokeSubprocess(
   }
 
   const timeoutMs = resolveTimeoutMs(entity, options);
+  const cwd = typeof config.cwd === 'string' && config.cwd ? config.cwd : undefined;
 
   return new Promise<InvocationResult>((resolve) => {
     const child = execFile(
@@ -692,6 +693,7 @@ async function invokeSubprocess(
       {
         timeout: timeoutMs,
         maxBuffer: 10 * 1024 * 1024, // 10 MB
+        ...(cwd ? { cwd } : {}),
         env: { ...process.env },
       },
       (error, stdout, stderr) => {
@@ -754,10 +756,17 @@ async function invokeCliCommand(
     );
   }
 
-  // Split command into base + args and validate against allowlist
+  // Split command into base + inline args, then append invocation_config.args.
+  // Pipeline stages supply command + args separately (invokePipeline), so both
+  // sources must be honored. The merged list is validated against the same
+  // blocked-pattern allowlist used by invokeSubprocess / invokeMcpStdio, so
+  // `--eval`, `-e`, `-c`, etc. can't smuggle code execution past the
+  // base-command allowlist.
   const parts = command.trim().split(/\s+/);
   const baseCommand = parts[0];
-  const args = parts.slice(1);
+  const inlineArgs = parts.slice(1);
+  const extraArgs = Array.isArray(config.args) ? (config.args as unknown[]) : [];
+  const mergedArgs = [...inlineArgs, ...extraArgs];
 
   if (!ALLOWED_CLI_COMMANDS.has(baseCommand)) {
     return failResult(
@@ -767,10 +776,7 @@ async function invokeCliCommand(
     );
   }
 
-  // Validate args against the same blocked-pattern allowlist used by
-  // invokeSubprocess / invokeMcpStdio, so `--eval`, `-e`, `-c`, etc. can't
-  // smuggle code execution past the base-command allowlist.
-  const argsValidation = validateArgs(args);
+  const argsValidation = validateArgs(mergedArgs);
   if (!argsValidation.valid) {
     return failResult(
       argsValidation.error || 'Invalid command arguments',
@@ -779,6 +785,7 @@ async function invokeCliCommand(
   }
 
   const timeoutMs = resolveTimeoutMs(entity, options);
+  const cwd = typeof config.cwd === 'string' && config.cwd ? config.cwd : undefined;
 
   return new Promise<InvocationResult>((resolve) => {
     execFile(
@@ -787,6 +794,7 @@ async function invokeCliCommand(
       {
         timeout: timeoutMs,
         maxBuffer: 10 * 1024 * 1024, // 10 MB
+        ...(cwd ? { cwd } : {}),
         env: {
           ...process.env,
           ENTITY_INPUT: JSON.stringify(input),

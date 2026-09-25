@@ -51,7 +51,8 @@ export const tools = [
   }),
 ];
 
-const OMNI_URL = process.env.OMNI_RESEARCH_URL || 'http://127.0.0.1:3010';
+// Port 3010 is OpenHub; OmniResearch lives on 3012.
+const OMNI_URL = process.env.OMNI_RESEARCH_URL || 'http://127.0.0.1:3012';
 const AETHERDESK_URL = process.env.AETHERDESK_BASE_URL || 'http://127.0.0.1:8002';
 // Internal key — same value AetherDesk expects as x-api-key.
 const AETHERDESK_KEY =
@@ -81,25 +82,30 @@ const TOOL_IMPL = {
   async get_health() {
     return { ok: true, status: 'healthy', uptimeMs: process.uptime() * 1000 };
   },
-  // REAL: routed through the OmniResearch service (:3010) which fans out to
-  // PubMed/arXiv/DuckDuckGo/BookBridge — all keyless fleet systems.
+  // REAL: routed through OmniResearch (:3012) multi-harvest — keyless
+  // ArXiv/OpenAlex/Wikipedia/PubMed fan-out (no /api/web-search on Omni).
   async web_search(args) {
     const query = String(args?.query || '').trim();
     if (!query) return { ok: false, error: 'query is required' };
     try {
-      const { status, ok, body } = await fetchJson(`${OMNI_URL}/api/web-search`, {
+      const { status, ok, body } = await fetchJson(`${OMNI_URL}/api/integrations/multi-harvest`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ query, maxPerSource: 5 }),
+        timeoutMs: 30000,
       });
       if (!ok) return { ok: false, error: `omni-research HTTP ${status}` };
-      const results = Array.isArray(body?.results)
-        ? body.results.slice(0, 8).map((r) => ({
-            title: String(r.title ?? r.name ?? ''),
-            url: String(r.url ?? r.link ?? ''),
-            snippet: String(r.summary ?? r.abstract ?? r.snippet ?? '').slice(0, 400),
-          }))
-        : [];
+      const sources = Array.isArray(body?.sources)
+        ? body.sources
+        : Array.isArray(body?.results)
+          ? body.results
+          : [];
+      const results = sources.slice(0, 8).map((r) => ({
+        title: String(r.title ?? r.name ?? ''),
+        url: String(r.url ?? r.link ?? ''),
+        snippet: String(r.summary ?? r.abstract ?? r.snippet ?? r.excerpt ?? '').slice(0, 400),
+        source: String(r.source ?? r.database ?? ''),
+      }));
       return { ok: true, results };
     } catch (err) {
       return { ok: false, error: `web_search failed: ${err instanceof Error ? err.message : err}` };

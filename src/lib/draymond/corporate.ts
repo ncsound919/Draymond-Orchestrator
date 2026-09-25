@@ -67,7 +67,7 @@ export const OFFICES: OfficeDef[] = [
   {
     id: 'cmo',
     title: 'CMO / Growth',
-    agentSlugs: ['observer', 'marketing-pulse', 'oss_marketing_stack', 'social-media-dashboard', 'dispatch_worker_tasks'],
+    agentSlugs: ['observer', 'marketing-pulse', 'oss_marketing_stack', 'dispatch_worker_tasks'],
     owns: [],
   },
   {
@@ -248,7 +248,6 @@ export const SLUG_SECTOR: Record<string, SectorId> = {
   'wf_mission_sync': 'e2-b2b',
   'marketing-pulse': 'e2-b2b',
   'oss_marketing_stack': 'e2-b2b',
-  'social-media-dashboard': 'e2-b2b',
   'dispatch_worker_tasks': 'e2-b2b',
   'publish_social_queue': 'e2-b2b',
   'evening_call_recap': 'e2-b2b',

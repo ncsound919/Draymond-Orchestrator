@@ -54,11 +54,6 @@ export const FLEET_DUTY: DutyAssignment[] = [
     onCallFor: 'inbound calls',
   },
   {
-    agentId: 'social-media-dashboard', duty: 'shift',
-    shift: { agentId: 'social-media-dashboard', days: [1, 2, 3, 4, 5], start: '09:00', end: '18:00', timezone: 'America/New_York', label: 'Workday' },
-    onCallFor: 'marketing leads',
-  },
-  {
     agentId: 'repair-team', duty: 'shift',
     shift: { agentId: 'repair-team', days: [], start: '18:00', end: '19:00', timezone: 'America/New_York', label: 'Daily repair shift' },
     onCallFor: 'failed jobs / weak components / service outages',

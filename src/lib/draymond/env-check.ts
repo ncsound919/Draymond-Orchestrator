@@ -30,8 +30,6 @@ const OPTIONAL_VARS: EnvVar[] = [
   { name: 'DRAYMOND_ALERT_EMAIL', required: false, description: 'Alert recipient email' },
   { name: 'UPLIFT_BASE_URL', required: false, description: 'Uplift Agent base URL' },
   { name: 'SPORTS_STEVE_URL', required: false, description: 'Sports Steve agent URL' },
-  { name: 'BET_BUDDY_URL', required: false, description: 'Bet Buddy agent URL' },
-  { name: 'SOCIAL_MEDIA_URL', required: false, description: 'Social Media Dashboard URL' },
   { name: 'OMNI_RESEARCH_URL', required: false, description: 'OmniResearch Pro URL' },
   { name: 'INDY_MUSIC_URL', required: false, description: 'Indy Music Platform URL' },
   { name: 'MEGACODE_URL', required: false, description: 'MegaCode/OverCoat URL' },

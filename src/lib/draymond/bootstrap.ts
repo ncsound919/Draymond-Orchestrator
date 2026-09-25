@@ -36,7 +36,6 @@ export const DEFAULT_CORE_SERVICES = [
   'uplift-agent',
   'opencode',
   'sports-steve',
-  'social-media-dashboard',
   'hemp-os',
   'hempforge',
 ] as const;
@@ -61,7 +60,6 @@ export const BOOT_GRAPH: Record<string, { dependsOn: string[] }> = {
   'uplift-agent': { dependsOn: [] },
   opencode: { dependsOn: [] },
   'sports-steve': { dependsOn: [] },
-  'social-media-dashboard': { dependsOn: [] },
   'hemp-os': { dependsOn: [] },
   hempforge: { dependsOn: [] },
 };

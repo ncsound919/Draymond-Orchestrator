@@ -102,7 +102,7 @@ export const DEFAULT_STRATEGY: MissionStrategy = {
     {
       id: "maas",
       name: "Marketing-as-a-Service",
-      agents: ["social-media-dashboard", "omni-research", "mutly", "uplift-agent"],
+      agents: ["omni-research", "mutly", "uplift-agent"],
       skills: ["seo-content-writer", "blog-writer", "content-strategy", "marketing-mode", "web-search"],
       deliveryCostCents: 2000,
       targetMonthly: 2000,

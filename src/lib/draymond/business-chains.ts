@@ -22,15 +22,15 @@ import type { InvocationMethod } from './types';
 //
 // Port ranges:
 //   3000        — Draymond (reserved)
-//   3001        — Bet Buddy (Express)
-//   3010        — OmniResearch Pro (Express)
+//   3001        — Twenty CRM (OSS marketing stack; Bet Buddy removed 2026-09-24)
+//   3012        — OmniResearch 2 (Express; 3010 is OpenHub)
 //   3020        — Overlay Chain (Next.js)
 //   3090        — Overlay Global Lens (Express; use PORT=3090 so it never
 //                 collides with Draymond's :3000 in local fleet dev)
 //   8000        — Uplift Agent (batch_server.py)
 //   8010        — Sports Steve (FastAPI)
 //   8020        — Indy Music Platform (FastAPI)
-//   8030        — Social Media Dashboard AI API (FastAPI)
+//   8030        — (freed — Social Media Dashboard decommissioned 2026-09-24)
 //   8040        — TradingAgents (wrapper — not yet built)
 //   8050        — Sub Team (wrapper — not yet built)
 //   9744        — MegaCode JetBrains bridge (HTTP)
@@ -163,99 +163,56 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     health_endpoint: '/health',
   },
 
-  // -- 4. Bet Buddy ----------------------------------------------------
-  // Express.js companion to Sports Steve — OCR, odds calc, Kelly, bankroll
+  // -- 5. Overlay Marketing Actions (CLI) ------------------------------
+  // Discrete marketing actions for the Draymond-led marketing formation.
+  // Replaces the decommissioned Social Media Dashboard (SMD, 2026-09-24).
+  //
+  // Invoked as `npx tsx <marketing>/actions.ts` with the request in
+  // ENTITY_INPUT. Actions:
+  //   - generate_image  -> keyless Pollinations (real JPEG/PNG/WebP bytes)
+  //   - schedule_posts  -> Postiz v2 POST /api/v2/post
+  // Each backend is probed first; failures return { ok:false } — no fabrication.
   {
-    name: 'Bet Buddy',
-    slug: 'bet-buddy',
+    name: 'Overlay Marketing Actions',
+    slug: 'overlay-marketing-actions',
     kind: 'service',
     description:
-      'Sports betting toolkit (Express.js). 30+ endpoints for OCR, odds calculation, statistics, Kelly criterion, bankroll management, and SimVC games.',
-    invocation_method: 'http_api',
+      'Discrete marketing actions via the overlay marketing CLI: keyless AI image generation (Pollinations) and Postiz social scheduling. Backends are probed first; failures return ok:false — nothing is fabricated.',
+    invocation_method: 'cli_command',
     invocation_config: {
-      url: agentUrl('BET_BUDDY_URL', 'http://localhost:3001'),
-      method: 'POST',
-      health_url: `${agentUrl('BET_BUDDY_URL', 'http://localhost:3001')}/health`,
-      endpoints: {
-        health: '/health',
-        odds_calc: '/api/tools/odds/calculate-return',
-        kelly: '/api/tools/statistics/kelly-criterion',
-        bankroll: '/api/tools/bankroll/unit-size',
-        ocr: '/api/ocr/extract',
-        stats: '/api/tools/statistics/calculate',
-      },
+      // Windows-safe: execFile cannot spawn the npx.cmd shim (ENOENT), so run
+      // the repo's own tsx CLI through the allowlisted `node` binary.
+      command:
+        'node node_modules/tsx/dist/cli.mjs ../01_Platforms/Overlay365/agent-team/agents/marketing/actions.ts',
+      requires: ['node'],
     },
-    capabilities: [
-      'odds_calculation',
-      'kelly_criterion',
-      'bankroll_management',
-      'screenshot_ocr',
-      'sports_statistics',
-    ],
-    tags: ['sports', 'betting', 'express'],
-    category: 'sports',
-    health_endpoint: '/health',
-  },
-
-  // -- 5. Social Media Dashboard (AI API) ------------------------------
-  // FastAPI AI backend — text/image/video generation, podcast, voicebox
-  {
-    name: 'Social Media Dashboard',
-    slug: 'social-media-dashboard',
-    kind: 'service',
-    description:
-      'AI-powered content creation service (FastAPI). Text, image, and video generation. Podcast narration/music/mixing. Voice synthesis and cloning. Celery/Redis for async.',
-    invocation_method: 'http_api',
-    invocation_config: {
-      url: agentUrl('SOCIAL_MEDIA_URL', 'http://localhost:8030'),
-      method: 'POST',
-      health_url: `${agentUrl('SOCIAL_MEDIA_URL', 'http://localhost:8030')}/api/ai/health`,
-      endpoints: {
-        generate_text: '/api/ai/generate-text',
-        generate_image: '/api/ai/generate-image',
-        generate_video: '/api/ai/generate-video',
-        schedule_posts: '/api/ai/schedule',
-        schedule_post: '/api/ai/schedule',
-        podcast_narrate: '/api/ai/podcast/narrate',
-        podcast_music: '/api/ai/podcast/music',
-        podcast_mix: '/api/ai/podcast/mix',
-        voicebox_synthesize: '/api/ai/voicebox/synthesize',
-        voicebox_clone: '/api/ai/voicebox/clone',
-      },
-    },
-    capabilities: [
-      'text_generation',
-      'image_generation',
-      'video_generation',
-      'podcast_creation',
-      'voice_synthesis',
-      'social_posting',
-      'campaign_management',
-    ],
-    tags: ['marketing', 'content', 'ai', 'fastapi'],
+    capabilities: ['image_generation', 'social_posting'],
+    tags: ['marketing', 'content', 'cli'],
     category: 'marketing',
-    health_endpoint: '/api/ai/health',
   },
 
-  // -- 6. OmniResearch Pro ---------------------------------------------
-  // Express.js backend — Ollama/SearXNG proxy, Slack/Notion integrations
-  // NOTE: Core Gemini research is client-side. Server proxies local models.
+  // -- 6. OmniResearch (v2) --------------------------------------------
+  // Express.js backend (agents/omniresearch 2). Port 3012 — 3010 is OpenHub.
+  // Models route through LiteLLM; local lane is llama.cpp (/api/llama/*).
+  // Every endpoint below maps to a route that actually exists on this service.
   {
-    name: 'OmniResearch Pro',
+    name: 'OmniResearch',
     slug: 'omni-research',
     kind: 'agent',
     description:
-      'Research assistant (Express.js + React). Server proxies Ollama and SearXNG. Gemini report generation is client-side. Use /api/ollama/generate for local-model reports.',
+      'Deep research agent (Express.js + React). Harvests live literature (multi-harvest), runs deterministic deep research, and exposes an MCP server. Local model reports via /api/llama/generate.',
     invocation_method: 'http_api',
     invocation_config: {
-      url: agentUrl('OMNI_RESEARCH_URL', 'http://localhost:3010'),
+      url: agentUrl('OMNI_RESEARCH_URL', 'http://localhost:3012'),
       method: 'POST',
-      health_url: `${agentUrl('OMNI_RESEARCH_URL', 'http://localhost:3010')}/api/health`,
+      health_url: `${agentUrl('OMNI_RESEARCH_URL', 'http://localhost:3012')}/api/health`,
       endpoints: {
-        trending_topics: '/api/trending-topics',
-        research_news: '/api/research',
-        web_search: '/api/web-search',
-        ollama_generate: '/api/ollama/generate',
+        trending_topics: '/api/integrations/multi-harvest',
+        research_news: '/api/agent/deep-deterministic-research',
+        web_search: '/api/integrations/multi-harvest',
+        llama_generate: '/api/llama/generate',
+        autonomous_loop: '/api/research/autonomous-loop',
+        mcp: '/api/mcp',
         slack_share: '/api/slack/share',
         notion_sync: '/api/notion/sync',
       },
@@ -263,10 +220,11 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     capabilities: [
       'research_generation',
       'web_search',
+      'mcp_server',
       'slack_share',
       'notion_sync',
     ],
-    tags: ['research', 'ollama', 'express'],
+    tags: ['research', 'litellm', 'mcp', 'express'],
     category: 'research',
     health_endpoint: '/api/health',
   },
@@ -793,17 +751,6 @@ const ENTITY_DEFS: EntitySeedDef[] = [
   // chains/schedulers never call a disjointed one-off tool — the parent owns
   // the singular pipeline and this entity is just a named stage handle.
   {
-    name: 'Marketing Tool (stage)',
-    slug: 'marketing-tool',
-    kind: 'tool',
-    description: 'Marketing asset engine — stage of the social-media-dashboard pipeline.',
-    invocation_method: 'pipeline',
-    invocation_config: { pipeline: 'social-media-dashboard', tool: 'marketing-tool' },
-    capabilities: ['marketing_automation', 'creation_studio', 'segmentation'],
-    tags: ['folded', 'marketing', 'pipeline'],
-    category: 'marketing',
-  },
-  {
     name: 'YouTube Shorts (stage)',
     slug: 'youtube-shorts',
     kind: 'tool',
@@ -1152,13 +1099,12 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
       },
       {
         name: 'Generate Content',
-        entitySlug: 'social-media-dashboard',
+        entitySlug: 'overlay-marketing-actions',
         action: 'generate_text',
         input_mapping: {
+          action: 'generate_text',
           topic: '$.steps.trending.output.topic',
-          platform: '$.input.platform',
-          tone: 'premium',
-          content_type: 'caption',
+          template: 'brief',
         },
         output_key: 'content',
         step_order: 2,
@@ -1166,9 +1112,10 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
       },
       {
         name: 'Generate Images',
-        entitySlug: 'social-media-dashboard',
+        entitySlug: 'overlay-marketing-actions',
         action: 'generate_image',
         input_mapping: {
+          action: 'generate_image',
           prompt: '$.steps.content.output.content',
           style_preset: '$.input.image_style',
         },
@@ -1178,9 +1125,10 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
       },
       {
         name: 'Schedule Posts',
-        entitySlug: 'social-media-dashboard',
+        entitySlug: 'overlay-marketing-actions',
         action: 'schedule_posts',
         input_mapping: {
+          action: 'schedule_posts',
           text: '$.steps.content.output.content',
           images: '$.steps.images.output',
           platforms: '$.input.platforms',
@@ -1197,7 +1145,7 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
     name: 'Sports Betting Daily',
     slug: 'sports-betting-daily',
     description:
-      'Full daily sports betting pipeline: Sports Steve daily-run assessment, Bet Buddy odds calc + Kelly criterion, and bet resolution.',
+      'Daily sports assessment via Sports Steve. Bet Buddy odds calc + Kelly criterion were removed 2026-09-24 (not provisioned).',
     steps: [
       {
         name: 'Daily Assessment',
@@ -1210,29 +1158,6 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
         output_key: 'assessment',
         step_order: 1,
         depends_on_indices: [],
-      },
-      {
-        name: 'Odds Calculation',
-        entitySlug: 'bet-buddy',
-        action: 'odds_calc',
-        input_mapping: {
-          bets: '$.steps.assessment.output',
-        },
-        output_key: 'odds',
-        step_order: 2,
-        depends_on_indices: [0],
-      },
-      {
-        name: 'Kelly Sizing',
-        entitySlug: 'bet-buddy',
-        action: 'kelly',
-        input_mapping: {
-          odds: '$.steps.odds.output',
-          bankroll: '$.input.bankroll',
-        },
-        output_key: 'kelly_sizing',
-        step_order: 3,
-        depends_on_indices: [1],
       },
     ],
   },
@@ -1495,13 +1420,12 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
       },
       {
         name: 'Generate Text',
-        entitySlug: 'social-media-dashboard',
+        entitySlug: 'overlay-marketing-actions',
         action: 'generate_text',
         input_mapping: {
+          action: 'generate_text',
           topic: '$.steps.trends.output.topic',
-          platform: '$.input.target_platform',
-          tone: 'premium',
-          content_type: 'caption',
+          template: 'brief',
         },
         output_key: 'text_content',
         step_order: 2,
@@ -1509,9 +1433,10 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
       },
       {
         name: 'Generate Image',
-        entitySlug: 'social-media-dashboard',
+        entitySlug: 'overlay-marketing-actions',
         action: 'generate_image',
         input_mapping: {
+          action: 'generate_image',
           prompt: '$.steps.text_content.output.content',
         },
         output_key: 'image_content',
@@ -1520,9 +1445,10 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
       },
       {
         name: 'Schedule Distribution',
-        entitySlug: 'social-media-dashboard',
+        entitySlug: 'overlay-marketing-actions',
         action: 'schedule_posts',
         input_mapping: {
+          action: 'schedule_posts',
           text: '$.steps.text_content.output.content',
           images: '$.steps.image_content.output',
           platforms: '$.input.platforms',
@@ -2123,7 +2049,7 @@ const JOB_DEFS: JobSeedDef[] = [
       },
     },
     notify_on_failure: true,
-    // bet-buddy backend not provisioned locally — keep disabled across /api/seed
+    // Bet Buddy removed 2026-09-24; the chain is now Sports Steve assessment only.
     is_enabled: false,
   },
 

@@ -111,7 +111,7 @@ describe('agentVoice', () => {
     await fs.writeFile(path.join(piperDir, 'en_US-lessac-medium.onnx'), 'onnx');
     process.env.PIPER_MODELS_DIR = piperDir;
     const mod = await loadVoices();
-    const res = await mod.agentVoice('social-media-dashboard');
+    const res = await mod.agentVoice('overlay365-qa');
 
     expect(res.voice.id).toBe('piper-en-f');
     expect(res.configured).toBe(true);
@@ -121,7 +121,7 @@ describe('agentVoice', () => {
   it('marks a piper voice unconfigured when the onnx model is missing', async () => {
     process.env.PIPER_MODELS_DIR = piperDir;
     const mod = await loadVoices();
-    const res = await mod.agentVoice('social-media-dashboard');
+    const res = await mod.agentVoice('overlay365-qa');
 
     expect(res.configured).toBe(false);
     expect(res.detail).toBe('piper model en_US-lessac-medium missing (set PIPER_MODELS_DIR)');
@@ -129,7 +129,7 @@ describe('agentVoice', () => {
 
   it('marks a piper voice unconfigured when PIPER_MODELS_DIR is unset', async () => {
     const mod = await loadVoices();
-    const res = await mod.agentVoice('social-media-dashboard');
+    const res = await mod.agentVoice('overlay365-qa');
 
     expect(res.configured).toBe(false);
     expect(res.detail).toContain('piper model en_US-lessac-medium missing');
@@ -180,10 +180,10 @@ describe('synthesizeGreeting', () => {
 
     const mod = await loadVoices();
     const outDir = path.join(tempDir, 'out');
-    const res = await mod.synthesizeGreeting('social-media-dashboard', 'hi there', outDir);
+    const res = await mod.synthesizeGreeting('overlay365-qa', 'hi there', outDir);
 
     expect(res.ok).toBe(true);
-    expect(res.file).toBe(path.join(outDir, 'social-media-dashboard.wav'));
+    expect(res.file).toBe(path.join(outDir, 'overlay365-qa.wav'));
     expect(res.detail).toBe('synthesized with en_US-lessac-medium');
     expect(mocks.spawn).toHaveBeenCalledWith(
       'python',
@@ -195,7 +195,7 @@ describe('synthesizeGreeting', () => {
         '--config',
         path.join(piperDir, 'en_US-lessac-medium.onnx.json'),
         '-f',
-        path.join(outDir, 'social-media-dashboard.wav'),
+        path.join(outDir, 'overlay365-qa.wav'),
       ],
     );
     const stat = await fs.stat(outDir);
@@ -209,7 +209,7 @@ describe('synthesizeGreeting', () => {
 
     const mod = await loadVoices();
     await expect(
-      mod.synthesizeGreeting('social-media-dashboard', 'hi', path.join(tempDir, 'out')),
+      mod.synthesizeGreeting('overlay365-qa', 'hi', path.join(tempDir, 'out')),
     ).rejects.toThrow('piper exited 1');
   });
 
@@ -220,7 +220,7 @@ describe('synthesizeGreeting', () => {
 
     const mod = await loadVoices();
     await expect(
-      mod.synthesizeGreeting('social-media-dashboard', 'hi', path.join(tempDir, 'out')),
+      mod.synthesizeGreeting('overlay365-qa', 'hi', path.join(tempDir, 'out')),
     ).rejects.toThrow('ENOENT');
   });
 

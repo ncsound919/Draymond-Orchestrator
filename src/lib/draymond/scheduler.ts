@@ -12,7 +12,7 @@ import { instantiateChain, executeChain } from './chains';
 import { checkAllAgentHealth } from './index';
 import { sendNotification, sendAlertEmail } from './notifications';
 import { emitJobStarted, emitJobCompleted, emitJobFailed } from '@/lib/draymond/event-bridge';
-import { delegationTimeoutSeconds, delegationFor, isWithinWindow, delegationWindow, canDelegateSector } from './delegation';
+import { delegationTimeoutSeconds, delegationFor, isWithinWindow, delegationWindow, canDelegate, canDelegateSector, recordDelegationConsumption } from './delegation';
 import { sectorFor } from './corporate';
 import { sectorSweep, ensureSectorForJob } from './sector-lifecycle';
 import { classifyRetryable, retryDelayMs } from './retry';
@@ -119,6 +119,21 @@ function sectorCapExceeded(job: ScheduledJob, now: Date): string | null {
   if (typeof handler !== 'string') return null;
   const gate = canDelegateSector(sectorFor(handler), now);
   return gate.ok ? null : gate.reason ?? 'sector cap';
+}
+
+/**
+ * Per-spec gate: the handler's OWN window + per-day token budget (`canDelegate`),
+ * not just its sector aggregate. Previously only the sector cap was enforced, so
+ * a single component could blow its declared daily budget as long as its sector
+ * had headroom. Returns the reason to defer, or null to run.
+ */
+function specBudgetExceeded(job: ScheduledJob, now: Date): string | null {
+  if (job.job_type !== 'custom') return null;
+  const handler = job.job_config?.handler;
+  if (typeof handler !== 'string') return null;
+  if (!delegationFor(handler)) return null; // unplanned handlers run as scheduled
+  const gate = canDelegate(handler, now);
+  return gate.ok ? null : gate.reason ?? 'delegation budget';
 }
 
 // ============================================================================
@@ -694,7 +709,7 @@ export const CUSTOM_HANDLERS: CustomHandlerDef[] = [
   { handler: 'benchmark_chains', label: 'Benchmark: Chains', description: 'Run a benchmark cycle over chains.' },
   { handler: 'run_overlay_qa', label: 'Overlay365 QA', description: 'Playwright QA pass across Overlay365 sites.' },
   { handler: 'scan_book_library', label: 'Book Library Scan', description: 'Auto-ingest new books from the library folders.' },
-  { handler: 'publish_social_queue', label: 'Social Publish Drainer', description: 'Drain the SMD publish queue to X/LinkedIn (deterministic publisher).' },
+  { handler: 'publish_social_queue', label: 'Social Publish Drainer', description: 'Drain the marketing publish queue via Postiz (PUBLISH_DRY_RUN guarded).' },
   { handler: 'wiki_sync', label: 'Brain Wiki Sync', description: 'Sync the deterministic-brain wiki into the cache.' },
   { handler: 'file_share_check', label: 'Overlay File Share Test', description: 'Exercise the file-sharing / browser-fetch surface.' },
   { handler: 'code_review_check', label: 'Overlay Code Review Scan', description: 'Exercise the local deep-analysis code-review scorer.' },
@@ -743,6 +758,31 @@ export const CUSTOM_HANDLERS: CustomHandlerDef[] = [
     handler: 'oncology_strategy_scan',
     label: 'Oncology Strategy Scan (weekly)',
     description: 'Weekly: run the strategy-team weeklyScan with oncology context (pilot-partner objective, EvidenceHub, versioned cohorts, discovery worklist) and report the venture-scan brief + Phase A gate status. Real strategist CLI, bounded 90s — never fabricates partners.',
+  },
+  {
+    handler: 'marketing_pulse',
+    label: 'Marketing Pulse (daily)',
+    description: 'Daily: The Observer\'s operational pulse — real SMD publish-queue state plus the Dev-Brain channel mix. Deterministic, no LLM; reports an absent queue or unreachable Dev-Brain honestly.',
+  },
+  {
+    handler: 'marketing_strategy_pass',
+    label: 'Marketing Strategy Pass (weekly)',
+    description: 'Weekly: run the marketing operative formation strategy seam — Dev-Brain /api/marketing/decide for the channel mix, then the strategy team (/api/strategy/decide) ranks the candidate bets. Never fabricates a ranking.',
+  },
+  {
+    handler: 'oss_marketing_stack_up',
+    label: 'OSS Marketing Stack Up',
+    description: 'Start the OSS distribution+audience cell (Shlink, Postiz+Temporal, Listmonk, Twenty, Formbricks, Umami, Windmill) in dependency order. Bounded 15s/service health wait.',
+  },
+  {
+    handler: 'oss_marketing_stack_status',
+    label: 'OSS Marketing Stack Status',
+    description: 'Probe the OSS marketing stack and report which services are up/down.',
+  },
+  {
+    handler: 'oss_marketing_stack_down',
+    label: 'OSS Marketing Stack Down',
+    description: 'Stop the OSS marketing stack (docker compose per file, deduplicated).',
   },
 ];
 
@@ -909,25 +949,86 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
       }
 
       if (handler === 'publish_social_queue') {
-        // Drain the SMD publish queue → X/LinkedIn (deterministic publisher).
-        const base = process.env.SOCIAL_MEDIA_URL?.replace(/\/+$/, '') ?? 'http://localhost:8030';
-        const res = await fetch(`${base}/api/ai/publish/drain`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: '{}',
+        // Governance first: Dev-Brain decides whether an autonomous public
+        // publish is allowed. In enforce mode a non-approved verdict (or an
+        // unreachable brain) HOLDS the queue instead of draining it.
+        const { evaluatePublishGuard } = await import('./marketing-governance');
+        const gate = await evaluatePublishGuard({
+          actionSummary: 'Drain the marketing publish queue via Postiz',
+          actionScope: 'mass_broadcast',
+          parameters: { contains_future_promises: false },
         });
-        if (!res.ok) throw new Error(`publish drain failed: HTTP ${res.status}`);
-        const body = (await res.json()) as { checked?: number; processed?: number; persisted?: number; outcomes?: Array<{ status: string }> };
+        if (!gate.allowed) {
+          return {
+            handler,
+            published: false,
+            governance: { allowed: false, status: gate.status, mode: gate.mode, reason: gate.reason },
+          };
+        }
+        // Drain the marketing publish queue → Postiz (POST /api/v2/post).
+        // PUBLISH_DRY_RUN defaults on; there is no SMD service anymore.
+        const { runMarketingPublishDrain } = await import('./marketing-team');
+        const drain = await runMarketingPublishDrain();
         return {
           handler,
-          checked: body.checked ?? 0,
-          processed: body.processed ?? 0,
-          persisted: body.persisted ?? 0,
-          statuses: (body.outcomes ?? []).reduce<Record<string, number>>((acc, o) => {
-            acc[o.status] = (acc[o.status] ?? 0) + 1;
-            return acc;
-          }, {}),
+          published: drain.published > 0,
+          governance: { allowed: true, status: gate.status, mode: gate.mode, reason: gate.reason },
+          dryRun: drain.dryRun,
+          queueFound: drain.queueFound,
+          checked: drain.checked,
+          published_count: drain.published,
+          held: drain.held,
+          note: drain.note,
         };
+      }
+
+      if (handler === 'marketing_pulse') {
+        // The Observer's daily operational pulse: real marketing queue state +
+        // the Dev-Brain channel mix. Deterministic, no LLM; reports absence honestly.
+        const { runMarketingPulse } = await import('./marketing-team');
+        return { handler, ...(await runMarketingPulse()) };
+      }
+
+      if (handler === 'marketing_strategy_pass') {
+        // The formation's strategy seam: Dev-Brain /api/marketing/decide for the
+        // channel mix, then the strategy team (/api/strategy/decide) ranks the
+        // candidate bets. Advisory + deterministic; never fabricates a ranking.
+        const { runMarketingStrategy } = await import('./marketing-team');
+        const s = await runMarketingStrategy();
+        return {
+          handler,
+          marketingDevBrainConsulted: s.marketingDevBrainConsulted,
+          topChannel: s.recommended.channelId,
+          strategyId: s.recommended.strategyId,
+          rankedIds: s.strategyTeam?.rankedIds ?? [],
+          guard: s.guard,
+          honestNotes: s.honestNotes,
+        };
+      }
+
+      if (handler === 'oss_marketing_stack_up') {
+        // Start the OSS distribution+audience cell (docker compose). Bounded
+        // health wait so the job fits its 300s timeout; compose up -d detaches.
+        const { ossTeamUp } = await import('./oss-marketing');
+        const results = await ossTeamUp(15_000);
+        return {
+          handler,
+          up: results.filter((r) => r.up).length,
+          total: results.length,
+          results,
+          note: 'Bounded 15s/service health wait — a service still starting reports not-up; re-run status to confirm.',
+        };
+      }
+
+      if (handler === 'oss_marketing_stack_status') {
+        const { ossTeamSummary } = await import('./oss-marketing');
+        return { handler, ...(await ossTeamSummary()) };
+      }
+
+      if (handler === 'oss_marketing_stack_down') {
+        const { ossTeamDown } = await import('./oss-marketing');
+        const results = await ossTeamDown();
+        return { handler, stopped: results.filter((r) => r.stopped).length, total: results.length, results };
       }
 
       if (handler === 'wiki_sync') {
@@ -2234,10 +2335,14 @@ const nowMs = now.getTime();
       deferred.push({ job, reason: `Delegation window closed (${delegationWindowLabel(job)})` });
     } else {
       const sectorGate = sectorCapExceeded(job, now);
-      if (sectorGate) {
-        // The job's corporate sector is at its daily token cap — defer so the
-        // allocation is real instead of advisory (see canDelegateSector).
-        deferred.push({ job, reason: `Sector daily token cap reached (${sectorGate})` });
+      const specGate = sectorGate ? null : specBudgetExceeded(job, now);
+      const gateReason = sectorGate
+        ? `Sector daily token cap reached (${sectorGate})`
+        : specGate;
+      if (gateReason) {
+        // The job's own delegation budget/window (or its corporate sector cap)
+        // is exhausted — defer so the allocation is real instead of advisory.
+        deferred.push({ job, reason: gateReason });
       } else if (Number.isFinite(dueMs) && overdueMs > CATCH_UP_GRACE_MS) {
         // Overdue beyond the strict grace. In catch-up mode, still run if within
         // the horizon; otherwise treat as stale.
@@ -2410,6 +2515,15 @@ const nowMs = now.getTime();
           next_run_at: nextRunAt,
         })
         .eq('id', job.id);
+
+      // Dedup vs the day runner: mark the handler as having run today so
+      // OpenHub's /api/ops/day (runPhase) does not re-run the same work.
+      try {
+        const handler = job.job_config?.handler;
+        if (job.job_type === 'custom' && typeof handler === 'string' && delegationFor(handler)) {
+          recordDelegationConsumption(handler, 1);
+        }
+      } catch { /* bookkeeping only */ }
 
       emitJobCompleted(job.id, job.name, job.job_type, durationMs);
 
@@ -2710,11 +2824,43 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     description: 'Each evening, the marketing team builds next-day content/tools.',
     cron_expression: '0 20 * * *',
     job_type: 'chain',
-    // 'marketing-pulse' was never a defined chain template; point at the real
-    // marketing chain so this job actually runs.
-    job_config: { chain_slug: 'daily-marketing-run' },
-    is_enabled: true,
-  },
+      // 'marketing-pulse' was never a defined chain template; point at the real
+      // marketing chain so this job actually runs.
+      job_config: { chain_slug: 'daily-marketing-run' },
+      is_enabled: true,
+    },
+    {
+      name: 'Marketing Pulse',
+      description: 'Midday: The Observer\'s operational pulse — real SMD publish-queue state plus the Dev-Brain channel mix (marketing-team.ts).',
+      cron_expression: '0 10 * * *',
+      job_type: 'custom',
+      job_config: { handler: 'marketing_pulse' },
+      is_enabled: true,
+    },
+    {
+      name: 'Marketing Strategy Pass',
+      description: 'Weekly Monday: run the marketing operative formation strategy seam — Dev-Brain marketing allocation, then strategy-team ranking of the candidate bets.',
+      cron_expression: '0 7 * * 1',
+      job_type: 'custom',
+      job_config: { handler: 'marketing_strategy_pass' },
+      is_enabled: true,
+    },
+    {
+      name: 'OSS Marketing Stack Up',
+      description: 'Morning 08:00: stand up the OSS marketing stack (distribution + audience cells) before the workday.',
+      cron_expression: '0 8 * * *',
+      job_type: 'custom',
+      job_config: { handler: 'oss_marketing_stack_up' },
+      is_enabled: true,
+    },
+    {
+      name: 'OSS Marketing Stack Status',
+      description: 'Evening 22:30: probe the OSS marketing stack and report up/down before night stop.',
+      cron_expression: '30 22 * * *',
+      job_type: 'custom',
+      job_config: { handler: 'oss_marketing_stack_status' },
+      is_enabled: true,
+    },
   {
     name: 'Agent Avatar Generation',
     description: 'Generate agent portrait photos via the image-generation skill.',

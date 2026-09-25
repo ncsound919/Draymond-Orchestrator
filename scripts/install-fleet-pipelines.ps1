@@ -24,8 +24,9 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 
 # parent -> requirements file (must match fleet-pipelines.ts)
+# NOTE: overlay-content (marketing) is CLI-only (npx tsx) and ships no pip
+# manifest, so it is intentionally absent.
 $PIPELINES = @{
-  "social-media-dashboard" = "pipelines\social-media-dashboard\requirements.txt"
   "generative-video-ai"    = "pipelines\generative-video-ai\requirements.txt"
   "bookbridge"             = "pipelines\bookbridge\requirements.txt"
   "omniresearch-pro"       = "pipelines\omniresearch-pro\requirements.txt"

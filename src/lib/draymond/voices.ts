@@ -40,7 +40,6 @@ const VOICES: Voice[] = [
 
 const AGENT_VOICES: AgentVoice[] = [
   { agentId: "aetherdesk", voiceId: "user-clone" },          // flagship = user's cloned voice
-  { agentId: "social-media-dashboard", voiceId: "piper-en-f" },
   { agentId: "overlay-guardian", voiceId: "piper-en-m" },
   { agentId: "overlay-auditor", voiceId: "piper-en-m" },
   { agentId: "overlay-treasurer", voiceId: "piper-en-m" },

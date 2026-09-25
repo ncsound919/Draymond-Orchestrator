@@ -157,6 +157,58 @@ export async function runBrainDecision(input: BrainDecisionInput = {}): Promise<
     }
   } catch { /* fall through to local harness */ }
 
+  // -- 2a1. TRICKY SITUATION ESCALATION (locked plan 2026-09-22 §6d) ---------
+  // When multiple independent failure signals are present (jobs + monitors
+  // together) the decision is ambiguous, so escalate through Dev-Brain's JEV
+  // path (/api/decide/jev). Dev-Brain's matrix stays authoritative; JEV adds a
+  // calibrated choice advisory. Honest: if Dev-Brain or JEV is unreachable the
+  // result is 'unavailable' and we fall through to local handling — never a
+  // fabricated verdict.
+  const { escalateTrickyDecision } = await import('./tricky-decision');
+  const trickySignals = failingJobs.length + downMonitors.length >= 2;
+  if (trickySignals && !devBrain) {
+    const escalated = await escalateTrickyDecision({
+      problem: brainQuery,
+      category: 'ambiguous',
+      options: decisionCandidates.map((c) => ({ id: c.id, title: c.title, description: c.description, tags: c.tags })),
+      context: `failingJobs=${failingJobs.length}; downMonitors=${downMonitors.length}; agendaGoals=${agenda.length}`,
+    });
+    if (escalated.ok && escalated.matrix) {
+      brainConsulted = true;
+      devBrain = { matrix: escalated.matrix as unknown as import('./dev-brain').DevBrainMatrix };
+      const rec = escalated.matrix.options?.find((o) => o.id === escalated.recommendedOptionId);
+      if (rec) focusOverride = rec.title?.replace(/^Advance: /, '') ?? null;
+      devBrainRepairOrder = (escalated.matrix.options ?? [])
+        .filter((o) => o.id.startsWith('job:') || o.id.startsWith('mon:'))
+        .sort((a, b) => ((b as { weightPercentage?: number }).weightPercentage ?? 0) - ((a as { weightPercentage?: number }).weightPercentage ?? 0))
+        .map((o) => o.id);
+    }
+  }
+
+  // -- 2a2. Dev-Brain → OpenHub ecosystem repair report ----------------------
+  // When a tricky decision found failing jobs or down monitors, mirror them to
+  // OpenHub's ecosystem-aware repair intake so OpenHub audits the affected
+  // tool's preloaded local folder and dispatches the fix to Axiom. Best-effort
+  // (dev-brain source, never blocks the decision path).
+  if (trickySignals) {
+    try {
+      const { reportToOpenHubBestEffort } = await import('./openhub-report');
+      const detail = [
+        ...failingJobs.slice(0, 3).map((j) => `job ${j.name}: ${String(j.error ?? '').slice(0, 120)}`),
+        ...downMonitors.slice(0, 3).map((m) => `monitor ${m} down`),
+      ].join(' | ');
+      await reportToOpenHubBestEffort({
+        toolId: 'draymond',
+        source: 'dev-brain',
+        severity: 'high',
+        kind: 'tricky-decision',
+        detail: detail.slice(0, 2000),
+        preset: 'quick',
+        dedupKey: `tricky:${failingJobs.map((j) => j.name).sort().join(',')}:${downMonitors.slice(0, 2).sort().join(',')}`,
+      });
+    } catch { /* best-effort */ }
+  }
+
   // -- 2b. Fallback: local harness / deterministic brain ---------------------
   if (!brainConsulted) {
     const { reasonLocal: local } = await import('./local-reason');

@@ -9,14 +9,16 @@
 //   1. Decide: weight channels/campaigns via Dev-Brain POST /api/marketing/decide
 //      (deterministic, auditable, no LLM). Falls back to equal-weight when
 //      Dev-Brain is down — decisions never stall.
-//   2. Guard: consult Dev-Brain's decision-tree domain "public_communication"
-//      before autonomous publishes (prevents off-brand / high-blast-radius sends).
+//   2. Guard: the Dev-Brain governance engine (marketing-governance.ts) decides
+//      whether an autonomous publish is allowed. In enforce mode (default) a
+//      non-approved verdict — or an unreachable Dev-Brain — HOLDS the publish.
 //
-// Both are advisory: Draymond and the SMD call them, but they never block
-// the publish path (best-effort, logged).
+// The allocation matrix is advisory; the publish guard is enforcing. Set
+// DRAYMOND_MARKETING_GOVERNANCE=shadow to report-without-blocking.
 // ============================================================================
 
 import { devBrainMarketingDecide, type DevBrainCandidate, type DevBrainMatrix } from './dev-brain';
+import { evaluatePublishGuard } from './marketing-governance';
 
 export interface MarketingChannel {
   id: string;
@@ -113,20 +115,20 @@ export async function decideMarketingMix(opts: {
     }));
   }
 
-  // Guard check: public_communication risk gate (best-effort, no hard block).
-  let guard: MarketingDecision['guard'] = null;
-  const top = allocation[0];
-  const isAutonomousPublish = Boolean(top?.id.includes('campaign') && (opts.campaigns?.length ?? 0) > 0);
-  if (matrix && top) {
-    const topOpt = matrix.options.find((o) => o.id === top.id);
-    const risk = topOpt?.riskLevel ?? 'LOW';
-    if (isAutonomousPublish && (risk === 'CRITICAL' || risk === 'HIGH')) {
-      guard = { allowed: false, reason: `Dev-Brain flagged ${top.id} as ${risk} — gate autonomous publish for human review.` };
-    } else {
-      guard = { allowed: true, reason: `Dev-Brain risk ${risk} — ${isAutonomousPublish ? 'publish allowed with audit.' : 'channel mix approved.'}` };
-    }
+  // Guard: Dev-Brain governance decides whether an autonomous publish is
+  // allowed (fail-closed in enforce mode). This is the published-action gate —
+  // not a local risk heuristic. Channel-mix-only calls need no publish gate.
+  let guard: MarketingDecision['guard'];
+  const campaigns = opts.campaigns ?? [];
+  if (campaigns.length > 0) {
+    const g = await evaluatePublishGuard({
+      actionSummary: `Autonomous marketing publish: ${campaigns.map((c) => c.title).join(', ').slice(0, 240)}`,
+      actionScope: 'mass_broadcast',
+      parameters: { campaign_count: campaigns.length, contains_future_promises: false },
+    });
+    guard = { allowed: g.allowed, reason: g.reason };
   } else {
-    guard = { allowed: true, reason: 'No high-risk autonomous publish detected — guard passed (Dev-Brain fallback).' };
+    guard = { allowed: true, reason: 'Channel mix only — no autonomous publish; public-communication gate not required.' };
   }
 
   return { generatedAt, devBrainConsulted, matrix, allocation, guard };

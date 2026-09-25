@@ -40,11 +40,13 @@ describe('fleet-manifest (single source of truth for PM2)', () => {
     expect(names).toContain('draymond');
     expect(names).toContain('deterministic-brain');
     expect(names).toContain('axiom');
-    // The full fleet: 1 core + 26 fleet + 11 marketing + 1 dsh + 1 brain = 40.
+    // The full fleet: 1 core + 26 fleet + 6 marketing + 1 dsh + 1 brain = 35.
     // `opencode` was deliberately RETIRED (codegen now routes through Axiom's
     // /v1/chat/completions) and hermes-brain/hermes-proxy were removed — bump
-    // this pin deliberately whenever the fleet changes.
-    expect(all).toHaveLength(40);
+    // this pin deliberately whenever the fleet changes. The SMD PM2 stack
+    // (smd/smd-redis/smd-celery/smd-beat/smd-browser) was decommissioned
+    // 2026-09-24 (5 apps removed), so marketing went 11 -> 6.
+    expect(all).toHaveLength(35);
   });
 
   it('supervises CodeNexus on its canonical 3205 port', () => {

@@ -52,7 +52,7 @@ describe('mission chain templates', () => {
   it('references only known entity slugs and valid actions', () => {
     const known = new Set([
       'grader', 'reporank', 'mutly', 'uplift-agent',
-      'omni-research', 'social-media-dashboard', 'kaggle',
+      'omni-research', 'overlay-marketing-actions', 'kaggle',
     ]);
     for (const chain of MISSION_CHAIN_DEFS) {
       for (const step of chain.steps) {

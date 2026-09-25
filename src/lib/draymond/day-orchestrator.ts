@@ -9,7 +9,7 @@
  */
 
 import { estimateTokens, costAwareOrder } from '../mathx';
-import { delegationFor, recordDelegationConsumption, phaseBudget } from './delegation';
+import { delegationFor, recordDelegationConsumption, phaseBudget, delegationConsumed } from './delegation';
 
 export type DayPhase = 'morning' | 'midday' | 'evening' | 'night';
 
@@ -33,7 +33,7 @@ export const DAY_FLOW: OrchestrationStep[] = [
   { id: 'news', phase: 'morning', time: '06:00', job: 'ingest_news', purpose: 'Current events into the fleet', feedsTo: ['overlay-strategist', 'omniresearch-pro'] },
   { id: 'research-rotation', phase: 'morning', time: '06:00', job: 'research_rotation', purpose: 'Drain the highest-priority ready science/sports experiment', feedsTo: ['deterministic-brain', 'overlay-strategist'] },
   { id: 'market', phase: 'morning', time: '07:00', job: 'fetch_market_data', purpose: 'Crypto + papers snapshot', feedsTo: ['overlay-treasurer', 'trading-agents', 'ghostfolio-engine', 'sports-steve'] },
-  { id: 'oss-marketing-up', phase: 'morning', time: '08:00', job: 'oss_marketing_stack', purpose: 'Start OSS marketing team (Shlink, Postiz, Listmonk, Twenty, Formbricks)', feedsTo: ['social-media-dashboard', 'mission-pipeline'] },
+  { id: 'oss-marketing-up', phase: 'morning', time: '08:00', job: 'oss_marketing_stack_up', purpose: 'Start OSS marketing team (Shlink, Postiz, Listmonk, Twenty, Formbricks, Umami, Windmill)', feedsTo: ['mission-pipeline'] },
   { id: 'strategy', phase: 'morning', time: '06:30', job: 'strategy_team', purpose: 'Overlay Strategist scan: intel brief + venture scout + roadmap clusters', feedsTo: ['overlay-strategist', 'mission-pipeline'] },
   { id: 'qa', phase: 'morning', time: '07:00', job: 'run_overlay_qa', purpose: 'Site integrity pass', feedsTo: ['overlay-auditor'] },
   { id: 'treasury', phase: 'morning', time: '08:00', job: 'treasury_pulse', purpose: 'Cash pulse with market context', feedsTo: ['mission-pipeline'] },
@@ -45,13 +45,13 @@ export const DAY_FLOW: OrchestrationStep[] = [
   { id: 'repair', phase: 'midday', time: ':15', job: 'self_repair_check', purpose: 'Auto-repair failures / escalate' },
   { id: 'bmk', phase: 'midday', time: '13:00', job: 'benchmark_chains', purpose: 'Benchmark chain health', feedsTo: ['deterministic-brain'] },
   { id: 'science-seed', phase: 'midday', time: '16:00', job: 'science_campaign_seed', purpose: 'Top up the science/sports experiment backlog', feedsTo: ['deterministic-brain', 'research-rotation'] },
-  { id: 'marketing', phase: 'midday', time: '10:00', job: 'marketing-pulse', purpose: 'Content + pipeline top-of-funnel' },
-  { id: 'media', phase: 'midday', time: '10:30', job: 'social-media-dashboard', purpose: 'Media pipeline (reassigned from generative-video-ai)', feedsTo: ['social-media-dashboard'] },
+  { id: 'marketing', phase: 'midday', time: '10:00', job: 'marketing_pulse', purpose: 'Marketing pulse: OSS publish state + Dev-Brain channel mix' },
+  { id: 'media', phase: 'midday', time: '10:30', job: 'overlay-content', purpose: 'Media pipeline (Content Engine)', feedsTo: ['overlay-content'] },
   { id: 'web', phase: 'midday', time: '11:00', job: 'agent-browser', purpose: 'Web automation pipeline (browser → scrape → QA)' },
   { id: 'knowledge', phase: 'night', time: '02:20', job: 'bookbridge', purpose: 'Knowledge pipeline (library → synthesis → vector → memory)' },
   // -- Evening — prepare next day ------------------------------------------
-  { id: 'eve-marketing', phase: 'evening', time: '20:00', job: 'marketing-pulse', purpose: 'Build next-day marketing tools' },
-  { id: 'oss-marketing-status', phase: 'evening', time: '22:30', job: 'oss_marketing_stack', purpose: 'OSS marketing team status before night stop', feedsTo: ['mission-pipeline'] },
+  { id: 'eve-marketing', phase: 'evening', time: '20:00', job: 'daily-marketing-run', purpose: 'Evening marketing chain: build next-day content/tools' },
+  { id: 'oss-marketing-status', phase: 'evening', time: '22:30', job: 'oss_marketing_stack_status', purpose: 'OSS marketing team status before night stop', feedsTo: ['mission-pipeline'] },
   { id: 'repair-shift', phase: 'evening', time: '18:00', job: 'repair_shift', purpose: 'Daily repair team shift — code-review audit, fix + upgrade the ecosystem, benchmark improvements, self-learn' },
   { id: 'research-grade', phase: 'evening', time: '18:30', job: 'research_grade_loop', purpose: 'Breakthrough-potential grading of CureMind/BB-Tech research output' },
   // -- Night — learn + build while idle ------------------------------------
@@ -130,6 +130,8 @@ export interface PhaseRunResult {
   phase: DayPhase;
   executed: string[];
   errors: string[];
+  /** Steps skipped because they already ran today (cron or an earlier phase run). */
+  skipped?: string[];
   /** Steps skipped because the optional token budget could not cover them. */
   dropped?: string[];
   /** Estimated tokens the executed steps would consume. */
@@ -178,16 +180,28 @@ function stepDeadline(step: OrchestrationStep): number {
  * the run cost-aware: steps are prioritized by weighted earliest-deadline and
  * the overflow is dropped instead of run, so the phase stays inside a token cap.
  */
-export async function runPhase(phase: DayPhase, budgetTokens?: number): Promise<PhaseRunResult> {
+export async function runPhase(phase: DayPhase, budgetTokens?: number, opts: { force?: boolean } = {}): Promise<PhaseRunResult> {
   const steps = DAY_FLOW.filter((s) => s.phase === phase);
   const executed: string[] = [];
   const errors: string[] = [];
+  const skipped: string[] = [];
 
-  let runSteps = steps;
+  // Dedup vs the crons (single-authority): a step whose handler already ran
+  // today — its own cron fired, an earlier phase run executed it, or the
+  // scheduler marked it — is not re-run. `force` overrides for a deliberate
+  // manual re-run.
+  const eligible = opts.force
+    ? steps
+    : steps.filter((s) => {
+        if (delegationConsumed(s.job) > 0) { skipped.push(s.id); return false; }
+        return true;
+      });
+
+  let runSteps = eligible;
   const dropped: string[] = [];
   if (budgetTokens !== undefined && budgetTokens > 0) {
     const ordered = costAwareOrder(
-      steps.map((s) => ({
+      eligible.map((s) => ({
         id: s.id,
         tokens: estimateStepTokens(s),
         costPerToken: 1,
@@ -197,12 +211,17 @@ export async function runPhase(phase: DayPhase, budgetTokens?: number): Promise<
       budgetTokens,
     );
     runSteps = ordered.scheduled
-      .map((r) => steps.find((s) => s.id === r.id))
+      .map((r) => eligible.find((s) => s.id === r.id))
       .filter((s): s is OrchestrationStep => Boolean(s));
     dropped.push(...ordered.dropped);
   }
 
   const handlers: Record<string, () => Promise<unknown>> = {
+    marketing_pulse: async () => (await import('./marketing-team')).runMarketingPulse(),
+    marketing_strategy_pass: async () => (await import('./marketing-team')).runMarketingStrategy(),
+    oss_marketing_stack_up: async () => (await import('./oss-marketing')).ossTeamUp(15_000),
+    oss_marketing_stack_status: async () => (await import('./oss-marketing')).ossTeamSummary(),
+    oss_marketing_stack_down: async () => (await import('./oss-marketing')).ossTeamDown(),
     ingest_news: async () => (await import('./news')).ingestNews(),
     fetch_market_data: async () => {
       const d = await import('./data-apis');
@@ -287,7 +306,7 @@ export async function runPhase(phase: DayPhase, budgetTokens?: number): Promise<
       errors.push(`${step.id}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
-  const result: PhaseRunResult = { phase, executed, errors };
+  const result: PhaseRunResult = { phase, executed, errors, skipped };
   if (budgetTokens !== undefined) {
     result.dropped = dropped;
     result.estimated_tokens = runSteps.reduce((a, s) => a + estimateStepTokens(s), 0);

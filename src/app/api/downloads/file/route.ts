@@ -7,7 +7,6 @@ import { getDb } from '@/lib/db/connection';
 
 // Mirrors the map in /api/downloads/signed-url.
 const PRODUCT_FILES: Record<string, string> = {
-  'sports-steve-bet-buddy': 'SportsSteveAndBetBuddy-Windows-x64.exe',
   'draymond-orchestrator': 'DraymondOrchestrator-Windows-x64.exe',
   'open-chat': 'OpenChat-Windows-x64.exe',
 };
