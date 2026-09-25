@@ -217,13 +217,20 @@ const FLEET_SERVICES = [
     memory: "1G",
     env: { ...D, NODE_ENV: "production" },
   }),
-  // OmniResearch Pro â€” deep-research analyst (Gemini / Ollama / SearXNG).
-  // Research-squad lead. Runs on :3010 (OMNI_RESEARCH_URL) so KeyWire keeps :3000.
+  // OmniResearch (v2) — deep-research agent. Replaced the legacy
+  // OmniResearch-Pro-main (retired 2026-09-23). Models route through LiteLLM
+  // (:4100); decision/synergy/Jev/governance via Dev-Brain (:3450);
+  // verify/repair/provenance via Recourse (:3050); repairs dispatched to
+  // Axiom (:3198) via OpenHub (:3010). Port 3012 = OMNI_RESEARCH_URL.
+  //
+  // Boots against the root tsx + root deps (express/vite/cors/dotenv), so no
+  // app-local install is needed to serve the API/MCP/health surface. A full
+  // UI deploy additionally needs `npm install && npm run build` in the app dir.
   pm2App({
     name: "omniresearch",
-    script: O("agents/OmniResearch-Pro-main/node_modules/tsx/dist/cli.mjs"),
+    script: path.join(ORCH_DIR, "node_modules", "tsx", "dist", "cli.mjs"),
     args: "server.ts",
-    cwd: O("agents/OmniResearch-Pro-main"),
+    cwd: O("agents/omniresearch 2"),
     interpreter: NODE,
     // The tsx wrapper + a long local-model run exceeded 768M and pm2 killed the
     // process mid-report; 2G lets a run finish (DeepSeek runs need far less).
@@ -232,7 +239,17 @@ const FLEET_SERVICES = [
       ...D,
       NODE_ENV: "production",
       PORT: "3012",
-      OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434",
+      // Fleet model chain (OpenAI-compatible). No @google/genai dependency.
+      LITELLM_URL: process.env.LITELLM_URL || "http://127.0.0.1:4100",
+      // Local lane is llama.cpp (llama-server), NOT Ollama. LOCAL_LLM_* is
+      // authoritative; OLLAMA_* is only a back-compat fallback in clients.ts.
+      LOCAL_LLM_BASE_URL: process.env.LOCAL_LLM_BASE_URL || "http://127.0.0.1:11434",
+      LOCAL_LLM_MODEL: process.env.LOCAL_LLM_MODEL || "minicpm5-fable",
+      // Ecosystem services the app is wired into.
+      DEV_BRAIN_URL: process.env.DEV_BRAIN_URL || "http://127.0.0.1:3450",
+      RECOURSE_URL: process.env.RECOURSE_URL || "http://127.0.0.1:3050",
+      AXIOM_URL: process.env.AXIOM_URL || "http://127.0.0.1:3198",
+      OPENHUB_URL: process.env.OPENHUB_URL || "http://127.0.0.1:3010",
       BOOKBRIDGE_URL: "http://127.0.0.1:8777",
     },
   }),
@@ -485,109 +502,19 @@ const FLEET_SERVICES = [
 
 // â”€â”€ Marketing / coding stack (ecosystem.marketing.config.js) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-const REDIS_BIN =
-  process.env.REDIS_BIN ||
-  "C:\\Program Files\\Redis\\redis-server.exe";
-
-const SMD_DIR = O("agents/Social-Media-Dashboard--main");
-
-const SMD_ENV = {
-  AI_BACKEND: "remote",
-  AI_IMAGE_BACKEND: "local",
-  AI_DEVICE: "cpu",
-  SD_MODEL: "stabilityai/sd-turbo",
-  REMOTE_LLM_MODEL: "opencode",
-  REMOTE_LLM_URL: "http://localhost:4100/chat/completions",
-  REMOTE_LLM_API_KEY: D.LITELLM_MASTER_KEY || D.DEEPSEEK_API_KEY || "",
-  GEMINI_API_KEY: D.GEMINI_API_KEY || "",
-  GEMINI_MODEL: "gemini-3.5-flash",
-  REDIS_URL: "redis://127.0.0.1:6379/0",
-  X_API_KEY: D.X_API_KEY || "",
-  X_API_SECRET: D.X_API_SECRET || "",
-  X_ACCESS_TOKEN: D.X_ACCESS_TOKEN || "",
-  X_ACCESS_TOKEN_SECRET: D.X_ACCESS_TOKEN_SECRET || "",
-  LINKEDIN_ACCESS_TOKEN: D.LINKEDIN_ACCESS_TOKEN || "",
-  LINKEDIN_AUTHOR_URN: D.LINKEDIN_AUTHOR_URN || "",
-  INSTAGRAM_ACCESS_TOKEN: D.INSTAGRAM_ACCESS_TOKEN || "",
-  TIKTOK_ACCESS_TOKEN: D.TIKTOK_ACCESS_TOKEN || "",
-  YOUTUBE_ACCESS_TOKEN: D.YOUTUBE_ACCESS_TOKEN || "",
-  FACEBOOK_ACCESS_TOKEN: D.FACEBOOK_ACCESS_TOKEN || "",
-  PINTEREST_ACCESS_TOKEN: D.PINTEREST_ACCESS_TOKEN || "",
-  PUBLISH_DRY_RUN: D.PUBLISH_DRY_RUN || "1",
-  BROWSER_SERVICE_URL: "http://127.0.0.1:8040",
-  BROWSER_SERVICE_API_KEY: D.BROWSER_SERVICE_API_KEY || "",
-};
+// The former SMD (Social Media Dashboard) PM2 stack — smd, smd-redis,
+// smd-celery, smd-beat, smd-browser — was DECOMMISSIONED 2026-09-24. The repo
+// (agents/Social-Media-Dashboard--main) was removed from disk; its content-gen
+// and scheduling role is now served by the OSS Compose marketing stack under
+// 04_Integrations/oss-marketing-stack (Postiz, Listmonk, Twenty, Formbricks,
+// Umami, Shlink, Windmill), managed by src/lib/draymond/oss-marketing.ts, with
+// AgentBrowser/Postiz providing real publishing. Do not re-add a PM2 app whose
+// cwd points into Social-Media-Dashboard--main.
 
 const MARKETING_SERVICES = [
   // opencode (headless codegen serve) RETIRED: codegen now routes through
   // Axiom's OpenAI-compatible /v1/chat/completions (src/lib/ide/opencode-client.ts).
   // Nothing in the fleet starts a local `opencode serve` anymore.
-  // Redis â€” message broker and result backend for Celery.
-  // The Windows service exists but is stopped by default; PM2 manages it here
-  // so the whole SMD stack starts and stops together.
-  pm2App({
-    name: "smd-redis",
-    script: REDIS_BIN,
-    args: `--port 6379 --bind 127.0.0.1 --dir "${path.join(ORCH_DIR, "data", "redis")}" --stop-writes-on-bgsave-error no`,
-    memory: "256M",
-    restart_delay: 2000,
-    logPrefix: "smd-redis",
-  }),
-
-  pm2App({
-    name: "smd",
-    script: PYTHON,
-    args: "-m uvicorn src.ai.api:app --host 127.0.0.1 --port 8030",
-    cwd: SMD_DIR,
-    memory: "1G",
-    env: SMD_ENV,
-  }),
-
-  // Celery worker â€” executes video generation, campaign sends, and AI copy tasks.
-  // Runs in the ai_tasks + default queues. Requires smd-redis to be healthy first.
-  pm2App({
-    name: "smd-celery",
-    script: PYTHON,
-    args: "-m celery -A celery_worker worker --loglevel=info --concurrency=2 -Q celery,ai_tasks",
-    cwd: SMD_DIR,
-    memory: "1G",
-    restart_delay: 5000,
-    logPrefix: "smd-celery",
-    env: SMD_ENV,
-  }),
-
-  // Celery beat â€” triggers recurring tasks: campaign scheduler (every 5 min)
-  // and analytics sync (every 60 min), as defined in celeryconfig.py.
-  pm2App({
-    name: "smd-beat",
-    script: PYTHON,
-    args: "-m celery -A celery_worker beat --loglevel=info --scheduler celery.beat:PersistentScheduler",
-    cwd: SMD_DIR,
-    memory: "256M",
-    restart_delay: 5000,
-    logPrefix: "smd-beat",
-    env: SMD_ENV,
-  }),
-
-  // Browser automation micro-service â€” Playwright-powered posting for Instagram,
-  // TikTok, YouTube, LinkedIn, and X. Port 8040. Sessions persisted to disk.
-  // Requires: `playwright install chromium` run once in the SMD virtualenv.
-  pm2App({
-    name: "smd-browser",
-    script: PYTHON,
-    args: "-m uvicorn browser_service.main:app --host 127.0.0.1 --port 8040",
-    cwd: SMD_DIR,
-    memory: "1G",
-    restart_delay: 5000,
-    logPrefix: "smd-browser",
-    env: {
-      ...SMD_ENV,
-      BROWSER_SERVICE_API_KEY: D.BROWSER_SERVICE_API_KEY || "",
-      // Set PLAYWRIGHT_BROWSERS_PATH if chromium is installed to a custom location
-      PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH || "",
-    },
-  }),
-
   pm2App({
     name: "grader",
     script: O("agents/Grader-main/node_modules/tsx/dist/cli.mjs"),
@@ -835,6 +762,19 @@ const INFRA_SERVICES = [
     memory: "2G",
     restart_delay: 5000,
     env: { NODE_ENV: "production" },
+  }),
+  // ecosystem-sampler — headless 24/7 history sampler for the Ecosystem Control
+  // Center. Writes the same .ecosystem-dashboard/history.jsonl schema the
+  // dashboard reads, so fleet uptime/report history stays continuous even when
+  // the desktop app is closed. Read-only (pm2 jlist + HTTP probes); no mutations.
+  pm2App({
+    name: "ecosystem-sampler",
+    script: path.join(UPLIFT_ROOT, "ecosystem", "scripts", "sampler.mjs"),
+    cwd: UPLIFT_ROOT,
+    interpreter: NODE,
+    memory: "256M",
+    restart_delay: 5000,
+    env: { NODE_ENV: "production", UPLIFT_ROOT },
   }),
 ];
 

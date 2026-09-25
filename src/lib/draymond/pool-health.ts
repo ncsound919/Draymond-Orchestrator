@@ -28,6 +28,21 @@ function repoRoot(): string {
   return process.cwd();
 }
 
+// Uplift workspace root — resolved independently of cwd so generated paths
+// (e.g. the MCP OpenAPI spec) never point outside the repo.
+function upliftRoot(): string {
+  const env = process.env.UPLIFT_ROOT;
+  if (env && fs.existsSync(path.join(env, 'ecosystem'))) return env;
+  let dir = repoRoot();
+  for (let i = 0; i < 6; i++) {
+    if (fs.existsSync(path.join(dir, 'ecosystem'))) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return path.resolve(repoRoot(), '..');
+}
+
 export interface PoolProbeResult {
   provider: string;
   credential: string;
@@ -365,10 +380,14 @@ export function buildLitellmConfig(
     lines.push(`      api_key: os.environ/OPENROUTER_API_KEY`);
   }
   if (ocModel) {
-    for (const k of [
+    // Only keys that probed OK enter the pool — dead/rotated keys otherwise burn
+    // router retries (operator: only 4 of the 6 Ollama keys actually work).
+    const liveOllamaKeys = (state.ollamaCloud ?? []).filter((o) => o.ok).map((o) => o.credential);
+    const ollamaKeys = liveOllamaKeys.length ? liveOllamaKeys : [
       'OLLAMA_KEY_PRIMARY', 'OLLAMA_KEY_TAP919BEATS', 'OLLAMA_KEY_TAP4500',
       'OLLAMA_KEY_NCSOUND919', 'OLLAMA_KEY_JOHNREDD888', 'OLLAMA_KEY_NCSOUND_ALT',
-    ]) {
+    ];
+    for (const k of ollamaKeys) {
       lines.push(`  - model_name: ollama-cloud`);
       lines.push(`    litellm_params:`);
       lines.push(`      model: ${JSON.stringify(ocModel)}`);
@@ -393,6 +412,13 @@ export function buildLitellmConfig(
   lines.push(`    litellm_params:`);
   lines.push(`      model: deepseek/deepseek-flash`);
   lines.push(`      api_key: os.environ/DEEPSEEK_API_KEY`);
+  // Terminal fallback: the small LOCAL model (llama.cpp lane, no key). Free →
+  // paid → local, per operator decision 2026-09-25.
+  lines.push(`  - model_name: local`);
+  lines.push(`    litellm_params:`);
+  lines.push(`      model: openai/${process.env.LOCAL_LLM_MODEL || 'minicpm5-fable'}`);
+  lines.push(`      api_base: ${process.env.LOCAL_LLM_BASE_URL || 'http://127.0.0.1:11434'}/v1`);
+  lines.push(`      api_key: "not-needed"`);
   lines.push('');
   lines.push('router_settings:');
   lines.push('  cooldown_time: 600');
@@ -403,11 +429,14 @@ export function buildLitellmConfig(
   // (direct) → ollama-cloud (Keywire) → openrouter-free. Deepseek must precede
   // ollama-cloud in every chain so free pools fall to the paid direct lane
   // before the Keywire lane.
-  lines.push('    - fleet-free: ["deepseek", "ollama-cloud", "openrouter-free"]');
-  lines.push('    - opencode-free: ["fleet-free", "zen-free", "deepseek", "ollama-cloud"]');
-  lines.push('    - zen-free: ["deepseek", "ollama-cloud", "openrouter-free"]');
-  lines.push('    - deepseek: ["opencode", "ollama-cloud"]');
-  lines.push('    - opencode: ["deepseek", "ollama-cloud"]');
+  lines.push('    - fleet-free: ["deepseek", "ollama-cloud", "openrouter-free", "local"]');
+  lines.push('    - opencode-free: ["fleet-free", "zen-free", "deepseek", "ollama-cloud", "local"]');
+  lines.push('    - zen-free: ["deepseek", "ollama-cloud", "openrouter-free", "local"]');
+  lines.push('    - deepseek: ["opencode", "ollama-cloud", "local"]');
+  lines.push('    - opencode: ["deepseek", "ollama-cloud", "local"]');
+  lines.push('    - ollama-cloud: ["local"]');
+  lines.push('    - openrouter-free: ["deepseek", "ollama-cloud", "local"]');
+  lines.push('    - local: []');
   lines.push('');
   lines.push('general_settings:');
   lines.push('  master_key: os.environ/LITELLM_MASTER_KEY');
@@ -419,5 +448,27 @@ export function buildLitellmConfig(
   lines.push('litellm_settings:');
   lines.push('  drop_params: true');
   lines.push('  set_verbose: false');
+  // MCP Gateway: expose the Ecosystem Control Center's READ-ONLY control API as
+  // MCP tools (OpenAPI→tools). spec_path is a local file (no SSRF round-trip);
+  // the service token must be present in the Keywire vault / env.
+  lines.push('');
+  lines.push('mcp_servers:');
+  lines.push('  ecosystem_control:');
+  lines.push('    url: "http://127.0.0.1:3080"');
+  {
+    const specPath = path.join(upliftRoot(), 'ecosystem', 'control-api.openapi.json');
+    if (!fs.existsSync(specPath)) {
+      console.warn(`[pool-health] WARNING: MCP OpenAPI spec not found at ${specPath}; mcp_servers.ecosystem_control will expose no tools until it exists.`);
+    }
+    lines.push(`    spec_path: ${JSON.stringify(specPath)}`);
+  }
+  lines.push('    auth_type: "api_key"');
+  lines.push('    auth_value: os.environ/ECOSYSTEM_CONTROL_TOKEN');
+  lines.push('    description: "Overlay365/Uplift ecosystem control (read-only): fleet status, health, history, models."');
+  lines.push('    allowed_tools:');
+  lines.push('      - get_fleet_status');
+  lines.push('      - get_monitor');
+  lines.push('      - get_history');
+  lines.push('      - get_models');
   return lines.join('\n') + '\n';
 }
