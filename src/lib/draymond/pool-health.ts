@@ -318,6 +318,7 @@ export function buildLitellmConfig(
     | 'freeModelAvailability'
     | 'openrouterFreeModel'
     | 'ollamaCloudModel'
+    | 'ollamaCloud'
   >
 ): string {
   // NOTE: model ids verified against https://opencode.ai/docs/zen/
