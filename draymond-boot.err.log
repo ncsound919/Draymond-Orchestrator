@@ -1,0 +1,171 @@
+[bootstrap] omniresearch-pro down after start attempt: no startable local recipe/checkout — escalate
+[bootstrap] uplift-agent down after start attempt: no startable local recipe/checkout — escalate
+[bootstrap] hempforge down after start attempt: no startable local recipe/checkout — escalate
+[discovery-loop] daemon run failed (0ms): Benchmark Olympics discovery-loop-run.ts not found (sibling app missing?)
+[Draymond] Optional env vars not set (features will be disabled):
+  - OPENAI_API_KEY: OpenAI API key for swarm decomposition
+  - ANTHROPIC_API_KEY: Anthropic API key for Claude calls
+  - QWEN_API_KEY: Qwen API key for Uplift Guide AI
+  - NEWSAPI_KEY: NewsAPI key for news fetching
+  - GNEWS_API_KEY: GNews API key
+  - WORLDNEWS_API_KEY: WorldNews API key
+  - UPLIFT_BASE_URL: Uplift Agent base URL
+  - SPORTS_STEVE_URL: Sports Steve agent URL
+  - INDY_MUSIC_URL: Indy Music Platform URL
+  - MEGACODE_URL: MegaCode/OverCoat URL
+  - OVERLAY_CHAIN_URL: Overlay Chain URL
+  - CCE_ROOT: Claude Code Extension root directory
+  - CCE_PYTHON: Python binary for CCE
+  - TRADING_AGENTS_PYTHON: Python binary for TradingAgents
+  - TRADING_AGENTS_DIR: TradingAgents project directory
+  - SUB_TEAM_PYTHON: Python binary for Sub Team
+  - SUB_TEAM_DIR: Sub Team project directory
+  - DRAYMOND_REGISTRY_DIR: File-based registry directory
+  - AUDIT_LOG_PATH: Audit log file path
+  - DRAYMOND_DB_PATH: Path to the local SQLite file (default ./data/draymond.db)
+  - DRAYMOND_ADMIN_EMAIL: Local admin login email (bootstrap)
+  - DRAYMOND_ADMIN_PASSWORD: Local admin login password (bootstrap; generated if unset)
+  - DRAYMOND_RELEASES_DIR: Directory served by /api/downloads/* (default ./data/paid-releases)
+  - AETHERDESK_BASE_URL: AetherDesk API base URL, must end in /api/v1 (e.g. http://127.0.0.1:8002/api/v1). Alias: AETHERDESK_API_URL
+  - DRAYMOND_REPAIR_AT_FAILURE_TIMEOUT_MS: Per-engine codegen timeout for the at-failure dispatch (default 30000)
+  - DRAYMOND_REPAIR_DISPATCH_COOLDOWN_MS: Cooldown between coding-crew dispatches for the same job (default 30min)
+  - DRAYMOND_REPAIR_REPORT_COOLDOWN_MS: Dedupe window for deterministic repair-report emails per job+outcome (default 30min)
+[tid-dispatcher:ALERT] [TID Discovery] Value represents a 4.4-sigma outlier from baseline operations. (target: upgrade-queue)
+[notify-dispatcher] channel legacy-email failing (will re-alert after cooldown): legacy-email:Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.goog
+[Draymond Notifications] Email send failed for a549feac-983b-4336-8739-c69c15dd863e: all notification channels failed: legacy-email: Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.google.com/mail/?p=BadCredentials 6a1803df08f44-91996d24c52sm35143836d6.29 - gsmtp
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[tid-dispatcher:ALERT] [TID Discovery] Value represents a 4.7-sigma outlier from baseline operations. (target: upgrade-queue)
+[tid-dispatcher:ALERT] [TID Discovery] Value represents a 4.2-sigma outlier from baseline operations. (target: mission)
+[discovery-loop] daemon run failed (0ms): Benchmark Olympics discovery-loop-run.ts not found (sibling app missing?)
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[notify-dispatcher] legacy-email failed again (digest-muted): legacy-email:Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.goog
+[Draymond Notifications] Email send failed for a136484b-f4d3-4433-a32f-43b8987dd072: all notification channels failed: legacy-email: Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.google.com/mail/?p=BadCredentials af79cd13be357-93e9919bbbesm366900985a.28 - gsmtp
+[notify-dispatcher] legacy-email failed again (digest-muted): legacy-email:Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.goog
+[Draymond Notifications] Email send failed for 24c4162b-ff66-4e58-bb1d-85aa9422de64: all notification channels failed: legacy-email: Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.google.com/mail/?p=BadCredentials af79cd13be357-93e9914986esm371944685a.17 - gsmtp
+[notify-dispatcher] legacy-email failed again (digest-muted): legacy-email:Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.goog
+[Draymond Notifications] Email send failed for 6ec12fa3-9eda-4cf4-85a7-455f2a52c80f: all notification channels failed: legacy-email: Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.google.com/mail/?p=BadCredentials 6a1803df08f44-91996cfe900sm35957636d6.20 - gsmtp
+[discovery-loop] daemon run failed (0ms): Benchmark Olympics discovery-loop-run.ts not found (sibling app missing?)
+[notify-dispatcher] legacy-email failed again (digest-muted): legacy-email:Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.goog
+[Draymond Notifications] Email send failed for 51704f74-65c8-43b2-b311-7bc24a545c65: all notification channels failed: legacy-email: Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.google.com/mail/?p=BadCredentials d75a77b69052e-53572202defsm35364421cf.31 - gsmtp
+[tid-dispatcher:ALERT] [TID Discovery] Value represents a 4.7-sigma outlier from baseline operations. (target: mission)
+[discovery-loop] daemon run failed (0ms): Benchmark Olympics discovery-loop-run.ts not found (sibling app missing?)
+[notify-dispatcher] legacy-email failed again (digest-muted): legacy-email:Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.goog
+[Draymond Notifications] Email send failed for fd5f5419-b9a8-4e1e-b341-6e922c5bac71: all notification channels failed: legacy-email: Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.google.com/mail/?p=BadCredentials af79cd13be357-93e991eca24sm375287685a.39 - gsmtp
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[notify-dispatcher] legacy-email failed again (digest-muted): legacy-email:Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.goog
+[Draymond Notifications] Email send failed for 48cf250d-2da8-4797-818b-2878f03e3986: all notification channels failed: legacy-email: Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.google.com/mail/?p=BadCredentials af79cd13be357-93e98f6f8desm379684885a.3 - gsmtp
+[discovery-loop] daemon run failed (0ms): Benchmark Olympics discovery-loop-run.ts not found (sibling app missing?)
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[notify-dispatcher] legacy-email failed again (digest-muted): legacy-email:Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.goog
+[Draymond Notifications] Email send failed for ed0bf617-f0d8-4aec-9752-0f9c4b530e7a: all notification channels failed: legacy-email: Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.google.com/mail/?p=BadCredentials af79cd13be357-93e991a94a3sm383589985a.33 - gsmtp
+[notify-dispatcher] legacy-email failed again (digest-muted): legacy-email:Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.goog
+[Draymond Notifications] Email send failed for 4ce1bcb9-de67-46df-af4e-73d4391eb70a: all notification channels failed: legacy-email: Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.google.com/mail/?p=BadCredentials 6a1803df08f44-91996cb9f4csm36870376d6.12 - gsmtp
+[discovery-loop] daemon run failed (0ms): Benchmark Olympics discovery-loop-run.ts not found (sibling app missing?)
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[discovery-loop] daemon run failed (0ms): Benchmark Olympics discovery-loop-run.ts not found (sibling app missing?)
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[discovery-loop] daemon run failed (0ms): Benchmark Olympics discovery-loop-run.ts not found (sibling app missing?)
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[discovery-loop] daemon run failed (0ms): Benchmark Olympics discovery-loop-run.ts not found (sibling app missing?)
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[notify-dispatcher] legacy-email failed again (digest-muted): legacy-email:Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.goog
+[Draymond Notifications] Email send failed for e310d6d5-5828-4006-b275-c2a784838061: all notification channels failed: legacy-email: Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.google.com/mail/?p=BadCredentials d75a77b69052e-53571f162e7sm38118091cf.1 - gsmtp
+[notify-dispatcher] legacy-email failed again (digest-muted): legacy-email:Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.goog
+[Draymond Notifications] Email send failed for 15b4991c-8b28-436f-8a1d-74dcb5f2eb10: all notification channels failed: legacy-email: Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.google.com/mail/?p=BadCredentials d75a77b69052e-535721ad0cbsm37713221cf.26 - gsmtp
+[discovery-loop] daemon run failed (0ms): Benchmark Olympics discovery-loop-run.ts not found (sibling app missing?)
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[notify-dispatcher] legacy-email failed again (digest-muted): legacy-email:Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.goog
+[Draymond Notifications] Email send failed for 52e71733-2abd-47f0-ac1e-73f9bea446f6: all notification channels failed: legacy-email: Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.google.com/mail/?p=BadCredentials d75a77b69052e-5357219c0ecsm37742201cf.24 - gsmtp
+[llm] provider "ollama" failed: This operation was aborted. Trying next.
+[llm] provider "opencode-free" failed: LLM API error 400: {"error":{"type":"server_error","message":"Upstream request failed: Model is unavailable."}}. Trying next.
+[llm] provider "openrouter" failed: LLM API error 429: {"error":{"message":"Rate limit exceeded: free-models-per-day. Add 5 credits to unlock 1000 free model requests per day","code":429,"metadata":{"headers":{"X-RateLimit-Limit":"50","X-RateLimit-Remaini. Trying next.
+[llm] provider "opencode" failed: LLM API error 400: {"type":"error","error":{"type":"MissingSessionID","message":"Request is missing x-opencode-session and cannot be routed efficiently. Please see https://opencode.ai/docs/go/#where-can-i-use-it"}}. Trying next.
+[llm] provider "deepseek" failed: LLM API error 401: {"error":{"message":"Authentication Fails, Your api key: ****d6f9 is invalid (request_id: 075ea679-bd8e-4237-a3ee-4a67f5c8426a)","type":"authentication_error","param":null,"code":"invalid_request_erro. Trying next.
+[llm] provider "ollama" failed: This operation was aborted. Trying next.
+[llm] provider "opencode-free" failed: LLM API error 400: {"error":{"type":"server_error","message":"Upstream request failed: Model is unavailable."}}. Trying next.
+[llm] provider "openrouter" failed: LLM API error 429: {"error":{"message":"Rate limit exceeded: free-models-per-day. Add 5 credits to unlock 1000 free model requests per day","code":429,"metadata":{"headers":{"X-RateLimit-Limit":"50","X-RateLimit-Remaini. Trying next.
+[llm] provider "opencode" failed: LLM API error 400: {"type":"error","error":{"type":"MissingSessionID","message":"Request is missing x-opencode-session and cannot be routed efficiently. Please see https://opencode.ai/docs/go/#where-can-i-use-it"}}. Trying next.
+[llm] provider "deepseek" failed: LLM API error 401: {"error":{"message":"Authentication Fails, Your api key: ****d6f9 is invalid (request_id: fca1e906-e3bd-431e-9253-d1d5927174ac)","type":"authentication_error","param":null,"code":"invalid_request_erro. Trying next.
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[fallbacks] LLM recovered — degraded mode OFF.
+[meter] middleman unreachable (http://localhost:8021) — metering paused: fetch failed
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[discovery-loop] daemon run failed (0ms): Benchmark Olympics discovery-loop-run.ts not found (sibling app missing?)
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[discovery-loop] daemon run failed (0ms): Benchmark Olympics discovery-loop-run.ts not found (sibling app missing?)
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[discovery-loop] daemon run failed (0ms): Benchmark Olympics discovery-loop-run.ts not found (sibling app missing?)
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[notify-dispatcher] legacy-email failed again (digest-muted): legacy-email:Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.goog
+[Draymond Notifications] Email send failed for 6e0c0b52-908a-43e2-a82b-4ce7ed2b7116: all notification channels failed: legacy-email: Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.google.com/mail/?p=BadCredentials af79cd13be357-93e991eeb5asm423813985a.41 - gsmtp
+[notify-dispatcher] legacy-email failed again (digest-muted): legacy-email:Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.goog
+[Draymond Notifications] Email send failed for 6f761b3f-2c10-4501-bd6f-f1340f156c94: all notification channels failed: legacy-email: Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.google.com/mail/?p=BadCredentials 6a1803df08f44-91996d00771sm41869186d6.21 - gsmtp
+[discovery-loop] daemon run failed (0ms): Benchmark Olympics discovery-loop-run.ts not found (sibling app missing?)
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[notify-dispatcher] legacy-email failed again (digest-muted): legacy-email:Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.goog
+[Draymond Notifications] Email send failed for 5c43f323-164d-4572-853d-447b010ef2c6: all notification channels failed: legacy-email: Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.google.com/mail/?p=BadCredentials d75a77b69052e-5357219c5f5sm39433451cf.25 - gsmtp
+[brain-task] brain unreachable: The operation was aborted due to timeout
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[discovery-loop] daemon run failed (0ms): Benchmark Olympics discovery-loop-run.ts not found (sibling app missing?)
+[tid-dispatcher:ALERT] [TID Discovery] Value represents a 3.6-sigma outlier from baseline operations. (target: monitors)
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[discovery-loop] daemon run failed (0ms): Benchmark Olympics discovery-loop-run.ts not found (sibling app missing?)
+[tid-dispatcher:ALERT] [TID Discovery] Rapid degradation detected in upgrade-queue kairos_weak_agent (slope=1.11/hr, R²=0.59). (target: upgrade-queue)
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[llm] provider "ollama" failed: This operation was aborted. Trying next.
+[llm] provider "opencode-free" failed: LLM API error 400: {"error":{"type":"server_error","message":"Upstream request failed: Model is unavailable."}}. Trying next.
+[llm] provider "openrouter" failed: LLM API error 429: {"error":{"message":"Rate limit exceeded: free-models-per-day. Add 5 credits to unlock 1000 free model requests per day","code":429,"metadata":{"headers":{"X-RateLimit-Limit":"50","X-RateLimit-Remaini. Trying next.
+[llm] provider "opencode" failed: LLM API error 400: {"type":"error","error":{"type":"MissingSessionID","message":"Request is missing x-opencode-session and cannot be routed efficiently. Please see https://opencode.ai/docs/go/#where-can-i-use-it"}}. Trying next.
+[llm] provider "deepseek" failed: LLM API error 401: {"error":{"message":"Authentication Fails, Your api key: ****d6f9 is invalid (request_id: 8dced20c-7f2e-464e-999a-47448f2b35e9)","type":"authentication_error","param":null,"code":"invalid_request_erro. Trying next.
+[openhub-report] not delivered to OpenHub: OpenHub HTTP 403: Invalid or expired access token
+[tid-dispatcher:ALERT] [TID Discovery] Rapid degradation detected in upgrade-queue kairos_weak_agent (slope=0.85/hr, R²=0.49). (target: upgrade-queue)
+[tid-dispatcher:ALERT] [TID Discovery] Value represents a 3.1-sigma outlier from baseline operations. (target: upgrade-queue)
+[tid-dispatcher:ALERT] [TID Discovery] Value represents a 3.2-sigma outlier from baseline operations. (target: mission)
+[notify-dispatcher] legacy-email failed again (digest-muted): legacy-email:Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.goog
+[Draymond Notifications] Email send failed for b8df05ba-44ed-415d-8f82-40a299a1bb67: all notification channels failed: legacy-email: Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.google.com/mail/?p=BadCredentials d75a77b69052e-5357209ee47sm40573151cf.6 - gsmtp
+[notify-dispatcher] legacy-email failed again (digest-muted): legacy-email:Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.goog
+[Draymond Notifications] Email send failed for cd5e6321-6f7e-4b0d-b65d-2124628d2ea4: all notification channels failed: legacy-email: Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.google.com/mail/?p=BadCredentials 6a1803df08f44-91996baa2afsm43154106d6.6 - gsmtp
+[discovery-loop] daemon run failed (0ms): Benchmark Olympics discovery-loop-run.ts not found (sibling app missing?)
+[tid-dispatcher:ALERT] [TID Discovery] Value represents a 3.6-sigma outlier from baseline operations. (target: upgrade-queue)
