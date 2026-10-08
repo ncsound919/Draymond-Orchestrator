@@ -29,18 +29,47 @@
 // ============================================================================
 
 const path = require("node:path");
+const fs = require("node:fs");
 
 const UPLIFT_ROOT = process.env.UPLIFT_ROOT || "C:\\Users\\User\\Downloads\\Uplift";
 const ORCH_DIR = path.join(UPLIFT_ROOT, "Draymond-Orchestrator");
 // BioSim + KG sidecars live in the recourse repo (they are recourse python
 // sidecars), not under UPLIFT_ROOT/components. Override RECOURSE_ROOT if it moves.
-const RECOURSE_ROOT = process.env.RECOURSE_ROOT || "C:\\Users\\User\\Downloads\\recourse";
+//
+// Resolution is a probe, not a guess. Three roots have each been "the right
+// one" at some point and two of them do not exist:
+//   1. <UPLIFT_ROOT>\06_Resources\recourse          -- asserted 2026-09-28, never existed
+//   2. <UPLIFT_ROOT>\recourse                      -- only holds recourse\data\reports
+//   3. <BUSINESS>\INFRASTRUCTURE\recourse          -- the live checkout, has python/ sidecars
+// A default that does not exist launches pm2 with a cwd that is not there, the
+// interpreter dies instantly, and the failure looks like a code bug. So: probe
+// the candidates for the actual entrypoints and take the first that has them.
+const ONCOLOGY_ROOT = path.join(UPLIFT_ROOT, "02_Pillars", "Overlay Science", "Overlay Oncology");
+const RECOURSE_CANDIDATES = [
+  process.env.RECOURSE_ROOT,
+  path.join(UPLIFT_ROOT, "06_Resources", "recourse"),
+  "C:\\Users\\User\\Downloads\\BUSINESS\\INFRASTRUCTURE\\recourse",
+].filter(Boolean);
+
+function resolveRecourseRoot() {
+  for (const candidate of RECOURSE_CANDIDATES) {
+    if (fs.existsSync(path.join(candidate, "python", "biosim_service", "main.py"))) return candidate;
+  }
+  return RECOURSE_CANDIDATES[RECOURSE_CANDIDATES.length - 1];
+}
+const RECOURSE_ROOT = resolveRecourseRoot();
 
 const PYTHON = process.env.PYTHON_PATH || "C:\\Program Files\\Python312\\python.exe";
 const NODE = process.env.NODE_PATH || "C:\\Program Files\\nodejs\\node.exe";
 
 /** Same restart-policy shape as fleet-manifest.js pm2App (self-contained). */
-function oncologyApp({ name, script, args, cwd, interpreter, memory = "512M", env = {}, logPrefix = name }) {
+function oncologyApp({ name, script, args, cwd, interpreter, memory = "512M", env = {}, logPrefix = name, disabled = false, note = "" }) {
+  if (disabled) {
+    // Keep the entry in the manifest, but make it a real pm2 "disabled: true"
+    // rather than an entry that boots and dies. An absent dependency and a
+    // broken service must not look the same in `pm2 list`.
+    return { name, disabled: true, note };
+  }
   const app = {
     name,
     script,
@@ -67,15 +96,18 @@ function oncologyApp({ name, script, args, cwd, interpreter, memory = "512M", en
 
 /**
  * ONCOLOGY_SIDECARS — the shift-scoped sidecar manifest (service -> run entry).
- * Each entry carries `disabled` for the honest "no determinable command" case;
- * all five currently have real commands so all are enabled.
+ *
+ * Entry-level honesty: `disabled: true` means "the code that made this real is
+ * not on this machine", which is a different fact from "broken". A component
+ * that is a gitlink with no .gitmodules and no remote cannot be started, and
+ * starting it anyway produces a crash-loop that reads as a defect.
  */
 const ONCOLOGY_SIDECARS = [
   oncologyApp({
     name: "oncology-umoe",
     script: PYTHON,
     args: "-m umoe.service --host 127.0.0.1 --port 8723",
-    cwd: path.join(UPLIFT_ROOT, "02_Pillars", "Overlay Science", "Overlay Oncology", "components", "UMOE"),
+    cwd: path.join(ONCOLOGY_ROOT, "components", "UMOE"),
     memory: "512M",
     env: { PYTHONIOENCODING: "utf-8" },
     logPrefix: "oncology-umoe",
@@ -84,7 +116,7 @@ const ONCOLOGY_SIDECARS = [
     name: "oncology-chemlab",
     script: NODE,
     args: "server.js",
-    cwd: path.join(UPLIFT_ROOT, "02_Pillars", "Overlay Science", "Overlay Oncology", "components", "Overlay-Chemlab"),
+    cwd: path.join(ONCOLOGY_ROOT, "components", "Overlay-Chemlab"),
     memory: "512M",
     env: { PORT: "8096", NODE_ENV: "production" },
     logPrefix: "oncology-chemlab",
@@ -92,12 +124,11 @@ const ONCOLOGY_SIDECARS = [
   oncologyApp({
     name: "oncology-oncoforesight",
     script: path.join(
-      UPLIFT_ROOT,
-      "02_Pillars", "Overlay Science", "Overlay Oncology", "components", "OncoForesight",
+      ONCOLOGY_ROOT, "components", "OncoForesight",
       "node_modules", "next", "dist", "bin", "next",
     ),
     args: "dev -p 8095",
-    cwd: path.join(UPLIFT_ROOT, "02_Pillars", "Overlay Science", "Overlay Oncology", "components", "OncoForesight"),
+    cwd: path.join(ONCOLOGY_ROOT, "components", "OncoForesight"),
     interpreter: NODE,
     memory: "1G",
     env: { PORT: "8095", NODE_ENV: "development" },
@@ -124,6 +155,11 @@ const ONCOLOGY_SIDECARS = [
 ];
 
 module.exports = {
-  apps: ONCOLOGY_SIDECARS,
+  // pm2 must not be handed `disabled: true` entries in `apps` -- it warns and
+  // ignores them, but keeping the filter explicit means the manifest exports
+  // exactly what will actually be started, and the disabled set stays visible
+  // via ONCOLOGY_DISABLED for the shift log / preflight.
+  apps: ONCOLOGY_SIDECARS.filter((a) => !a.disabled),
   ONCOLOGY_SIDECARS,
+  ONCOLOGY_DISABLED: ONCOLOGY_SIDECARS.filter((a) => a.disabled),
 };

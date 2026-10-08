@@ -176,7 +176,7 @@ function buildCrew(goal: string, kind: GoalKind): IdeCrew {
 // -- Plan decomposition ------------------------------------------------------
 
 const ALLOWED_KINDS = new Set<IdeStepKind>(['plan', 'codegen', 'edit', 'scan', 'analyze', 'symbols', 'test', 'typecheck', 'build', 'review', 'browser-check', 'command', 'git-status', 'git-diff', 'git-commit', 'diagnose', 'repair', 'verify', 'message']);
-const ALLOWED_AGENTS = new Set<IdeStepAgent>(['uplift', 'mutly', 'agent-browser', 'megacode', 'big-homie', 'codegang', 'opencode']);
+const ALLOWED_AGENTS = new Set<IdeStepAgent>(['uplift', 'mutly', 'agent-browser', 'megacode', 'big-homie', 'codegang', 'axiom']);
 
 const ALLOWED_REPAIR_TYPES = new Set(['patch', 'env-set', 'command', 'preset', 'restart']);
 const REPAIR_PRESETS = new Set(['install', 'install-ci', 'prisma-generate', 'pip-install', 'typecheck', 'lint', 'test', 'build']);
@@ -607,11 +607,11 @@ async function runStep(session: IdeSession, step: IdeStep): Promise<void> {
     switch (step.agent) {
       case 'uplift':
       case 'megacode':
-      case 'opencode': {
+      case 'axiom': {
         const prefix = session.redirect ? `[Human redirect] ${session.redirect}\n\n` : '';
         session.redirect = undefined;
         let result: { success: boolean; content: string; files: { path: string; action: 'created' | 'edited' | 'deleted' | 'untouched' }[]; error?: string };
-        if (step.agent === 'opencode') {
+        if (step.agent === 'axiom') {
           const r = await runOpencodeCodegen({ prompt: `${prefix}${step.prompt}`, workspace: session.workspace ?? process.cwd() });
           result = { success: r.success, content: r.content, files: [], error: r.error };
         } else {

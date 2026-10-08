@@ -281,14 +281,17 @@ export async function collectExecutionSignals(limit = 200): Promise<TidSignal[]>
   try {
     const db = getDb();
     // Aggregated stats by entity/agent over the last batch of executions
+    // Schema drift fix: draymond_execution_logs has entity_id/entity_slug, not
+    // agent_id (see src/lib/db/schema.ts). Group by the readable slug and alias
+    // it so the signal shape is unchanged.
     const rows = db.prepare(`
-      SELECT agent_id,
+      SELECT entity_slug AS agent_id,
              COUNT(*) as total_calls,
              SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as success_calls,
              AVG(duration_ms) as avg_duration,
              MAX(created_at) as latest_at
       FROM draymond_execution_logs
-      GROUP BY agent_id
+      GROUP BY entity_slug
       ORDER BY latest_at DESC
       LIMIT ?
     `).all(limit) as Array<{

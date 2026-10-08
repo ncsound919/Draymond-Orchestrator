@@ -45,7 +45,7 @@ $TOOLS = @{
   "claw-protect"  = @{ cmd = "npm";      args = @("run", "dev");                           cwd = "agents\Claw-Protect-main"; port = 3300; health = "/api/health" }
   "system-agent"  = @{ cmd = "node";     args = @("--import", "tsx", "src/server.ts");     cwd = "agents\system-agent"; port = 3405; health = "/api/health" }
   "vibeserve"     = @{ cmd = "python";   args = @("-m", "vibeserve");                      cwd = "agents\VibeServe-main"; port = 3600; health = "/health" }
-  "big-homie"     = @{ cmd = "uvicorn";  args = @("big_homie_web:app", "--port", "3500");  cwd = "agents\AgentBrowser-main\Big-Homie-main"; port = 3500; health = "/tools/status" }
+  "big-homie"     = @{ cmd = "python";  args = @("big_homie_web.py");  cwd =             "agents\AgentBrowser-main\Big-Homie-main"; port = 8888; health = "/tools/status" }
   "litellm"       = @{ cmd = "powershell"; args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "scripts\start-litellm.ps1"); cwd = "."; port = 4100; health = "/health" }
   # Ecosystem data/research services
   # BookBridge - self-hosts HTTP on 8777 via main.py (bookbridge.server).

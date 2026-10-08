@@ -36,7 +36,7 @@ export function normalizeServices(services: Array<ServiceHealthLike & Partial<Se
 }
 
 function inferCategory(slug: string): string {
-  if (['litellm', 'dsh-harness', 'opencode'].includes(slug)) return 'coding';
+  if (['litellm', 'dsh-harness', 'axiom'].includes(slug)) return 'coding';
   if (['claw-protect', 'depscan', 'nuclei', 'keywire'].includes(slug)) return 'security';
   if (['reporank', 'grader'].includes(slug)) return 'review';
   if (['agent-browser', 'hermes-brain', 'scheduler'].includes(slug)) return 'orchestration';

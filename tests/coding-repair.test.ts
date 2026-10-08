@@ -21,7 +21,7 @@ import { pingUplift, dispatchTask } from '../src/lib/uplift';
 import { updateJob } from '../src/lib/draymond/scheduler';
 
 const job = { id: 'a', name: 'Evening Marketing Prep', job_type: 'custom', job_config: {} };
-const crew: RepairCrew = { lead: 'opencode', members: ['big-homie'], reason: 'master coding stack' };
+const crew: RepairCrew = { lead: 'axiom', members: ['big-homie'], reason: 'master coding stack' };
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -31,33 +31,33 @@ describe('coding repair dispatch', () => {
   it('produces a fixed, actionable deterministic plan', () => {
     const plan = deterministicRepairPlan(job, 'boom', crew);
     expect(plan).toContain('Evening Marketing Prep');
-    expect(plan).toContain('opencode');
+    expect(plan).toContain('Axiom');
     expect(plan).toContain('boom');
   });
 
-  it('applies a job_config patch returned by opencode', async () => {
+  it('applies a job_config patch returned by axiom', async () => {
     vi.mocked(runOpencodeCodegen).mockResolvedValue({
       success: true,
       content: '```json\n{"handler":"scan_book_library"}\n```',
       duration_ms: 5,
-      model: 'opencode',
+      model: 'axiom',
     });
     const out = await dispatchCodingRepair(job, 'boom', [], crew);
     expect(out.action).toBe('fixed');
-    expect(out.dispatch.engine).toBe('opencode');
+    expect(out.dispatch.engine).toBe('axiom');
     expect(updateJob).toHaveBeenCalledWith('a', { job_config: { handler: 'scan_book_library' } });
   });
 
-  it('hands a fix proposal off without applying when opencode returns non-config text', async () => {
+  it('hands a fix proposal off without applying when axiom returns non-config text', async () => {
     vi.mocked(runOpencodeCodegen).mockResolvedValue({
       success: true,
       content: 'check the API key for this provider',
       duration_ms: 5,
-      model: 'opencode',
+      model: 'axiom',
     });
     const out = await dispatchCodingRepair(job, 'boom', [], crew);
     expect(out.action).toBe('handed-off');
-    expect(out.dispatch.engine).toBe('opencode');
+    expect(out.dispatch.engine).toBe('axiom');
     expect(updateJob).not.toHaveBeenCalled();
   });
 
@@ -67,7 +67,7 @@ describe('coding repair dispatch', () => {
       success: true,
       content: '```json\n{"type":"sms"}\n```',
       duration_ms: 5,
-      model: 'opencode',
+      model: 'axiom',
     });
     const out = await dispatchCodingRepair(jobWithConfig, 'boom', [], crew);
     expect(out.action).toBe('handed-off');
@@ -75,11 +75,11 @@ describe('coding repair dispatch', () => {
     expect(out.detail).toContain('overlap');
   });
 
-  it('hands off to uplift-agent when opencode returns nothing usable', async () => {
+  it('hands off to uplift-agent when axiom returns nothing usable', async () => {
     vi.mocked(runOpencodeCodegen).mockResolvedValue({
       success: false,
       content: '',
-      error: 'opencode returned no text',
+      error: 'axiom returned no text',
       duration_ms: 5,
     });
     vi.mocked(pingUplift).mockResolvedValue(true);

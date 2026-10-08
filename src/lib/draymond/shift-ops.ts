@@ -76,7 +76,7 @@ export const OPS_REPAIR_CHAIN: RepairChainStage[] = [
   {
     order: 5,
     stage: 'codegen',
-    detail: 'opencode-client → AXIOM_URL /v1/chat/completions; uplift-agent executes the deterministic plan.',
+    detail: 'axiom-client → AXIOM_URL /v1/chat/completions; uplift-agent executes the deterministic plan.',
   },
   {
     order: 6,

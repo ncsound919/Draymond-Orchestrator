@@ -826,7 +826,18 @@ export async function runMarketingPublishDrain(): Promise<MarketingPublishDrainR
       outcomes.push({ index: i, platform, ok: false, detail: 'held: no text/content field' });
       continue;
     }
-    const res = await invokeMarketingAction({ action: 'schedule_posts', text });
+    // Pass the platform and any generated image through. Previously only `text`
+    // was forwarded, so a queue item's channel was silently dropped on the way
+    // to Postiz and the outcome record could not say where a post went.
+    const imagePaths = Array.isArray(item.imagePaths)
+      ? (item.imagePaths as unknown[]).filter((p): p is string => typeof p === 'string')
+      : [];
+    const res = await invokeMarketingAction({
+      action: 'schedule_posts',
+      text,
+      ...(platform ? { platform } : {}),
+      ...(imagePaths.length > 0 ? { imagePaths } : {}),
+    });
     const ok = res.ok === true;
     if (ok) published++;
     outcomes.push({
@@ -834,7 +845,7 @@ export async function runMarketingPublishDrain(): Promise<MarketingPublishDrainR
       platform,
       ok,
       detail: ok
-        ? `published${typeof res.post_id === 'string' ? ` (${res.post_id})` : ''}`
+        ? `published to ${platform ?? 'unspecified channel'}${typeof res.post_id === 'string' ? ` (${res.post_id})` : ''}`
         : String(res.error ?? 'failed'),
     });
   }

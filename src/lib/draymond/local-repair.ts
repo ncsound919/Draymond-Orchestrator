@@ -1,7 +1,7 @@
 // ============================================================================
 // DRAYMOND LOCAL REPAIR — free, on-device first pass for the repair crew
 // ============================================================================
-// The host runs llama.cpp (`llama-server`) on :11434 serving MiniCPM5-2B via an
+// The host runs llama.cpp (`llama-server`) on :11434 serving Qwen3.5-2B via an
 // OpenAI-compatible API. It is tiny and cheap, so it is the right tool for:
 //   - failure triage / classification refinement
 //   - minimal job_config proposals (short, structured, verifiable)

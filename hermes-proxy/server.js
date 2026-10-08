@@ -127,7 +127,12 @@ const server = http.createServer(async (req, res) => {
   // with zero cloud dependencies.
   if (req.method === 'POST' && (req.url === '/api/v1/voice/synthesize' || req.url === '/api/v1/voice/transcribe')) {
     const isSynth = req.url.endsWith('/synthesize');
-    const aetherdesk = process.env.AETHERDESK_BASE_URL || 'http://127.0.0.1:8000/api/v1';
+    // This branch appends '/voice/...' itself, so it needs the API BASE
+    // (ending in /api/v1), not the bare origin that tools/index.js derives.
+    let aetherdesk = (
+      process.env.AETHERDESK_BASE_URL || process.env.AETHERDESK_API_URL || 'http://127.0.0.1:8002'
+    ).trim().replace(/\/+$/, '');
+    if (!/\/api\/v1$/i.test(aetherdesk)) aetherdesk = `${aetherdesk}/api/v1`;
     const key = process.env.AETHERDESK_API_KEY || '';
     let body;
     try {

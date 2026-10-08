@@ -16,7 +16,7 @@
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import { probeService } from './service-manager';
+import { probeService, dockerAvailable } from './service-manager';
 
 const execFileAsync = promisify(execFile);
 
@@ -160,6 +160,10 @@ export async function ossServiceUp(
 ): Promise<{ slug: string; up: boolean; detail: string }> {
   const pre = await probeService(member.slug, 1500);
   if (pre.up) return { slug: member.slug, up: true, detail: 'already up' };
+  // Docker-only stack: with no Docker CLI, this capability is disabled (ADR-0008).
+  if (!dockerAvailable()) {
+    return { slug: member.slug, up: false, detail: 'docker not installed — OSS marketing stack is Docker-only and disabled (ADR-0008)' };
+  }
   const res = await runCompose(['up', '-d', member.service], composePath(member));
   if (!res.ok) return { slug: member.slug, up: false, detail: `compose up failed: ${res.detail}` };
   const attempts = Math.max(1, Math.floor(waitMs / 1500));
@@ -189,6 +193,9 @@ export async function ossTeamUp(waitMs = 180_000): Promise<Array<{ slug: string;
 
 /** Stop one compose service. */
 export async function ossServiceDown(member: OssService): Promise<{ slug: string; stopped: boolean; detail: string }> {
+  if (!dockerAvailable()) {
+    return { slug: member.slug, stopped: false, detail: 'docker not installed (ADR-0008) — nothing to stop' };
+  }
   const res = await runCompose(['stop', member.service], composePath(member));
   const stopped = res.ok;
   return { slug: member.slug, stopped, detail: res.detail };
@@ -197,6 +204,9 @@ export async function ossServiceDown(member: OssService): Promise<{ slug: string
 /** Stop the whole team (compose per file, deduplicated). */
 export async function ossTeamDown(): Promise<Array<{ slug: string; stopped: boolean; detail: string }>> {
   const results: Array<{ slug: string; stopped: boolean; detail: string }> = [];
+  if (!dockerAvailable()) {
+    return OSS_MARKETING_TEAM.map((m) => ({ slug: m.slug, stopped: false, detail: 'docker not installed (ADR-0008) — nothing to stop' }));
+  }
   const seenFiles = new Set<string>();
   for (const member of OSS_MARKETING_TEAM) {
     const file = composePath(member);
@@ -217,9 +227,10 @@ export async function ossTeamSummary(): Promise<{
   checked: number;
   up: number;
   down: string[];
+  docker: boolean;
   statuses: Array<{ slug: string; name: string; up: boolean; detail: string; port: number }>;
 }> {
   const statuses = await ossTeamStatus();
   const down = statuses.filter((s) => !s.up).map((s) => s.slug);
-  return { checked: statuses.length, up: statuses.filter((s) => s.up).length, down, statuses };
+  return { checked: statuses.length, up: statuses.filter((s) => s.up).length, down, docker: dockerAvailable(), statuses };
 }

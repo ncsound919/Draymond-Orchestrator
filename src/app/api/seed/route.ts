@@ -19,6 +19,7 @@ import { SEED_ENTITIES } from '@/lib/draymond/seed';
 import { seedChainTemplates } from '@/lib/draymond/chains-seed';
 import { seedMissionChains } from '@/lib/draymond/mission-chains';
 import { interconnectSystem } from '@/lib/draymond/systemic';
+import { applySchedulePolicy } from '@/lib/draymond/schedule-policy';
 import { authorizeRequest } from '@/lib/draymond/api-auth';
 
 export const dynamic = 'force-dynamic';
@@ -31,6 +32,15 @@ export async function POST(request: NextRequest) {
 
   // -- Run seed --------------------------------------------------------
   try {
+    // Vault-first: mirror vault-only chain secrets into the environment
+    // (memory-only) so seeded entity interpolation (${VAR}) resolves even if
+    // the boot-time sync missed. Never overwrites explicitly set env values.
+    try {
+      const { syncVaultSecretsToEnv } = await import('@/lib/draymond/keywire');
+      await syncVaultSecretsToEnv();
+    } catch (err) {
+      console.error('[Seed] vault secret sync failed:', err instanceof Error ? err.message : err);
+    }
     // Order matters: registerEntities(SEED_ENTITIES) first, then
     // seedBusinessAutomation() LAST so the business-chain entity configs
     // (http_api URLs the chains actually invoke) win over the registry seed
@@ -45,6 +55,13 @@ export async function POST(request: NextRequest) {
     const chainTemplatesResult = await seedChainTemplates();
     const missionChainsResult = await seedMissionChains();
     const systemic = await interconnectSystem();
+    // Final overlay: align the live schedule to the ecosystem strategy tiers
+    // (never deletes jobs; tunes cadence + enablement). Runs LAST so it wins
+    // over any seeder that (re)enabled a job.
+    const schedule = await applySchedulePolicy().catch((err) => {
+      console.error('[Seed] schedule policy failed:', err instanceof Error ? err.message : err);
+      return { updated: [] as string[], unchanged: 0, unknown: [] as string[], healed: [] as string[] };
+    });
     const durationMs = Date.now() - startTime;
 
     const allErrors = [
@@ -89,6 +106,12 @@ export async function POST(request: NextRequest) {
         agenda: systemic.agenda,
         graph: systemic.graph,
         consolidation: systemic.consolidation,
+      },
+      schedule: {
+        retuned: schedule.updated,
+        unchanged: schedule.unchanged,
+        drift: schedule.unknown,
+        healed: schedule.healed,
       },
       errors: allErrors.length > 0 ? allErrors : undefined,
     });

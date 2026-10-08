@@ -1158,8 +1158,26 @@ export async function getDashboardSummary(): Promise<DraymondDashboardSummary> {
         .limit(10),
     ]);
 
-  const agents = (agentsResult.data || []) as Array<{ status: string }>;
+  let agents = (agentsResult.data || []) as Array<{ status: string }>;
   const actions24h = (actionsResult.data || []) as Array<{ confidence_score: number }>;
+
+  // `draymond_agents` is legacy and empty in live installs; the real liveness
+  // signal is the heartbeat sweep (.draymond/heartbeats.json). Fall back to it
+  // so the dashboard/digest reflects real up/down instead of a permanent
+  // "0% agents healthy". Stale records (>24h, from services no longer probed)
+  // are ignored so they don't drag health down forever.
+  if (agents.length === 0) {
+    try {
+      const { getHeartbeats } = await import('./heartbeat');
+      const hb = await getHeartbeats();
+      const fresh = Object.values(hb).filter(
+        (h) => h && Date.now() - new Date(h.last_seen).getTime() < 24 * 60 * 60 * 1000
+      );
+      if (fresh.length > 0) {
+        agents = fresh.map((h) => ({ status: h.up ? 'active' : 'offline' }));
+      }
+    } catch { /* heartbeat file best-effort */ }
+  }
 
   const avgConfidence =
     actions24h.length > 0

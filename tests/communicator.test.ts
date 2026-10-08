@@ -37,8 +37,12 @@ beforeEach(async () => {
   delete process.env.NTFY_URL;
   delete process.env.NTFY_TOPIC_RECAPS;
   delete process.env.NTFY_TOPIC_RESULTS;
+  delete process.env.OPENHUB_NTFY_URL;
+  delete process.env.OPENHUB_NTFY_TOPIC;
+  delete process.env.OPENHUB_NTFY_TOKEN;
   delete process.env.GMAIL_USER;
   delete process.env.DRAYMOND_ALERT_EMAIL;
+  delete process.env.DRAYMOND_RECAP_EMAIL;
 });
 
 afterEach(async () => {
@@ -67,6 +71,13 @@ async function loadCommunicator() {
   }));
   vi.doMock('../src/lib/draymond/notifications', () => ({
     sendMemo: mocks.sendMemo,
+  }));
+  // Delivery voice is unit-tested in recap-voice.test.ts; keep it offline here
+  // so sendRecap exercises channel plumbing + the plain-recap fallback (and
+  // never reaches the live JEV/LiteLLM endpoints).
+  vi.doMock('../src/lib/draymond/recap-voice', () => ({
+    humanizedRecap: vi.fn(async () => { throw new Error('voice offline in tests'); }),
+    buildRecapVoice: vi.fn(async () => { throw new Error('voice offline in tests'); }),
   }));
   return await import('../src/lib/draymond/communicator');
 }
@@ -192,6 +203,9 @@ describe('saveRecap', () => {
 
 describe('sendRecap', () => {
   it('reports not-configured details when no channels are set', async () => {
+    // Recap email is opt-in; enable it so this asserts the credentials-missing
+    // path (rather than the disabled path).
+    process.env.DRAYMOND_RECAP_EMAIL = '1';
     const mod = await loadCommunicator();
     const res = await mod.sendRecap(recap);
 
@@ -201,6 +215,16 @@ describe('sendRecap', () => {
       'ntfy: NTFY_URL/TOPIC not configured',
       'email: GMAIL_USER/ALERT_EMAIL not configured',
     ]);
+  });
+
+  it('does not email the recap by default (recap email is opt-in)', async () => {
+    process.env.GMAIL_USER = 'me@example.com';
+    const mod = await loadCommunicator();
+    const res = await mod.sendRecap(recap);
+
+    expect(res.channels).not.toContain('email');
+    expect(res.detail).toContain('email: disabled (set DRAYMOND_RECAP_EMAIL=1 to enable)');
+    expect(mocks.sendMemo).not.toHaveBeenCalled();
   });
 
   it('pushes a recap to the openchat webhook', async () => {
@@ -228,6 +252,7 @@ describe('sendRecap', () => {
     process.env.NTFY_URL = 'https://ntfy.example.com/';
     process.env.NTFY_TOPIC_RECAPS = 'recaps';
     process.env.GMAIL_USER = 'me@example.com';
+    process.env.DRAYMOND_RECAP_EMAIL = '1';
     mocks.sendMemo.mockResolvedValue(undefined);
     const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
@@ -290,6 +315,7 @@ describe('sendRecap', () => {
 
   it('reports email failure when sendMemo throws', async () => {
     process.env.GMAIL_USER = 'me@example.com';
+    process.env.DRAYMOND_RECAP_EMAIL = '1';
     mocks.sendMemo.mockRejectedValue(new Error('smtp down'));
 
     const mod = await loadCommunicator();

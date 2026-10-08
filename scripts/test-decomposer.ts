@@ -21,7 +21,7 @@ async function main() {
 
   console.log('== IDE steps adapter ==');
   const IDE_KINDS = new Set(['plan','codegen','edit','scan','analyze','symbols','test','typecheck','build','review','browser-check','command','git-status','git-diff','git-commit','diagnose','repair','verify','message']);
-  const IDE_AGENTS = new Set(['uplift','mutly','agent-browser','megacode','big-homie','codegang','opencode']);
+  const IDE_AGENTS = new Set(['uplift','mutly','agent-browser','megacode','big-homie','codegang','axiom']);
   for (const g of goals) {
     const s = decomposeGoalToIdeSteps(g, IDE_KINDS, IDE_AGENTS);
     console.log(`${g.slice(0,40)} => ${s}`);

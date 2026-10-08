@@ -40,13 +40,20 @@ describe('fleet-manifest (single source of truth for PM2)', () => {
     expect(names).toContain('draymond');
     expect(names).toContain('deterministic-brain');
     expect(names).toContain('axiom');
-    // The full fleet: 1 core + 26 fleet + 6 marketing + 1 dsh + 1 brain = 35.
-    // `opencode` was deliberately RETIRED (codegen now routes through Axiom's
-    // /v1/chat/completions) and hermes-brain/hermes-proxy were removed — bump
-    // this pin deliberately whenever the fleet changes. The SMD PM2 stack
-    // (smd/smd-redis/smd-celery/smd-beat/smd-browser) was decommissioned
-    // 2026-09-24 (5 apps removed), so marketing went 11 -> 6.
-    expect(all).toHaveLength(35);
+    // The lean fleet (RUN LEAN policy): 1 core + 20 fleet + 5 marketing + 1 dsh
+    // + 1 brain = 28. `opencode` was deliberately RETIRED (codegen now routes
+    // through Axiom's /v1/chat/completions) and hermes-brain/hermes-proxy were
+    // removed — bump this pin deliberately whenever the fleet changes. The SMD
+    // PM2 stack (smd/smd-redis/smd-celery/smd-beat/smd-browser) was
+    // decommissioned 2026-09-24 (5 apps removed), so marketing went 11 -> 6.
+    // 2026-09-27/28 lean pass: bookbridge→synthbook, mutly/uplift-agent/
+    // hemp-os/vibe-reality/halofy/buzz-relay/rome dropped (unprovisioned or
+    // retired; covered on-demand by the sector lifecycle instead).
+    // 2026-09-28: `indy-music` RETIRED — its cwd `agents/IndyMusic-Service` does
+    // not exist anywhere in the tree, so pm2 could never start it. The move
+    // guard now also checks cwd/interpreter/port, which is how this silently-dead
+    // entry was finally surfaced.
+    expect(all).toHaveLength(27);
   });
 
   it('supervises CodeNexus on its canonical 3205 port', () => {
@@ -82,9 +89,11 @@ describe('fleet-manifest (single source of truth for PM2)', () => {
 
   it('resolves every cwd under UPLIFT_ROOT (no scattered hardcoded roots)', () => {
     const uplift = 'C:\\Users\\User\\Downloads\\Uplift';
-    // Recourse is the one deliberate exception: its canonical repo lives
-    // outside UPLIFT_ROOT at C:\Users\User\Downloads\recourse.
-    const externalCwds = ['C:/Users/User/Downloads/recourse'];
+    // Deliberate external roots: Synthbook (the book/knowledge-synthesis app that
+    // replaced BookBridge) lives outside UPLIFT_ROOT at C:\Users\User\Downloads\Synthbook,
+    // overridable via SYNTHBOOK_DIR. (Recourse now lives under UPLIFT_ROOT at
+    // 06_Resources/recourse, so it is no longer an exception.)
+    const externalCwds = ['C:\\Users\\User\\Downloads\\Synthbook'];
     const m = loadManifest();
     const all = [
       m.CORE_APP,
@@ -93,10 +102,12 @@ describe('fleet-manifest (single source of truth for PM2)', () => {
       ...m.DSH_SERVICES,
       ...m.BRAIN_SERVICES,
     ];
+    const norm = (p: string) => p.replace(/\//g, '\\');
     for (const app of all) {
       if (app.cwd) {
+        const cwd = norm(app.cwd);
         const rooted =
-          app.cwd.startsWith(uplift) || externalCwds.some((p) => app.cwd.startsWith(p));
+          cwd.startsWith(uplift) || externalCwds.some((p) => cwd.startsWith(p));
         expect(rooted).toBe(true);
       }
     }
@@ -106,10 +117,10 @@ describe('fleet-manifest (single source of truth for PM2)', () => {
     const fakeRoot = 'D:\\Fake\\Uplift';
     const m = loadManifest({ UPLIFT_ROOT: fakeRoot });
     expect(m.ORCH_DIR.startsWith(fakeRoot)).toBe(true);
-    const bookbridge = (m.FLEET_SERVICES as Array<{ name: string; cwd: string }>).find(
-      (a: { name: string }) => a.name === 'bookbridge',
+    const rooted = (m.FLEET_SERVICES as Array<{ name: string; cwd: string }>).find(
+      (a: { name: string }) => a.name === 'omniresearch',
     );
-    expect(bookbridge?.cwd.startsWith(fakeRoot)).toBe(true);
+    expect(rooted?.cwd.startsWith(fakeRoot)).toBe(true);
   });
 
   it('keeps the codegen app pinned to the Axiom endpoint', () => {

@@ -47,20 +47,24 @@ function FILE(): string {
 }
 
 const STRIPE = {
+  // 2026-09-28 repricing: audit/research/maas cut ~3–4× vs the prior catalog.
+  // An empty priceId means the new Stripe Price has not been created yet —
+  // the tier is display-only and checkout must fail closed until an ID is set.
+  // (Aetherdesk is deliberately unchanged — already below the voice cost floor.)
   maas: {
-    starter: { priceId: "price_1U2JTkQrfNRBru0z2et9pdou", cents: 50000 },
-    growth: { priceId: "price_1U2JTsQrfNRBru0z0AaEA9YF", cents: 100000 },
-    scale: { priceId: "price_1U2JTtQrfNRBru0zAcI0Dx4t", cents: 150000 },
+    starter: { priceId: "", cents: 14900 },
+    growth: { priceId: "", cents: 29900 },
+    scale: { priceId: "", cents: 49900 },
   },
   audit: {
-    standard: { priceId: "price_1U2JTuQrfNRBru0zifMHiEYo", cents: 25000 },
-    deep: { priceId: "price_1U2JTvQrfNRBru0zWYwlpwfg", cents: 50000 },
-    enterprise: { priceId: "price_1U2JTwQrfNRBru0zggUucOS8", cents: 100000 },
+    standard: { priceId: "", cents: 7900 },
+    deep: { priceId: "", cents: 14900 },
+    enterprise: { priceId: "", cents: 29900 },
   },
   research: {
-    brief: { priceId: "price_1U2JTxQrfNRBru0znwDZA8sb", cents: 50000 },
-    deep: { priceId: "price_1U2JTyQrfNRBru0zFa8JVdSX", cents: 100000 },
-    custom: { priceId: "price_1U2JTzQrfNRBru0zQ8w9xKTj", cents: 200000 },
+    brief: { priceId: "", cents: 14900 },
+    deep: { priceId: "", cents: 29900 },
+    custom: { priceId: "", cents: 49900 },
   },
   aetherdesk: {
     hour: { priceId: "price_1U2JgaQrfNRBru0zimyABYTi", cents: 200 },
@@ -102,15 +106,15 @@ export const DEFAULT_STRATEGY: MissionStrategy = {
     {
       id: "maas",
       name: "Marketing-as-a-Service",
-      agents: ["omni-research", "mutly", "uplift-agent"],
+      agents: ["omniresearch-pro", "mutly", "uplift-agent"],
       skills: ["seo-content-writer", "blog-writer", "content-strategy", "marketing-mode", "web-search"],
       deliveryCostCents: 2000,
       targetMonthly: 2000,
       billing: "recurring_monthly",
       tiers: [
-        { id: "starter", name: "Starter", priceCents: 50000, billing: "recurring_monthly", stripePriceId: STRIPE.maas.starter.priceId },
-        { id: "growth", name: "Growth", priceCents: 100000, billing: "recurring_monthly", stripePriceId: STRIPE.maas.growth.priceId },
-        { id: "scale", name: "Scale", priceCents: 150000, billing: "recurring_monthly", stripePriceId: STRIPE.maas.scale.priceId },
+        { id: "starter", name: "Starter", priceCents: 14900, billing: "recurring_monthly", stripePriceId: STRIPE.maas.starter.priceId },
+        { id: "growth", name: "Growth", priceCents: 29900, billing: "recurring_monthly", stripePriceId: STRIPE.maas.growth.priceId },
+        { id: "scale", name: "Scale", priceCents: 49900, billing: "recurring_monthly", stripePriceId: STRIPE.maas.scale.priceId },
       ],
     },
     {
@@ -122,23 +126,23 @@ export const DEFAULT_STRATEGY: MissionStrategy = {
       targetMonthly: 1000,
       billing: "one_time",
       tiers: [
-        { id: "standard", name: "Standard", priceCents: 25000, billing: "one_time", stripePriceId: STRIPE.audit.standard.priceId },
-        { id: "deep", name: "Deep", priceCents: 50000, billing: "one_time", stripePriceId: STRIPE.audit.deep.priceId },
-        { id: "enterprise", name: "Enterprise", priceCents: 100000, billing: "one_time", stripePriceId: STRIPE.audit.enterprise.priceId },
+        { id: "standard", name: "Standard", priceCents: 7900, billing: "one_time", stripePriceId: STRIPE.audit.standard.priceId },
+        { id: "deep", name: "Deep", priceCents: 14900, billing: "one_time", stripePriceId: STRIPE.audit.deep.priceId },
+        { id: "enterprise", name: "Enterprise", priceCents: 29900, billing: "one_time", stripePriceId: STRIPE.audit.enterprise.priceId },
       ],
     },
     {
       id: "research",
       name: "Research Brief",
-      agents: ["omni-research", "kaggle", "uplift-agent", "bookbridge"],
+      agents: ["omniresearch-pro", "kaggle", "uplift-agent", "bookbridge"],
       skills: ["market-research-reports", "qingyan-research", "multi-search-engine", "book-bridge", "book-to-skill", "book-to-skill-chain", "book-synthesis-personal"],
       deliveryCostCents: 1500,
       targetMonthly: 1000,
       billing: "one_time",
       tiers: [
-        { id: "brief", name: "Brief", priceCents: 50000, billing: "one_time", stripePriceId: STRIPE.research.brief.priceId },
-        { id: "deep", name: "Deep", priceCents: 100000, billing: "one_time", stripePriceId: STRIPE.research.deep.priceId },
-        { id: "custom", name: "Custom", priceCents: 200000, billing: "one_time", stripePriceId: STRIPE.research.custom.priceId },
+        { id: "brief", name: "Brief", priceCents: 14900, billing: "one_time", stripePriceId: STRIPE.research.brief.priceId },
+        { id: "deep", name: "Deep", priceCents: 29900, billing: "one_time", stripePriceId: STRIPE.research.deep.priceId },
+        { id: "custom", name: "Custom", priceCents: 49900, billing: "one_time", stripePriceId: STRIPE.research.custom.priceId },
       ],
     },
   ],

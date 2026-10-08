@@ -10,7 +10,7 @@
 //
 // The dev team is assembled from the ecosystem, exactly as the operator
 // specified: omniresearch (scout), recourse + recursive-ip (design),
-// axiom + opencode + deterministic-brain (build), Overlay Cheetah + the MCP
+// axiom + deterministic-brain (build), Overlay Cheetah + the MCP
 // stack (toolchain), grader/reporank/codenexus/quality-suite/trust-layer
 // (gate), openhub (ship). Marketing is a HANDOFF — the released artifact is
 // handed to the existing marketing formation; the factory does not invent
@@ -206,7 +206,7 @@ export const RELEASE_FORMATION: ReleasePosition[] = [
   {
     slug: 'axiom',
     name: 'Axiom',
-    role: 'Build lead — codegen execution engine + Recourse bridge; runs the project loop (opencode -> det-brain -> cheetah -> LLM fallback), tests, rollback.',
+    role: 'Build lead — codegen execution engine + Recourse bridge; runs the project loop (det-brain -> cheetah -> LLM fallback), tests, rollback.',
     cell: 'build',
     rank: 'lead',
     duty: 'shift',
@@ -217,26 +217,8 @@ export const RELEASE_FORMATION: ReleasePosition[] = [
     gates: ['S9 verify gate', 'independent QA', 'failure classification'],
     basis: 'ai',
     kind: 'pipeline',
-    location: 'agents/axiom',
+    location: '06_Resources/Axiom Agent',
     port: 3198,
-    invocation: 'http_api',
-  },
-  {
-    slug: 'opencode',
-    name: 'opencode (headless)',
-    role: 'Build member — headless codegen engine (Go tier) dispatched by Axiom; primary codegen in the no-fallback path.',
-    cell: 'build',
-    rank: 'member',
-    duty: 'shift',
-    reportsTo: 'axiom',
-    cadence: 'Per item (per iteration)',
-    inputs: ['development doc', 'bounded goal'],
-    outputs: ['code diff'],
-    gates: ['Axiom S9 verify gate'],
-    basis: 'ai',
-    kind: 'service',
-    location: null,
-    port: 4096,
     invocation: 'http_api',
   },
   {

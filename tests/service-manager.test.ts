@@ -5,6 +5,7 @@ import path from 'node:path';
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { TOOL_PORTS } from '../src/lib/draymond/ports';
 import {
+  listTrackedServices,
   probeAllServices,
   probeService,
   restartService,
@@ -33,7 +34,7 @@ beforeEach(() => {
   mockExecFileSync.mockReset();
   delete process.env.MUTLY_URL;
   delete process.env.BRAIN_URL;
-  delete process.env.OPENCODE_SERVE_PORT;
+  delete process.env.AXIOM_URL;
   delete process.env.DRAYMOND_PUBLIC_URL;
   // Point process.cwd() at the tmp dir so logPath + cwd resolution stay offline.
   vi.spyOn(process, 'cwd').mockReturnValue(tmp);
@@ -66,7 +67,7 @@ describe('serviceCatalog', () => {
 describe('serviceUrl', () => {
   it('builds a localhost URL from the canonical port + health path', () => {
     expect(serviceUrl('mutly')).toBe('http://localhost:4000/api/agent/public-config');
-    expect(serviceUrl('opencode')).toBe('http://localhost:4096/');
+    expect(serviceUrl('axiom')).toBe('http://localhost:3198/api/health');
   });
 
   it('prefers a full-URL env override and strips trailing slashes', () => {
@@ -75,8 +76,8 @@ describe('serviceUrl', () => {
   });
 
   it('ignores env vars that are bare port numbers', () => {
-    process.env.OPENCODE_SERVE_PORT = '4096';
-    expect(serviceUrl('opencode')).toBe('http://localhost:4096/');
+    process.env.AXIOM_URL = '3198';
+    expect(serviceUrl('axiom')).toBe('http://localhost:3198/api/health');
   });
 
   it('returns null for unknown or stdio-only slugs', () => {
@@ -232,6 +233,40 @@ describe('startService', () => {
     expect(r.detail).toContain('started "node server.js"');
     const opts = mockSpawn.mock.calls[0]![2] as { cwd?: string };
     expect(opts.cwd).toBe(path.join(tmp, 'agents', 'Uplift-Agent'));
+  });
+});
+
+describe('listTrackedServices', () => {
+  it('reports registry entries with liveness', () => {
+    fs.mkdirSync(path.join(tmp, 'data'), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmp, 'data', 'server-pids.json'),
+      JSON.stringify({
+        live: { slug: 'live', pid: process.pid, startedAt: new Date().toISOString(), cwd: tmp, command: 'node server.js' },
+        ghost: { slug: 'ghost', pid: 2147483647, startedAt: new Date().toISOString(), cwd: tmp, command: 'node server.js' },
+      }),
+    );
+    const tracked = listTrackedServices();
+    expect(tracked.find((t) => t.slug === 'live')?.alive).toBe(true);
+    expect(tracked.find((t) => t.slug === 'ghost')?.alive).toBe(false);
+  });
+});
+
+describe('startService dependencies', () => {
+  it('co-starts system-agent before claw-protect', async () => {
+    fs.mkdirSync(path.join(tmp, 'agents', 'Claw-Protect-main'), { recursive: true });
+    fs.mkdirSync(path.join(tmp, 'agents', 'system-agent'), { recursive: true });
+    fetchMock.mockReset().mockResolvedValue(new Response('{}', { status: 500 }));
+    vi.useFakeTimers();
+    const pending = startService('claw-protect');
+    await vi.advanceTimersByTimeAsync(60 * 1500);
+    const r = await pending;
+    expect(r.up).toBe(false); // nothing ever becomes healthy in this sandbox
+    expect(r.detail).toContain('but health check still failing');
+    expect(mockSpawn).toHaveBeenCalledTimes(2);
+    const cmds = mockSpawn.mock.calls.map((c) => `${String(c[0])} ${(c[1] as string[]).join(' ')}`);
+    expect(cmds[0]).toContain('server.ts'); // system-agent dependency first
+    expect(cmds[1]).toContain('dev'); // claw-protect itself second
   });
 });
 

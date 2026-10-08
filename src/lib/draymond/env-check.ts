@@ -47,7 +47,7 @@ const OPTIONAL_VARS: EnvVar[] = [
   { name: 'DRAYMOND_ADMIN_PASSWORD', required: false, description: 'Local admin login password (bootstrap; generated if unset)' },
   { name: 'DRAYMOND_RELEASES_DIR', required: false, description: 'Directory served by /api/downloads/* (default ./data/paid-releases)' },
   { name: 'DEEPSEEK_API_KEY', required: false, description: 'DeepSeek API key for the task router' },
-  { name: 'AETHERDESK_BASE_URL', required: false, description: 'AetherDesk API base URL (e.g. http://127.0.0.1:8000/api/v1)' },
+  { name: 'AETHERDESK_BASE_URL', required: false, description: 'AetherDesk API base URL, must end in /api/v1 (e.g. http://127.0.0.1:8002/api/v1). Alias: AETHERDESK_API_URL' },
   { name: 'AETHERDESK_API_KEY', required: false, description: 'AetherDesk INTERNAL_API_KEY for x-api-key auth' },
   { name: 'NTFY_TOPIC_RESULTS', required: false, description: 'ntfy topic for execution result notifications (separate from approvals)' },
   { name: 'NTFY_TOPIC_REPAIR', required: false, description: 'ntfy topic for deterministic repair reports (defaults to NTFY_TOPIC_RESULTS)' },

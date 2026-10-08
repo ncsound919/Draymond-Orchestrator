@@ -7,6 +7,7 @@
 // ============================================================================
 
 import path from 'node:path';
+import os from 'node:os';
 import { createDraymondAdminClient } from './client';
 import { instantiateChain, executeChain } from './chains';
 import { checkAllAgentHealth } from './index';
@@ -14,7 +15,7 @@ import { sendNotification, sendAlertEmail } from './notifications';
 import { emitJobStarted, emitJobCompleted, emitJobFailed } from '@/lib/draymond/event-bridge';
 import { delegationTimeoutSeconds, delegationFor, isWithinWindow, delegationWindow, canDelegate, canDelegateSector, recordDelegationConsumption } from './delegation';
 import { sectorFor } from './corporate';
-import { sectorSweep, ensureSectorForJob } from './sector-lifecycle';
+import { sectorSweep, ensureSectorForJob, ensureChainServicesForJob } from './sector-lifecycle';
 import { classifyRetryable, retryDelayMs } from './retry';
 import type { BbtechInsightSyncResult } from '@/lib/science/trendsFeed';
 import type { DrainResult as GapDrainResult } from '@/lib/science/researchEscalation';
@@ -529,12 +530,23 @@ export async function runJobNow(id: string): Promise<JobRunResult> {
   // The idle sweep then stops them once the sector goes quiet.
   try {
     const handler = job.job_config?.handler;
+    const chainSlug = job.job_config?.chain_slug;
     if (typeof handler === 'string') {
       const sector = sectorFor(handler);
       const result = await ensureSectorForJob(sector);
       if (result.started.length > 0 || result.failed.length > 0) {
         console.log(
           `[sector-lifecycle] job "${job.name}" (${handler}) sector ${sector}: started=[${result.started.join(',')}] failed=[${result.failed.join(',')}] disabled=${result.disabled}`
+        );
+      }
+    } else if (typeof chainSlug === 'string') {
+      // Chain jobs carry chain_slug (no handler), so the sector hook above never
+      // ran for them — their dependency services stayed down (e.g. the oncology
+      // chains hitting overlay-oncology:3070 → "fetch failed"). Warm them here.
+      const result = await ensureChainServicesForJob(chainSlug);
+      if (result.started.length > 0 || result.failed.length > 0) {
+        console.log(
+          `[sector-lifecycle] chain job "${job.name}" (${chainSlug}): started=[${result.started.join(',')}] failed=[${result.failed.join(',')}]`
         );
       }
     }
@@ -784,6 +796,9 @@ export const CUSTOM_HANDLERS: CustomHandlerDef[] = [
     label: 'OSS Marketing Stack Down',
     description: 'Stop the OSS marketing stack (docker compose per file, deduplicated).',
   },
+  { handler: 'secret_scan', label: 'Secret Scan (weekly)', description: 'Walk the ecosystem working tree for secret values via AgentBrowser repo-audit; alert on critical/high findings. Real findings only.' },
+  { handler: 'backup_verify', label: 'Backup Verify (daily)', description: 'Inspect the newest fleet-backup snapshot (manifest.json / backup-log.txt); alert on FAIL items, staleness, or a missing drive.' },
+  { handler: 'ci_status', label: 'CI Status Poll', description: 'Poll the latest GitHub Actions run for DRAYMOND_CI_REPOS; alert on non-success. Honest offline state when no token.' },
 ];
 
 /**
@@ -897,6 +912,21 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
 
         case 'custom': {
       const handler = config.handler as string | undefined;
+
+      if (handler === 'secret_scan') {
+        const { runSecretScanJob } = await import('./security-jobs');
+        return await runSecretScanJob();
+      }
+
+      if (handler === 'backup_verify') {
+        const { verifyBackupsJob } = await import('./security-jobs');
+        return await verifyBackupsJob();
+      }
+
+      if (handler === 'ci_status') {
+        const { checkCiStatusJob } = await import('./security-jobs');
+        return await checkCiStatusJob();
+      }
 
       if (handler === 'free_model_daily_assignment') {
         const { runDailyAssignment } = await import('./freeModelDailyAssignment');
@@ -1555,7 +1585,10 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         const { listJobs, updateJob } = await import('./scheduler');
         const { repairFailedJob } = await import('./repair-team');
         const { repairHintsFor } = await import('./learning-repair');
-        const failed = (await listJobs()).filter((j) => j.last_run_status === 'failed');
+        // Only repair jobs that are ENABLED. A disabled/sunset job can sit at
+        // last_run_status='failed' forever; repairing it burns tokens and emits
+        // a recurring report that never sticks. Disabled = intentional.
+        const failed = (await listJobs()).filter((j) => j.last_run_status === 'failed' && j.is_enabled);
         const reports = [];
         const hintsByJob: Array<{ job: string; hints: number }> = [];
         for (const j of failed.slice(0, 10)) {
@@ -1831,6 +1864,23 @@ async function executeJobByType(job: ScheduledJob): Promise<unknown> {
         const iterations = Math.max(1, Math.min(4, Number((config as { iterations?: unknown }).iterations) || 1));
         const res = await runDiscoveryLoopScript({ iterations, repair: process.env.DRAYMOND_REPAIR_BENCHMARK_ENABLED !== '0' });
         return { handler, iterations, ok: res.ok, duration_ms: res.durationMs, output: (res.stdout || '').trim().slice(-1500), error: res.error };
+      }
+
+      if (handler === 'strategy_review') {
+        // Weekly: regenerate the ecosystem manifest/priority model from the
+        // inventory + overrides so strategy tiers and priorities stay current
+        // (ecosystem/strategy.md §7 review cadence). Writes only the generated
+        // manifest + ECOSYSTEM.md; never touches the hand-edited overrides.
+        const { execFile } = await import('node:child_process');
+        const { promisify } = await import('node:util');
+        const root = process.env.UPLIFT_ROOT ?? 'C:\\Users\\User\\Downloads\\Uplift';
+        const script = path.join(root, 'ecosystem', 'scripts', 'build-manifest.mjs');
+        const { stdout } = await promisify(execFile)('node', [script], {
+          cwd: root,
+          timeout: 120_000,
+          maxBuffer: 4 * 1024 * 1024,
+        });
+        return { handler, output: (stdout || '').trim().slice(-1500) };
       }
 
       if (handler === 'repair_shift') {
@@ -2216,6 +2266,97 @@ export interface RunDueJobsOptions {
  *
  * Returns an array of results for each job attempted.
  */
+// ============================================================================
+// HOST-PRESSURE GATE (2026-09-28)
+// ============================================================================
+// The scheduler previously had time-of-day windows, token caps and leases, but
+// nothing that looked at the MACHINE. On a laptop running the always-on core
+// plus called-up tools, a heavy cron could still land on top of the operator's
+// work. This is the missing "don't overload the laptop" mechanism.
+//
+// Pressure = 0.65 * CPU-busy-ratio + 0.35 * (1 - free-memory-ratio), sampled
+// from cumulative os.cpus() tick deltas between scheduler ticks (a lifetime
+// average is useless, so the first call only seeds the baseline).
+//
+// Behaviour when pressure is high: the job is DEFERRED on the existing path —
+// skipped and next_run_at advanced — exactly like a closed delegation window.
+// It is never queued, never run late, and never counted as a failure.
+//
+//   pressure < HEAVY_THRESHOLD   -> everything runs
+//   HEAVY <= pressure < HARD     -> only non-heavy jobs run
+//   pressure >= HARD             -> everything defers except health/notify
+//
+// Disable with DRAYMOND_HOST_PRESSURE_GATE=0. Tune with
+// DRAYMOND_PRESSURE_HEAVY / DRAYMOND_PRESSURE_HARD.
+// ============================================================================
+
+/** Permanently exempt: cheap telemetry, and its absence creates blind spots. */
+function isPressureExempt(job: ScheduledJob): boolean {
+  return job.job_type === 'health_check' || job.job_type === 'notification';
+}
+
+/** Heavy = chains, and the handler families that are known to be expensive. */
+function isHeavyJob(job: ScheduledJob): boolean {
+  if (job.job_type === 'chain') return true;
+  const handler = job.job_config?.handler;
+  if (typeof handler !== 'string') return false;
+  return /^(oncology_|science_|benchmark_|dream_|self_|ultraplan|weekend_|repair_|night_)/.test(handler);
+}
+
+let _prevCpuTicks: { idle: number; total: number } | null = null;
+
+/** Instantaneous host pressure in [0,1]. See the block comment above. */
+export function hostPressure(): number {
+  const cpus = os.cpus();
+  let idle = 0;
+  let total = 0;
+  for (const c of cpus) {
+    idle += c.times.idle;
+    total += c.times.user + c.times.nice + c.times.sys + c.times.idle + c.times.irq;
+  }
+  const memPressure = 1 - os.freemem() / Math.max(1, os.totalmem());
+  if (!_prevCpuTicks || total <= _prevCpuTicks.total) {
+    // First sample (or a counter reset): the cumulative CPU ratio is a
+    // lifetime average and would mislead. Seed the baseline and report only
+    // the memory component, scaled to the same 0..1 shape.
+    _prevCpuTicks = { idle, total };
+    return Math.min(1, Math.max(0, 0.35 * memPressure));
+  }
+  const dIdle = idle - _prevCpuTicks.idle;
+  const dTotal = total - _prevCpuTicks.total;
+  _prevCpuTicks = { idle, total };
+  const busy = dTotal > 0 ? 1 - dIdle / dTotal : 0;
+  return Math.min(1, Math.max(0, 0.65 * busy + 0.35 * memPressure));
+}
+
+function pressureGate(): { heavy: number; hard: number; enabled: boolean } {
+  const raw = process.env.DRAYMOND_HOST_PRESSURE_GATE;
+  const enabled = raw !== '0' && raw !== 'false';
+  const heavy = Number(process.env.DRAYMOND_PRESSURE_HEAVY ?? 0.6);
+  const hard = Number(process.env.DRAYMOND_PRESSURE_HARD ?? 0.85);
+  return {
+    enabled,
+    heavy: Number.isFinite(heavy) ? heavy : 0.6,
+    hard: Number.isFinite(hard) ? hard : 0.85,
+  };
+}
+
+/** Reason to defer, or null to run. Pure so it is directly testable. */
+export function pressureDeferReason(
+  job: Pick<ScheduledJob, 'job_type' | 'job_config'>,
+  pressure: number,
+  limits: { heavy: number; hard: number; enabled: boolean } = pressureGate(),
+): string | null {
+  if (!limits.enabled) return null;
+  if (isPressureExempt(job as ScheduledJob)) return null;
+  const p = pressure.toFixed(2);
+  if (pressure >= limits.hard) return `Host pressure ${p} >= ${limits.hard} — deferring all but health checks`;
+  if (pressure >= limits.heavy && isHeavyJob(job as ScheduledJob)) {
+    return `Host pressure ${p} >= ${limits.heavy} — deferring heavy job`;
+  }
+  return null;
+}
+
 export async function runDueJobs(now = new Date(), opts?: RunDueJobsOptions): Promise<JobRunResult[]> {
   const supabase = createDraymondAdminClient();
   const results: JobRunResult[] = [];
@@ -2325,6 +2466,9 @@ const nowMs = now.getTime();
   const runnable: ScheduledJob[] = [];
   const stale: ScheduledJob[] = [];
   const deferred: Array<{ job: ScheduledJob; reason: string }> = [];
+  // One host sample per tick, shared across all due jobs (hostPressure() is a
+  // delta sampler — calling it per job would consume the deltas).
+  const pressure = hostPressure();
   for (const raw of dueJobs) {
     const job = raw as ScheduledJob;
     const dueMs = job.next_run_at ? new Date(job.next_run_at).getTime() : nowMs;
@@ -2336,9 +2480,11 @@ const nowMs = now.getTime();
     } else {
       const sectorGate = sectorCapExceeded(job, now);
       const specGate = sectorGate ? null : specBudgetExceeded(job, now);
+      // Host pressure only consulted when the earlier, cheaper gates passed.
+      const pressureReason = sectorGate || specGate ? null : pressureDeferReason(job, pressure);
       const gateReason = sectorGate
         ? `Sector daily token cap reached (${sectorGate})`
-        : specGate;
+        : specGate ?? pressureReason;
       if (gateReason) {
         // The job's own delegation budget/window (or its corporate sector cap)
         // is exhausted — defer so the allocation is real instead of advisory.
@@ -2456,12 +2602,20 @@ const nowMs = now.getTime();
     // (same hook as runJobNow) so on-demand work can reach its dependencies.
     try {
       const handler = job.job_config?.handler;
+      const chainSlug = job.job_config?.chain_slug;
       if (typeof handler === 'string') {
         const sector = sectorFor(handler);
         const result = await ensureSectorForJob(sector);
         if (result.started.length > 0 || result.failed.length > 0) {
           console.log(
             `[sector-lifecycle] job "${job.name}" (${handler}) sector ${sector}: started=[${result.started.join(',')}] failed=[${result.failed.join(',')}] disabled=${result.disabled}`
+          );
+        }
+      } else if (typeof chainSlug === 'string') {
+        const result = await ensureChainServicesForJob(chainSlug);
+        if (result.started.length > 0 || result.failed.length > 0) {
+          console.log(
+            `[sector-lifecycle] chain job "${job.name}" (${chainSlug}): started=[${result.started.join(',')}] failed=[${result.failed.join(',')}]`
           );
         }
       }
@@ -2608,16 +2762,23 @@ const nowMs = now.getTime();
         error: errorMessage,
       });
 
-      // Failure notification
+      // Failure notification. Deduped per job+error: a recurring identical
+      // failure alerts ONCE per window instead of on every run ("don't show me
+      // the same message twice"); a new/different error still alerts.
       if (job.notify_on_failure && recipient) {
         try {
-          await sendAlertEmail(
-            recipient,
-            `Scheduled job "${job.name}" FAILED`,
-            `Job "${job.name}" (${job.job_type}) failed after ${durationMs}ms${retried}.\n\nError: ${errorMessage}\n\nFail count: ${job.fail_count + 1} / Run count: ${job.run_count + 1}`,
-            'agent_failure',
-            { priority: 'high', metadata: { job_id: job.id, duration_ms: durationMs, error: errorMessage } }
-          );
+          const { isOnCooldown } = await import('./workflow-budget');
+          const failKey = `${job.id}|${errorMessage.slice(0, 140)}`;
+          const cooldownMs = Number(process.env.DRAYMOND_JOB_FAILURE_EMAIL_COOLDOWN_MS) || 24 * 60 * 60 * 1000;
+          if (!isOnCooldown('job-fail-email', failKey, cooldownMs)) {
+            await sendAlertEmail(
+              recipient,
+              `Scheduled job "${job.name}" FAILED`,
+              `Job "${job.name}" (${job.job_type}) failed after ${durationMs}ms${retried}.\n\nError: ${errorMessage}\n\nFail count: ${job.fail_count + 1} / Run count: ${job.run_count + 1}`,
+              'agent_failure',
+              { priority: 'high', metadata: { job_id: job.id, duration_ms: durationMs, error: errorMessage } }
+            );
+          }
         } catch (notifyErr) {
           console.error('[Draymond Scheduler] Failed to send failure notification for "%s":', job.name, notifyErr);
         }
@@ -2692,6 +2853,15 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     description: 'Daily 8am health check across all registered agents and monitors.',
     cron_expression: '0 8 * * *',
     job_type: 'health_check',
+    is_enabled: true,
+  },
+  {
+    name: 'Weekly Strategy Review',
+    description:
+      'Weekly: regenerate the ecosystem manifest/priority model from inventory + overrides and surface strategy-tier churn. Feeds the schedule policy (schedule-policy.ts).',
+    cron_expression: '0 6 * * 1',
+    job_type: 'custom',
+    job_config: { handler: 'strategy_review' },
     is_enabled: true,
   },
   {
@@ -2999,11 +3169,13 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
   },
   {
     name: 'MaaS Monthly Cycle',
-    description: 'Weekly Monday 9am \u2014 run the MaaS delivery chain for each active MaaS client.',
+    description: 'Weekly Monday 9am — run the MaaS delivery chain for each active MaaS client.',
     cron_expression: '0 9 * * 1',
     job_type: 'custom',
     job_config: { handler: 'mission_run_maas_cycle' },
-    is_enabled: true,
+    // DISABLED 2026-09-28: chain needs mutly (retired) + uplift-agent
+    // (unprovisioned). Mirrored in schedule-policy GATED_OFF.
+    is_enabled: false,
   },
   {
     name: 'Kairos Scan',
@@ -3058,8 +3230,20 @@ const BASIC_JOBS: ScheduledJobInsert[] = [
     description: 'Weekly Monday 9:30am — run the deep research brief chain for the week ahead.',
     cron_expression: '30 9 * * 1',
     job_type: 'chain',
-    job_config: { chain_slug: 'research-brief-delivery' },
-    is_enabled: true,
+    // DISABLED 2026-09-28: chain depends on unprovisioned backends (mutly :4000
+    // retired, uplift-agent :8000 never provisioned). Keep disabled across seed
+    // until the chain is repointed. Default input is set so a future re-enable
+    // cannot 422 on the omni query/domain requirement.
+    job_config: {
+      chain_slug: 'research-brief-delivery',
+      input: {
+        topic: 'weekly ecosystem research briefing',
+        dataset: 'nathanlauga/nba-games',
+        tags: 'research',
+        force: false,
+      },
+    },
+    is_enabled: false,
   },
   {
     name: 'Weekend Ops Review',

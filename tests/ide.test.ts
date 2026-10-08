@@ -8,7 +8,7 @@ import { decideByMonteCarlo } from '../src/lib/ide/monte-carlo';
 
 // ============================================================================
 // Hermetic network mocks — the session manager dispatches to live engines
-// (LLM providers, Uplift, Mutly, Codegang, opencode) that are NOT running in
+// (LLM providers, Uplift, Mutly, Codegang, axiom) that are NOT running in
 // tests. Mock them so steps fail fast and deterministically instead of hanging
 // on real HTTP/LLM timeouts. The tests assert the orchestration logic (DAG,
 // fail-soft, decisions), not live-engine integration.
@@ -53,7 +53,7 @@ vi.mock('../src/lib/ide/codegang-client', () => ({
 }));
 
 vi.mock('../src/lib/ide/opencode-client', () => ({
-  runOpencodeCodegen: vi.fn(async () => ({ success: false, content: '', error: 'opencode offline in tests' })),
+  runOpencodeCodegen: vi.fn(async () => ({ success: false, content: '', error: 'axiom offline in tests' })),
 }));
 
 // Probe: return a deterministic "not started" diagnosis for every service so
@@ -372,7 +372,7 @@ describe('ide session manager', () => {
     const workspace = path.join(tmpDir, 'bench');
     await fs.mkdir(workspace, { recursive: true });
 
-    // Fast run: skip the landing-page finisher and opencode (engines are offline in tests).
+    // Fast run: skip the landing-page finisher and axiom (engines are offline in tests).
     const run = await runIdeBenchmark({ workspaceRoot: workspace, skipLandingPage: true, skipCodegen: true });
     expect(run.results.length).toBeGreaterThan(0);
     expect(run.results.some((r) => r.task === 'reachability')).toBe(true);

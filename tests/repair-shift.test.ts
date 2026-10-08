@@ -23,14 +23,15 @@ const { mockRunBenchmark, mockScheduler, mockRepairTeam, mockServices, mockBench
     },
     mockScheduler: {
       listJobs: vi.fn().mockResolvedValue([
-        { id: 'j1', name: 'Broken Job', job_type: 'custom', job_config: {}, last_run_status: 'failed', last_error: 'boom' },
-        { id: 'j2', name: 'Fine Job', job_type: 'custom', job_config: {}, last_run_status: 'success' },
+        { id: 'j1', name: 'Broken Job', job_type: 'custom', job_config: {}, last_run_status: 'failed', is_enabled: true, last_error: 'boom' },
+        { id: 'j2', name: 'Fine Job', job_type: 'custom', job_config: {}, last_run_status: 'success', is_enabled: true },
+        { id: 'j3', name: 'Retired Job', job_type: 'custom', job_config: {}, last_run_status: 'failed', is_enabled: false, last_error: 'old' },
       ]),
       updateJob: vi.fn().mockResolvedValue(undefined),
     },
     mockRepairTeam: {
-      repairFailedJob: vi.fn().mockResolvedValue({ action: 'fixed', jobId: 'j1', jobName: 'Broken Job', failureKind: 'code_error', detail: 'fixed', crew: { lead: 'opencode', members: [], reason: 'x' }, error: 'boom', repairedAt: 'x' }),
-      repairWeakEntity: vi.fn().mockResolvedValue({ action: 'fixed', jobId: 'benchmark:x', jobName: 'x', failureKind: 'benchmark_weak', detail: 'fixed', crew: { lead: 'opencode', members: [], reason: 'x' }, error: '', repairedAt: 'x' }),
+      repairFailedJob: vi.fn().mockResolvedValue({ action: 'fixed', jobId: 'j1', jobName: 'Broken Job', failureKind: 'code_error', detail: 'fixed', crew: { lead: 'axiom', members: [], reason: 'x' }, error: 'boom', repairedAt: 'x' }),
+      repairWeakEntity: vi.fn().mockResolvedValue({ action: 'fixed', jobId: 'benchmark:x', jobName: 'x', failureKind: 'benchmark_weak', detail: 'fixed', crew: { lead: 'axiom', members: [], reason: 'x' }, error: '', repairedAt: 'x' }),
     },
     mockServices: {
       probeAllServices: vi.fn().mockResolvedValue([
@@ -83,8 +84,15 @@ describe('daily repair shift', () => {
     expect(result.audit.weakest.length).toBeGreaterThan(0);
     // Only components with score >= 50 are audit targets.
     expect(result.audit.weakest.every((w) => w.score >= 50)).toBe(true);
-    // Repair: failed job fixed + weak component fixed + service started.
+    // Repair: failed ENABLED job fixed (disabled/retired jobs skipped) + weak
+    // component fixed + service started.
     expect(mockRepairTeam.repairFailedJob).toHaveBeenCalledTimes(1);
+    expect(mockRepairTeam.repairFailedJob).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'j1' }),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
     expect(mockRepairTeam.repairWeakEntity).toHaveBeenCalled();
     expect(mockServices.startDownServices).toHaveBeenCalled();
     // Improvements: gains recorded for acted-on components.

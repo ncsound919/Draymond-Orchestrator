@@ -2,7 +2,7 @@
 // DRAYMOND — Deterministic Goal Decomposer
 // ============================================================================
 // A zero-LLM replacement for the paid task-decomposition call. Small local
-// models (qwen3:0.6b) grade POORLY on decomposition (shallow/placeholder
+// models (qwen3.5-2b) grade POORLY on decomposition (shallow/placeholder
 // output), and deepseek costs money for it. This tool turns a goal into a
 // concrete, agent-assigned task plan deterministically via category detection
 // + templates, so the swarm decompose path is fully self-contained.

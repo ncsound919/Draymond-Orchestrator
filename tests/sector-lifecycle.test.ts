@@ -1,7 +1,21 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+
+vi.mock('../src/lib/draymond/pm2', () => ({
+  pm2List: vi.fn(async () => new Map()),
+  pm2Stop: vi.fn(async () => true),
+  pm2IsOnline: vi.fn(async () => false),
+  pm2StartConfig: vi.fn(async () => true),
+}));
+
+const mockStopService = vi.fn(async (slug: string) => ({ slug, up: false }));
+let mockTracked: Array<{ slug: string; pid: number; startedAt: string; cwd: string; command: string; alive: boolean }> = [];
+vi.mock('../src/lib/draymond/service-manager', () => ({
+  listTrackedServices: vi.fn(() => mockTracked),
+  stopService: (...args: unknown[]) => mockStopService(...(args as [string])),
+}));
 
 let lifecycle: typeof import('../src/lib/draymond/sector-lifecycle');
 let tmpDir: string;
@@ -85,5 +99,59 @@ describe('sector-lifecycle (pure logic)', () => {
 
   it('lifecycle is off by default (safety)', () => {
     expect(lifecycle.lifecycleEnabled()).toBe(false);
+  });
+});
+
+describe('sectorSweep reaps detached call-ups', () => {
+  it('stops an over-TTL tracked service pm2 cannot see', async () => {
+    mockStopService.mockClear();
+    mockTracked = [{
+      slug: 'big-homie',
+      pid: 424242,
+      startedAt: new Date(Date.now() - 31 * 60 * 1000).toISOString(),
+      cwd: '/tmp/x',
+      command: 'python big_homie_web.py',
+      alive: true,
+    }];
+    const res = await lifecycle.sectorSweep(new Date());
+    expect(mockStopService).toHaveBeenCalledWith('big-homie');
+    expect(res.stopped).toContain('big-homie');
+  });
+
+  it('keeps a tracked service inside its TTL', async () => {
+    mockStopService.mockClear();
+    mockTracked = [{
+      slug: 'big-homie',
+      pid: 424243,
+      startedAt: new Date().toISOString(),
+      cwd: '/tmp/x',
+      command: 'python big_homie_web.py',
+      alive: true,
+    }];
+    const res = await lifecycle.sectorSweep(new Date());
+    expect(mockStopService).not.toHaveBeenCalled();
+    expect(res.kept).toContain('big-homie');
+  });
+});
+
+describe('cold-start pressure gate', () => {
+  it('reports host load in [0,1]', () => {
+    const load = lifecycle.hostLoad();
+    expect(load).toBeGreaterThanOrEqual(0);
+    expect(load).toBeLessThanOrEqual(1);
+  });
+
+  it('always allows warm services', () => {
+    expect(lifecycle.coldStartAllowed('overlay-oncology')).toBe(true);
+    expect(lifecycle.coldStartAllowed('deterministic-brain')).toBe(true);
+  });
+
+  it('allows on-demand starts when the gate is disabled', () => {
+    process.env.DRAYMOND_HOST_PRESSURE_GATE = '0';
+    try {
+      expect(lifecycle.coldStartAllowed('grader')).toBe(true);
+    } finally {
+      delete process.env.DRAYMOND_HOST_PRESSURE_GATE;
+    }
   });
 });

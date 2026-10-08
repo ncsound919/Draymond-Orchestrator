@@ -74,6 +74,30 @@ function isPidAlive(pid: number): boolean {
   }
 }
 
+export interface TrackedService extends StartedService {
+  alive: boolean;
+}
+
+/**
+ * Services this module launched as detached processes (data/server-pids.json).
+ * These are invisible to pm2 — the sector sweep consults this registry so
+ * detached call-ups cannot leak past their idle TTL (e.g. big-homie holding
+ * :8888 while pm2 reported it stopped).
+ */
+export function listTrackedServices(): TrackedService[] {
+  const reg = readPidRegistry();
+  return Object.values(reg).map((e) => ({ ...e, alive: isPidAlive(e.pid) }));
+}
+
+/**
+ * Hard dependencies co-started (best-effort) before the key service.
+ * Claw-Protect's endpoint monitor consumes the resident system-agent (:3405);
+ * without it the monitor degrades to agent-unreachable.
+ */
+const SERVICE_DEPS: Record<string, string[]> = {
+  'claw-protect': ['system-agent'],
+};
+
 export interface ServiceHealth {
   slug: string;
   name: string;
@@ -84,12 +108,24 @@ export interface ServiceHealth {
 }
 
 /** Canonical repo-root-relative working dir per slug (overrides ports.ts cwd). */
+/** The Draymond repo root. ports.ts declares service cwd values RELATIVE TO THE
+ *  DRAYMOND REPO ROOT. In a standalone build, process.cwd() is
+ *  `.next/standalone/Draymond-Orchestrator`, so resolving a recipe cwd against
+ *  cwd produced a non-existent path → "no startable local recipe — escalate"
+ *  and services were never brought back up. Resolve against the real root
+ *  (same derivation as sector-lifecycle.orchDir). */
+function repoRoot(): string {
+  const registry = process.env.DRAYMOND_REGISTRY_DIR;
+  if (registry) return path.dirname(registry); // <ORCH>/.draymond -> <ORCH>
+  return process.cwd();
+}
+
 const CWD_OVERRIDES: Record<string, string> = {
   'bookbridge': 'agents/BookBridge--main',
   'hemp-os': '../potential/Hemp-OS-main',
   'hempforge': '../02_Pillars/Overlay Science/Biotech/HempForge-main',
   'deterministic-brain': 'agents/deterministic-brain',
-  'opencode': '.',
+  'axiom': '../06_Resources/Axiom Agent',
   'sports-steve': 'agents/Sports-Steve-main',
   'mutly': 'agents/Mutly-Daemon-Agent',
   'uplift-agent': 'agents/Uplift-Agent',
@@ -147,12 +183,13 @@ const START_MAP: Record<string, { command: [string, string[]]; port: number; hea
     port: 3100,
     health: '/health',
   },
-  opencode: {
-    // Managed by PM2 (ecosystem.marketing.config.js) — headless codegen server.
-    // The service-manager probes health but never spawns it.
-    command: ['node', [path.join('node_modules', 'opencode-ai', 'bin', 'opencode'), 'serve', '--port', '4096']],
-    port: 4096,
-    health: '/',
+  axiom: {
+    // Managed by PM2 (fleet-manifest DSH_SERVICES) — coding harness + Recourse
+    // bridge. The service-manager probes health but never spawns it.
+    command: ['node', ['--import', 'tsx', 'server.ts']],
+    port: 3198,
+    health: '/api/health',
+    env: { AXIOM_PORT: '3198' },
   },
   hempforge: {
     command: ['npm', ['run', 'dev']],
@@ -232,9 +269,13 @@ const START_MAP: Record<string, { command: [string, string[]]; port: number; hea
     env: { PORT: '3202', VIBE_REALITY_LOCAL: '1' },
   },
   'cureforge': {
-    command: ['npm', ['run', 'dev']],
+    // Native production run (Docker removed — ADR-0008). Built server on 3060;
+    // the dev default is 3000, which collides with Keywire. No /api/health
+    // route exists — production serves the SPA at "/", so that is the probe.
+    command: ['node', ['dist/server.cjs']],
     port: 3060,
-    health: '/api/health',
+    health: '/',
+    env: { PORT: '3060', NODE_ENV: 'production' },
   },
   'sub-team': {
     command: ['python', ['main.py', '--serve', '--port', '8050', '--host', '0.0.0.0']],
@@ -393,26 +434,92 @@ function resolveWin32Executable(name: string): string | null {
 }
 
 /**
+ * True when a `docker` CLI is on PATH. Docker is intentionally NOT installed on
+ * this box (ADR-0008): Docker-only services (stirling-pdf, the OSS marketing
+ * compose stack) are disabled and must not be started or reported as startable.
+ */
+export function dockerAvailable(): boolean {
+  return resolveWin32Executable('docker') !== null;
+}
+
+/**
  * Start one service (best-effort). Returns the probe result after a short
  * wait. Never throws — a failed start resolves with up=false + detail.
  */
-export async function startService(slug: string): Promise<ServiceHealth> {
+/**
+ * Services supervised by pm2 (fleet-manifest.js / ecosystem/fleet-policy.json
+ * `always_on`). The on-demand manager must NEVER spawn a second copy of these,
+ * and must NEVER pm2-stop them. Doing so caused the deterministic-brain :3210
+ * bind crash-loop — two `startup.py` processes fighting over the port — and the
+ * resulting flapping DOWN/RECOVERED alert emails. pm2 is the sole supervisor:
+ * this module probes them but does not start/stop them.
+ * Override with DRAYMOND_ONDEMAND_MANAGE_CORE=1 only if you remove pm2 ownership.
+ */
+const PM2_OWNED_SLUGS = new Set([
+  'draymond', 'deterministic-brain', 'keywire', 'truth-chain', 'truth-chain-web',
+  'dev-brain', 'litellm', 'localjev', 'llama-server', 'nomic-embed',
+  'openhub', 'ecosystem-sampler',
+]);
+
+function isPm2Owned(slug: string): boolean {
+  return PM2_OWNED_SLUGS.has(slug) && process.env.DRAYMOND_ONDEMAND_MANAGE_CORE !== '1';
+}
+
+export async function startService(slug: string, _seen: string[] = []): Promise<ServiceHealth> {
   const def = START_MAP[slug];
   const tool = TOOL_PORTS.find((t) => t.slug === slug);
   if (!def) {
     return { slug, name: tool?.name ?? slug, url: serviceUrl(slug), up: false, detail: `no start recipe for "${slug}" — escalate` };
   }
 
+  // pm2 owns this service — never spawn a duplicate (port-conflict crash loop).
+  if (isPm2Owned(slug)) {
+    const p = await probeService(slug, 3000);
+    return {
+      ...p,
+      detail: p.up ? p.detail : `pm2-owned "${slug}" is down — pm2 will restart it; on-demand start refused`,
+    };
+  }
+
   // Already up? Nothing to do.
   const pre = await probeService(slug, 1500);
   if (pre.up) return pre;
 
-  const cwd = /*turbopackIgnore: true*/ path.resolve(process.cwd(), CWD_OVERRIDES[slug] ?? tool?.cwd ?? '.');
+  // Host-pressure gate (mirror of sector-lifecycle): never spawn onto a maxed
+  // box. Booting heavy apps at 97% RAM is what froze the machine and killed
+  // the PM2 daemon. Disable with DRAYMOND_HOST_PRESSURE_GATE=0.
+  try {
+    const { coldStartAllowed } = await import('./sector-lifecycle');
+    if (!coldStartAllowed(slug)) {
+      return {
+        slug, name: tool?.name ?? slug, url: serviceUrl(slug), up: false,
+        detail: 'host load too high — cold start deferred (RUN LEAN)',
+      };
+    }
+  } catch { /* gate best-effort — fall through to start */ }
+
+  // Co-start declared hard dependencies first (best-effort). Cycle-safe: each
+  // slug is visited at most once per startService call tree.
+  for (const dep of SERVICE_DEPS[slug] ?? []) {
+    if (dep !== slug && !_seen.includes(dep)) {
+      try {
+        await startService(dep, [..._seen, slug]);
+      } catch {
+        /* best-effort — the key service may still come up degraded */
+      }
+    }
+  }
+
+  const cwd = /*turbopackIgnore: true*/ path.resolve(repoRoot(), CWD_OVERRIDES[slug] ?? tool?.cwd ?? '.');
   if (!fs.existsSync(cwd)) {
     return { slug, name: tool?.name ?? slug, url: serviceUrl(slug), up: false, detail: `working dir missing: ${cwd}` };
   }
 
   const [cmd, args] = def.command;
+  // Docker-only recipes are unavailable when Docker is not installed (ADR-0008).
+  if (cmd === 'docker' && !dockerAvailable()) {
+    return { slug, name: tool?.name ?? slug, url: serviceUrl(slug), up: false, detail: 'docker not installed — this service is Docker-only and disabled (ADR-0008)' };
+  }
   const { out, err } = logPath(slug);
   const env = def.env ? { ...process.env, ...def.env } : process.env;
 
@@ -493,10 +600,12 @@ export async function stopService(slug: string): Promise<ServiceHealth> {
   }
   clearStarted(slug);
 
-  // pm2-owned service? stop it sticky (autorestart will not resurrect it).
+  // pm2-owned service? stop it sticky (autorestart will not resurrect it) —
+  // but NEVER for always-on core, or the sector sweep would take pm2's brain
+  // down and cause the DOWN/RECOVERED flap.
   try {
     const { pm2IsOnline, pm2Stop } = await import('./pm2');
-    if (await pm2IsOnline(slug)) {
+    if (!isPm2Owned(slug) && await pm2IsOnline(slug)) {
       const ok = await pm2Stop(slug);
       if (ok) {
         detail = detail ? `${detail}; pm2 stop ${slug}` : `pm2 stop ${slug}`;
@@ -532,10 +641,14 @@ export async function restartService(slug: string): Promise<ServiceHealth> {
 export function canStartService(slug: string): boolean {
   const def = START_MAP[slug];
   if (!def) return false;
+  // pm2 supervises always-on core — never an on-demand start target.
+  if (isPm2Owned(slug)) return false;
   const tool = TOOL_PORTS.find((t) => t.slug === slug);
-  const cwd = /*turbopackIgnore: true*/ path.resolve(process.cwd(), CWD_OVERRIDES[slug] ?? tool?.cwd ?? '.');
+  const cwd = /*turbopackIgnore: true*/ path.resolve(repoRoot(), CWD_OVERRIDES[slug] ?? tool?.cwd ?? '.');
   if (!fs.existsSync(cwd)) return false;
   const [cmd] = def.command;
+  // Docker-only recipes can never boot when Docker is not installed (ADR-0008).
+  if (cmd === 'docker') return dockerAvailable();
   // npm/pnpm/pnpx/npx/npm run need installed deps to boot.
   if (cmd === 'npm' || cmd === 'pnpm' || cmd === 'pnpx' || cmd === 'npx') {
     return fs.existsSync(path.join(cwd, 'node_modules'));

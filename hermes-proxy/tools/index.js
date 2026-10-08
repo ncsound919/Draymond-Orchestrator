@@ -53,7 +53,18 @@ export const tools = [
 
 // Port 3010 is OpenHub; OmniResearch lives on 3012.
 const OMNI_URL = process.env.OMNI_RESEARCH_URL || 'http://127.0.0.1:3012';
-const AETHERDESK_URL = process.env.AETHERDESK_BASE_URL || 'http://127.0.0.1:8002';
+// AetherDesk: these tools append '/api/v1/...' themselves, so they need a BARE
+// ORIGIN. Callers that append nothing (voice/*) need the API base. Deriving the
+// origin from the base keeps one env var driving both without a double /api/v1.
+const AETHERDESK_API_BASE = (() => {
+  let base = (process.env.AETHERDESK_BASE_URL || process.env.AETHERDESK_API_URL || 'http://127.0.0.1:8002')
+    .trim()
+    .replace(/\/+$/, '');
+  if (!/^https?:\/\//i.test(base)) base = `http://${base}`;
+  if (!/\/api\/v1$/i.test(base)) base = `${base}/api/v1`;
+  return base;
+})();
+const AETHERDESK_URL = AETHERDESK_API_BASE.replace(/\/api\/v1$/i, '');
 // Internal key — same value AetherDesk expects as x-api-key.
 const AETHERDESK_KEY =
   process.env.AETHERDESK_API_KEY || process.env.INTERNAL_API_KEY || '';

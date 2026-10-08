@@ -14,6 +14,14 @@
 // Env knobs:
 //   UPLIFT_ROOT            â€” override the ecosystem root (default: C:\Users\User\Downloads\Uplift)
 //   PYTHON_PATH / NODE_PATHâ€” override the interpreter paths (else auto-detected defaults)
+//
+// ============================================================================
+// RUN LEAN — the fleet does NOT all run at once (see ecosystem/fleet-policy.json,
+// ADR-0007). Only the always-on core starts (draymond + deterministic-brain +
+// keywire/truth-chain + dev-brain/litellm + localjev/llama-server/nomic-embed +
+// openhub + ecosystem-sampler). Everything else in this manifest is CALLED UP ON
+// DEMAND via DRAYMOND_SECTOR_LIFECYCLE (below) or Keywire's CAPABILITY_MAP, then
+// reaped when idle. NEVER `pm2 start` all configs — it overloads the machine.
 // ============================================================================
 
 const fs = require("node:fs");
@@ -25,6 +33,8 @@ const ORCH_DIR = path.join(UPLIFT_ROOT, "Draymond-Orchestrator");
 // Rooted path helpers â€” the ONLY place ecosystem paths are derived.
 const P = (rel) => path.join(UPLIFT_ROOT, rel); // uplift-rooted
 const O = (rel) => path.join(ORCH_DIR, rel);     // orchestrator-rooted
+// Canonical Recourse repo (moved out of Uplift/06_Resources 2026-10). Override with RECOURSE_DIR.
+const RECOURSE_DIR = process.env.RECOURSE_DIR || "C:\\Users\\User\\Downloads\\BUSINESS\\INFRASTRUCTURE\\recourse";
 
 function loadEnvLocal(file = path.join(ORCH_DIR, ".env.local")) {
   const env = {};
@@ -49,6 +59,10 @@ const BUN = process.env.BUN_PATH || "C:\\Users\\User\\.bun\\bin\\bun.exe";
 const CLOUDFLARED_BIN =
   process.env.CLOUDFLARED_BIN ||
   "C:\\Program Files (x86)\\cloudflared\\cloudflared.exe";
+
+// Synthbook (replaced BookBridge 2026-09-27) lives outside the Uplift tree.
+const SYNTHBOOK_DIR =
+  process.env.SYNTHBOOK_DIR || "C:\\Users\\User\\Downloads\\Synthbook";
 
 /**
  * Build a PM2 app object from manifest data. Every service gets the same
@@ -79,6 +93,12 @@ function pm2App({
     max_restarts: 10,
     min_uptime: "10s",
     exp_backoff_restart_delay,
+    // Kill the WHOLE process tree on stop/restart. Many entries are tsx/vite/bun
+    // wrappers that spawn a grandchild process; without kill_tree pm2 stops only
+    // the wrapper and the grandchild keeps the port, so the next start hits
+    // EADDRINUSE and the app dies. This was the root cause of the 2026-09-27
+    // startup-failure storm and of `pm2 stop` not freeing ports. Windows-safe.
+    kill_tree: true,
     time: true,
     merge_logs: true,
     out_file: path.join(ORCH_DIR, "data", "logs", `${logPrefix}-out.log`),
@@ -121,25 +141,25 @@ const CORE_APP = pm2App({
     GMAIL_USE_OAUTH: "1",
     ALLOW_LOCAL_AGENTS: "1",
     LOCAL_SERVICE_ALLOWLIST: process.env.LOCAL_SERVICE_ALLOWLIST || "",
-    // Lean boot: do NOT autostart the 9 core services on boot — the sector
-    // lifecycle cold-starts them on demand and sweeps them when idle. The
-    // deterministic brain (native :3210) still comes up via its own service.
-    DRAYMOND_AUTOSTART_SERVICES: "0",
-    // Fleet auto-loading DISABLED 2026-09-08: Draymond was cold-starting the
-    // whole fleet (smd/bookbridge/opencode + E2/E3/E4) on every job, causing
-    // EADDRINUSE crash loops from orphaned port holders. The operator loads
-    // service clusters per task instead. Setting this to 0 stops BOTH the auto
-    // cold-start (ensureSectorForJob) and the idle sweep (sectorSweep).
-    DRAYMOND_SECTOR_LIFECYCLE: process.env.DRAYMOND_SECTOR_LIFECYCLE || "0",
-    // Autonomous repair/upgrade disabled 2026-09-08: the failover matrix +
-    // benchmark-olympics repair dispatch were auto-spawning/reconfiguring
-    // services the operator deliberately stopped. Operator loads service
-    // clusters per task; nothing self-heals the fleet on its own.
-    DRAYMOND_FAILOVER_MATRIX: "0",
-    DRAYMOND_REPAIR_BENCHMARK_ENABLED: "0",
-    // Master auto-start kill-switch (self-repair monitor:down path + any
-    // autonomous spawn): 0 = manual cluster mode, services never auto-start.
-    DRAYMOND_AUTO_START_SERVICES: "0",
+    // Global Lens fleet-publish auth — must match GL_PUBLISH_KEY in
+    // 05_Apps/Overlay-Global-Lens/.env (lens returns 401 without the header).
+    // Set it in Draymond's .env.local (or Keywire vault); chains interpolate
+    // ${GL_PUBLISH_KEY} at call time so no secret is persisted in job rows.
+    GL_PUBLISH_KEY: D.GL_PUBLISH_KEY || "",
+    // Do NOT autostart the core here. Draymond is the job scheduler; pm2 is the
+    // sole supervisor of always-on services (see ecosystem/fleet-policy.json).
+    // With autostart on, Draymond spawned its OWN deterministic-brain child that
+    // grabbed :3210, so the pm2-managed brain could never bind and crash-looped
+    // (49+ restarts, ~54% CPU churn). Re-enable only if you remove pm2 ownership.
+    // Override explicitly with DRAYMOND_CORE_SERVICES / DRAYMOND_AUTOSTART_SERVICES.
+    DRAYMOND_AUTOSTART_SERVICES: process.env.DRAYMOND_AUTOSTART_SERVICES || "0",
+    // Sector lifecycle enabled so services auto-start on demand and sweep when idle
+    DRAYMOND_SECTOR_LIFECYCLE: process.env.DRAYMOND_SECTOR_LIFECYCLE || "1",
+    // Failover matrix enabled for autonomous service reconfiguration
+    DRAYMOND_FAILOVER_MATRIX: "1",
+    DRAYMOND_REPAIR_BENCHMARK_ENABLED: "1",
+    // Master auto-start enabled so self-repair can bring up downed services
+    DRAYMOND_AUTO_START_SERVICES: "1",
     DRAYMOND_DAILY_COST_CAP_CENTS:
       process.env.DRAYMOND_DAILY_COST_CAP_CENTS || "5000",
     // Governance gate (ACE policy kernel): off | shadow | enforce. Only the
@@ -196,7 +216,7 @@ const FLEET_SERVICES = [
     name: "commission-engine",
     script: PYTHON,
     args: "-m uvicorn commission_engine.main:app --host 127.0.0.1 --port 8003",
-    cwd: P("05_Apps/Staffing-Commission-Engine"),
+    cwd: P("06_Resources/Staffing-Commission-Engine"),
     memory: "1G",
     env: {
       ...D,
@@ -209,13 +229,26 @@ const FLEET_SERVICES = [
       PORT: "8003",
     },
   }),
+  // Synthbook — real book / knowledge synthesis. REPLACED BookBridge
+  // (agents/BookBridge--main, retired 2026-09-27). Next.js standalone on :3072:
+  // ingest (EPUB/TXT) → LiteLLM embeddings (nomic-embed, :11435) → semantic
+  // retrieval → cross-domain synthesis with SERVER-VERIFIED citations.
+  // Build first: `cd <SYNTHBOOK_DIR> && bun run build`.
   pm2App({
-    name: "bookbridge",
-    script: PYTHON,
-    args: "main.py --http-only",
-    cwd: O("agents/BookBridge--main"),
+    name: "synthbook",
+    script: path.join(SYNTHBOOK_DIR, ".next", "standalone", "server.js"),
+    cwd: SYNTHBOOK_DIR,
+    interpreter: NODE,
     memory: "1G",
-    env: { ...D, NODE_ENV: "production" },
+    env: {
+      ...D,
+      NODE_ENV: "production",
+      PORT: "3072",
+      HOSTNAME: "127.0.0.1",
+      LITELLM_URL: process.env.LITELLM_URL || "http://127.0.0.1:4100",
+      SYNTHBOOK_LLM_MODEL: process.env.SYNTHBOOK_LLM_MODEL || "deepseek",
+      SYNTHBOOK_EMBED_MODEL: process.env.SYNTHBOOK_EMBED_MODEL || "nomic-embed",
+    },
   }),
   // OmniResearch (v2) — deep-research agent. Replaced the legacy
   // OmniResearch-Pro-main (retired 2026-09-23). Models route through LiteLLM
@@ -244,7 +277,7 @@ const FLEET_SERVICES = [
       // Local lane is llama.cpp (llama-server), NOT Ollama. LOCAL_LLM_* is
       // authoritative; OLLAMA_* is only a back-compat fallback in clients.ts.
       LOCAL_LLM_BASE_URL: process.env.LOCAL_LLM_BASE_URL || "http://127.0.0.1:11434",
-      LOCAL_LLM_MODEL: process.env.LOCAL_LLM_MODEL || "minicpm5-fable",
+      LOCAL_LLM_MODEL: process.env.LOCAL_LLM_MODEL || "qwen3.5-2b",
       // Ecosystem services the app is wired into.
       DEV_BRAIN_URL: process.env.DEV_BRAIN_URL || "http://127.0.0.1:3450",
       RECOURSE_URL: process.env.RECOURSE_URL || "http://127.0.0.1:3050",
@@ -253,14 +286,8 @@ const FLEET_SERVICES = [
       BOOKBRIDGE_URL: "http://127.0.0.1:8777",
     },
   }),
-  pm2App({
-    name: "uplift-agent",
-    script: "server.js",
-    cwd: O("agents/Uplift-Agent"),
-    interpreter: NODE,
-    memory: "1G",
-    env: { UPLIFT_PORT: "8000", NODE_ENV: "production", ...D },
-  }),
+  // RETIRED 2026-09-27 — entry path gone (agents/Uplift-Agent/server.js missing;
+  // file moved/removed). Re-add when the agent is restored at a known path.
   pm2App({
     name: "sub-team",
     script: PYTHON,
@@ -279,14 +306,18 @@ const FLEET_SERVICES = [
     memory: "512M",
     env: { ...D, NODE_ENV: "production" },
   }),
-  pm2App({
-    name: "indy-music",
-    script: PYTHON,
-    args: "-m uvicorn main:app --host 127.0.0.1 --port 8020",
-    cwd: O("agents/IndyMusic-Service"),
-    memory: "512M",
-    env: { ...D, NODE_ENV: "production" },
-  }),
+  // RETIRED 2026-09-28 — cwd `agents/IndyMusic-Service` does not exist (searched
+  // the whole tree; nothing matched). pm2 would have failed to start it, and the
+  // script-only move guard never caught it. Re-add when the service is restored
+  // at a known path. Music now lives under 02_Pillars/Overlay Music/.
+  // pm2App({
+  //   name: "indy-music",
+  //   script: PYTHON,
+  //   args: "-m uvicorn main:app --host 127.0.0.1 --port 8020",
+  //   cwd: O("agents/IndyMusic-Service"),
+  //   memory: "512M",
+  //   env: { ...D, NODE_ENV: "production" },
+  // }),
   pm2App({
     name: "litellm",
     // Wrapper loads .env.local + data/litellm.env (KeyWire-vault pool keys)
@@ -303,15 +334,8 @@ const FLEET_SERVICES = [
       OPENROUTER_API_KEY: D.OPENROUTER_API_KEY || "",
     },
   }),
-  pm2App({
-    name: "hemp-os",
-    script: "server.ts",
-    cwd: P("potential/Hemp-OS-main"),
-    interpreter: NODE,
-    node_args: "--import tsx",
-    memory: "1G",
-    env: { PORT: "3100", NODE_ENV: "production", ...D },
-  }),
+  // RETIRED 2026-09-27 — archived as a duplicate in
+  // 08_Archive/2026-09-25-duplicate-sweep/potential/Hemp-OS-main.
   pm2App({
     name: "bbtech-web-app",
     script: "server.ts",
@@ -366,25 +390,13 @@ const FLEET_SERVICES = [
   // Vibe-Reality — Gemini "reality-check" repo auditor (deep-score loop's
   // third scorer). VIBE_REALITY_LOCAL=1 skips Firebase auth for fleet-internal
   // scoring; production tiering still requires an idToken.
-  pm2App({
-    name: "vibe-reality",
-    script: "server.ts",
-    cwd: O("agents/Vibe-Reality-main"),
-    interpreter: NODE,
-    node_args: "--import tsx",
-    memory: "512M",
-    env: {
-      PORT: "3202",
-      NODE_ENV: "production",
-      VIBE_REALITY_LOCAL: "1",
-      GEMINI_API_KEY: D.GEMINI_API_KEY || "",
-    },
-  }),
+  // RETIRED 2026-09-27 — entry path gone (agents/Vibe-Reality-main/server.ts missing).
+  // Restored 2026-09-27 — moved to 05_Apps/Open-Chat.
   pm2App({
     name: "openchat",
-    script: P("Open-Chat/node_modules/vite/bin/vite.js"),
+    script: P("05_Apps/Open-Chat/node_modules/vite/bin/vite.js"),
     args: "--port 5175 --strictPort",
-    cwd: P("Open-Chat"),
+    cwd: P("05_Apps/Open-Chat"),
     interpreter: NODE,
     memory: "512M",
     env: { NODE_ENV: "development", PORT: "5175" },
@@ -394,10 +406,12 @@ const FLEET_SERVICES = [
   // outputs (via OVERLAY_RESEARCH_DIR), plus Draymond's HTTP endpoints.
   // Runs its own SQLite (app.sqlite) for fast public serving. Port 3090 is the
   // fleet dev port (Draymond owns 3000/3444).
+  // Restored 2026-09-27 — moved to 05_Apps/Overlay-Global-Lens. Requires
+  // `npm run build` in that dir (produces dist/server.mjs) before first start.
   pm2App({
     name: "global-lens",
-    script: P("Overlay-Global-Lens/dist/server.mjs"),
-    cwd: P("Overlay-Global-Lens"),
+    script: P("05_Apps/Overlay-Global-Lens/dist/server.mjs"),
+    cwd: P("05_Apps/Overlay-Global-Lens"),
     interpreter: NODE,
     memory: "1G",
     env: {
@@ -430,22 +444,25 @@ const FLEET_SERVICES = [
   }),
   pm2App({
     name: "dev-brain",
-    script: P("Dev-Brain/dist/server.cjs"),
+    script: P("06_Resources/Dev-Brain/dist/server.cjs"),
     args: "",
-    cwd: P("Dev-Brain"),
+    cwd: P("06_Resources/Dev-Brain"),
     interpreter: NODE,
     memory: "256M",
-    env: { PORT: "3450", HOST: "127.0.0.1", NODE_ENV: "production", ...D },
+    env: {
+      PORT: "3450",
+      HOST: "127.0.0.1",
+      NODE_ENV: "production",
+      ...D,
+      // Local Jev is CPU-only and slow: cold start measured ~14.5s, and the
+      // dashboard's tick sends a LARGE state (milestones + services + gaps)
+      // whose prefill alone can exceed 12s on this throttling laptop. The
+      // old 10s/12s caps aborted every decision → "offline". 60s here; the
+      // dashboard client timeout is set higher (60s) so it waits for this.
+      JEV_TIMEOUT_MS: "60000",
+    },
   }),
-  pm2App({
-    name: "halofy",
-    script: P("04_Integrations/github-awesome/halofy/kernel/node_modules/tsx/dist/cli.mjs"),
-    args: "src/http/main.ts",
-    cwd: P("04_Integrations/github-awesome/halofy/kernel"),
-    interpreter: NODE,
-    memory: "512M",
-    env: { HALOMEM_PORT: "8787", NODE_ENV: "production" },
-  }),
+  // RETIRED 2026-09-27 — entry path gone (04_Integrations/github-awesome/halofy missing).
   pm2App({
     name: "eidos",
     script: "C:\\Users\\User\\.local\\bin\\eidos.exe",
@@ -463,17 +480,17 @@ const FLEET_SERVICES = [
   // offline and the deterministic engines still run.
   pm2App({
     name: "recourse",
-    // Canonical repo (C:\Users\User\Downloads\recourse). The vendored
+    // Canonical repo (moved 2026-09-27 to 06_Resources/recourse). The vendored
     // agents/recourse copy lacks /api/recourse/provider/chat and
     // /api/recourse/memory/*, so it cannot serve the Open-Chat chat surface.
     // The canonical repo's own .env is already local-first:
-    //   LOCAL_MODEL_BASE_URL=http://127.0.0.1:11434/v1, LOCAL_MODEL_NAME=minicpm5-fable,
+    //   LOCAL_MODEL_BASE_URL=http://127.0.0.1:11434/v1, LOCAL_MODEL_NAME=qwen3.5-2b,
     //   with an api.pgsgrove.com fallback.
     // Run from source via tsx so code changes (e.g. the /v1 OpenAI shim) take
     // effect without a dist rebuild.
-    script: "C:/Users/User/Downloads/recourse/node_modules/tsx/dist/cli.mjs",
+    script: path.join(RECOURSE_DIR, "node_modules", "tsx", "dist", "cli.mjs"),
     args: "server.ts",
-    cwd: "C:/Users/User/Downloads/recourse",
+    cwd: RECOURSE_DIR,
     interpreter: NODE,
     memory: "1G",
     env: {
@@ -482,22 +499,7 @@ const FLEET_SERVICES = [
       ...D,
     },
   }),
-  pm2App({
-    name: "buzz-relay",
-    script: P("04_Integrations/github-awesome/buzz/pm2-buzz-relay.cjs"),
-    args: "",
-    cwd: P("04_Integrations/github-awesome/buzz"),
-    interpreter: NODE,
-    memory: "512M",
-  }),
-  pm2App({
-    name: "rome",
-    script: P("04_Integrations/github-awesome/rome/pm2-rome.cjs"),
-    args: "",
-    cwd: P("04_Integrations/github-awesome/rome"),
-    interpreter: NODE,
-    memory: "512M",
-  }),
+  // RETIRED 2026-09-27 — entry paths gone (04_Integrations/github-awesome/{buzz,rome} missing).
 ];
 
 // â”€â”€ Marketing / coding stack (ecosystem.marketing.config.js) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -537,7 +539,14 @@ const MARKETING_SERVICES = [
   pm2App({
     name: "agent-browser",
     script: O("agents/AgentBrowser-main/node_modules/next/dist/bin/next"),
-    args: "dev -p 3700",
+    // --webpack is REQUIRED: Next 16.2.x Turbopack dev throws
+    // "components.ComponentMod.handler is not a function" on every App Router
+    // route handler (health / browser-control / v1/run), so the whole API 500s
+    // and Keywire's call-up probe fails. Webpack dev serves the same routes
+    // correctly (verified 2026-09-28: health 200; /api/v1/run 401 no-auth →
+    // 400 bad-plan → 200 valid run). Do not drop --webpack until the upstream
+    // Turbopack dev route-handler regression is fixed.
+    args: "dev --webpack -p 3700",
     cwd: O("agents/AgentBrowser-main"),
     interpreter: NODE,
     memory: "1G",
@@ -556,20 +565,7 @@ const MARKETING_SERVICES = [
       KEYWIRE_ENV_SLUG: D.KEYWIRE_ENV_SLUG || "production",
     },
   }),
-  pm2App({
-    name: "mutly",
-    script: O("agents/Mutly-Daemon-Agent/node_modules/tsx/dist/cli.mjs"),
-    args: "server.ts",
-    cwd: O("agents/Mutly-Daemon-Agent"),
-    interpreter: NODE,
-    memory: "1G",
-    env: {
-      PORT: "4000",
-      NODE_ENV: "development",
-      MUTLY_WS_PORT: "24679",
-      MUTLY_ALLOW_SIMULATION_STUBS: "true",
-    },
-  }),
+  // RETIRED 2026-09-27 — entry path gone (agents/Mutly-Daemon-Agent missing).
   pm2App({
     name: "reporank",
     script: O(
@@ -638,7 +634,7 @@ const MARKETING_SERVICES = [
 // plan and re-emailed the operator on a loop. Axiom loads its own .env
 // (AXIOM_PORT=3198, Keywire + model keys), so inject only NODE_ENV/AXIOM_PORT/
 // UPLIFT_ROOT and let its dotenv be authoritative.
-const AXIOM_DIR = P("Deepseek Harness/Axiom Agent");
+const AXIOM_DIR = P("06_Resources/Axiom Agent");
 const DSH_SERVICES = [
   pm2App({
     name: "axiom",
@@ -652,6 +648,10 @@ const DSH_SERVICES = [
       NODE_ENV: "development",
       AXIOM_PORT: "3198",
       UPLIFT_ROOT,
+      // Keywire vault moved to 06_Resources/Keywire on 2026-09-27; without
+      // this Axiom falls back to its emergency key and dashboard-minted
+      // tokens (signed with the real Keywire jwtSecret) 401.
+      KEYWIRE_KEYS_FILE: P("06_Resources/Keywire/data/keywire-keys.json"),
     },
   }),
 ];
@@ -689,9 +689,10 @@ const LLAMA_SERVER_BIN =
 
 const INFRA_SERVICES = [
   // localjev — Jev-compatible System One API (Bun, :8080). LocalJev wraps the
-  // local DiffusionGemma endpoint with prompted-probability inference. Bun app:
-  // entry is `bun run src/index.ts` (package.json start); pm2 runs the entry
-  // directly through the Bun interpreter (same code path, no npm wrapper).
+  // local llama.cpp endpoint (:11434, Qwen3.5-2B) with prompted-probability
+  // inference. Bun app: entry is `bun run src/index.ts` (package.json start);
+  // pm2 runs the entry directly through the Bun interpreter (same code path, no
+  // npm wrapper).
   // LOCALJEV_UPSTREAM / LOCALJEV_UPSTREAM_MODEL come from localjev's own .env;
   // only the port is pinned here. Memory 256M per operator gate.
   pm2App({
@@ -711,14 +712,14 @@ const INFRA_SERVICES = [
   pm2App({
     name: "openhub",
     script: path.join(
-      P("Deepseek Harness/Axiom Agent/openhub"),
+      P("06_Resources/Axiom Agent/openhub"),
       "node_modules",
       "tsx",
       "dist",
       "cli.mjs"
     ),
     args: "server.ts",
-    cwd: P("Deepseek Harness/Axiom Agent/openhub"),
+    cwd: P("06_Resources/Axiom Agent/openhub"),
     interpreter: NODE,
     memory: "1G",
     restart_delay: 5000,
@@ -726,40 +727,45 @@ const INFRA_SERVICES = [
       NODE_ENV: "development",
       PORT: "3010",
       UPLIFT_ROOT,
+      // Same Keywire move as axiom above.
+      KEYWIRE_KEYS_FILE: P("06_Resources/Keywire/data/keywire-keys.json"),
     },
   }),
-  // llama-server — llama.cpp OpenAI-compatible server for the DiffusionGemma
-  // (:8000) lane feeding LocalJev (`diffusiongemma-26B-A4B-it-4bit`).
+  // llama-server — llama.cpp OpenAI-compatible server for the fleet's LOCAL
+  // MODEL lane on :11434 (alias `qwen3.5-2b`). LocalJev points at this
+  // (LOCALJEV_UPSTREAM=http://127.0.0.1:11434). This is the tier Jev decisions
+  // fall back to when the Vercel AI Gateway is unavailable.
   //
-  // HONEST NOTES (verified 2026-09-22):
-  //   - Binary path VERIFIED on disk (also on PATH via the ggml.llamacpp winget
-  //     shim; `start-local.ps1` in C:\Users\User\models uses the same binary).
-  //   - The diffusiongemma-26B-A4B-it-4bit GGUF is NOT present on this machine
-  //     (searched C:\Users\User\models + the repo; only MiniCPM5 fable + nomic
-  //     embed are on disk). The `-m` path below is therefore a documented
-  //     default, NOT a verified start command — the entry stays stopped until
-  //     the operator downloads the GGUF and confirms the model path. The localjev
-  //     README's DiffusionGemma bake-off ran on a Mac (oMLX); the llama.cpp
-  //     lane on Windows was never captured with a start command.
-  //   - The llama-server process actually running today (PID captured in
-  //     data/logs/llama-server-error.log notes) is the :11434 minicpm5-fable
-  //     lane, started by start-minicpm.ps1 / start-local.ps1 — a DIFFERENT
-  //     unmanaged process. Its exact cmdline:
-  //       llama-server.exe -m C:\Users\User\models\MiniCPM5-1B-Claude-Opus-Fable5-V2-Thinking-Q8_0.gguf
-  //         --port 11434 --host 127.0.0.1 -t 8 -b 2048 -ub 512 --cache-prompt
-  //         --parallel 1 -c 8192 --reasoning off -ngl 0
-  //   - Memory: 2G restart ceiling. The live llama-server (1B model) measures
-  //     ~1.7 GB private; the plan's "400MB" figure understated reality. A 26B
-  //     A4B-4bit DiffusionGemma needs far more than this 16 GB laptop's ~5 GB
-  //     headroom — treat this lane as best-effort/occasional, not always-on.
-  // Args mirror start-local.ps1 discipline: --load-mode mmap+mlock keeps the
-  // model resident, -t pins threads on this 4C/8T i7, -c 8192 context.
+  // SWITCHED 2026-09-28: MiniCPM5-1B "Fable" → Unsloth Qwen3.5-2B (UD-Q4_K_XL).
+  // Rationale (operator's own head-to-head on the oncology suite): Qwen3.5-2B
+  // scored 35/38 vs 37/38 for the 4B at ~2.2x the speed (6.8 vs 3.1 tok/s), so
+  // the 4B is unusable on this 15W laptop. Unsloth Dynamic 2.0 upcasts important
+  // layers to 8/16-bit, so UD-Q4_K_XL beats a plain Q4_K_M at +0.06 GB. Qwen3.5-2B
+  // is natively multimodal, so the same server takes --mmproj and also covers the
+  // local vision tier (no separate model). `--alias qwen3.5-2b` is the
+  // ecosystem-wide local model id (matches the GenieX phone catalog).
+  // Memory ceiling raised 3G→4G: 1.28 GB weights + 0.64 GB projector + KV, and
+  // pm2 killing it mid-inference would reintroduce the local-lane outage.
   pm2App({
     name: "llama-server",
     script: LLAMA_SERVER_BIN,
     args:
-      "-m C:\\Users\\User\\models\\diffusiongemma-26B-A4B-it-4bit.gguf --port 8000 --host 127.0.0.1 -c 8192 -np 1 -t 6 --load-mode mmap+mlock --alias diffusiongemma-26B-A4B-it-4bit",
-    memory: "2G",
+      "-m C:\\Users\\User\\models\\Qwen3.5-2B-UD-Q4_K_XL.gguf --mmproj C:\\Users\\User\\models\\Qwen3.5-2B-mmproj-F16.gguf --port 11434 --host 127.0.0.1 -t 6 -b 2048 -ub 512 --cache-prompt --parallel 1 -c 8192 --reasoning off -ngl 0 --jinja --min-p 0 --alias qwen3.5-2b",
+    memory: "4G",
+    restart_delay: 5000,
+    env: { NODE_ENV: "production" },
+  }),
+  // nomic-embed — local EMBEDDINGS server (llama.cpp), the tier LiteLLM's
+  // `nomic-embed` model group points at (:11435). nomic-embed-text-v1.5, 768-dim,
+  // Apache-2.0, offline. Required by Synthbook's retrieval and any other
+  // semantic retrieval. Mirrors C:\Users\User\models\start-embed.ps1. Separate
+  // port from the :11434 chat lane because llama-server serves one model each.
+  pm2App({
+    name: "nomic-embed",
+    script: LLAMA_SERVER_BIN,
+    args:
+      "-m C:\\Users\\User\\models\\nomic-embed-text-v1.5.Q8_0.gguf --port 11435 --host 127.0.0.1 -c 2048 -np 1 -t 6 -fa on --alias nomic-embed --embeddings --pooling mean",
+    memory: "1G",
     restart_delay: 5000,
     env: { NODE_ENV: "production" },
   }),
@@ -778,6 +784,67 @@ const INFRA_SERVICES = [
   }),
 ];
 
+// ── Move guard ───────────────────────────────────────────────────────────────
+// Files get moved around; a stale entry path silently produces a pm2 app that
+// dies on start (or a registry entry that points at the wrong script). Resolve
+// every declared entry at load time and SHOUT about any problems, so a move is
+// caught by config load / `node fleet-manifest.js` — not by a silent crash hours
+// later. Warn-only: never blocks a config from loading.
+//
+// Beyond the original script-existence check this also verifies the working
+// directory and an absolute interpreter path, and detects two entries claiming
+// the same `--port`. The script-only check is what let a service whose routes
+// all 404'd still be recorded as "verified online".
+function fleetEntryIssues() {
+  const groups = {
+    CORE_APP,
+    FLEET_SERVICES,
+    MARKETING_SERVICES,
+    DSH_SERVICES,
+    BRAIN_SERVICES,
+    INFRA_SERVICES,
+  };
+  const seen = new Set();
+  const issues = [];
+  const portClaims = new Map();
+  for (const val of Object.values(groups)) {
+    const arr = Array.isArray(val) ? val : val && val.name ? [val] : [];
+    for (const app of arr) {
+      if (!app || !app.name || seen.has(app.name)) continue;
+      seen.add(app.name);
+      if (!app.script) continue;
+      const p = path.isAbsolute(app.script)
+        ? app.script
+        : path.resolve(app.cwd || process.cwd(), app.script);
+      if (!fs.existsSync(p)) issues.push(`${app.name} -> MISSING script ${p}`);
+      if (app.cwd && !fs.existsSync(app.cwd)) {
+        issues.push(`${app.name} -> MISSING cwd ${app.cwd}`);
+      }
+      if (app.interpreter && path.isAbsolute(app.interpreter) && !fs.existsSync(app.interpreter)) {
+        issues.push(`${app.name} -> MISSING interpreter ${app.interpreter}`);
+      }
+      const argsStr = Array.isArray(app.args) ? app.args.join(" ") : String(app.args || "");
+      const m = argsStr.match(/--port[= ](\d{2,5})/);
+      if (m) {
+        if (!portClaims.has(m[1])) portClaims.set(m[1], []);
+        portClaims.get(m[1]).push(app.name);
+      }
+    }
+  }
+  for (const [port, names] of portClaims) {
+    if (names.length > 1) {
+      issues.push(`PORT CONFLICT :${port} claimed by ${names.join(", ")}`);
+    }
+  }
+  return issues;
+}
+
+if (require.main === module) {
+  const issues = fleetEntryIssues();
+  console.log(`[fleet-manifest] ${issues.length ? `${issues.length} issue(s)` : "all entries resolve"}`);
+  for (const m of issues) console.log(`[fleet-manifest]   ${m}`);
+}
+
 module.exports = {
   UPLIFT_ROOT,
   ORCH_DIR,
@@ -789,5 +856,6 @@ module.exports = {
   DSH_SERVICES,
   BRAIN_SERVICES,
   INFRA_SERVICES,
+  fleetEntryIssues,
 };
 

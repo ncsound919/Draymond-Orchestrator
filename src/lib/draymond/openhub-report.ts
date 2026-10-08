@@ -4,7 +4,7 @@
 // Draymond reports job/code failures to OpenHub's ecosystem-aware repair
 // intake (POST /api/ecosystem/report). OpenHub resolves the tool's PRELOADED
 // local folder, audits it, and dispatches the fix to Axiom with the same
-// targetDir — Axiom/opencode never rescans the full codebase.
+// targetDir — Axiom never rescans the full codebase.
 //
 // Honesty contract:
 //   - Fail-soft: if OpenHub is unreachable, this returns ok:false with an

@@ -11,7 +11,7 @@ import { writeBrainFile } from './journal';
  *
  * Fixing, not reporting: this module ACTUALLY dispatches repairs:
  *   - service_down  → attempts to START the real service (service-manager).
- *   - code_error    → dispatches the coding crew (opencode) to generate a patch
+ *   - code_error    → dispatches the coding crew (axiom) to generate a patch
  *                     IMMEDIATELY on the first failure (bounded by a per-job
  *                     cooldown so tokens aren't burned on identical repeats).
  *   - missing_env   → escalates with a concrete provisioning instruction.
@@ -281,7 +281,7 @@ export function serviceForFailure(jobName: string, error: string): string[] {
     { slug: "uplift", keywords: ["uplift-agent", "uplift agent"] },
     { slug: "sports-steve", keywords: ["sports-steve", "sports steve"] },
     { slug: "mutly", keywords: ["mutly"] },
-    { slug: "opencode", keywords: ["opencode"] },
+    { slug: "axiom", keywords: ["axiom", "opencode"] },
   ];
   for (const c of catalog) {
     if (c.keywords.some((k) => e.includes(k))) matches.push(c.slug);
@@ -327,6 +327,33 @@ export async function repairFailedJob(
   lessonHints: string[] = [],
   options: RepairRepairOptions = {},
 ): Promise<RepairReport> {
+  // Guard: a job that is intentionally DISABLED is never repaired. Repairing it
+  // burns tokens and emits a recurring "fixed"/"escalated" report that can never
+  // stick (the job stays off) — the "reported fixed every day, nothing changes"
+  // churn. Look the row up by id and skip if it is off. Best-effort: if the
+  // lookup fails we fall through to the normal repair path.
+  try {
+    const { listJobs } = await import('./scheduler');
+    const row = (await listJobs({ limit: 200 })).find((j) => j.id === job.id);
+    if (row && !row.is_enabled) {
+      const report: RepairReport = {
+        jobId: job.id,
+        jobName: job.name,
+        failureKind: classifyFailure(error),
+        error,
+        crew: { lead: 'none', members: [], reason: 'job disabled — repair skipped' },
+        action: 'handed-off',
+        detail: 'job is intentionally disabled (OFF) — not repaired; re-enable it to schedule repairs',
+        repairedAt: new Date().toISOString(),
+        lessonHints,
+        dispatch: { kind: 'deferred', result: 'disabled' },
+      };
+      // deferred handoff => recordRepair is silent (no email, no OpenHub report)
+      await recordRepair(report);
+      return report;
+    }
+  } catch { /* lookup best-effort — fall through to normal repair */ }
+
   const deterministicKind = classifyFailure(error);
   let kind = deterministicKind;
   // Local-first triage refinement: only override the fuzzy buckets (unknown /
@@ -558,7 +585,7 @@ export interface BenchmarkWeakEntity {
  *   1. Failover config fix — reuses the upgrade-queue failover matrix
  *      (reconfigureEntity, gated by DRAYMOND_FAILOVER_MATRIX) to apply safe,
  *      reversible invocation changes (retries/timeout) on the component.
- *   2. Coding crew — opencode (primary) → uplift-agent (fallback) → a
+ *   2. Coding crew — axiom (primary) → uplift-agent (fallback) → a
  *      deterministic terminal plan, so a code/config fix is PROPOSED and
  *      captured for the crew lead even when no engine is reachable.
  *
@@ -724,10 +751,12 @@ async function recordRepair(report: RepairReport): Promise<void> {
   // audits the tool's PRELOADED local folder and dispatches the fix to Axiom
   // with the same targetDir (no full-codebase rescan by Axiom/opencode).
   // Best-effort — OpenHub being down never blocks the local repair path.
-  // Only report code/skill repairs with a real outcome, not silent deferrals.
+  // ALL real repair outcomes (fixed, escalated, handed-off) go to OpenHub so
+  // Axiom can audit and fix. Silent deferrals (cooldown/waiting) are skipped.
   const openHubReportable =
-    (report.action === 'fixed' || report.action === 'escalated' || report.action === 'handed-off') &&
-    report.failureKind !== 'unknown';
+    report.action === 'fixed' ||
+    report.action === 'escalated' ||
+    (report.action === 'handed-off' && report.dispatch?.kind !== 'deferred');
   if (openHubReportable) {
     try {
       const { reportToOpenHubBestEffort } = await import('./openhub-report');
@@ -792,18 +821,43 @@ export function renderRepairReport(report: RepairReport): string {
   return lines.join('\n');
 }
 
-const reportCooldownMs = () => Number(process.env.DRAYMOND_REPAIR_REPORT_COOLDOWN_MS) || 30 * 60 * 1000;
+// Repair-report dedup window. Keyed per JOB + OUTCOME — NOT per detail and NOT
+// per run-instance — so a recurring failure of the same job/chain template is
+// reported to the repair team once per window instead of once per run. Chain
+// run instances (…-run-<epoch>, "… — Run <ISO>") collapse to their template, so
+// the hundreds of failed run rows can no longer each emit a fresh report.
+// Default 24h; override with DRAYMOND_REPAIR_REPORT_COOLDOWN_MS.
+const reportCooldownMs = () => Number(process.env.DRAYMOND_REPAIR_REPORT_COOLDOWN_MS) || 24 * 60 * 60 * 1000;
+
+/** Collapse a job / chain-run identifier to the stable template it belongs to. */
+export function normalizeRepairKey(jobId: string, jobName: string): string {
+  return (jobName || jobId || 'unknown')
+    .replace(/\s+[\u2014\u2013-]\s*Run\s+.*$/i, '') // "Morning Briefing — Run 2026-…"
+    .replace(/-run-\d+/gi, '')                      // "morning-briefing-run-1786…"
+    .trim()
+    .toLowerCase();
+}
 
 /**
- * Push a deterministic repair report to the operator (email) AND the
- * repair/coding team (ntfy repair topic). Best-effort, never throws, and
- * deduped per job+outcome so a burst of failures cannot flood the inbox.
+ * Push a deterministic repair report to the REPAIR TEAM (ntfy) and — only when
+ * explicitly opted in — the operator (email). Best-effort, never throws.
+ *
+ * Deduped per job+outcome: the repair still runs, but the same recurring
+ * outcome is not re-broadcast every shift ("I should not see the same message
+ * twice"). Operator email is OFF by default: repairs are the repair team's job,
+ * not an inbox subscription. Set DRAYMOND_REPAIR_REPORT_EMAIL=1 to re-enable.
  */
 export async function sendRepairReport(report: RepairReport): Promise<boolean> {
+  // One report per job + outcome per window (check-and-set).
+  const { isOnCooldown } = await import('./workflow-budget');
+  const key = `${normalizeRepairKey(report.jobId, report.jobName)}|${report.action}`;
+  if (isOnCooldown('repair-report', key, reportCooldownMs())) return false;
+
   const text = renderRepairReport(report);
   let sent = false;
 
-  // ntfy → the repair/coding team + the phone (Open-Chat auto-speaks).
+  // ntfy → the repair/coding team + the phone (Open-Chat auto-speaks). This is
+  // where repairs are announced so the crew can act.
   try {
     const base = process.env.NTFY_URL;
     const topic = process.env.NTFY_TOPIC_REPAIR ?? process.env.NTFY_TOPIC_RESULTS;
@@ -824,18 +878,18 @@ export async function sendRepairReport(report: RepairReport): Promise<boolean> {
     }
   } catch { /* best-effort */ }
 
-  // Email → the operator. Deduped so identical job outcomes don't spam.
-  try {
-    const recipient = process.env.DRAYMOND_ALERT_EMAIL ?? process.env.GMAIL_USER;
-    if (recipient) {
-      const { isOnCooldown } = await import('./workflow-budget');
-      if (!isOnCooldown(`report:${report.jobId}`, report.action, reportCooldownMs())) {
+  // Email → the operator. OFF by default (repairs go to the repair team). Opt
+  // back in with DRAYMOND_REPAIR_REPORT_EMAIL=1.
+  if (process.env.DRAYMOND_REPAIR_REPORT_EMAIL === '1') {
+    try {
+      const recipient = process.env.DRAYMOND_ALERT_EMAIL ?? process.env.GMAIL_USER;
+      if (recipient) {
         const { sendMemo } = await import('./notifications');
         await sendMemo(`Draymond repair — ${report.jobName} (${report.action})`, text, recipient);
         sent = true;
       }
-    }
-  } catch { /* best-effort */ }
+    } catch { /* best-effort */ }
+  }
 
   return sent;
 }

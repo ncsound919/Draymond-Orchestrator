@@ -209,7 +209,10 @@ export async function sendRecap(recap: PhaseRecap): Promise<{ channels: string[]
 // Email via the existing Gmail memo path. Uses the JEV-framed humanized
   // recap (varied subject + delivery voice) when available; falls back to the
   // plain markdown recap when the voice module cannot load.
-  if (process.env.GMAIL_USER || process.env.DRAYMOND_ALERT_EMAIL) {
+  // OFF by default: 4 automated recap emails/day is noise the operator did not
+  // ask for — recaps already go to Open-Chat + ntfy above. Re-enable with
+  // DRAYMOND_RECAP_EMAIL=1.
+  if (process.env.DRAYMOND_RECAP_EMAIL === '1' && (process.env.GMAIL_USER || process.env.DRAYMOND_ALERT_EMAIL)) {
     try {
       const { sendMemo } = await import("./notifications");
       let subject = `Overlay365 ${recap.phase} recap — ${recap.generatedAt.slice(0, 10)}`;
@@ -227,7 +230,11 @@ export async function sendRecap(recap: PhaseRecap): Promise<{ channels: string[]
       detail.push(`email: ${err instanceof Error ? err.message : String(err)}`);
     }
   } else {
-    detail.push("email: GMAIL_USER/ALERT_EMAIL not configured");
+    detail.push(
+      process.env.DRAYMOND_RECAP_EMAIL === '1'
+        ? "email: GMAIL_USER/ALERT_EMAIL not configured"
+        : "email: disabled (set DRAYMOND_RECAP_EMAIL=1 to enable)"
+    );
   }
 
   return { channels, detail };

@@ -11,9 +11,11 @@
 //
 //   npx pm2 start ecosystem.infra.config.js && npx pm2 save
 //
-// NOTE: do NOT start this config until the operator has reviewed the
-// llama-server entry — its DiffusionGemma model file is NOT on disk yet (see
-// the manifest comment); the entry is a documented scaffold.
+// NOTE: the old "do NOT start this config" scaffold warning is RESOLVED. The
+// llama-server entry now serves Unsloth Qwen3.5-2B (UD-Q4_K_XL + its mmproj),
+// both present on disk as of 2026-09-28. Under RUN LEAN, start only what you
+// need rather than the whole group:
+//   npx pm2 start ecosystem.infra.config.js --only llama-server,nomic-embed
 // ============================================================================
 
 const { INFRA_SERVICES } = require("./fleet-manifest");

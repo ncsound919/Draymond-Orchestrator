@@ -22,6 +22,7 @@
 // ============================================================================
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import type { SectorId } from './corporate';
 import { sectorById } from './corporate';
@@ -118,7 +119,8 @@ export const MANAGED_SERVICES: Record<string, ServiceDef> = {
   'claw-protect': { slug: 'claw-protect', sector: 'e3-tooling', config: MARKETING, mode: 'on-demand', idleTtlMs: ttl(DEFAULT_LIGHT_TTL_MS) },
   grader: { slug: 'grader', sector: 'e3-tooling', config: MARKETING, mode: 'on-demand', idleTtlMs: ttl(DEFAULT_LIGHT_TTL_MS) },
   reporank: { slug: 'reporank', sector: 'e3-tooling', config: MARKETING, mode: 'on-demand', idleTtlMs: ttl(DEFAULT_LIGHT_TTL_MS) },
-  mutly: { slug: 'mutly', sector: 'e3-tooling', config: MARKETING, mode: 'on-demand', idleTtlMs: ttl(DEFAULT_LIGHT_TTL_MS) },
+  // (mutly removed 2026-09-28: agents/Mutly-Daemon-Agent checkout gone, no pm2
+  // entry — every e3-tooling job logged failed=[mutly]. Re-add when provisioned.)
   // (vibe-reality removed 2026-09-01: port 3202 held by a native process — pm2 cannot own it.)
   'big-homie': { slug: 'big-homie', sector: 'e3-tooling', config: FLEET, mode: 'on-demand', idleTtlMs: ttl(DEFAULT_LIGHT_TTL_MS) },
   'system-agent': { slug: 'system-agent', sector: 'e3-tooling', config: FLEET, mode: 'on-demand', idleTtlMs: ttl(DEFAULT_LIGHT_TTL_MS) },
@@ -139,8 +141,8 @@ export const MANAGED_SERVICES: Record<string, ServiceDef> = {
   'indy-music': { slug: 'indy-music', sector: 'e4-vertical', config: FLEET, mode: 'on-demand', idleTtlMs: ttl(DEFAULT_LIGHT_TTL_MS) },
   'overlay-chain': { slug: 'overlay-chain', sector: 'e4-vertical', config: FLEET, mode: 'on-demand', idleTtlMs: ttl(DEFAULT_LIGHT_TTL_MS) },
   'hemp-os': { slug: 'hemp-os', sector: 'e4-vertical', config: FLEET, mode: 'on-demand', idleTtlMs: ttl(DEFAULT_LIGHT_TTL_MS) },
-  // Re-added 2026-09-01: now pm2-owned (port 8000) and job-driven — sweepable.
-  'uplift-agent': { slug: 'uplift-agent', sector: 'e4-vertical', config: FLEET, mode: 'on-demand', idleTtlMs: ttl(DEFAULT_LIGHT_TTL_MS) },
+  // (uplift-agent removed 2026-09-28: Hermes fork never provisioned locally, no
+  // pm2 entry — jobs depending on it are seeded disabled. Re-add when provisioned.)
   'sub-team': { slug: 'sub-team', sector: 'e4-vertical', config: FLEET, mode: 'on-demand', idleTtlMs: ttl(DEFAULT_HEAVY_TTL_MS), heavy: true },
 
   // ---- Research engines (pinned warm 2026-09-08) ----
@@ -153,7 +155,7 @@ export const MANAGED_SERVICES: Record<string, ServiceDef> = {
   recourse: { slug: 'recourse', sector: 'e4-vertical', config: 'ecosystem.fleet.config.js', mode: 'warm' },
 
   // ---- Ops infra (not warm, but storable on-demand) ----
-  // (opencode removed 2026-09-01: headless serve crash-looped 105k+ restarts — needs config fix first.)
+  // (opencode harness removed 2026-09-01: headless serve crash-looped 105k+ restarts; replaced by Axiom (:3198) 2026-09-18.)
   // (dsh-harness removed 2026-09-01: cut from the fleet (CPU hog, overlaps litellm).)
 };
 
@@ -248,6 +250,62 @@ export async function ensureSectorForJob(
   return { touched, started, failed, disabled: !on };
 }
 
+/**
+ * Entity slug → pm2 service slug, when the two differ. Kept tiny and explicit.
+ */
+const ENTITY_SERVICE_ALIAS: Record<string, string> = {
+  'omni-research': 'omniresearch',
+  'overlay-global-lens': 'global-lens',
+};
+
+/**
+ * Ensure the pm2 services a CHAIN job depends on are up before it runs.
+ *
+ * Chain jobs carry `job_config.chain_slug` (no `handler`), so the handler-based
+ * sector hook never warmed their dependencies. That is why the oncology chains
+ * ran with overlay-oncology (:3070) down and failed "fetch failed". This
+ * resolves the chain template's step entities to managed services and ensures
+ * each one — targeted per-service, NOT the whole sector (RUN LEAN).
+ *
+ * Best-effort: returns a report, never throws.
+ */
+export async function ensureChainServicesForJob(
+  chainSlug: string,
+): Promise<{ started: string[]; failed: string[]; touched: string[]; skipped: string[] }> {
+  const started: string[] = [];
+  const failed: string[] = [];
+  const touched: string[] = [];
+  const skipped: string[] = [];
+  try {
+    const { getChain, getChainSteps } = await import('./chains');
+    const template = await getChain(chainSlug).catch(() => null);
+    if (!template) return { started, failed, touched, skipped };
+    const steps = (await getChainSteps(template.id).catch(() => [])) as Array<{ entity_id?: string | null }>;
+    const entityIds = [...new Set(steps.map((s) => s.entity_id).filter((v): v is string => Boolean(v)))];
+    if (entityIds.length === 0) return { started, failed, touched, skipped };
+
+    const { createDraymondAdminClient } = await import('./client');
+    const supabase = createDraymondAdminClient();
+    const { data } = await supabase.from('draymond_entities').select('slug').in('id', entityIds);
+    const rows = (data ?? []) as Array<{ slug?: string | null }>;
+    const entitySlugs = [...new Set(rows.map((r) => String(r.slug ?? '')).filter(Boolean))];
+
+    for (const entitySlug of entitySlugs) {
+      const serviceSlug = MANAGED_SERVICES[entitySlug] ? entitySlug : ENTITY_SERVICE_ALIAS[entitySlug];
+      if (!serviceSlug || !MANAGED_SERVICES[serviceSlug]) {
+        skipped.push(entitySlug); // not a pm2-managed service (e.g. kaggle proxy)
+        continue;
+      }
+      const res = await ensureServiceForTask(serviceSlug);
+      if (res === 'started') started.push(serviceSlug);
+      else if (res === 'failed') failed.push(serviceSlug);
+      else if (res === 'up') touched.push(serviceSlug);
+      else skipped.push(serviceSlug);
+    }
+  } catch { /* best-effort — lifecycle must never block a job */ }
+  return { started, failed, touched, skipped };
+}
+
 function lastUsedIso(slug: string): string | undefined {
   return loadActivity().lastUsed[slug];
 }
@@ -311,6 +369,46 @@ export function sectorServiceCounts(): Record<SectorId, { total: number; onDeman
 
 export type EnsureResult = 'up' | 'started' | 'noop' | 'failed' | 'disabled';
 
+/** Instantaneous host load in [0,1] (1-min loadavg share + memory pressure).
+ *  Local sampler (NOT the scheduler's delta sampler) so lifecycle start
+ *  decisions never consume the scheduler tick's CPU deltas. */
+export function hostLoad(): number {
+  const cpus = Math.max(1, os.cpus().length);
+  const load = Math.min(1, Math.max(0, os.loadavg()[0] / cpus));
+  const mem = 1 - os.freemem() / Math.max(1, os.totalmem());
+  return Math.min(1, Math.max(0, 0.65 * load + 0.35 * mem));
+}
+
+function coldStartGate(): { heavy: number; hard: number; enabled: boolean } {
+  const raw = process.env.DRAYMOND_HOST_PRESSURE_GATE;
+  const enabled = raw !== '0' && raw !== 'false';
+  const heavy = Number(process.env.DRAYMOND_PRESSURE_HEAVY ?? 0.6);
+  const hard = Number(process.env.DRAYMOND_PRESSURE_HARD ?? 0.85);
+  return {
+    enabled,
+    heavy: Number.isFinite(heavy) ? heavy : 0.6,
+    hard: Number.isFinite(hard) ? hard : 0.85,
+  };
+}
+
+/**
+ * True when a service may be cold-started right now. Mirrors the scheduler's
+ * pressure semantics (heavy services defer at HEAVY, everything at HARD) so
+ * the lifecycle cannot freeze the box by booting heavy apps onto maxed RAM —
+ * the exact failure that took PM2 down. Disable with
+ * DRAYMOND_HOST_PRESSURE_GATE=0. Warm services always return true (pinned).
+ */
+export function coldStartAllowed(slug: string): boolean {
+  if (isWarm(slug)) return true;
+  const gate = coldStartGate();
+  if (!gate.enabled) return true;
+  const load = hostLoad();
+  const def = getServiceDef(slug);
+  if (load >= gate.hard) return false;
+  if (def?.heavy && load >= gate.heavy) return false;
+  return true;
+}
+
 /**
  * Ensure a managed service is up before a task uses it. Warm services are
  * always treated as required; on-demand services are cold-started on demand.
@@ -334,6 +432,11 @@ export async function ensureServiceForTask(slug: string): Promise<EnsureResult> 
 
   // On-demand: cold-start only when the operator has enabled the lifecycle.
   if (!lifecycleEnabled()) return 'disabled';
+  // Host-pressure gate: refuse to pile a cold start onto a maxed box.
+  if (!coldStartAllowed(slug)) {
+    console.warn(`[sector-lifecycle] not cold-starting "${slug}" — host load ${hostLoad().toFixed(2)} too high (RUN LEAN)`);
+    return 'failed';
+  }
   const started = await pm2StartConfig(/*turbopackIgnore: true*/ path.join(ORCH, def.config), slug);
   if (!started) return 'failed';
   touchService(slug);
@@ -379,6 +482,38 @@ export async function sectorSweep(now = new Date()): Promise<{ stopped: string[]
     const ok = await pm2Stop(slug);
     if (ok) stopped.push(slug);
     else failed.push(slug);
+  }
+
+  // -- Detached call-ups (service-manager PID registry) --
+  // startService() spawns detached processes tracked in data/server-pids.json,
+  // invisible to pm2 — the loop above can never see them. Reap over-TTL ones
+  // the same way so call-ups cannot leak (e.g. big-homie holding :8888 for 80+
+  // minutes while pm2 reported it stopped). Dynamic import: service-manager
+  // never imports this module, so there is no load cycle.
+  try {
+    const { listTrackedServices, stopService } = await import('./service-manager');
+    for (const tracked of listTrackedServices()) {
+      if (stopped.includes(tracked.slug) || kept.includes(tracked.slug)) continue;
+      const def = MANAGED_SERVICES[tracked.slug];
+      if (!def || def.mode === 'warm' || isWarm(tracked.slug)) continue;
+      if (!tracked.alive) continue; // stale registry entry — nothing to do
+      const proc = list.get(tracked.slug);
+      if (proc && proc.status === 'online') continue; // pm2-owned — handled above
+      const ageMs = now.getTime() - Date.parse(tracked.startedAt);
+      if (!Number.isFinite(ageMs)) continue;
+      if (ageMs >= (def.idleTtlMs ?? DEFAULT_LIGHT_TTL_MS)) {
+        try {
+          await stopService(tracked.slug);
+          stopped.push(tracked.slug);
+        } catch {
+          failed.push(tracked.slug);
+        }
+      } else {
+        kept.push(tracked.slug);
+      }
+    }
+  } catch {
+    /* registry unreadable — pm2 loop above already ran */
   }
   return { stopped, kept, failed };
 }

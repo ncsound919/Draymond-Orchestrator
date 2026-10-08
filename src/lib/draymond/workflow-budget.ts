@@ -264,7 +264,7 @@ export interface AssignedModel {
 const TIER_DEFAULTS: Record<ModelTier, AssignedModel> = {
   free:   { provider: 'opencode-free', model: 'muse-spark-1.2-contributor-free', tier: 'free' },
   go:     { provider: 'opencode',  model: 'deepseek-v4-flash', tier: 'go'    },
-  ollama: { provider: 'ollama',    model: 'qwen3:0.6b',        tier: 'ollama' },
+  ollama: { provider: 'ollama',    model: 'qwen3.5-2b',        tier: 'ollama' },
 };
 
 /**
@@ -326,19 +326,18 @@ export function assignModelForTask(
     return { ...TIER_DEFAULTS.free, model: readAssignedFreeModel() };
   }
 
-  // Local-only skills always route to Ollama regardless of budget
+  // Local-only skills always route to the local model regardless of budget.
+  // COLLAPSED 2026-09-28: the local lane was a 5-model set (fast / mid-vision /
+  // biomed / ocr / chem specialists). The ecosystem now serves ONE multimodal
+  // model on :11434 (see ecosystem/local-models.json), so every local tier
+  // resolves to it. To restore the specialist split, re-add the weights and a
+  // per-tier map; check-local-models.mjs will flag any tier pointing at a model
+  // the lane no longer serves.
   const ollamaSkills = new Set(['vision', 'biomed', 'ocr', 'chem', 'fast']);
   if (ollamaSkills.has(skillTier)) {
-    const ollamaModels: Record<string, string> = {
-      vision: process.env.OLLAMA_VISION_MODEL ?? 'qwen3.5:4b',
-      biomed: 'medgemma:4b',
-      ocr:    'deepseek-ocr:3b',
-      chem:   'txgemma-2b',
-      fast:   'qwen3:0.6b',
-    };
-    const model = ollamaModels[skillTier] ?? 'qwen3:0.6b';
+    const localModel = process.env.OLLAMA_VISION_MODEL ?? 'qwen3.5-2b';
     _assignmentCounts.ollama += 1;
-    return { provider: 'ollama', model, tier: 'ollama' };
+    return { provider: 'ollama', model: localModel, tier: 'ollama' };
   }
 
   // Code / general tasks: treasury gates Go-tier access

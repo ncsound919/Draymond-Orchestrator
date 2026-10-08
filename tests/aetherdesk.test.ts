@@ -1,10 +1,64 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  AETHERDESK_DEFAULT_BASE_URL,
   AETHERDESK_OPERATIONS,
   buildAetherDeskUrl,
   executeAetherDeskOperation,
   getOperationRisk,
+  normalizeAetherDeskBaseUrl,
+  resolveAetherDeskBaseUrl,
 } from '../src/lib/draymond/aetherdesk';
+
+describe('normalizeAetherDeskBaseUrl', () => {
+  it('defaults to the pm2 port when nothing is configured', () => {
+    expect(AETHERDESK_DEFAULT_BASE_URL).toBe('http://127.0.0.1:8002/api/v1');
+    expect(normalizeAetherDeskBaseUrl(undefined)).toBe(AETHERDESK_DEFAULT_BASE_URL);
+    expect(normalizeAetherDeskBaseUrl('')).toBe(AETHERDESK_DEFAULT_BASE_URL);
+  });
+
+  it('appends /api/v1 to a bare origin', () => {
+    expect(normalizeAetherDeskBaseUrl('http://127.0.0.1:8002')).toBe('http://127.0.0.1:8002/api/v1');
+  });
+
+  it('never doubles /api/v1', () => {
+    expect(normalizeAetherDeskBaseUrl('http://127.0.0.1:8002/api/v1')).toBe('http://127.0.0.1:8002/api/v1');
+    expect(normalizeAetherDeskBaseUrl('http://127.0.0.1:8002/api/v1/')).toBe('http://127.0.0.1:8002/api/v1');
+  });
+
+  it('adds a missing scheme and strips trailing slashes', () => {
+    expect(normalizeAetherDeskBaseUrl('127.0.0.1:8002//')).toBe('http://127.0.0.1:8002/api/v1');
+    expect(normalizeAetherDeskBaseUrl('https://aether.example.com')).toBe('https://aether.example.com/api/v1');
+  });
+});
+
+describe('resolveAetherDeskBaseUrl', () => {
+  const original = { ...process.env };
+
+  afterEach(() => {
+    for (const k of ['AETHERDESK_BASE_URL', 'AETHERDESK_API_URL']) {
+      if (original[k] === undefined) delete process.env[k];
+      else process.env[k] = original[k];
+    }
+  });
+
+  it('prefers AETHERDESK_BASE_URL', () => {
+    process.env.AETHERDESK_BASE_URL = 'http://127.0.0.1:8002/api/v1';
+    process.env.AETHERDESK_API_URL = 'http://elsewhere:9999/api/v1';
+    expect(resolveAetherDeskBaseUrl()).toBe('http://127.0.0.1:8002/api/v1');
+  });
+
+  it('falls back to AETHERDESK_API_URL, the name .env.local actually uses', () => {
+    delete process.env.AETHERDESK_BASE_URL;
+    process.env.AETHERDESK_API_URL = 'http://127.0.0.1:8002/api/v1';
+    expect(resolveAetherDeskBaseUrl()).toBe('http://127.0.0.1:8002/api/v1');
+  });
+
+  it('still resolves when neither var is set', () => {
+    delete process.env.AETHERDESK_BASE_URL;
+    delete process.env.AETHERDESK_API_URL;
+    expect(resolveAetherDeskBaseUrl()).toBe(AETHERDESK_DEFAULT_BASE_URL);
+  });
+});
 
 describe('AETHERDESK_OPERATIONS catalog', () => {
   it('defines all 17 catalog operations', () => {

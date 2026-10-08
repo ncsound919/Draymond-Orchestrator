@@ -247,6 +247,9 @@ const ENTITY_DEFS: EntitySeedDef[] = [
       endpoints: {
         publish: '/api/publish',
       },
+      // ${GL_PUBLISH_KEY} is interpolated by the invoker at call time — no secret
+      // is persisted in the entity row. The lens requires Bearer auth (401 otherwise).
+      headers: { authorization: 'Bearer ${GL_PUBLISH_KEY}' },
     },
     capabilities: ['publishing', 'news_ingest', 'content_syndication'],
     tags: ['publishing', 'news', 'overlay365'],
@@ -554,9 +557,9 @@ const ENTITY_DEFS: EntitySeedDef[] = [
       'Call-center platform — outbound/inbound calls via Fonoster, AI agent orchestration, voice cloning (personal copy), campaigns, transcripts, and call analytics. Used by the fleet for ecosystem outreach calls.',
     invocation_method: 'http_api',
     invocation_config: {
-      url: agentUrl('AETHERDESK_BASE_URL', 'http://127.0.0.1:8000/api/v1'),
+      url: agentUrl('AETHERDESK_BASE_URL', 'http://127.0.0.1:8002/api/v1'),
       method: 'POST',
-      health_url: `${agentUrl('AETHERDESK_BASE_URL', 'http://127.0.0.1:8000/api/v1')}/health`,
+      health_url: `${agentUrl('AETHERDESK_BASE_URL', 'http://127.0.0.1:8002/api/v1')}/health`,
       endpoints: {
         health: '/health',
         list_agents: '/tenants/{tenant_id}/agents',
@@ -625,28 +628,34 @@ const ENTITY_DEFS: EntitySeedDef[] = [
   },
 
   // -- 13. Kaggle -----------------------------------------------------
-  // Data provider — research datasets through the deterministic brain
+  // Data provider — research datasets proxied through Draymond's own /api/ops/kaggle
   {
     name: 'Kaggle',
     slug: 'kaggle',
     kind: 'tool',
     description:
-      'Data provider — pull Kaggle datasets/competitions into research. Downloads datasets as deterministic content-hashed snapshots and feeds them into the knowledge bank via the deterministic brain (localhost:3210 /kaggle/*). Feeds OmniResearch, backtesting, and the retrieval layer.',
+      'Data provider — pull Kaggle datasets/competitions into research. Proxied through Draymond\'s own CRON_SECRET-protected /api/ops/kaggle, which forwards research_feed/download/files to the deterministic brain\'s /kaggle/* routes (the actual implementation). Feeds OmniResearch, backtesting, and the retrieval layer.',
     invocation_method: 'http_api',
     invocation_config: {
-      url: agentUrl('BRAIN_URL', 'http://localhost:3210'),
+      // Internal self-call: loopback, NOT DRAYMOND_PUBLIC_URL — the public
+      // tunnel can be down; the chain must reach Draymond's own proxy locally.
+      url: agentUrl('DRAYMOND_INTERNAL_URL', 'http://localhost:3444'),
       method: 'POST',
-      health_url: `${agentUrl('BRAIN_URL', 'http://localhost:3210')}/kaggle/status`,
+      health_url: `${agentUrl('DRAYMOND_INTERNAL_URL', 'http://localhost:3444')}/api/ops/kaggle/status`,
       endpoints: {
-        status: '/kaggle/status',
-        whoami: '/kaggle/whoami',
-        search: '/kaggle/datasets/search',
-        files: '/kaggle/datasets/files',
-        download: '/kaggle/datasets/download',
-        snapshots: '/kaggle/snapshots',
-        research_feed: '/kaggle/research/feed',
-        research_feeds: '/kaggle/research/feeds',
+        status: { path: '/api/ops/kaggle/status', method: 'GET' },
+        whoami: { path: '/api/ops/kaggle/status', method: 'GET' },
+        search: { path: '/api/ops/kaggle', method: 'POST' },
+        files: { path: '/api/ops/kaggle', method: 'POST' },
+        competitions: { path: '/api/ops/kaggle', method: 'GET' },
+        download: { path: '/api/ops/kaggle', method: 'POST' },
+        snapshots: { path: '/api/ops/kaggle', method: 'GET' },
+        research_feed: { path: '/api/ops/kaggle', method: 'POST' },
+        research_feeds: { path: '/api/ops/kaggle', method: 'GET' },
       },
+      // ${CRON_SECRET} is interpolated by the invoker at call time — no secret
+      // is persisted in the entity row.
+      headers: { authorization: 'Bearer ${CRON_SECRET}' },
     },
     capabilities: [
       'data_provider',
@@ -657,7 +666,7 @@ const ENTITY_DEFS: EntitySeedDef[] = [
     ],
     tags: ['data', 'research', 'datasets', 'kaggle'],
     category: 'research',
-    health_endpoint: '/kaggle/status',
+    health_endpoint: '/api/ops/kaggle/status',
   },
 
   // -- BookBridge service ----------------------------------------------
@@ -1136,28 +1145,6 @@ const CHAIN_TEMPLATES: ChainTemplateDef[] = [
         output_key: 'scheduled',
         step_order: 4,
         depends_on_indices: [1, 2],
-      },
-    ],
-  },
-
-  // -- Chain 3: Sports Betting Daily -----------------------------------
-  {
-    name: 'Sports Betting Daily',
-    slug: 'sports-betting-daily',
-    description:
-      'Daily sports assessment via Sports Steve. Bet Buddy odds calc + Kelly criterion were removed 2026-09-24 (not provisioned).',
-    steps: [
-      {
-        name: 'Daily Assessment',
-        entitySlug: 'sports-steve',
-        action: 'daily_run',
-        input_mapping: {
-          sport: '$.input.sport',
-          date: '$.input.date',
-        },
-        output_key: 'assessment',
-        step_order: 1,
-        depends_on_indices: [],
       },
     ],
   },
@@ -1976,6 +1963,8 @@ const JOB_DEFS: JobSeedDef[] = [
   },
 
   // -- Morning Briefing (9AM daily) ------------------------------------
+  // trading-agents + sports-steve + uplift-agent not provisioned locally —
+  // keep disabled across /api/seed (re-enable when the backends exist).
   {
     name: 'Morning Briefing',
     cron_expression: '0 9 * * *',
@@ -1989,9 +1978,11 @@ const JOB_DEFS: JobSeedDef[] = [
       },
     },
     notify_on_failure: true,
+    is_enabled: false,
   },
 
   // -- Finance (9:30AM weekdays) ---------------------------------------
+  // trading-agents not provisioned locally — keep disabled across /api/seed.
   {
     name: 'Daily Finance Analysis',
     cron_expression: '30 9 * * 1-5',
@@ -2003,6 +1994,7 @@ const JOB_DEFS: JobSeedDef[] = [
       },
     },
     notify_on_failure: true,
+    is_enabled: false,
   },
 
   // -- Night research shift boundary (22:00–06:00) ---------------------
@@ -2020,6 +2012,8 @@ const JOB_DEFS: JobSeedDef[] = [
   // docker status/stop check, not heavy marketing — allowed.)
 
   // -- Marketing (10AM daily) ------------------------------------------
+  // Postiz social backend (:4007) not provisioned locally — the schedule_posts
+  // step can never succeed. Keep disabled across /api/seed.
   {
     name: 'Daily Marketing Run',
     cron_expression: '0 10 * * *',
@@ -2034,22 +2028,6 @@ const JOB_DEFS: JobSeedDef[] = [
         platforms: ['twitter', 'linkedin'],
       },
     },
-  },
-
-  // -- Sports Betting (12PM daily) -------------------------------------
-  {
-    name: 'Sports Betting Daily',
-    cron_expression: '0 12 * * *',
-    job_type: 'chain',
-    job_config: {
-      chain_slug: 'sports-betting-daily',
-      input: {
-        sport: 'nba',
-        bankroll: 1000,
-      },
-    },
-    notify_on_failure: true,
-    // Bet Buddy removed 2026-09-24; the chain is now Sports Steve assessment only.
     is_enabled: false,
   },
 
@@ -2087,6 +2065,8 @@ const JOB_DEFS: JobSeedDef[] = [
   },
 
   // -- Full Content Creation (2PM Mon/Wed/Fri) -------------------------
+  // Postiz social backend (:4007) not provisioned locally — the schedule_posts
+  // step can never succeed. Keep disabled across /api/seed.
   {
     name: 'Full Content Creation',
     cron_expression: '0 14 * * 1,3,5',
@@ -2100,6 +2080,7 @@ const JOB_DEFS: JobSeedDef[] = [
         platforms: ['twitter', 'linkedin', 'instagram'],
       },
     },
+    is_enabled: false,
   },
 
   // -- Hemp Research & News (7AM daily) --------------------------------
@@ -2120,6 +2101,8 @@ const JOB_DEFS: JobSeedDef[] = [
   },
 
   // -- IP Portfolio Grading (9AM Mondays) ------------------------------
+  // Recursive IP service + uplift-agent not provisioned locally — keep
+  // disabled across /api/seed (re-enable when the backends exist).
   {
     name: 'IP Portfolio Grading',
     cron_expression: '0 9 * * 1',
@@ -2132,6 +2115,7 @@ const JOB_DEFS: JobSeedDef[] = [
       },
     },
     notify_on_failure: true,
+    is_enabled: false,
   },
 
   // -- Research Data Pipeline (6AM Wednesdays) -------------------------
@@ -2149,11 +2133,13 @@ const JOB_DEFS: JobSeedDef[] = [
       },
     },
     notify_on_failure: true,
-    // kaggle service not provisioned locally — keep disabled across /api/seed
-    is_enabled: false,
+    is_enabled: true,
   },
 
   // -- Book-Grounded Research + Library Distill (5AM daily) -------------
+  // BookBridge retired 2026-09-27 (replaced by Synthbook) and the distill step
+  // is an unimplemented internal stub — keep disabled across /api/seed until
+  // the chain is repointed at Synthbook :3072.
   {
     name: 'Book-Grounded Research',
     cron_expression: '0 5 * * *',
@@ -2167,6 +2153,7 @@ const JOB_DEFS: JobSeedDef[] = [
       },
     },
     notify_on_failure: true,
+    is_enabled: false,
   },
 
   // -- Brain Wiki sync (daily 3AM) -------------------------------------
@@ -2366,6 +2353,31 @@ const JOB_DEFS: JobSeedDef[] = [
       },
     },
     notify_on_failure: true,
+  },
+
+  // -- Security spine (2026-09-28) --------------------------------------
+  // Scheduled security jobs. Cadence lives in schedule-policy.ts (these
+  // values are just seed defaults and are overlaid idempotently).
+  {
+    name: 'Secret Scan',
+    cron_expression: '15 6 * * 1',
+    job_type: 'custom',
+    job_config: { handler: 'secret_scan' },
+    notify_on_failure: true,
+  },
+  {
+    name: 'Backup Verify',
+    cron_expression: '30 7 * * *',
+    job_type: 'custom',
+    job_config: { handler: 'backup_verify' },
+    notify_on_failure: true,
+  },
+  {
+    name: 'CI Status Poll',
+    cron_expression: '10 * * * *',
+    job_type: 'custom',
+    job_config: { handler: 'ci_status' },
+    notify_on_failure: false,
   },
 ];
 

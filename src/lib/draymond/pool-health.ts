@@ -332,6 +332,16 @@ export function buildLitellmConfig(
   lines.push('# Edit scripts/template instead of this file — it is overwritten each morning.');
   lines.push('model_list:');
 
+  // LOCAL EMBEDDINGS (llama.cpp nomic-embed-text-v1.5 on :11435, started by
+  // C:\\Users\\User\\models\\start-embed.ps1 / the `nomic-embed` pm2 app).
+  // Text-synthesis retrieval depends on this; without it /v1/embeddings 501s.
+  // 768-dim, Apache-2.0, offline/free. Override host via EMBED_API_BASE.
+  lines.push(`  - model_name: nomic-embed`);
+  lines.push(`    litellm_params:`);
+  lines.push(`      model: openai/nomic-embed`);
+  lines.push(`      api_base: ${process.env.EMBED_API_BASE || 'http://127.0.0.1:11435/v1'}`);
+  lines.push(`      api_key: "not-needed"`);
+
   // STABLE EDGE GROUP: `fleet-free` is the one name downstream consumers (DSH
   // harness adapter, hooks) point at. It always maps to the current daily-
   // assigned free model across every entitled account — rotation happens HERE,
@@ -415,11 +425,69 @@ export function buildLitellmConfig(
   lines.push(`      api_key: os.environ/DEEPSEEK_API_KEY`);
   // Terminal fallback: the small LOCAL model (llama.cpp lane, no key). Free →
   // paid → local, per operator decision 2026-09-25.
+  // Google Gemini via the AI Studio free tier (no billing required). KeyWire-first
+  // key (litellm-pool applies GEMINI_API_KEY from the vault). A high-quality free
+  // lane that sits alongside the opencode/ollama-cloud free pools.
+  lines.push(`  - model_name: gemini`);
+  lines.push(`    litellm_params:`);
+  lines.push(`      model: gemini/${process.env.GEMINI_LITELLM_MODEL || 'gemini-2.5-flash'}`);
+  lines.push(`      api_key: os.environ/GEMINI_API_KEY`);
+  // Cloudflare AI Gateway lane — Workers AI routed through the `ecosystem`
+  // gateway, so calls gain gateway analytics, caching, and rate limiting.
+  lines.push(`  - model_name: cf-gateway`);
+  lines.push(`    litellm_params:`);
+  lines.push(`      model: openai/@cf/meta/llama-3.1-8b-instruct-fp8-fast`);
+  // NOTE the trailing /v1: LiteLLM's openai provider appends "/chat/completions"
+  // to api_base, and the AI Gateway Workers-AI route requires the /v1 prefix
+  // (.../ecosystem/workers-ai/v1/chat/completions). Without it the gateway 400s
+  // with "Could not route to /accounts/<id>/ai/chat/completions".
+  lines.push(`      api_base: https://gateway.ai.cloudflare.com/v1/${process.env.CLOUDFLARE_ACCOUNT_ID || ''}/ecosystem/workers-ai/v1`);
+  lines.push(`      api_key: os.environ/CLOUDFLARE_API_TOKEN`);
+  // Gemini embeddings (free tier). output_dimensionality pinned to 768 so the
+  // vectors match the existing stores (Workers AI bge / nomic). Default is 3072.
+  lines.push(`  - model_name: gemini-embed`);
+  lines.push(`    litellm_params:`);
+  lines.push(`      model: gemini/${process.env.GEMINI_EMBED_MODEL || 'gemini-embedding-001'}`);
+  lines.push(`      api_key: os.environ/GEMINI_API_KEY`);
+  lines.push(`      dimensions: ${process.env.GEMINI_EMBED_DIM || '768'}`);
+  // Cloudflare Workers AI — cloud offload of the local CPU model lane.
+  // OpenAI-compatible surface (…/accounts/<id>/ai/v1). `workers-ai` runs chat on
+  // Cloudflare GPUs; `workers-ai-embed` (bge-base-en-v1.5, 768-dim) is the cloud
+  // counterpart of the local nomic-embed lane. Account + key come from the
+  // Keywire-synced data/litellm.env (CLOUDFLARE_ACCOUNT_ID /
+  // CLOUDFLARE_API_TOKEN). Speaks the same OpenAI shape LiteLLM expects.
+  {
+    const cfBase = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID || ''}/ai/v1`;
+    lines.push(`  - model_name: workers-ai`);
+    lines.push(`    litellm_params:`);
+    lines.push(`      model: openai/${process.env.WORKERS_AI_CHAT_MODEL || '@cf/meta/llama-3.1-8b-instruct-fp8-fast'}`);
+    lines.push(`      api_base: ${cfBase}`);
+    lines.push(`      api_key: os.environ/CLOUDFLARE_API_TOKEN`);
+    lines.push(`  - model_name: workers-ai-embed`);
+    lines.push(`    litellm_params:`);
+    lines.push(`      model: openai/${process.env.WORKERS_AI_EMBED_MODEL || '@cf/baai/bge-base-en-v1.5'}`);
+    lines.push(`      api_base: ${cfBase}`);
+    lines.push(`      api_key: os.environ/CLOUDFLARE_API_TOKEN`);
+  }
   lines.push(`  - model_name: local`);
   lines.push(`    litellm_params:`);
-  lines.push(`      model: openai/${process.env.LOCAL_LLM_MODEL || 'minicpm5-fable'}`);
+  lines.push(`      model: openai/${process.env.LOCAL_LLM_MODEL || 'qwen3.5-2b'}`);
   lines.push(`      api_base: ${process.env.LOCAL_LLM_BASE_URL || 'http://127.0.0.1:11434'}/v1`);
   lines.push(`      api_key: "not-needed"`);
+  // On-demand PHONE NODE — a GenieX (Hexagon NPU) lane served by the operator's
+  // Snapdragon phone (05_Apps/GenieX-Node). External OpenAI-compatible origin,
+  // NOT a pm2 app; it appears only while PHONE_NODE_BASE_URL is set, so the lane
+  // vanishes when the phone is offline instead of burning router cooldowns.
+  // Deliberately NOT added to the fallback chains: callers target `phone`
+  // explicitly, so frontier/medical traffic never silently degrades to a 4B model.
+  const phoneBase = process.env.PHONE_NODE_BASE_URL;
+  if (phoneBase) {
+    lines.push(`  - model_name: phone`);
+    lines.push(`    litellm_params:`);
+    lines.push(`      model: openai/${process.env.PHONE_NODE_MODEL || 'phone-node'}`);
+    lines.push(`      api_base: ${phoneBase.replace(/\/$/, '')}/v1`);
+    lines.push(`      api_key: os.environ/PHONE_NODE_KEY`);
+  }
   lines.push('');
   lines.push('router_settings:');
   lines.push('  cooldown_time: 600');
@@ -430,13 +498,17 @@ export function buildLitellmConfig(
   // (direct) → ollama-cloud (Keywire) → openrouter-free. Deepseek must precede
   // ollama-cloud in every chain so free pools fall to the paid direct lane
   // before the Keywire lane.
-  lines.push('    - fleet-free: ["deepseek", "ollama-cloud", "openrouter-free", "local"]');
-  lines.push('    - opencode-free: ["fleet-free", "zen-free", "deepseek", "ollama-cloud", "local"]');
-  lines.push('    - zen-free: ["deepseek", "ollama-cloud", "openrouter-free", "local"]');
-  lines.push('    - deepseek: ["opencode", "ollama-cloud", "local"]');
-  lines.push('    - opencode: ["deepseek", "ollama-cloud", "local"]');
-  lines.push('    - ollama-cloud: ["local"]');
-  lines.push('    - openrouter-free: ["deepseek", "ollama-cloud", "local"]');
+  // workers-ai sits just before local in every chain: cloud (Workers AI) is the
+  // preferred safety net; the CPU-bound local lane is the true last resort.
+  lines.push('    - fleet-free: ["deepseek", "ollama-cloud", "openrouter-free", "gemini", "workers-ai", "local"]');
+  lines.push('    - opencode-free: ["fleet-free", "zen-free", "deepseek", "ollama-cloud", "gemini", "workers-ai", "local"]');
+  lines.push('    - zen-free: ["deepseek", "ollama-cloud", "openrouter-free", "gemini", "workers-ai", "local"]');
+  lines.push('    - deepseek: ["opencode", "ollama-cloud", "gemini", "workers-ai", "local"]');
+  lines.push('    - opencode: ["deepseek", "ollama-cloud", "gemini", "workers-ai", "local"]');
+  lines.push('    - ollama-cloud: ["gemini", "workers-ai", "local"]');
+  lines.push('    - openrouter-free: ["deepseek", "ollama-cloud", "gemini", "workers-ai", "local"]');
+  lines.push('    - gemini: ["workers-ai", "local"]');
+  lines.push('    - workers-ai: ["local"]');
   lines.push('    - local: []');
   lines.push('');
   lines.push('general_settings:');

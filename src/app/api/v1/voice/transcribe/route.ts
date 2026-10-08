@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { authorizeRequest } from '@/lib/draymond/api-auth';
 import { appendAuditLog } from '@/lib/audit';
+import { resolveAetherDeskBaseUrl } from '@/lib/draymond/aetherdesk';
 
 export const dynamic = 'force-dynamic';
 
-const AETHERDESK_BASE_URL =
-  process.env.AETHERDESK_BASE_URL || 'http://127.0.0.1:8000/api/v1';
+const AETHERDESK_BASE_URL = resolveAetherDeskBaseUrl();
 const AETHERDESK_API_KEY = process.env.AETHERDESK_API_KEY || '';
 
 /** Max audio payload in bytes (matches AetherDesk's 25 MB cap). */

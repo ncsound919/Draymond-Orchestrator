@@ -16,13 +16,16 @@ export interface SkillMapFile {
   skills: Record<string, { tier: string; provider: string; model: string }>;
 }
 
+// COLLAPSED 2026-09-28: local tiers all resolve to the one served model
+// (qwen3.5-2b — see ecosystem/local-models.json). The old 5-model local set
+// (the former 5-model specialist set) is gone.
 const TIER_DEFAULTS: Record<string, { provider: string; model: string }> = {
-  fast:   { provider: 'ollama',   model: 'qwen3:0.6b' },
+  fast:   { provider: 'ollama',   model: 'qwen3.5-2b' },
   code:   { provider: 'ox-alpha', model: 'x-preview-f-free' },
-  vision: { provider: 'ollama',   model: 'qwen3.5:4b' },
-  biomed: { provider: 'ollama',   model: 'medgemma:4b' },
-  ocr:    { provider: 'ollama',   model: 'deepseek-ocr:3b' },
-  chem:   { provider: 'ollama',   model: 'txgemma-2b' },
+  vision: { provider: 'ollama',   model: 'qwen3.5-2b' },
+  biomed: { provider: 'ollama',   model: 'qwen3.5-2b' },
+  ocr:    { provider: 'ollama',   model: 'qwen3.5-2b' },
+  chem:   { provider: 'ollama',   model: 'qwen3.5-2b' },
 };
 
 function categorizeSkill(skillId: string): string {

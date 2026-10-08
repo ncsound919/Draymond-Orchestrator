@@ -63,7 +63,7 @@ const TOOL_PROBES: Array<{ slug: string; label: string }> = [
   { slug: 'big-homie', label: 'big-homie' },
   { slug: 'vibeserve', label: 'vibeserve' },
   { slug: 'megacode', label: 'megacode' },
-  { slug: 'opencode', label: 'opencode' },
+  { slug: 'axiom', label: 'axiom' },
 ];
 
 function makeResult(input: Omit<IdeBenchmarkResult, 'ts'>): IdeBenchmarkResult {
@@ -187,7 +187,7 @@ async function benchmarkLandingPage(workspaceRoot: string): Promise<IdeBenchmark
   });
 }
 
-/** Real codegen benchmark: opencode writes a TS module, Codegang scores it. */
+/** Real codegen benchmark: axiom writes a TS module, Codegang scores it. */
 async function benchmarkOpencodeCodegen(workspaceRoot: string): Promise<IdeBenchmarkResult> {
   const started = Date.now();
   const dir = path.join(workspaceRoot, 'codegen');
@@ -203,7 +203,7 @@ async function benchmarkOpencodeCodegen(workspaceRoot: string): Promise<IdeBench
   const { runOpencodeCodegen, extractCodeBlocks } = await import('./opencode-client');
   const r = await runOpencodeCodegen({ prompt, workspace: dir, timeoutMs: 90_000 });
 
-  // opencode's headless server writes files relative to its own cwd, so we
+  // axiom's codegen endpoint writes files relative to our workspace, so we
   // capture the code from the reply and materialize it in the workspace.
   const blocks = r.success ? extractCodeBlocks(r.content, 'ts') : [];
   let score: number | null = null;
@@ -222,11 +222,11 @@ async function benchmarkOpencodeCodegen(workspaceRoot: string): Promise<IdeBench
       analyzeError = 'could not write generated file';
     }
   } else if (r.success) {
-    analyzeError = 'no code block in opencode reply';
+    analyzeError = 'no code block in axiom reply';
   }
 
   return makeResult({
-    tool: 'opencode',
+    tool: 'axiom',
     task: 'codegen',
     success: r.success && generated && score != null,
     duration_ms: Date.now() - started,
@@ -234,8 +234,8 @@ async function benchmarkOpencodeCodegen(workspaceRoot: string): Promise<IdeBench
     files: generated ? 1 : 0,
     error: r.success ? (analyzeError ?? undefined) : r.error,
     detail: r.success
-      ? `opencode generated fib.ts → codegang ${score ?? 'n/a'}/100${analyzeError ? ` (${analyzeError})` : ''}`
-      : `opencode failed: ${r.error ?? 'unknown'}`,
+      ? `axiom generated fib.ts → codegang ${score ?? 'n/a'}/100${analyzeError ? ` (${analyzeError})` : ''}`
+      : `axiom failed: ${r.error ?? 'unknown'}`,
   });
 }
 
@@ -329,7 +329,7 @@ export interface RunIdeBenchmarkOptions {
   workspaceRoot?: string;
   /** Skip the (slow) landing-page finisher build — used by fast tests. */
   skipLandingPage?: boolean;
-  /** Skip the opencode codegen task (spawns a real server) — used by fast tests. */
+  /** Skip the axiom codegen task (spawns a real server) — used by fast tests. */
   skipCodegen?: boolean;
 }
 

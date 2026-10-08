@@ -149,7 +149,6 @@ export const DELEGATION_PLAN: DelegationSpec[] = [
   // -- Sports — daily + events ---------------------------------------------
   { slug: 'sports-steve', label: 'Sports Steve', phase: 'morning', window: { start: '06:00', end: '23:00' }, timeBudgetMs: 600_000, tokenBudgetPerRun: 48_000, tokenBudgetPerDay: 160_000, tier: 'flash', priority: 2, duty: 'shift' },
   { slug: 'editorial_push', label: 'Editorial morning push', phase: 'morning', timeBudgetMs: 300_000, tokenBudgetPerRun: 32_000, tokenBudgetPerDay: 32_000, tier: 'flash', priority: 2, duty: 'shift' },
-  { slug: 'sports-betting-daily', label: 'Sports betting daily', phase: 'morning', timeBudgetMs: 600_000, tokenBudgetPerRun: 64_000, tokenBudgetPerDay: 64_000, tier: 'flash', priority: 2, duty: 'shift' },
 
   // -- Science / research — deep work at night -----------------------------
   { slug: 'omniresearch-pro', label: 'OmniResearch Pro (+ open-notebook)', phase: 'night', window: { start: '20:00', end: '06:00' }, timeBudgetMs: 1_800_000, tokenBudgetPerRun: 120_000, tokenBudgetPerDay: 300_000, tier: 'pro', priority: 2, duty: 'night' },

@@ -41,6 +41,29 @@ export interface FreeCatalogResult {
 const PROBE_TIMEOUT_MS = 10_000;
 const MAX_CANDIDATES = 8;
 
+/** Env names holding opencode Zen pool keys (mirrors llm.ts OPENCODE_KEY_NAMES). */
+const OPENCODE_POOL_NAMES = [
+  'OPENCODE_API_KEY',
+  'OPENCODE_KEY_TAP4500',
+  'OPENCODE_KEY_NCSOUND919',
+  'OPENCODE_KEY_TAP919BEATS',
+  'OPENCODE_KEY_JOHNREDD',
+];
+
+/**
+ * Usable opencode keys: configured values only (same gate as providerConfigured
+ * — length>10 and no 'API_KEY' placeholder). A single dead/rotated key must not
+ * poison the whole sync: catalog fetch + probes walk the pool until one works.
+ */
+function opencodeKeyPool(): string[] {
+  const keys: string[] = [];
+  for (const name of OPENCODE_POOL_NAMES) {
+    const v = process.env[name];
+    if (v && v.length > 10 && !v.includes('API_KEY')) keys.push(v);
+  }
+  return keys;
+}
+
 function registryDir(): string {
   return (
     process.env.DRAYMOND_REGISTRY_DIR ??
@@ -232,14 +255,19 @@ export async function runFreeCatalogSync(
     };
   }
 
-  const opencodeKey = process.env.OPENCODE_API_KEY ?? '';
+  const pool = opencodeKeyPool();
   const openrouterKey = process.env.OPENROUTER_API_KEY ?? '';
 
-  // Collect candidates from both sources
-  const [openrouterIds, opencodeIds] = await Promise.all([
-    openrouterKey ? fetchOpenRouterFree(openrouterKey) : Promise.resolve([]),
-    opencodeKey ? fetchOpenCodeFree(opencodeKey) : Promise.resolve([]),
-  ]);
+  // Collect candidates from both sources. The opencode catalog fetch walks the
+  // key pool — the first key returning a non-empty list wins, so one dead key
+  // cannot poison the sync into a stale assignment.
+  let openrouterIds: string[] = [];
+  if (openrouterKey) openrouterIds = await fetchOpenRouterFree(openrouterKey);
+  let opencodeIds: string[] = [];
+  for (const k of pool) {
+    opencodeIds = await fetchOpenCodeFree(k);
+    if (opencodeIds.length) break;
+  }
 
   // Deduplicate; opencode (current primary) candidates first
   const seen = new Set<string>();
@@ -251,16 +279,32 @@ export async function runFreeCatalogSync(
     if (!seen.has(id)) { seen.add(id); allIds.push({ id, source: 'openrouter' }); }
   }
 
-  // Probe each candidate
+  // Probe each candidate across the key pool. Auth-ish failures (401/403/429)
+  // fall through to the next pool key; a definitive answer (eligible, 400,
+  // empty content, network error) is kept. One dead key can no longer mark a
+  // live model ineligible for the whole fleet.
   const probed: CatalogCandidate[] = await Promise.all(
     allIds.slice(0, MAX_CANDIDATES).map(async ({ id, source }) => {
       const baseURL = source === 'openrouter'
         ? 'https://openrouter.ai/api/v1'
         : 'https://opencode.ai/zen/v1';
-      const apiKey = source === 'openrouter' ? openrouterKey : opencodeKey;
-      const { latencyMs, eligible, reason } = await probeCandidate(id, baseURL, apiKey);
-      const candidate: CatalogCandidate = { id, source, latencyMs, eligible };
-      if (reason) candidate.ineligibleReason = reason;
+      const keys = source === 'openrouter'
+        ? (openrouterKey ? [openrouterKey] : [])
+        : pool;
+      let last: { latencyMs: number; eligible: boolean; reason?: string } = {
+        latencyMs: 0,
+        eligible: false,
+        reason: 'no usable API key in pool',
+      };
+      for (const apiKey of keys) {
+        const r = await probeCandidate(id, baseURL, apiKey);
+        last = r;
+        if (r.eligible) break;
+        const authish = r.reason ? /HTTP 40[13]|HTTP 429/.test(r.reason) : false;
+        if (!authish) break;
+      }
+      const candidate: CatalogCandidate = { id, source, latencyMs: last.latencyMs, eligible: last.eligible };
+      if (last.reason) candidate.ineligibleReason = last.reason;
       return candidate;
     })
   );

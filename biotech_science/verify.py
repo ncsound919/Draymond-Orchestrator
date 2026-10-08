@@ -14,6 +14,9 @@ Draymond's parallel biotech engine. Two deterministic capabilities:
 Evidence tiers:
   E1  - live ChEMBL / ClinicalTrials.gov evidence fetched
   E3  - offline deterministic priors (default)
+  X0  - self-declared internal translation; NO external evidence fetched and NOT
+        a scientific claim. Used by onco_metrics.py (the bbtech vocabulary
+        mapping). X0 exists so an internal mapping can never wear an E1 badge.
 """
 from __future__ import annotations
 
@@ -63,7 +66,11 @@ def bayesian_update(
         "p_d_given_not_h": round(p_d_nh, 4),
         "chembl_active_count": int(chembl_active_count),
         "has_clinical_trials": bool(has_clinical_trials),
-        "evidence_tier": "E1",
+        # This function performs arithmetic on caller-supplied evidence; it
+        # fetches nothing itself. Tier reflects whether REAL evidence counts
+        # were supplied — same convention as line ~106. It previously hardcoded
+        # "E1" unconditionally, asserting fetched evidence that never happened.
+        "evidence_tier": "E1" if (chembl_active_count > 0 or has_clinical_trials) else "E3",
     }
 
 

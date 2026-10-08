@@ -8,7 +8,7 @@
 const AGENTBROWSER_URL = process.env.AGENTBROWSER_URL ?? "http://localhost:3700";
 const AGENTBROWSER_API_KEY = process.env.AGENTBROWSER_API_KEY ?? "";
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+async function post<T>(path: string, body: unknown, timeoutMs = 90_000): Promise<T> {
   const res = await fetch(`${AGENTBROWSER_URL}${path}`, {
     method: "POST",
     headers: {
@@ -16,7 +16,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
       ...(AGENTBROWSER_API_KEY ? { "X-Agent-Auth": AGENTBROWSER_API_KEY } : {}),
     },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(90_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) throw new Error(`AgentBrowser ${path} failed: HTTP ${res.status}`);
   return res.json() as Promise<T>;
@@ -160,6 +160,31 @@ export async function runSiteTests(suite = "all"): Promise<SiteTestReport> {
   });
   if (!res.ok) throw new Error(`AgentBrowser /api/testing failed: HTTP ${res.status}`);
   return res.json() as Promise<SiteTestReport>;
+}
+
+// -- Repo audit (secrets / CI / smoke) via AgentBrowser -----------------------
+
+export interface RepoAuditResponse {
+  ok: boolean;
+  runId: string;
+  secretScan?: { findings: Array<{ ruleId: string; severity: string; file: string; line: number }>; counts: { critical: number; high: number; medium: number; low: number; total: number }; truncated: boolean };
+  ci?: { conclusion: string | null; status: string; runUrl: string | null; reason?: string };
+  smoke?: Array<{ url: string; ok: boolean; status: number | null; detail: string }>;
+  findings: string[];
+}
+
+/** Run AgentBrowser's on-demand repository audit (secrets / CI / smoke). */
+export async function runRepoAudit(input: {
+  owner?: string;
+  repo?: string;
+  sha?: string;
+  branch?: string;
+  projectPath?: string;
+  urls?: string[];
+  scan?: Array<'secrets' | 'ci' | 'smoke'>;
+}): Promise<RepoAuditResponse> {
+  // A full-tree secret scan can exceed the default 90s; give it 5 minutes.
+  return post<RepoAuditResponse>('/api/v1/repo-audit', input, 300_000);
 }
 
 export function agentBrowserUrl(): string {

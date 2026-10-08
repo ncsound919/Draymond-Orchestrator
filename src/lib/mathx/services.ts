@@ -798,7 +798,7 @@ export async function probeMathModels(): Promise<{
 }> {
   const ollamaURL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
   // Speaks /api/tags (Ollama) AND /v1/models (llama.cpp / LM Studio / vLLM), so
-  // a llama-server serving e.g. minicpm5-2b is detected instead of seen as down.
+  // a llama-server serving e.g. qwen3.5-2b is detected instead of seen as down.
   const models = await fetchLocalModels(ollamaURL, 1500);
   return {
     claude: hasKey('anthropic'),

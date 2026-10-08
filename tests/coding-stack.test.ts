@@ -16,8 +16,8 @@ describe('master coding stack', () => {
     }
   });
 
-  it('codegen primary is opencode, uplift-agent is the fallback', () => {
-    expect(getCodingLayer('codegen')?.primary).toBe('opencode');
+  it('codegen primary is axiom, uplift-agent is the fallback', () => {
+    expect(getCodingLayer('codegen')?.primary).toBe('axiom');
     expect(getCodingLayer('codegen')?.fallback).toBe('uplift-agent');
   });
 
@@ -36,7 +36,7 @@ describe('master coding stack', () => {
 
   it('resolveCodingTools orders primary first with no dupes', () => {
     expect(resolveCodingTools('codegen')).toEqual([
-      'opencode',
+      'axiom',
       'uplift-agent',
       'megacode',
       'everything-claude-code',

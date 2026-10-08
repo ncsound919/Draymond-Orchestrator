@@ -338,27 +338,28 @@ const tools: DraymondEntityInsert[] = [
     risk_level_default: 'low',
   },
   {
-    name: 'opencode',
-    slug: 'opencode',
+    name: 'Axiom',
+    slug: 'axiom',
     kind: 'agent',
-    description: 'Headless codegen engine (deepseek-v4-flash 0731). Runs `opencode serve --port 4096`; codegen steps dispatch via `opencode run --attach`. Primary codegen layer in the master coding stack. Exposed as a VibeServe MCP tool (opencode_run / opencode_status).',
-    version: '1.14.23',
-    tags: ['coding', 'codegen', 'agent', 'mcp', 'headless'],
+    description: 'Coding harness + Recourse bridge — replaced the retired `opencode serve` headless codegen engine. Serves an OpenAI-compatible codegen endpoint (POST /v1/chat/completions, route auto|local) and the project-loop repair + stack-verify bridge (/api/recourse/bridge/*, /api/ops/stack-verify). Primary codegen layer in the master coding stack.',
+    version: '1.0.0',
+    tags: ['coding', 'codegen', 'agent', 'recourse', 'headless'],
     category: 'dev-tools',
     sector: 'community',
     invocation_method: 'http_api',
     invocation_config: {
       // URL set at runtime via env — do not hardcode localhost
-      url: 'http://localhost:4096', // OPENCODE_SERVE_PORT
+      url: 'http://localhost:3198', // AXIOM_URL
       method: 'POST',
       timeout_ms: 180000,
       endpoints: {
-        health: { path: '/', method: 'GET' },
+        health: { path: '/api/health', method: 'GET' },
+        chat: { path: '/v1/chat/completions', method: 'POST' },
       },
-      requires_env: ['OPENCODE_SERVE_PORT'],
+      requires_env: ['AXIOM_URL'],
     },
-    capabilities: ['code_completion', 'codegen', 'editing', 'multi-tool-agent'],
-    download_path: 'C:/Users/User/AppData/Roaming/npm/node_modules/opencode-ai',
+    capabilities: ['code_generation', 'code_editing', 'project_repair', 'stack_verify', 'multi-tool-agent'],
+    download_path: '06_Resources/Axiom Agent',
     is_integrated: true,
     risk_level_default: 'low',
   },
@@ -728,7 +729,7 @@ const tools: DraymondEntityInsert[] = [
       requires_env: ['LITELLM_URL'],
     },
     capabilities: ['rag-research', 'document-synthesis', 'intelligence-reports', 'web-search', 'mcp-server', 'analysis', 'generation'],
-    depends_on: [],
+    depends_on: ['kaggle'],
     source_type: 'local',
     download_path: 'agents/omniresearch 2',
     is_integrated: true,
@@ -846,10 +847,12 @@ const tools: DraymondEntityInsert[] = [
     sector: 'learn',
     invocation_method: 'http_api',
     invocation_config: {
-      // Kaggle is proxied through Draymond's own /api/ops/kaggle (the brain's
-      // /kaggle/* routes were never implemented). Status probe = unauthenticated
-      // /api/ops/kaggle/status; full search = authed /api/ops/kaggle.
-      url: process.env.DRAYMOND_PUBLIC_URL || 'http://localhost:3444',
+      // Kaggle is proxied through Draymond's own /api/ops/kaggle. Status/search
+      // are served locally; research_feed/download/files are forwarded to the
+      // deterministic brain's /kaggle/* routes (the real implementation).
+      // Internal self-call: loopback, NOT DRAYMOND_PUBLIC_URL — the public
+      // tunnel can be down, and the chain must reach Draymond's own proxy.
+      url: process.env.DRAYMOND_INTERNAL_URL || 'http://localhost:3444',
       method: 'POST',
       timeout_ms: 120000,
       endpoints: {
@@ -863,6 +866,10 @@ const tools: DraymondEntityInsert[] = [
         research_feed: { path: '/api/ops/kaggle', method: 'POST' },
         research_feeds: { path: '/api/ops/kaggle', method: 'GET' },
       },
+      // Kaggle is proxied through Draymond's own CRON_SECRET-protected
+      // /api/ops/kaggle. The invoker interpolates ${CRON_SECRET} at call time
+      // (no secret is persisted in the entity row), otherwise the step 401s.
+      headers: { authorization: 'Bearer ${CRON_SECRET}' },
       requires_env: ['KAGGLE_API_TOKEN'],
     },
     capabilities: ['data-provider', 'dataset-search', 'dataset-download', 'competition-listing', 'snapshotting', 'research-feed'],
@@ -2140,7 +2147,8 @@ const services: DraymondEntityInsert[] = [
     invocation_config: {
       url: 'http://localhost:3060',
       method: 'POST',
-      health_url: 'http://localhost:3060/api/health',
+      // Native run (ADR-0008): production serves the SPA at "/" — no /api/health.
+      health_url: 'http://localhost:3060/',
       requires_env: ['CUREFORGE_URL', 'GEMINI_API_KEY'],
     },
     capabilities: [
@@ -2151,7 +2159,7 @@ const services: DraymondEntityInsert[] = [
       'monte_carlo_simulation',
       'reproducible_traces',
     ],
-    download_path: '02_Pillars/Overlay Science/Biotech/CureForge',
+    download_path: '02_Pillars/Overlay Science/Overlay Oncology/components/CureForge',
     is_integrated: true,
     risk_level_default: 'low',
   },

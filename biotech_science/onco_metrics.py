@@ -175,5 +175,11 @@ def compute_onco_metrics(
         "four_factors": factors,
         "tumor_gravity": gravity,
         "tumor_flow": flow,
-        "evidence_tier": "E1",
+        # X0 = self-declared internal translation, ZERO external evidence.
+        # This module is a deterministic mapping from the bbtech/sports
+        # vocabulary onto an oncology vocabulary. It fetches nothing and is not
+        # a scientific claim. It was previously stamped "E1", which verify.py
+        # reserves for "live ChEMBL / ClinicalTrials.gov evidence fetched" —
+        # a false lab badge on an invented translation layer (fixed 2026-09-28).
+        "evidence_tier": "X0",
     }

@@ -21,7 +21,7 @@ export type IdePhase =
 export type IdeStepStatus = 'queued' | 'running' | 'waiting' | 'done' | 'failed';
 
 /** Which execution engine handles the step. */
-export type IdeStepAgent = 'uplift' | 'mutly' | 'agent-browser' | 'megacode' | 'big-homie' | 'codegang' | 'opencode';
+export type IdeStepAgent = 'uplift' | 'mutly' | 'agent-browser' | 'megacode' | 'big-homie' | 'codegang' | 'axiom';
 
 /** What kind of work the step performs. */
 export type IdeStepKind =

@@ -2,17 +2,17 @@ import { describe, expect, it, afterAll, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { classifyFailure, assembleCrew, leastAttempted, leadAttemptsFromLog, leadStatsFromLog, bestLeadFromStats, repairFailedJob, repairWeakEntity, renderRepairReport, type RepairReport } from '../src/lib/draymond/repair-team';
+import { classifyFailure, assembleCrew, leastAttempted, leadAttemptsFromLog, leadStatsFromLog, bestLeadFromStats, repairFailedJob, repairWeakEntity, renderRepairReport, normalizeRepairKey, type RepairReport } from '../src/lib/draymond/repair-team';
 
-// Hermetic env: repairFailedJob → recordRepair + recordOutcome write to the
+// Hermetic env: repairFailedJob â†’ recordRepair + recordOutcome write to the
 // file-backed .draymond registry. Without this temp dir, the test fixtures
-// (j1–j4, "X" job) pollute the REAL repair-team-log.json + learning-outcomes.json
+// (j1â€“j4, "X" job) pollute the REAL repair-team-log.json + learning-outcomes.json
 // and poison the self-learning lessons. See tests/metrics.test.ts for the pattern.
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'draymond-repair-team-'));
 process.env.DRAYMOND_REGISTRY_DIR = tmp;
 
-// The codegen dispatch path must never hit a real opencode/uplift process in
-// tests — stub it to a fast, fixed outcome.
+// The codegen dispatch path must never hit a real axiom/uplift process in
+// tests â€” stub it to a fast, fixed outcome.
 vi.mock('../src/lib/draymond/coding-repair', () => ({
   dispatchCodingRepair: vi.fn(async () => ({
     action: 'handed-off',
@@ -37,7 +37,7 @@ describe('repair team', () => {
 
   it('assembles a coding crew for config failures', () => {
     const crew = assembleCrew('chain_config');
-    expect(crew.lead).toBe('opencode');
+    expect(crew.lead).toBe('axiom');
     expect(crew.members).toContain('megacode');
     expect(crew.members).toContain('big-homie');
     expect(crew.members).toContain('reporank');
@@ -112,7 +112,7 @@ describe('repair team', () => {
       jobName: 'Evening Marketing Prep',
       failureKind: 'chain_config',
       error: 'chain job missing job_config.chain_slug',
-      crew: { lead: 'opencode', members: ['big-homie', 'reporank'], reason: 'x' },
+      crew: { lead: 'axiom', members: ['big-homie', 'reporank'], reason: 'x' },
       action: 'fixed',
       detail: 'rewrote job_config: chain -> chain_slug',
       repairedAt: '2026-08-09T00:00:00.000Z',
@@ -124,7 +124,7 @@ describe('repair team', () => {
     expect(text).toContain('Evening Marketing Prep');
     expect(text).toContain('Chain config');
     expect(text).toContain('FIXED');
-    expect(text).toContain('opencode + big-homie, reporank');
+    expect(text).toContain('axiom + big-homie, reporank');
     expect(text).toContain('rewrote job_config: chain -> chain_slug');
   });
 });
@@ -179,12 +179,12 @@ describe('benchmark weakness repair (Benchmark Olympics wiring)', () => {
 
 // Exploration is what turns the repair-Elo loop from inert into real: without a
 // varying lead there is no head-to-head to learn from. These tests pin the
-// safety properties — default is byte-identical, a bogus lead is ignored, and
+// safety properties â€” default is byte-identical, a bogus lead is ignored, and
 // the round-robin is deterministic from the log.
-describe('assembleCrew — lead selection', () => {
+describe('assembleCrew â€” lead selection', () => {
   it('is unchanged by default (stack primary)', () => {
-    expect(assembleCrew('code_error').lead).toBe('opencode');
-    expect(assembleCrew('chain_config').lead).toBe('opencode');
+    expect(assembleCrew('code_error').lead).toBe('axiom');
+    expect(assembleCrew('chain_config').lead).toBe('axiom');
   });
 
   it('honours a preferred lead that is a real coding candidate', () => {
@@ -198,17 +198,17 @@ describe('assembleCrew — lead selection', () => {
     // Axiom's Dev-Brain lanes (keywire/sub-team/...) are services, not coding
     // leads; a mismatch must fall back, not install an engine that cannot fix code.
     const crew = assembleCrew('code_error', { preferredLead: 'keywire' });
-    expect(crew.lead).toBe('opencode');
+    expect(crew.lead).toBe('axiom');
     expect(crew.reason).toContain('stack primary');
   });
 
   it('round-robins to the least-attempted candidate when exploring', () => {
-    // Real codegen candidates: opencode, uplift-agent, megacode,
+    // Real codegen candidates: axiom, uplift-agent, megacode,
     // everything-claude-code, sub-team. Give every one a count so the least is
     // unambiguous rather than an unlisted candidate sitting at zero.
     const crew = assembleCrew('code_error', {
       explore: true,
-      attempts: { opencode: 5, 'uplift-agent': 1, megacode: 3, 'everything-claude-code': 2, 'sub-team': 4 },
+      attempts: { axiom: 5, 'uplift-agent': 1, megacode: 3, 'everything-claude-code': 2, 'sub-team': 4 },
     });
     expect(crew.lead).toBe('uplift-agent');
   });
@@ -217,14 +217,14 @@ describe('assembleCrew — lead selection', () => {
     const crew = assembleCrew('code_error', {
       preferredLead: 'megacode',
       explore: true,
-      attempts: { opencode: 0, 'uplift-agent': 0, megacode: 9 },
+      attempts: { axiom: 0, 'uplift-agent': 0, megacode: 9 },
     });
     expect(crew.lead).toBe('megacode');
   });
 
   it('leaves non-coding kinds untouched by lead options', () => {
     expect(assembleCrew('service_down', { preferredLead: 'megacode', explore: true }).lead).toBe('overlay-auditor');
-    expect(assembleCrew('missing_env', { preferredLead: 'opencode' }).lead).toBe('uplift-agent');
+    expect(assembleCrew('missing_env', { preferredLead: 'axiom' }).lead).toBe('uplift-agent');
     expect(assembleCrew('unknown', { explore: true }).lead).toBe('omniresearch-pro');
   });
 
@@ -236,50 +236,70 @@ describe('assembleCrew — lead selection', () => {
   it('leadAttemptsFromLog counts only the requested kind', () => {
     const attempts = leadAttemptsFromLog(
       [
-        { failureKind: 'code_error', crew: { lead: 'opencode' } },
-        { failureKind: 'code_error', crew: { lead: 'opencode' } },
+        { failureKind: 'code_error', crew: { lead: 'axiom' } },
+        { failureKind: 'code_error', crew: { lead: 'axiom' } },
         { failureKind: 'code_error', crew: { lead: 'uplift-agent' } },
         { failureKind: 'service_down', crew: { lead: 'overlay-auditor' } },
         { failureKind: 'code_error' },
       ],
       'code_error',
     );
-    expect(attempts).toEqual({ opencode: 2, 'uplift-agent': 1 });
+    expect(attempts).toEqual({ axiom: 2, 'uplift-agent': 1 });
   });
 
   it('leadStatsFromLog credits only fixed as a fix (handed-off is an attempt, not a fix)', () => {
     const stats = leadStatsFromLog(
       [
-        { failureKind: 'code_error', crew: { lead: 'opencode' }, action: 'fixed' },
-        { failureKind: 'code_error', crew: { lead: 'opencode' }, action: 'handed-off' },
+        { failureKind: 'code_error', crew: { lead: 'axiom' }, action: 'fixed' },
+        { failureKind: 'code_error', crew: { lead: 'axiom' }, action: 'handed-off' },
         { failureKind: 'code_error', crew: { lead: 'uplift-agent' }, action: 'escalated' },
       ],
       'code_error',
     );
-    expect(stats.attempts).toEqual({ opencode: 2, 'uplift-agent': 1 });
-    expect(stats.fixes).toEqual({ opencode: 1 });
+    expect(stats.attempts).toEqual({ axiom: 2, 'uplift-agent': 1 });
+    expect(stats.fixes).toEqual({ axiom: 1 });
   });
 });
 
-describe('bestLeadFromStats — the exploit half', () => {
-  const candidates = ['opencode', 'uplift-agent', 'megacode', 'everything-claude-code', 'sub-team'];
+describe('bestLeadFromStats â€” the exploit half', () => {
+  const candidates = ['axiom', 'uplift-agent', 'megacode', 'everything-claude-code', 'sub-team'];
 
   it('returns undefined until a challenger is measured', () => {
-    expect(bestLeadFromStats({ attempts: { opencode: 3 }, fixes: { opencode: 2 } }, candidates)).toBeUndefined();
+    expect(bestLeadFromStats({ attempts: { axiom: 3 }, fixes: { axiom: 2 } }, candidates)).toBeUndefined();
   });
 
   it('returns a challenger that measurably beats the primary', () => {
     const stats = {
-      attempts: { opencode: 3, 'uplift-agent': 3 },
-      fixes: { opencode: 0, 'uplift-agent': 3 },
+      attempts: { axiom: 3, 'uplift-agent': 3 },
+      fixes: { axiom: 0, 'uplift-agent': 3 },
     };
     expect(bestLeadFromStats(stats, candidates)).toBe('uplift-agent');
   });
 
   it('returns undefined when the primary is already best or equal', () => {
-    const primaryBest = { attempts: { opencode: 3, 'uplift-agent': 3 }, fixes: { opencode: 3, 'uplift-agent': 1 } };
+    const primaryBest = { attempts: { axiom: 3, 'uplift-agent': 3 }, fixes: { axiom: 3, 'uplift-agent': 1 } };
     expect(bestLeadFromStats(primaryBest, candidates)).toBeUndefined();
-    const equal = { attempts: { opencode: 3, 'uplift-agent': 3 }, fixes: { opencode: 2, 'uplift-agent': 2 } };
+    const equal = { attempts: { axiom: 3, 'uplift-agent': 3 }, fixes: { axiom: 2, 'uplift-agent': 2 } };
     expect(bestLeadFromStats(equal, candidates)).toBeUndefined();
   });
 });
+
+describe('normalizeRepairKey — repair-report dedup collapses run instances', () => {
+  it('collapses a chain run-instance slug and a "Run <ISO>" name to the template', () => {
+    expect(normalizeRepairKey('morning-briefing-run-1786541063864', 'morning-briefing-run-1786541063864'))
+      .toBe('morning-briefing');
+    expect(normalizeRepairKey('c1', 'Morning Briefing \u2014 Run 2026-09-28T03:10:00Z'))
+      .toBe('morning briefing');
+  });
+
+  it('is stable across two different run instances of the same template', () => {
+    expect(normalizeRepairKey('x-run-111', 'Daily Finance Analysis \u2014 Run 2026-09-28T10:00:00Z'))
+      .toBe(normalizeRepairKey('x-run-222', 'Daily Finance Analysis \u2014 Run 2026-09-29T22:00:00Z'));
+  });
+
+  it('leaves an ordinary job name unchanged (lowercased/trimmed)', () => {
+    expect(normalizeRepairKey('job-1', 'Fleet Health Check')).toBe('fleet health check');
+  });
+});
+
+

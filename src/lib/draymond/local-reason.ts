@@ -1,7 +1,7 @@
 // ============================================================================
 // DRAYMOND LOCAL REASONING — free, on-device reasoning for ops
 // ============================================================================
-// Draymond leans on the deterministic brain's LOCAL model (qwen3:0.6b fast
+// Draymond leans on the deterministic brain's LOCAL model (qwen3.5-2b fast
 // tier via the brain's /local/harness/reason) for cheap, zero-token reasoning
 // over ecosystem state: hiccup triage, repair dispatch rationale, and schedule
 // notes. This is strictly best-effort and timeout-safe — every call fails soft

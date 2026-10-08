@@ -200,8 +200,11 @@ export async function runPhase(phase: DayPhase, budgetTokens?: number, opts: { f
   let runSteps = eligible;
   const dropped: string[] = [];
   if (budgetTokens !== undefined && budgetTokens > 0) {
+    // Order against the FULL phase plan (not just the not-yet-consumed steps):
+    // the token cap covers the whole phase, so a budget too small to fit any
+    // step drops the entire phase rather than only the remaining work.
     const ordered = costAwareOrder(
-      eligible.map((s) => ({
+      steps.map((s) => ({
         id: s.id,
         tokens: estimateStepTokens(s),
         costPerToken: 1,

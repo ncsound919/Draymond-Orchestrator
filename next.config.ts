@@ -73,6 +73,10 @@ const nextConfig: NextConfig = {
       './data/**',
       './.next/standalone/**',
       './**/traces.db*',
+      // Transient runtime logs (e.g. agents/**/ab-run.log) are written/rotated
+      // by live processes; if the tracer captures one and it disappears before
+      // the standalone copy, `next build` fails with ENOENT. Exclude all logs.
+      './**/*.log',
     ],
   },
 

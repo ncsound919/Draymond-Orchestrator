@@ -20,6 +20,7 @@
 // ============================================================================
 
 import { seedBasicJobs } from './scheduler';
+import { applySchedulePolicy } from './schedule-policy';
 import { startDownServices, probeService } from './service-manager';
 import { seedAgentMonitors, disableAbsentServiceMonitors } from './monitors';
 import { installFallbackRegistry } from './fallback-registry';
@@ -31,10 +32,9 @@ import { getFallbackCoverage } from './fallbacks';
  * every boot. */
 export const DEFAULT_CORE_SERVICES = [
   'deterministic-brain',
-  'bookbridge',
-  'omni-research',
+  'omniresearch-pro',
   'uplift-agent',
-  'opencode',
+  'axiom',
   'sports-steve',
   'hemp-os',
   'hempforge',
@@ -55,10 +55,9 @@ export const DEFAULT_CORE_SERVICES = [
  */
 export const BOOT_GRAPH: Record<string, { dependsOn: string[] }> = {
   'deterministic-brain': { dependsOn: [] }, // the reasoning engine — always first
-  bookbridge: { dependsOn: [] },
-  'omni-research': { dependsOn: [] },
+  'omniresearch-pro': { dependsOn: [] },
   'uplift-agent': { dependsOn: [] },
-  opencode: { dependsOn: [] },
+  axiom: { dependsOn: [] },
   'sports-steve': { dependsOn: [] },
   'hemp-os': { dependsOn: [] },
   hempforge: { dependsOn: [] },
@@ -158,6 +157,24 @@ export async function bootstrapEcosystem(): Promise<{
     console.warn(`[bootstrap] fallback registry uncovered: ${fbCoverage.uncovered.join(', ')}`);
   }
 
+  // 0. Mirror vault-only chain secrets into the environment (memory-only,
+  // never written to disk). Chain header interpolation (${VAR}) reads
+  // process.env at call time — without this, vault-provisioned credentials
+  // like GL_PUBLISH_KEY expand to empty and fleet calls 401. Env values
+  // already set are never overwritten.
+  try {
+    const { syncVaultSecretsToEnv } = await import('./keywire');
+    const vault = await syncVaultSecretsToEnv();
+    if (vault.synced.length > 0) {
+      console.log(`[bootstrap] vault secrets synced to env: ${vault.synced.join(', ')}`);
+    }
+    if (vault.missing.length > 0) {
+      console.warn(`[bootstrap] vault secrets missing (unconfigured): ${vault.missing.join(', ')}`);
+    }
+  } catch (err) {
+    console.warn('[bootstrap] vault secret sync skipped:', err instanceof Error ? err.message : err);
+  }
+
   // 1. Seed the default cron set so the scheduler has work on first boot.
   let seededJobs = 0;
   try {
@@ -167,6 +184,24 @@ export async function bootstrapEcosystem(): Promise<{
     }
   } catch (err) {
     console.warn('[bootstrap] seedBasicJobs skipped:', err instanceof Error ? err.message : err);
+  }
+
+  // 1a. Apply the ecosystem-aligned schedule policy (idempotent overlay):
+  // which jobs run, how often, and which degraded-tier product lines are held
+  // OFF. Never deletes jobs — tunes is_enabled + cron only. See schedule-policy.ts.
+  try {
+    const policy = await applySchedulePolicy();
+    if (policy.updated.length > 0) {
+      console.log(`[bootstrap] schedule policy applied: ${policy.updated.length} job(s) retuned/disabled`);
+    }
+    if (policy.unknown.length > 0) {
+      console.warn(`[bootstrap] schedule policy drift — enabled jobs with no rule: ${policy.unknown.join(', ')}`);
+    }
+    if (policy.healed.length > 0) {
+      console.log(`[bootstrap] schedule policy healed: ${policy.healed.length} job(s) had no next_run_at — recomputed (${policy.healed.join(', ')})`);
+    }
+  } catch (err) {
+    console.warn('[bootstrap] schedule policy skipped:', err instanceof Error ? err.message : err);
   }
 
   // 1b. Seed site monitors and disable the ones for services not present on

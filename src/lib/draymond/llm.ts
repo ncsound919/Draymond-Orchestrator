@@ -135,7 +135,7 @@ const PROVIDER_ENV: Record<LLMProvider, string> = {
 };
 
 /** Bootstrap default until the Keywire-maintained catalog publishes the list. */
-const DEFAULT_FREE_MODEL = 'muse-spark-1.2-contributor-free';
+const DEFAULT_FREE_MODEL = 'muse-spark-1.3-contributor-free';
 const OPENROUTER_DEFAULT_MODEL = 'nvidia/nemotron-3.5-lightning:free';
 
 const DEFAULT_MODELS: Record<LLMProvider, string> = {
@@ -157,10 +157,10 @@ const DEFAULT_MODELS: Record<LLMProvider, string> = {
   litellm: 'gpt-4o-mini',
   dsh: 'fleet-free',
   // Local tier — an OpenAI-compatible llama.cpp server (`llama-server`) on
-  // OLLAMA_BASE_URL, currently MiniCPM5-1B "Fable" (alias minicpm5-fable).
-  // OLLAMA_MODEL selects the model; the local fast tier is a 1B model, so it is
+  // OLLAMA_BASE_URL, currently Unsloth Qwen3.5-2B (alias qwen3.5-2b).
+  // OLLAMA_MODEL selects the model; the local tier is a 2B model, so it is
   // used for triage/short JSON, not heavy codegen (that goes to Axiom).
-  ollama: process.env.OLLAMA_MODEL ?? 'minicpm5-fable',
+  ollama: process.env.OLLAMA_MODEL ?? 'qwen3.5-2b',
 };
 
 /** Resolution order when no explicit provider is requested. Free + local tiers first, paid last. */
@@ -457,7 +457,7 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
   const model =
     options.model ??
     (provider === 'ollama' && options.images?.length
-      ? process.env.OLLAMA_VISION_MODEL ?? 'qwen3.5:4b'
+      ? process.env.OLLAMA_VISION_MODEL ?? 'qwen3.5-2b'
       : options.reasoning && provider === 'deepseek'
         ? 'deepseek-reasoner'
         : DEFAULT_MODELS[provider]);
@@ -552,8 +552,9 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
               ? { response_format: options.responseFormat }
               : {}),
           ...(options.reasoning ? { reasoning_effort: 'high' } : {}),
-          // llama.cpp hosts a thinking model (MiniCPM5): without this it emits
-          // everything into `reasoning_content` and returns empty `content`.
+          // llama.cpp hosts a hybrid-reasoning model (Qwen3.5-2B): without this
+          // it can emit everything into `reasoning_content` and return empty
+          // `content`. Qwen3.5 Small defaults to non-thinking; pin it anyway.
           ...(provider === 'ollama' ? { chat_template_kwargs: { enable_thinking: false } } : {}),
         }),
         signal: controller.signal,
@@ -575,7 +576,7 @@ async function callProvider(provider: LLMProvider, options: LLMCallOptions): Pro
 
     const choices = data.choices as Array<{ message?: { content?: string; reasoning_content?: string } }>;
     let content = choices?.[0]?.message?.content ?? '';
-    // Reasoning models (llama.cpp MiniCPM) can leave `content` empty and place
+    // Reasoning models (llama.cpp Qwen3.5-2B) can leave `content` empty and place
     // the answer in `reasoning_content` — accept it as a last resort.
     if (!content) content = choices?.[0]?.message?.reasoning_content ?? '';
     // Some opencode/deepseek responses put the answer in `reasoning_content`
@@ -748,7 +749,7 @@ export async function callLLM(options: LLMCallOptions): Promise<string> {
   }
 
   // Vision provider order: fleet policy is local-first (VISION_ROUTING != '0') so
-  // qwen3.5:4b handles screenshots/images without spending cloud tokens.
+  // qwen3.5-2b handles screenshots/images without spending cloud tokens.
   // Set VISION_ROUTING=0 to revert to cloud-first (legacy behaviour).
   const CLOUD_VISION: LLMProvider[] = ['anthropic', 'gemini', 'openai'];
   const visionLocalFirst = process.env.VISION_ROUTING !== '0';
@@ -894,7 +895,7 @@ function isValidJson(text: string): boolean {
 
 /**
  * Small, cheap local-model call for tool-calling / quick classification.
- * Runs qwen3:0.6b via Ollama — near-zero cost, no API keys. Falls back to
+ * Runs qwen3.5-2b via Ollama — near-zero cost, no API keys. Falls back to
  * the normal provider chain when Ollama is unreachable.
  */
 export async function callLocalModel(options: {
@@ -1000,13 +1001,13 @@ async function consultSkillMap(skillId: string): Promise<{ provider: string; mod
 }
 
 /**
- * Route a vision subtask to the local Ollama lane (qwen3.5:4b by default).
+ * Route a vision subtask to the local model lane (qwen3.5-2b by default).
  * Always uses the local lane first; falls back to cloud vision providers when
  * Ollama is unreachable. Results come back as plain text — callers continue
  * on their own primary model after receiving the result (swap-back pattern).
  */
 export async function callVisionSubtask(options: LLMCallOptions & { images: NonNullable<LLMCallOptions['images']> }): Promise<string> {
-  const visionModel = process.env.OLLAMA_VISION_MODEL ?? 'qwen3.5:4b';
+  const visionModel = process.env.OLLAMA_VISION_MODEL ?? 'qwen3.5-2b';
   try {
     const result = await callLLM({
       ...options,

@@ -805,7 +805,21 @@ export async function sendHealthDigest(
 
   const notificationId = (record as NotificationRecord).id;
 
-  // 2. Send the digest email with rich HTML (via S10 dispatcher cascade)
+  // 2. Email the digest ONLY when the operator has opted in. By default the
+  // digest is recorded to the notification centre (in-app) but NOT emailed —
+  // a daily automated email is noise the operator did not ask for.
+  // Re-enable with DRAYMOND_DIGEST_EMAIL=1.
+  if (process.env.DRAYMOND_DIGEST_EMAIL !== '1') {
+    const { data: suppressed } = await supabase
+      .from('draymond_notifications')
+      .update({ status: 'suppressed' })
+      .eq('id', notificationId)
+      .select()
+      .single();
+    return (suppressed ?? record) as NotificationRecord;
+  }
+
+  // Send the digest email with rich HTML (via S10 dispatcher cascade)
   try {
     const html = renderHealthDigestHtml(summary);
 

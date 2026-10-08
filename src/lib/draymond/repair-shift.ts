@@ -125,7 +125,10 @@ export async function runRepairShift(options: RepairShiftOptions = {}): Promise<
   const seen = new Set<string>();
   for (const t of [...weakTargets]
     .sort((a, b) => b.score - a.score)
-    .filter((t) => t.score >= 50)) {
+    // Skip individual chain RUN instances (…-run-<epoch>). There are hundreds
+    // of them and repairing each is pure churn; the template is repaired once
+    // via its scheduler job instead. See repair-team normalizeRepairKey.
+    .filter((t) => t.score >= 50 && !/-run-\d+/i.test(t.slug))) {
     const key = `${t.componentClass}:${t.slug}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -139,7 +142,7 @@ export async function runRepairShift(options: RepairShiftOptions = {}): Promise<
     const { listJobs, updateJob } = await import("./scheduler");
     const { repairFailedJob } = await import("./repair-team");
     const { repairHintsFor } = await import("./learning-repair");
-    const failed = (await listJobs()).filter((j) => j.last_run_status === "failed").slice(0, maxJobs);
+    const failed = (await listJobs()).filter((j) => j.last_run_status === "failed" && j.is_enabled).slice(0, maxJobs);
     for (const job of failed) {
       try {
         const hints = await repairHintsFor(`scheduler:${job.name}`);

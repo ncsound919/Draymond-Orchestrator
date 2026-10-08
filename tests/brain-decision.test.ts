@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/lib/draymond/brain-client', () => ({
   getBrainStatus: vi.fn(async () => null),
@@ -49,8 +49,18 @@ vi.mock('../src/lib/draymond/scheduler', async () => {
 
 import { runBrainDecision } from '../src/lib/draymond/brain-decision';
 
+beforeEach(() => {
+  // Block all network: the live Dev-Brain (a running fleet service) must not
+  // leak into these unit tests. Tests that exercise the client stub fetch
+  // themselves, overriding this default.
+  vi.stubGlobal('fetch', vi.fn(() => {
+    throw new Error('network disabled in tests');
+  }));
+});
+
 afterEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('brain decision engine', () => {

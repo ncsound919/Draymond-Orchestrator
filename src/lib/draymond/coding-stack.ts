@@ -6,8 +6,9 @@
 // repair team, chains, and schedulers never guess which agent to call.
 //
 // Deduplication notes:
-//   codegen   uplift-agent (Hermes fork, 52 tools/244 skills) is primary;
-//             megacode (JetBrains multi-LLM) is the refactor fallback;
+//   codegen   axiom (coding harness: OpenAI-compatible codegen + Recourse
+//             project-loop repair) is primary; uplift-agent (Hermes fork) is the
+//             fallback; megacode (JetBrains multi-LLM) handles refactors;
 //             everything-claude-code owns agent/CLI/skill authoring;
 //             sub-team owns deterministic spec→impl→verify pipelines.
 //   review    reporank (repo-level scoring + remediation) primary, grader
@@ -35,17 +36,17 @@ export const CODING_STACK: CodingLayer[] = [
   {
     id: 'codegen',
     label: 'Code Generation & Editing',
-    primary: 'opencode',
+    primary: 'axiom',
     fallback: 'uplift-agent',
-    tools: ['opencode', 'uplift-agent', 'megacode', 'everything-claude-code', 'sub-team'],
-    description: 'Write and edit code. opencode (deepseek-v4-flash 0731, headless serve) is the primary codegen engine; Uplift Agent (Hermes fork) is the fallback; Megacode handles multi-LLM/JetBrains work; Everything Claude Code owns agent/CLI/skill authoring; Sub-Team runs deterministic spec-to-implementation pipelines.',
+    tools: ['axiom', 'uplift-agent', 'megacode', 'everything-claude-code', 'sub-team'],
+    description: 'Write and edit code. Axiom (:3198, OpenAI-compatible /v1/chat/completions + Recourse project-loop repair) is the primary codegen engine; Uplift Agent (Hermes fork) is the fallback; Megacode handles multi-LLM/JetBrains work; Everything Claude Code owns agent/CLI/skill authoring; Sub-Team runs deterministic spec-to-implementation pipelines.',
   },
   {
     id: 'refactor',
     label: 'Refactoring & Large Edits',
     primary: 'megacode',
-    fallback: 'opencode',
-    tools: ['megacode', 'opencode', 'uplift-agent'],
+    fallback: 'axiom',
+    tools: ['megacode', 'axiom', 'uplift-agent'],
     description: 'Mass/mechanical edits, cross-file refactors, and IDE-driven changes.',
   },
   {

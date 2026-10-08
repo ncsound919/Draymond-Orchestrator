@@ -1,5 +1,5 @@
 /**
- * Quality grading round: local (qwen3:0.6b via hardened callLocalModel) vs
+ * Quality grading round: local (qwen3.5-2b via hardened callLocalModel) vs
  * paid (deepseek fallback). Runs 3 local trials per task to measure output
  * variability, plus one paid reference. Grades raw output for JSON validity
  * and correctness so we can decide which tiers can move local.

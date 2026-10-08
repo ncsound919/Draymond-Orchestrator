@@ -7,10 +7,10 @@
 // to the crew lead for review.
 //
 // Engine chain (never throws, never stalls):
-//   1. opencode (primary codegen engine) — synchronous, applies job_config
-//      patches deterministically when the reply is valid JSON.
+//   1. Axiom (primary codegen engine; `runOpencodeCodegen`) — synchronous,
+//      applies job_config patches deterministically when the reply is valid JSON.
 //   2. Uplift Agent (codegen fallback per the master coding stack) — dispatched
-//      as an async repair task when opencode is unreachable/empty.
+//      as an async repair task when Axiom is unreachable/empty.
 //   3. Deterministic terminal plan — a fixed, templated actionable escalation
 //      so a total engine outage can't leave the pipeline stuck.
 //
@@ -85,14 +85,14 @@ function buildRepairPrompt(
  */
 export function deterministicRepairPlan(job: RepairJobLike, error: string, crew: RepairCrew): string {
   return (
-    `Deterministic fallback — both codegen engines (opencode + uplift-agent) unreachable. ` +
+    `Deterministic fallback — both codegen engines (Axiom + uplift-agent) unreachable. ` +
     `Assign ${crew.lead}${crew.members.length ? ` (+ ${crew.members.join(', ')})` : ''} to patch job "${job.name}": ` +
     `${clip(error, 300)}`
   );
 }
 
 /**
- * Run opencode headless to propose a fix for a failing job. On failure it falls
+ * Run Axiom to propose a fix for a failing job. On failure it falls
  * back to the Uplift Agent (api_call), then to a deterministic plan. Never throws.
  */
 export async function dispatchCodingRepair(
@@ -111,7 +111,7 @@ export async function dispatchCodingRepair(
   const grounding = await recourseGroundingBlock(`repair ${job.name}: ${error.slice(0, 200)}`).catch(() => '');
   const prompt = buildRepairPrompt(job, error, lessonHints, grounding);
 
-  // -- 0. Local model (MiniCPM5-2B via llama.cpp) — free first pass ----------
+  // -- 0. Local model (Qwen3.5-2B via llama.cpp) — free first pass -----------
   // Cheap, on-device, zero token cost. Only trusted for a minimal job_config
   // proposal; anything needing real code reasoning falls through to Axiom.
   if (repairLocalEnabled()) {
@@ -135,7 +135,7 @@ export async function dispatchCodingRepair(
     }
   }
 
-  // -- 1. opencode (primary) ------------------------------------------------
+  // -- 1. Axiom (primary) ---------------------------------------------------
   try {
     const { runOpencodeCodegen } = await import('../ide/opencode-client');
     const result = await runOpencodeCodegen({ prompt, workspace: process.cwd(), timeoutMs: engineTimeout });
@@ -147,26 +147,26 @@ export async function dispatchCodingRepair(
       if (applied.applied) {
         return {
           action: 'fixed',
-          detail: `coding crew (${result.model ?? 'opencode'}) proposed + applied a job_config patch: ${clip(applied.detail, 300)}`,
-          dispatch: { kind: 'codegen', engine: result.model ?? 'opencode', result: content, duration_ms },
+          detail: `coding crew (${result.model ?? 'axiom'}) proposed + applied a job_config patch: ${clip(applied.detail, 300)}`,
+          dispatch: { kind: 'codegen', engine: result.model ?? 'axiom', result: content, duration_ms },
         };
       }
       return {
         action: 'handed-off',
-        detail: `coding crew (${result.model ?? 'opencode'}) proposed a fix — ${clip(applied.detail, 300)}`,
-        dispatch: { kind: 'codegen', engine: result.model ?? 'opencode', result: content, duration_ms },
+        detail: `coding crew (${result.model ?? 'axiom'}) proposed a fix — ${clip(applied.detail, 300)}`,
+        dispatch: { kind: 'codegen', engine: result.model ?? 'axiom', result: content, duration_ms },
       };
     }
-    // Fall through to the Uplift Agent when opencode returns nothing usable.
+    // Fall through to the Uplift Agent when Axiom returns nothing usable.
   } catch {
-    // Fall through to the Uplift Agent when opencode is unreachable.
+    // Fall through to the Uplift Agent when Axiom is unreachable.
   }
 
   // -- 2. Uplift Agent (codegen fallback per the master coding stack) -------
   if (!opts.skipUplift) {
     const uplift = await dispatchUpliftRepair(job, prompt, engineTimeout);
     if (uplift.ok) {
-      const detail = `opencode unavailable — handed repair task ${uplift.taskId} to uplift-agent (fallback)`;
+      const detail = `Axiom unavailable — handed repair task ${uplift.taskId} to uplift-agent (fallback)`;
       return {
         action: 'handed-off',
         detail,
@@ -221,7 +221,7 @@ async function dispatchUpliftRepair(
 /**
  * If the coding crew's reply contains a valid job_config JSON, apply it via the
  * injected updater (the caller passes updateJobConfig through repair-team).
- * This is the "self-healing config" path: opencode fixes the config, Draymond
+ * This is the "self-healing config" path: Axiom fixes the config, Draymond
  * writes it back, the job runs correctly next time.
  */
 async function tryApplyJobConfigPatch(

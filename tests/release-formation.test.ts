@@ -29,7 +29,6 @@ describe('release crew formation', () => {
       'openhub',
       'cheetah',
       'deterministic-brain',
-      'opencode',
     ]) {
       expect(slugs, `missing ${slug}`).toContain(slug);
     }

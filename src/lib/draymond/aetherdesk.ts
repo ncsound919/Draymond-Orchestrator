@@ -3,7 +3,13 @@
 // ============================================================================
 // Registers AetherDesk as a Draymond entity and provides a typed operation
 // catalog plus a REST executor for the AetherDesk Call Center API
-// (http://127.0.0.1:8000/api/v1, auth via x-api-key = INTERNAL_API_KEY).
+// (auth via x-api-key = INTERNAL_API_KEY).
+//
+// URL contract: AETHERDESK_BASE_URL is the API base and MUST end in /api/v1.
+// Every path in AETHERDESK_OPERATIONS is relative to that. Use
+// resolveAetherDeskBaseUrl() rather than reading process.env directly — it
+// tolerates a bare origin, a missing scheme, and the legacy AETHERDESK_API_URL
+// name, so no caller can reintroduce a double-/api/v1 or a wrong port.
 //
 // This module is deliberately free of Supabase/Next imports so the catalog
 // and URL builder are unit-testable in a plain node environment. The only
@@ -13,9 +19,36 @@
 import type { ActionRiskLevel } from './types';
 import { publishResultNotification } from './ntfy';
 
+/** pm2 runs the API on 8002 (fleet-manifest.js). The old 8000 default was never a live port. */
+export const AETHERDESK_DEFAULT_BASE_URL = 'http://127.0.0.1:8002/api/v1';
+
+/**
+ * Normalize an AetherDesk base URL to the single contract: absolute scheme,
+ * no trailing slash, ending in /api/v1. Accepts a bare origin, a full API base,
+ * with or without a scheme, with or without a trailing slash.
+ */
+export function normalizeAetherDeskBaseUrl(raw: string | undefined | null): string {
+  let base = (raw ?? '').trim().replace(/\/+$/, '');
+  if (!base) return AETHERDESK_DEFAULT_BASE_URL;
+  if (!/^https?:\/\//i.test(base)) base = `http://${base}`;
+  if (!/\/api\/v1$/i.test(base)) base = `${base}/api/v1`;
+  return base;
+}
+
+/**
+ * Resolve the configured API base. AETHERDESK_BASE_URL wins; AETHERDESK_API_URL
+ * is accepted as an alias because the Python side (deterministic-brain) has
+ * always used that name and both are set in .env.local.
+ */
+export function resolveAetherDeskBaseUrl(): string {
+  return normalizeAetherDeskBaseUrl(
+    process.env.AETHERDESK_BASE_URL || process.env.AETHERDESK_API_URL || AETHERDESK_DEFAULT_BASE_URL,
+  );
+}
+
 export type AetherDeskOperationDef = {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  /** Path template relative to AETHERDESK_BASE_URL. `{tenant_id}` and `{*_id}` placeholders. */
+  /** Path template relative to the resolved API base. `{tenant_id}` and `{*_id}` placeholders. */
   path: string;
   risk: Exclude<ActionRiskLevel, 'safe'>;
   /** Routes whose tenant_id is a *query* param (verify_tenant_access reads it from the query string). */
@@ -107,14 +140,14 @@ export async function executeAetherDeskOperation(
   input: Record<string, unknown>,
   options?: { tenantId?: string; timeoutMs?: number }
 ): Promise<AetherDeskExecutionResult> {
-  const baseUrl = process.env.AETHERDESK_BASE_URL;
+  const baseUrl = resolveAetherDeskBaseUrl();
   const apiKey = process.env.AETHERDESK_API_KEY;
 
-  if (!baseUrl || !apiKey) {
+  if (!apiKey) {
     return {
       success: false,
       output: {},
-      error: 'AETHERDESK_BASE_URL / AETHERDESK_API_KEY not configured',
+      error: 'AETHERDESK_API_KEY not configured',
     };
   }
 

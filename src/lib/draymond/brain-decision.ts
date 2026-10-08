@@ -317,6 +317,12 @@ export async function runBrainDecision(input: BrainDecisionInput = {}): Promise<
         actions.push({ action: 'repair:job', detail: `${j.name} not found in job table — skip`, ok: false });
         continue;
       }
+      if (!jobRow.is_enabled) {
+        // Disabled = intentional. Never repair it (churns tokens + reports that
+        // can't stick). See repair-team disabled guard.
+        actions.push({ action: 'repair:job', detail: `${j.name} is disabled — repair skipped`, ok: false });
+        continue;
+      }
       const report = await repairFailedJob(
         { id: jobRow.id, name: jobRow.name, job_type: jobRow.job_type, job_config: jobRow.job_config ?? {} },
         String(j.error ?? 'unknown error'),

@@ -351,7 +351,7 @@ export async function routeTask(
   // provider chain fails entirely (e.g. all keys out of balance), fall back to
   // the local model so routing still works.
   const usedLocal = false;
-  // Local is the DEFAULT tier for routing — grading showed qwen3:0.6b
+  // Local is the DEFAULT tier for routing — grading showed qwen3.5-2b
   // classifies intent/entity reliably (3/3) at near-zero cost. The paid chain
   // stays as the fallback when the local route is rejected/unavailable.
   const localResult = await tryLocalRoute(task, startMs, snapshot, userMessage);
